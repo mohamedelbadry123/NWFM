@@ -1,9 +1,8 @@
 namespace NWFM.Shared.Abstractions;
 
-/// <summary>Workflow attribution only; this is not an authenticated identity.</summary>
+/// <summary>Identifies the authenticated user performing workflow actions.</summary>
 public interface IWorkflowActorContext
 {
     Guid ActorId { get; }
     Guid ParticipantId { get; }
-    Guid DefaultActorId { get; }
 }

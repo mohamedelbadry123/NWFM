@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -16,6 +18,7 @@ using Workflow.Application.Queries.ListBusinessCalendars;
 [ApiController]
 [Route("api/workflow/calendars")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageCalendars)]
 public sealed class BusinessCalendarsController : WorkflowControllerBase
 {
     private readonly ISender _sender;

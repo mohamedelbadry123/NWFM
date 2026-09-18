@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -28,6 +30,7 @@ using Workflow.Application.Queries.ListInstanceTimers;
 [ApiController]
 [Route("api/workflow/runtime")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ViewInstances)]
 public sealed class WorkflowRuntimeController : WorkflowControllerBase
 {
     private readonly ISender _sender;

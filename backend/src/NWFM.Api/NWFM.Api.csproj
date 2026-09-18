@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Modules/Auth/Auth.Api/Auth.Api.csproj" />
+    <ProjectReference Include="../Modules/Auth/Auth.Infrastructure/Auth.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Api/Workflow.Api.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Infrastructure/Workflow.Infrastructure.csproj" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />

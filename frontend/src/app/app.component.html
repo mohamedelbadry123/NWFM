@@ -1,13 +1,18 @@
+@if (authStore.isAuthenticated()) {
 <div class="min-h-screen bg-ink-50 text-ink-900">
   <header class="sticky top-0 z-40 border-b border-ink-200 bg-white px-5 py-3 flex flex-wrap items-center gap-5">
     <a routerLink="/org/workflow" class="text-xl font-bold tracking-wide text-primary">NWFM</a>
     <span class="text-sm text-ink-500">{{locale.isRtl() ? 'إدارة سير العمل' : 'Workflow management'}}</span>
     <div class="ms-auto flex flex-wrap items-center gap-4 text-sm">
       <label>{{locale.isRtl() ? 'المؤسسة' : 'Tenant'}} <select class="ms-2 rounded-lg border border-ink-200 px-2 py-1.5" aria-label="Tenant"><option>{{context.tenant()?.name || 'NWFM'}}</option></select></label>
-      <label>{{locale.isRtl() ? 'المشارك' : 'Participant'}} <select class="ms-2 rounded-lg border border-ink-200 px-2 py-1.5" [ngModel]="context.selectedParticipantId()" (ngModelChange)="context.selectParticipant($event)" aria-label="Participant">
-        @for(p of context.participants(); track p.id){<option [value]="p.id">{{locale.isRtl() ? (p.displayNameAr || p.displayName) : p.displayName}}</option>}
-      </select></label>
+      @if (authStore.user(); as user) {
+        <span class="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+          {{ user.userName }}
+        </span>
+      }
       <button class="rounded-lg border border-ink-200 px-3 py-1.5" (click)="locale.setLocale(locale.isRtl() ? 'en' : 'ar')">{{locale.isRtl() ? 'English' : 'العربية'}}</button>
+      <p-button [label]="'auth.logout' | translate" severity="danger" [text]="true" size="small" (onClick)="onLogout()" icon="pi pi-sign-out" />
     </div>
   </header>
   <div class="flex flex-col lg:flex-row">
@@ -21,3 +26,6 @@
   </div>
   <div class="fixed bottom-5 end-5 z-50 space-y-2" aria-live="polite">@for(t of toast.toasts(); track t.id){<div role="status" class="max-w-md rounded-xl border bg-white p-4 shadow-lg" [class.border-red-300]="t.type === 'error'">{{t.message}}<button (click)="toast.dismiss(t.id)" class="ms-4" aria-label="Dismiss">×</button></div>}</div>
 </div>
+} @else {
+  <router-outlet />
+}

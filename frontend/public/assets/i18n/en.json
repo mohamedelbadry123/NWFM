@@ -1898,5 +1898,30 @@
         }
       }
     }
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "subtitle": "Enter your credentials to access the system",
+      "username": "Username",
+      "username_placeholder": "Enter your username",
+      "password": "Password",
+      "password_placeholder": "Enter your password",
+      "submit": "Sign In",
+      "signing_in": "Signing in…",
+      "sso_btn": "Sign in with SSO",
+      "error_invalid": "Invalid username or password.",
+      "error_generic": "Login failed. Please try again."
+    },
+    "logout": "Sign Out",
+    "access_denied": {
+      "title": "Access Denied",
+      "message": "You do not have permission to access this resource.",
+      "back_to_login": "Back to Login"
+    },
+    "sso_callback": {
+      "loading": "Completing sign-in…",
+      "error": "SSO authentication failed. Please try again."
+    }
   }
 }

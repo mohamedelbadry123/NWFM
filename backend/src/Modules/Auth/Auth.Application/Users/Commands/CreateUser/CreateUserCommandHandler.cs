@@ -1,0 +1,36 @@
+using Auth.Application.Common.Interfaces;
+using Auth.Application.Users.Models;
+using MediatR;
+using NWFM.Shared.Results;
+
+namespace Auth.Application.Users.Commands.CreateUser;
+
+public sealed class CreateUserCommandHandler(IUserAccountService userAccountService)
+    : IRequestHandler<CreateUserCommand, Result<UserDetailDto>>
+{
+    public async Task<Result<UserDetailDto>> Handle(CreateUserCommand request, CancellationToken ct)
+    {
+        var createResult = await userAccountService.CreateUserAsync(new NewUserAccount
+        {
+            UserName = request.UserName,
+            Email = request.Email,
+            PhoneNumber = request.PhoneNumber,
+            Password = request.Password,
+            Roles = request.Roles
+        }, ct);
+
+        if (!createResult.IsSuccess)
+            return Result<UserDetailDto>.Failure(createResult.Error);
+
+        var getResult = await userAccountService.GetUserAsync(createResult.Value, ct);
+        if (!getResult.IsSuccess)
+            return Result<UserDetailDto>.Failure(getResult.Error);
+
+        var u = getResult.Value;
+        return Result<UserDetailDto>.Success(new UserDetailDto
+        {
+            Id = u.Id, UserName = u.UserName, Email = u.Email, PhoneNumber = u.PhoneNumber,
+            IsEnabled = u.IsEnabled, TeamId = u.TeamId, Roles = u.Roles
+        });
+    }
+}
