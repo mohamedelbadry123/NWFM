@@ -28,4 +28,17 @@ public sealed class Department : Entity
             throw new DomainException("Department code is required.");
         return new Department(code.Trim(), nameEn.Trim(), nameAr.Trim());
     }
+
+    public void Update(string nameEn, string nameAr)
+    {
+        NameEn = nameEn.Trim();
+        NameAr = nameAr.Trim();
+        SetUpdated(DateTime.UtcNow);
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        SetUpdated(DateTime.UtcNow);
+    }
 }

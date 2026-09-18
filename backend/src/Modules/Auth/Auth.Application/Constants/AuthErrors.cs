@@ -19,4 +19,8 @@ public static class AuthErrors
     public static readonly Error SsoCodeInvalid = new("Auth.SsoCodeInvalid", "Invalid or expired SSO authorization code.");
     public static readonly Error Unauthorized = new("Auth.Unauthorized", "You are not authenticated.");
     public static readonly Error RoleNotFound = new("Auth.RoleNotFound", "Role not found.");
+    public static readonly Error LookupNotFound = new("Auth.LookupNotFound", "Lookup item was not found.");
+    public static readonly Error LookupDuplicate = new("Auth.LookupDuplicate", "A lookup item with this code already exists.");
+    public static readonly Error LookupParentRequired = new("Auth.LookupParentRequired", "A parent code is required for this lookup.");
+    public static Error LookupUnknownType(string type) => new("Auth.LookupUnknownType", $"Unknown lookup type: {type}.");
 }

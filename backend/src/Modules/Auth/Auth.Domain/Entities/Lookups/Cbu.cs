@@ -30,4 +30,18 @@ public sealed class Cbu : Entity
             throw new DomainException("CBU code is required.");
         return new Cbu(code.Trim(), nameEn.Trim(), nameAr.Trim(), clusterCode.Trim());
     }
+
+    public void Update(string nameEn, string nameAr, string clusterCode)
+    {
+        NameEn = nameEn.Trim();
+        NameAr = nameAr.Trim();
+        ClusterCode = clusterCode.Trim();
+        SetUpdated(DateTime.UtcNow);
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        SetUpdated(DateTime.UtcNow);
+    }
 }

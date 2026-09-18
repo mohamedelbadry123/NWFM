@@ -32,4 +32,18 @@ public sealed class Branch : Entity
             throw new DomainException("Branch code is required.");
         return new Branch(code.Trim(), nameEn.Trim(), nameAr.Trim(), cbuCode?.Trim(), branchCode?.Trim());
     }
+
+    public void Update(string nameEn, string nameAr, string? cbuCode)
+    {
+        NameEn = nameEn.Trim();
+        NameAr = nameAr.Trim();
+        CbuCode = cbuCode?.Trim();
+        SetUpdated(DateTime.UtcNow);
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        SetUpdated(DateTime.UtcNow);
+    }
 }
