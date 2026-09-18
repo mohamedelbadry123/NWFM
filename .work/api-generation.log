@@ -1,0 +1,284 @@
+Using OpenAPI specification version: 3.0.4
+Operation '/api/app-context.get' didn't specify an 'operationId'. Assuming 'apiAppContextGet'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Operation '/api/workflow/calendars.get' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsGet'.
+Operation '/api/workflow/calendars.post' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/calendars/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsIdGet'.
+Operation '/api/workflow/calendars/{id}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/calendars/{id}/periods.post' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsIdPeriodsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/calendars/{id}/holidays.post' didn't specify an 'operationId'. Assuming 'apiWorkflowCalendarsIdHolidaysPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/health.get' didn't specify an 'operationId'. Assuming 'healthGet'.
+Operation '/api/workflow/sla-policies.get' didn't specify an 'operationId'. Assuming 'apiWorkflowSlaPoliciesGet'.
+Operation '/api/workflow/sla-policies.post' didn't specify an 'operationId'. Assuming 'apiWorkflowSlaPoliciesPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/sla-policies/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowSlaPoliciesIdGet'.
+Operation '/api/workflow/sla-policies/{id}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowSlaPoliciesIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/actions-catalog.get' didn't specify an 'operationId'. Assuming 'apiWorkflowActionsCatalogGet'.
+Operation '/api/workflow/assignment-groups.get' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsGet'.
+Operation '/api/workflow/assignment-groups.post' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/assignment-groups/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsIdGet'.
+Operation '/api/workflow/assignment-groups/{id}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/assignment-groups/{id}/members.post' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsIdMembersPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/assignment-groups/{id}/members/{participantId}.delete' didn't specify an 'operationId'. Assuming 'apiWorkflowAssignmentGroupsIdMembersParticipantIdDelete'.
+Operation '/api/workflow/definitions/{definitionId}/bindings.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsGet'.
+Operation '/api/workflow/definitions/{definitionId}/bindings.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdGet'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/readiness.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdReadinessGet'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/deactivate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdDeactivatePost'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/activate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdActivatePost'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/organizations/{organizationId}/mappings.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdOrganizationsOrganizationIdMappingsGet'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/organizations/{organizationId}/mappings.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdOrganizationsOrganizationIdMappingsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/organizations/{organizationId}/mappings/{mappingId}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdOrganizationsOrganizationIdMappingsMappingIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/bindings/{bindingId}/organizations/{organizationId}/mappings/{mappingId}.delete' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdBindingsBindingIdOrganizationsOrganizationIdMappingsMappingIdDelete'.
+Operation '/api/workflow/bindings.get' didn't specify an 'operationId'. Assuming 'apiWorkflowBindingsGet'.
+Operation '/api/workflow/bindings/{bindingId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowBindingsBindingIdGet'.
+Operation '/api/workflow/bindings/{bindingId}/simulate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowBindingsBindingIdSimulatePost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/bindings/organizations/{organizationId}/groups.get' didn't specify an 'operationId'. Assuming 'apiWorkflowBindingsOrganizationsOrganizationIdGroupsGet'.
+Operation '/api/workflow/definitions.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsGet'.
+Operation '/api/workflow/definitions.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsIdGet'.
+Operation '/api/workflow/definitions/{id}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{id}/activate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsIdActivatePost'.
+Operation '/api/workflow/definitions/{id}/deactivate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsIdDeactivatePost'.
+Operation '/api/workflow/departments.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDepartmentsGet'.
+Operation '/api/workflow/departments.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDepartmentsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/departments/{id}.put' didn't specify an 'operationId'. Assuming 'apiWorkflowDepartmentsIdPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/departments/{id}/members.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDepartmentsIdMembersPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/departments/{id}/members/{participantId}.delete' didn't specify an 'operationId'. Assuming 'apiWorkflowDepartmentsIdMembersParticipantIdDelete'.
+Operation '/api/workflow/status.get' didn't specify an 'operationId'. Assuming 'apiWorkflowStatusGet'.
+Operation '/api/workflow/incidents.get' didn't specify an 'operationId'. Assuming 'apiWorkflowIncidentsGet'.
+Operation '/api/workflow/incidents/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowIncidentsIdGet'.
+Operation '/api/workflow/incidents/{id}/resolve.post' didn't specify an 'operationId'. Assuming 'apiWorkflowIncidentsIdResolvePost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/incidents/{id}/ignore.post' didn't specify an 'operationId'. Assuming 'apiWorkflowIncidentsIdIgnorePost'.
+Operation '/api/workflow/incidents/by-instance/{instanceId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowIncidentsByInstanceInstanceIdGet'.
+Operation '/api/workflow/integration-messages/inbox/dead-letters.get' didn't specify an 'operationId'. Assuming 'apiWorkflowIntegrationMessagesInboxDeadLettersGet'.
+Operation '/api/workflow/integration-messages/inbox/{messageId}/replay.post' didn't specify an 'operationId'. Assuming 'apiWorkflowIntegrationMessagesInboxMessageIdReplayPost'.
+Operation '/api/workflow/integration-messages/outbox/failed.get' didn't specify an 'operationId'. Assuming 'apiWorkflowIntegrationMessagesOutboxFailedGet'.
+Operation '/api/workflow/integration-messages/outbox/{messageId}/replay.post' didn't specify an 'operationId'. Assuming 'apiWorkflowIntegrationMessagesOutboxMessageIdReplayPost'.
+Operation '/api/workflow/module-catalog.get' didn't specify an 'operationId'. Assuming 'apiWorkflowModuleCatalogGet'.
+Operation '/api/workflow/notifications.get' didn't specify an 'operationId'. Assuming 'apiWorkflowNotificationsGet'.
+Operation '/api/workflow/participants.get' didn't specify an 'operationId'. Assuming 'apiWorkflowParticipantsGet'.
+Operation '/api/workflow/participants.post' didn't specify an 'operationId'. Assuming 'apiWorkflowParticipantsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/participants/{id}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowParticipantsIdGet'.
+Operation '/api/workflow/participants/{id}.delete' didn't specify an 'operationId'. Assuming 'apiWorkflowParticipantsIdDelete'.
+Operation '/api/workflow/requests.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRequestsGet'.
+Operation '/api/workflow/requests/{requestId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRequestsRequestIdGet'.
+Operation '/api/workflow/requests/by-instance/{instanceId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRequestsByInstanceInstanceIdGet'.
+Operation '/api/workflow/runtime/instances.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesGet'.
+Operation '/api/workflow/runtime/instances.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/runtime/instances/{instanceId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/progress.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdProgressGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/live-graph.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdLiveGraphGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/timeline.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdTimelineGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/timers.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdTimersGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/incidents.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdIncidentsGet'.
+Operation '/api/workflow/runtime/business/{moduleKey}/{entityType}/{entityId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeBusinessModuleKeyEntityTypeEntityIdGet'.
+Operation '/api/workflow/runtime/instances/{instanceId}/suspend.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdSuspendPost'.
+Operation '/api/workflow/runtime/instances/{instanceId}/resume.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdResumePost'.
+Operation '/api/workflow/runtime/instances/{instanceId}/cancel.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeInstancesInstanceIdCancelPost'.
+Operation '/api/workflow/runtime/admin/instances.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesGet'.
+Operation '/api/workflow/runtime/admin/instances/{instanceId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesInstanceIdGet'.
+Operation '/api/workflow/runtime/admin/instances/{instanceId}/live-graph.get' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesInstanceIdLiveGraphGet'.
+Operation '/api/workflow/runtime/admin/instances/{instanceId}/suspend.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesInstanceIdSuspendPost'.
+Operation '/api/workflow/runtime/admin/instances/{instanceId}/resume.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesInstanceIdResumePost'.
+Operation '/api/workflow/runtime/admin/instances/{instanceId}/retry.post' didn't specify an 'operationId'. Assuming 'apiWorkflowRuntimeAdminInstancesInstanceIdRetryPost'.
+Operation '/api/workflow/definitions/{definitionId}/versions.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsGet'.
+Operation '/api/workflow/definitions/{definitionId}/versions.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdGet'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/publish-preview.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdPublishPreviewGet'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/xml.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlGet'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/xml.put' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlPut'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/projection.get' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdProjectionGet'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/validate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdValidatePost'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/publish.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdPublishPost'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/clone.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdClonePost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/definitions/{definitionId}/versions/{versionId}/retire.post' didn't specify an 'operationId'. Assuming 'apiWorkflowDefinitionsDefinitionIdVersionsVersionIdRetirePost'.
+Operation '/api/workflow/workload.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkloadGet'.
+Operation '/api/workflow/work-items/my.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsMyGet'.
+Operation '/api/workflow/work-items/available.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsAvailableGet'.
+Operation '/api/workflow/work-items/overdue.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsOverdueGet'.
+Operation '/api/workflow/work-items/group/{groupId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsGroupGroupIdGet'.
+Operation '/api/workflow/work-items/{workItemId}.get' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdGet'.
+Operation '/api/workflow/work-items/{workItemId}/claim.post' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdClaimPost'.
+Operation '/api/workflow/work-items/{workItemId}/release.post' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdReleasePost'.
+Operation '/api/workflow/work-items/{workItemId}/complete.post' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdCompletePost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/work-items/{workItemId}/reassign.post' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdReassignPost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Operation '/api/workflow/work-items/{workItemId}/delegate.post' didn't specify an 'operationId'. Assuming 'apiWorkflowWorkItemsWorkItemIdDelegatePost'.
+Overwriting variant method part '$Json' for media type 'application/json' by media type 'text/json'.
+Overwriting variant method part '$Json' for media type 'text/json' by media type 'application/*+json'.
+Wrote src\app\shared\models\api.ts
+Wrote src\app\shared\models\fn\app-context\api-app-context-get-json.ts
+Wrote src\app\shared\models\fn\app-context\api-app-context-get-plain.ts
+Wrote src\app\shared\models\fn\business-calendars\api-workflow-calendars-get.ts
+Wrote src\app\shared\models\fn\business-calendars\api-workflow-calendars-id-get.ts
+Wrote src\app\shared\models\fn\business-calendars\api-workflow-calendars-id-holidays-post.ts
+Wrote src\app\shared\models\fn\business-calendars\api-workflow-calendars-id-periods-post.ts
+Wrote src\app\shared\models\fn\business-calendars\api-workflow-calendars-id-put.ts
+Wrote src\app\shared\models\fn\nwfm-api\health-get.ts
+Wrote src\app\shared\models\fn\sla-policies\api-workflow-sla-policies-get.ts
+Wrote src\app\shared\models\fn\sla-policies\api-workflow-sla-policies-id-get.ts
+Wrote src\app\shared\models\fn\sla-policies\api-workflow-sla-policies-id-put.ts
+Wrote src\app\shared\models\fn\work-items\api-workflow-work-items-available-get.ts
+Wrote src\app\shared\models\fn\work-items\api-workflow-work-items-overdue-get.ts
+Wrote src\app\shared\models\fn\work-items\api-workflow-work-items-work-item-id-complete-post.ts
+Wrote src\app\shared\models\fn\work-items\api-workflow-work-items-work-item-id-delegate-post.ts
+Wrote src\app\shared\models\fn\work-items\api-workflow-work-items-work-item-id-reassign-post.ts
+Wrote src\app\shared\models\fn\workflow-assignment-groups\api-workflow-assignment-groups-get.ts
+Wrote src\app\shared\models\fn\workflow-bindings\api-workflow-definitions-definition-id-bindings-binding-id-put.ts
+Wrote src\app\shared\models\fn\workflow-bindings\api-workflow-definitions-definition-id-bindings-binding-id-readiness-get.ts
+Wrote src\app\shared\models\fn\workflow-bindings\api-workflow-definitions-definition-id-bindings-get.ts
+Wrote src\app\shared\models\fn\workflow-bindings\api-workflow-definitions-definition-id-bindings-post.ts
+Wrote src\app\shared\models\fn\workflow-bindings-catalog\api-workflow-bindings-binding-id-simulate-post.ts
+Wrote src\app\shared\models\fn\workflow-bindings-catalog\api-workflow-bindings-get.ts
+Wrote src\app\shared\models\fn\workflow-definitions\api-workflow-definitions-get.ts
+Wrote src\app\shared\models\fn\workflow-departments\api-workflow-departments-get.ts
+Wrote src\app\shared\models\fn\workflow-health\api-workflow-status-get.ts
+Wrote src\app\shared\models\fn\workflow-incidents\api-workflow-incidents-by-instance-instance-id-get.ts
+Wrote src\app\shared\models\fn\workflow-incidents\api-workflow-incidents-get.ts
+Wrote src\app\shared\models\fn\workflow-incidents\api-workflow-incidents-id-ignore-post.ts
+Wrote src\app\shared\models\fn\workflow-incidents\api-workflow-incidents-id-resolve-post.ts
+Wrote src\app\shared\models\fn\workflow-integration-messages\api-workflow-integration-messages-inbox-dead-letters-get.ts
+Wrote src\app\shared\models\fn\workflow-integration-messages\api-workflow-integration-messages-inbox-message-id-replay-post.ts
+Wrote src\app\shared\models\fn\workflow-integration-messages\api-workflow-integration-messages-outbox-failed-get.ts
+Wrote src\app\shared\models\fn\workflow-integration-messages\api-workflow-integration-messages-outbox-message-id-replay-post.ts
+Wrote src\app\shared\models\fn\workflow-notifications\api-workflow-notifications-get.ts
+Wrote src\app\shared\models\fn\workflow-participants\api-workflow-participants-get.ts
+Wrote src\app\shared\models\fn\workflow-participants\api-workflow-participants-id-get.ts
+Wrote src\app\shared\models\fn\workflow-requests\api-workflow-requests-by-instance-instance-id-get.ts
+Wrote src\app\shared\models\fn\workflow-requests\api-workflow-requests-get.ts
+Wrote src\app\shared\models\fn\workflow-requests\api-workflow-requests-request-id-get.ts
+Wrote src\app\shared\models\fn\workflow-runtime\api-workflow-runtime-admin-instances-get.ts
+Wrote src\app\shared\models\fn\workflow-runtime\api-workflow-runtime-admin-instances-instance-id-live-graph-get.ts
+Wrote src\app\shared\models\fn\workflow-runtime\api-workflow-runtime-business-module-key-entity-type-entity-id-get.ts
+Wrote src\app\shared\models\fn\workflow-runtime\api-workflow-runtime-instances-get.ts
+Wrote src\app\shared\models\fn\workflow-runtime\api-workflow-runtime-instances-instance-id-live-graph-get.ts
+Wrote src\app\shared\models\fn\workflow-versions\api-workflow-definitions-definition-id-versions-get.ts
+Wrote src\app\shared\models\fn\workflow-versions\api-workflow-definitions-definition-id-versions-version-id-projection-get.ts
+Wrote src\app\shared\models\fn\workflow-versions\api-workflow-definitions-definition-id-versions-version-id-publish-preview-get.ts
+Wrote src\app\shared\models\fn\workflow-workload\api-workflow-workload-get.ts
+Wrote src\app\shared\models\functions.ts
+Wrote src\app\shared\models\models\action-execution-trigger-array.ts
+Wrote src\app\shared\models\models\action-failure-policy-array.ts
+Wrote src\app\shared\models\models\activity-instance-status-array.ts
+Wrote src\app\shared\models\models\activity-type-array.ts
+Wrote src\app\shared\models\models\assignee-type-array.ts
+Wrote src\app\shared\models\models\assignment-strategy-array.ts
+Wrote src\app\shared\models\models\day-of-week-array.ts
+Wrote src\app\shared\models\models\Microsoft\AspNetCore\Mvc\problem-details.ts
+Wrote src\app\shared\models\models\NWFM\Api\Controllers\app-context-dto.ts
+Wrote src\app\shared\models\models\NWFM\Api\Controllers\participant-context-dto.ts
+Wrote src\app\shared\models\models\NWFM\Api\Controllers\tenant-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-business-calendar-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-sla-policy-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-assignment-group-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-binding-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-definition-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-department-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-incident-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-instance-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-integration-inbox-message-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-integration-outbox-message-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-participant-dto.ts
+Wrote src\app\shared\models\models\NWFM\Shared\Results\paginated-result-of-workflow-version-dto.ts
+Wrote src\app\shared\models\models\sla-duration-unit-array.ts
+Wrote src\app\shared\models\models\variable-data-type-array.ts
+Wrote src\app\shared\models\models\work-item-status-array.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\add-calendar-holiday-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\add-calendar-period-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\complete-work-item-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\create-workflow-binding-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\delegate-work-item-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\reassign-work-item-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\register-participant-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\resolve-incident-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\simulate-workflow-binding-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\update-business-calendar-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\update-sla-policy-request.ts
+Wrote src\app\shared\models\models\Workflow\Api\Controllers\update-workflow-binding-request.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-binding-readiness-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-integration-inbox-message-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-integration-outbox-message-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-live-graph-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-live-graph-edge-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-live-graph-node-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-notification-log-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-notification-log-page-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-publish-preview-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-request-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-request-kpi-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-simulation-result-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workflow-simulation-step-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workload-dashboard-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workload-group-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\DTOs\workload-totals-dto.ts
+Wrote src\app\shared\models\models\Workflow\Application\Queries\ListWorkflowRequests\workflow-request-page-dto.ts
+Wrote src\app\shared\models\models\Workflow\Domain\Enums\workflow-notification-log-status.ts
+Wrote src\app\shared\models\models\workflow-binding-mode-array.ts
+Wrote src\app\shared\models\models\workflow-event-type-array.ts
+Wrote src\app\shared\models\models\workflow-execution-policy-array.ts
+Wrote src\app\shared\models\models\workflow-incident-severity-array.ts
+Wrote src\app\shared\models\models\workflow-incident-status-array.ts
+Wrote src\app\shared\models\models\workflow-incident-type-array.ts
+Wrote src\app\shared\models\models\workflow-instance-status-array.ts
+Wrote src\app\shared\models\models\workflow-notification-log-status-array.ts
+Wrote src\app\shared\models\models\workflow-timer-status-array.ts
+Wrote src\app\shared\models\models\workflow-timer-type-array.ts
+Wrote src\app\shared\models\models\workflow-validation-status-array.ts
+Wrote src\app\shared\models\models\workflow-version-policy-array.ts
+Wrote src\app\shared\models\models\workflow-version-status-array.ts
+Wrote src\app\shared\models\models.ts
+Generation from http://localhost:5080/swagger/v1/swagger.json finished with 119 models and 21 services.

@@ -1,0 +1,45 @@
+- Generating browser application bundles (phase: setup)...
+√ Browser application bundle generation complete.
+16 09 2026 20:18:45.519:INFO [karma-server]: Karma v6.4.4 server started at http://localhost:9876/
+16 09 2026 20:18:45.520:INFO [launcher]: Launching browsers ChromeHeadless with concurrency unlimited
+16 09 2026 20:18:45.569:INFO [launcher]: Starting browser ChromeHeadless
+16 09 2026 20:18:47.060:INFO [Chrome Headless 152.0.0.0 (Windows 10)]: Connected on socket 3-3oUynV9CeF6g0nAAAB with id 38845985
+Chrome Headless 152.0.0.0 (Windows 10): Executed 0 of 35[32m SUCCESS[39m (0 secs / 0 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 1 of 35[32m SUCCESS[39m (0 secs / 0.002 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 2 of 35[32m SUCCESS[39m (0 secs / 0.002 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 3 of 35[32m SUCCESS[39m (0 secs / 0.003 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 4 of 35[32m SUCCESS[39m (0 secs / 0.003 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 5 of 35[32m SUCCESS[39m (0 secs / 0.245 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 6 of 35[32m SUCCESS[39m (0 secs / 0.257 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 7 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 8 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 9 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 10 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 11 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 12 of 35[32m SUCCESS[39m (0 secs / 0.258 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 13 of 35[32m SUCCESS[39m (0 secs / 0.315 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 14 of 35[32m SUCCESS[39m (0 secs / 0.315 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 15 of 35[32m SUCCESS[39m (0 secs / 0.315 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 16 of 35[32m SUCCESS[39m (0 secs / 0.315 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 17 of 35[32m SUCCESS[39m (0 secs / 0.315 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 18 of 35[32m SUCCESS[39m (0 secs / 0.332 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 19 of 35[32m SUCCESS[39m (0 secs / 0.332 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 20 of 35[32m SUCCESS[39m (0 secs / 0.332 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 21 of 35[32m SUCCESS[39m (0 secs / 0.332 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 22 of 35[32m SUCCESS[39m (0 secs / 0.332 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 23 of 35[32m SUCCESS[39m (0 secs / 0.333 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 24 of 35[32m SUCCESS[39m (0 secs / 0.333 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 25 of 35[32m SUCCESS[39m (0 secs / 0.333 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 26 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 27 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 28 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 29 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 30 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 31 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 32 of 35[32m SUCCESS[39m (0 secs / 0.334 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 33 of 35[32m SUCCESS[39m (0 secs / 0.335 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 34 of 35[32m SUCCESS[39m (0 secs / 0.335 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 35 of 35[32m SUCCESS[39m (0 secs / 0.335 secs)
+[1A[2KChrome Headless 152.0.0.0 (Windows 10): Executed 35 of 35[32m SUCCESS[39m (0.347 secs / 0.335 secs)
+[32mTOTAL: 35 SUCCESS[39m
+√ Browser application bundle generation complete.

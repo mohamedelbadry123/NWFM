@@ -1,0 +1,10 @@
+  NWFM.Shared -> D:\Work\NWFM\backend\src\NWFM.Shared\bin\Debug\net10.0\NWFM.Shared.dll
+  Workflow.Domain -> D:\Work\NWFM\backend\src\Modules\Workflow\Workflow.Domain\bin\Debug\net10.0\Workflow.Domain.dll
+  Workflow.Application -> D:\Work\NWFM\backend\src\Modules\Workflow\Workflow.Application\bin\Debug\net10.0\Workflow.Application.dll
+  Workflow.Api -> D:\Work\NWFM\backend\src\Modules\Workflow\Workflow.Api\bin\Debug\net10.0\Workflow.Api.dll
+  Workflow.Infrastructure -> D:\Work\NWFM\backend\src\Modules\Workflow\Workflow.Infrastructure\bin\Debug\net10.0\Workflow.Infrastructure.dll
+  NWFM.Tests -> D:\Work\NWFM\backend\tests\NWFM.Tests\bin\Debug\net10.0\NWFM.Tests.dll
+Test run for D:\Work\NWFM\backend\tests\NWFM.Tests\bin\Debug\net10.0\NWFM.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:   217, Skipped:     0, Total:   217, Duration: 1 s - NWFM.Tests.dll (net10.0)

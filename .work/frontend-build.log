@@ -1,0 +1,39 @@
+> Building...
+√ Building...
+Initial chunk files | Names                                |  Raw size
+chunk-6HIUKJOK.js   | -                                    |   1.38 MB | 
+chunk-DLHPAZ2M.js   | -                                    | 152.80 kB | 
+polyfills.js        | polyfills                            |  89.70 kB | 
+styles.css          | styles                               |  76.42 kB | 
+chunk-YNSYVV76.js   | -                                    |  36.83 kB | 
+main.js             | main                                 |  21.61 kB | 
+chunk-QXNIO5WZ.js   | -                                    |   2.66 kB | 
+chunk-WDMUDEB6.js   | -                                    |   1.93 kB | 
+chunk-EY2PQVKH.js   | -                                    |   1.47 kB | 
+chunk-3WCCYJP7.js   | -                                    |   1.41 kB | 
+chunk-R4UAQOKJ.js   | -                                    | 982 bytes | 
+
+                    | Initial total                        |   1.77 MB
+
+Lazy chunk files    | Names                                |  Raw size
+chunk-QM2HK35E.js   | -                                    |   1.23 MB | 
+chunk-6FSPAIUP.js   | workflow-designer-component          | 689.10 kB | 
+chunk-RKC5Z56D.js   | workflow-binding-wizard-component    | 128.59 kB | 
+chunk-PMNJKYWC.js   | workflow-binding-detail-component    |  89.78 kB | 
+chunk-G6TPN36M.js   | workflow-assignment-groups-component |  76.77 kB | 
+chunk-3EIFVVKN.js   | workflow-definitions-component       |  75.62 kB | 
+chunk-AI2CYAPP.js   | workflow-task-detail-component       |  74.44 kB | 
+chunk-URSAOT5W.js   | workflow-help-center-component       |  73.69 kB | 
+chunk-ABNHO22Z.js   | workflow-versions-component          |  67.77 kB | 
+chunk-77KDVLDI.js   | workflow-departments-component       |  61.05 kB | 
+chunk-2U7PBI7B.js   | workflow-tasks-component             |  51.12 kB | 
+chunk-GUUAYUPS.js   | workflow-requests-component          |  48.14 kB | 
+chunk-7RJGVQBF.js   | -                                    |  41.61 kB | 
+chunk-6NXHMYPF.js   | workflow-participants-component      |  40.48 kB | 
+chunk-EGWMRH52.js   | workflow-request-progress-component  |  39.47 kB | 
+...and 41 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [19.906 seconds] - 2026-09-16T17:04:13.784Z
+
+Output location: D:\Work\NWFM\frontend\dist\frontend
+

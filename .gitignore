@@ -21,7 +21,8 @@
 
 # ---- Logs & temp ----
 *.log
-.work/
+!.work/*.log
+.work/dotnet/
 *.tmp
 *.bak
 
