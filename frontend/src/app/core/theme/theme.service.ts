@@ -1,23 +1,35 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 
-const THEME_KEY = 'privora_theme';
+const THEME_STORAGE_KEY = 'nwfm.theme';
+const LEGACY_THEME_KEY = 'privora_theme';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly _isDark = signal<boolean>(
-    localStorage.getItem(THEME_KEY) === 'dark'
-  );
+  private readonly _isDark = signal(false);
 
+  /** Workflow designer and other existing pages call `theme.isDark()`. */
   readonly isDark = this._isDark.asReadonly();
+  readonly mode = computed(() => this._isDark() ? 'dark' : 'light');
 
   constructor() {
-    document.documentElement.classList.toggle('dark', this._isDark());
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    const fromLegacy = localStorage.getItem(LEGACY_THEME_KEY);
+    const dark = stored === 'dark' || (stored !== 'light' && fromLegacy === 'dark');
+    this.apply(dark);
   }
 
   toggle(): void {
-    const dark = !this._isDark();
+    this.apply(!this._isDark());
+  }
+
+  private apply(dark: boolean): void {
     this._isDark.set(dark);
+    localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    if (dark) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
   }
 }

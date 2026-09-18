@@ -1,37 +1,61 @@
-import { Component, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { ButtonModule } from 'primeng/button';
+import { AuthService } from '../../../core/auth/auth.service';
+
+const KNOWN_REASONS = [
+  'notProvisioned',
+  'inactive',
+  'noScope',
+  'crewAccount',
+  'exchangeFailed',
+  'noNameId',
+] as const;
+
+type DenialReason = (typeof KNOWN_REASONS)[number] | 'unknown';
 
 @Component({
   selector: 'app-access-denied',
   standalone: true,
-  imports: [TranslateModule, ButtonModule, RouterLink],
-  template: `
-    <div class="flex min-h-screen items-center justify-center bg-ink-50 px-4">
-      <div class="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-8 text-center shadow-lg">
-        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger-50">
-          <svg class="h-8 w-8 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-          </svg>
-        </div>
-        <h1 class="text-xl font-bold text-ink-900">{{ 'auth.access_denied.title' | translate }}</h1>
-        <p class="mt-2 text-sm text-ink-500">
-          @if (reason) {
-            {{ reason }}
-          } @else {
-            {{ 'auth.access_denied.message' | translate }}
-          }
-        </p>
-        <div class="mt-6">
-          <p-button [label]="'auth.access_denied.back_to_login' | translate"
-            routerLink="/login" severity="secondary" />
-        </div>
-      </div>
-    </div>
-  `
+  imports: [TranslateModule, ButtonModule],
+  templateUrl: './access-denied.component.html',
+  styleUrl: './access-denied.component.scss',
 })
 export class AccessDeniedComponent {
   private readonly route = inject(ActivatedRoute);
-  readonly reason = this.route.snapshot.queryParamMap.get('reason');
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+
+  protected readonly retrying = signal(false);
+  protected readonly username = this.route.snapshot.queryParamMap.get('username');
+
+  protected readonly reason = computed<DenialReason>(() => {
+    const raw = this.route.snapshot.queryParamMap.get('reason');
+    return KNOWN_REASONS.includes(raw as (typeof KNOWN_REASONS)[number])
+      ? (raw as DenialReason)
+      : 'unknown';
+  });
+
+  protected readonly messageKey = computed(() => `auth.sso.denied.${this.reason()}`);
+
+  protected retry(): void {
+    if (this.retrying()) return;
+    this.retrying.set(true);
+
+    this.auth.getSsoStatus().subscribe({
+      next: (res) => {
+        if (res.isSuccess && res.value.enabled) {
+          window.location.href = '/api/v1/auth/sso/redirect';
+          return;
+        }
+        this.retrying.set(false);
+        void this.router.navigate(['/login']);
+      },
+      error: () => {
+        this.retrying.set(false);
+        void this.router.navigate(['/login']);
+      },
+    });
+  }
 }

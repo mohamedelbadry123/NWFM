@@ -17,6 +17,7 @@ export class AuthStore {
   readonly isAuthenticated = computed(() => !!this._accessToken());
   readonly permissions = computed(() => this._user()?.permissions ?? []);
   readonly roles = computed(() => this._user()?.roles ?? []);
+  readonly userName = computed(() => this._user()?.userName ?? null);
 
   setSession(response: AuthTokenResponse): void {
     if (!response.isSuccess || !response.value) return;

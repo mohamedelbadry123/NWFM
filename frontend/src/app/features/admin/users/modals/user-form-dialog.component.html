@@ -1,0 +1,32 @@
+<p-dialog [(visible)]="visible" [header]="(isEdit() ? 'users.editUser' : 'users.newUser') | translate"
+  [modal]="true" [style]="{ width: '32rem' }">
+  <form [formGroup]="form" class="flex flex-col gap-3">
+    <div class="flex flex-col gap-1">
+      <label>{{ 'users.userName' | translate }}</label>
+      <input pInputText formControlName="userName" />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label>{{ 'users.email' | translate }}</label>
+      <input pInputText formControlName="email" />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label>{{ 'users.phoneNumber' | translate }}</label>
+      <input pInputText formControlName="phoneNumber" />
+    </div>
+    @if (!isEdit()) {
+      <div class="flex flex-col gap-1">
+        <label>{{ 'users.password' | translate }}</label>
+        <p-password formControlName="password" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" />
+      </div>
+    }
+    <div class="flex flex-col gap-1">
+      <label>{{ 'users.roles' | translate }}</label>
+      <p-multiselect formControlName="roles" [options]="roles()" optionLabel="label" optionValue="value"
+        appendTo="body" styleClass="w-full" />
+    </div>
+  </form>
+  <ng-template pTemplate="footer">
+    <p-button [label]="'common.cancel' | translate" severity="secondary" [text]="true" (onClick)="visible.set(false)" />
+    <p-button [label]="'common.save' | translate" [loading]="saving()" (onClick)="save()" />
+  </ng-template>
+</p-dialog>

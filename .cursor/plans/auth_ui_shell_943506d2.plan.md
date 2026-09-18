@@ -4,25 +4,25 @@ overview: Port the full reference site chrome (layout, colors, sidebar, topbar, 
 todos:
   - id: shell
     content: Port the full reference site chrome (layout SCSS, water/teal tokens, PrimeNG WaterPreset, theme toggle, sidebar/topbar) and regroup workflow links into collapsible groups with no permission filters
-    status: pending
+    status: completed
   - id: app-context
     content: Fix AppContextService for { tenantId } so the error banner no longer hides the app
-    status: pending
+    status: completed
   - id: login
     content: Restyle login/SSO/access-denied to match the reference split hero layout; preserve returnUrl in authGuard
-    status: pending
+    status: completed
   - id: lookups-api
     content: Add lookup create/update/set-active commands and LookupsController write endpoints for the five LKP entities
-    status: pending
+    status: completed
   - id: lookups-ui
     content: Build 5-tab PrimeNG lookups page (search, table, dialogs) and guard with ManageLookups
-    status: pending
+    status: completed
   - id: users-roles
     content: Port users and role-permissions pages; permissionGuard + *hasPermission on those pages only
-    status: pending
+    status: completed
   - id: i18n
     content: Add nav/auth/lookups/users/role-permission keys to en.json and ar.json
-    status: pending
+    status: completed
 isProject: false
 ---
 

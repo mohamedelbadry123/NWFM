@@ -5,7 +5,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideTranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 import { providePrimeNG } from 'primeng/config';
-import Aura from '@primeng/themes/aura';
+import { WaterPreset } from './core/theme/water-preset';
 import { routes } from './app.routes';
 import { provideApiConfiguration } from './shared/models/api-configuration';
 import { provideLocaleInitializer } from './core/i18n/locale.initializer';
@@ -22,7 +22,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     providePrimeNG({
       theme: {
-        preset: Aura,
+        preset: WaterPreset,
         options: { darkModeSelector: '.dark' }
       }
     }),

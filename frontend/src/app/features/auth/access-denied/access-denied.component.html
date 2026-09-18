@@ -1,0 +1,20 @@
+<div class="denied-page">
+  <div class="denied-card">
+    <span class="denied-icon"><i class="pi pi-lock"></i></span>
+    <h1>{{ 'auth.sso.denied.title' | translate }}</h1>
+    <p class="denied-message">{{ messageKey() | translate }}</p>
+    @if (username) {
+      <p class="denied-account">
+        {{ 'auth.sso.denied.account' | translate }}
+        <strong>{{ username }}</strong>
+      </p>
+    }
+    <p-button
+      (onClick)="retry()"
+      [label]="'auth.sso.denied.tryAgain' | translate"
+      [loading]="retrying()"
+      [disabled]="retrying()"
+      styleClass="w-full"
+    />
+  </div>
+</div>

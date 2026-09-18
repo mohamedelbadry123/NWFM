@@ -1,126 +1,138 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { NgClass } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
-import { InputTextModule } from 'primeng/inputtext';
-import { PasswordModule } from 'primeng/password';
+import { InputText } from 'primeng/inputtext';
+import { Password } from 'primeng/password';
+import { Checkbox } from 'primeng/checkbox';
 import { ButtonModule } from 'primeng/button';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import { MessageModule } from 'primeng/message';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthStore } from '../../../core/auth/auth.store';
-import { finalize } from 'rxjs';
+import { AppContextService } from '../../../core/context/app-context.service';
+import { LocaleService } from '../../../core/i18n/locale.service';
+import { SsoStatus } from '../../../core/auth/auth.model';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, TranslateModule, InputTextModule, PasswordModule, ButtonModule, MessageModule],
-  template: `
-    <div class="flex min-h-screen items-center justify-center bg-ink-50 px-4">
-      <div class="w-full max-w-md rounded-2xl border border-ink-200 bg-white p-8 shadow-lg">
-        <div class="mb-6 text-center">
-          <h1 class="text-2xl font-bold text-primary">NWFM</h1>
-          <h2 class="mt-2 text-xl font-semibold text-ink-900">{{ 'auth.login.title' | translate }}</h2>
-          <p class="mt-1 text-sm text-ink-500">{{ 'auth.login.subtitle' | translate }}</p>
-        </div>
-
-        @if (errorMessage()) {
-          <p-message severity="error" [text]="errorMessage()!" styleClass="mb-4 w-full" />
-        }
-
-        <form (ngSubmit)="onLogin()" class="space-y-5">
-          <div>
-            <label for="username" class="prv-label">{{ 'auth.login.username' | translate }}</label>
-            <input pInputText id="username" [(ngModel)]="userName" name="userName"
-              [placeholder]="'auth.login.username_placeholder' | translate"
-              class="w-full" autocomplete="username" />
-          </div>
-
-          <div>
-            <label for="password" class="prv-label">{{ 'auth.login.password' | translate }}</label>
-            <p-password id="password" [(ngModel)]="password" name="password"
-              [placeholder]="'auth.login.password_placeholder' | translate"
-              [feedback]="false" [toggleMask]="true"
-              styleClass="w-full" inputStyleClass="w-full" />
-          </div>
-
-          <p-button type="submit" [label]="loading() ? ('auth.login.signing_in' | translate) : ('auth.login.submit' | translate)"
-            [loading]="loading()" [disabled]="loading() || !userName || !password"
-            styleClass="w-full" />
-        </form>
-
-        @if (ssoEnabled()) {
-          <div class="mt-4">
-            <div class="my-4 flex items-center gap-3">
-              <div class="h-px flex-1 bg-ink-200"></div>
-              <span class="text-xs text-ink-400">OR</span>
-              <div class="h-px flex-1 bg-ink-200"></div>
-            </div>
-            <p-button [label]="'auth.login.sso_btn' | translate" severity="secondary"
-              styleClass="w-full" (onClick)="onSsoLogin()" [disabled]="loading()" />
-          </div>
-        }
-      </div>
-    </div>
-  `
+  imports: [
+    ReactiveFormsModule,
+    NgClass,
+    TranslateModule,
+    InputText,
+    Password,
+    Checkbox,
+    ButtonModule,
+    ProgressSpinner,
+    MessageModule,
+  ],
+  templateUrl: './login.component.html',
+  styleUrl: './login.component.scss',
 })
 export class LoginComponent implements OnInit {
-  private readonly authService = inject(AuthService);
-  private readonly authStore = inject(AuthStore);
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  private readonly store = inject(AuthStore);
+  private readonly appContext = inject(AppContextService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  protected readonly locale = inject(LocaleService);
 
-  userName = '';
-  password = '';
-  readonly loading = signal(false);
-  readonly errorMessage = signal<string | null>(null);
-  readonly ssoEnabled = signal(false);
+  protected readonly submitting = signal(false);
+  protected readonly redirecting = signal(false);
+  protected readonly errorMessage = signal<string | null>(null);
+  private readonly ssoStatus = signal<SsoStatus>({ enabled: false, allowLocalLoginForAdministrators: true });
+
+  private readonly returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+  private readonly localRequested = this.route.snapshot.queryParamMap.get('local') === '1';
+
+  protected readonly ssoEnabled = computed(() => this.ssoStatus().enabled);
+  protected readonly credentialsFormVisible = signal(this.localRequested);
+  protected readonly showCredentialsForm = computed(
+    () => !this.ssoEnabled() || this.credentialsFormVisible(),
+  );
+  protected readonly localLoginOffered = computed(
+    () => !this.ssoEnabled() || this.ssoStatus().allowLocalLoginForAdministrators,
+  );
+  protected readonly handingOver = signal(false);
+
+  protected readonly form = this.fb.nonNullable.group({
+    userName: ['', [Validators.required]],
+    password: ['', [Validators.required]],
+    rememberMe: [true],
+  });
+
+  protected get f() {
+    return this.form.controls;
+  }
 
   ngOnInit(): void {
-    this.authService.getSsoStatus().subscribe({
+    this.auth.getSsoStatus().subscribe({
       next: (res) => {
-        if (res.isSuccess && res.value.enabled) {
-          this.ssoEnabled.set(true);
+        if (res.isSuccess && res.value) {
+          this.ssoStatus.set(res.value);
         }
-      }
+      },
     });
   }
 
-  onLogin(): void {
-    if (!this.userName || !this.password) return;
-    this.loading.set(true);
-    this.errorMessage.set(null);
-
-    this.authService.login(this.userName, this.password)
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (response) => {
-          if (response.isSuccess) {
-            this.authStore.setSession(response);
-            this.loadProfileAndNavigate();
-          } else {
-            this.errorMessage.set(response.error?.message || 'auth.login.error_invalid');
-          }
-        },
-        error: () => {
-          this.errorMessage.set('auth.login.error_generic');
-        }
-      });
+  protected toggleLanguage(): void {
+    this.locale.toggle();
   }
 
-  onSsoLogin(): void {
+  protected revealCredentialsForm(): void {
+    this.credentialsFormVisible.set(true);
+  }
+
+  protected signInWithSso(): void {
+    if (this.redirecting()) return;
+    this.redirecting.set(true);
+    if (this.returnUrl) sessionStorage.setItem('nwfm.sso.returnUrl', this.returnUrl);
     window.location.href = '/api/v1/auth/sso/redirect';
   }
 
-  private loadProfileAndNavigate(): void {
-    this.authService.getProfile().subscribe({
-      next: (res) => {
-        if (res.isSuccess) {
-          this.authStore.updateProfile(res.value);
+  protected submit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    const { userName, password } = this.form.getRawValue();
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+
+    this.auth.login(userName, password).subscribe({
+      next: (response) => {
+        this.submitting.set(false);
+        if (response.isSuccess) {
+          this.store.setSession(response);
+          this.loadProfileAndNavigate();
+        } else {
+          this.errorMessage.set(response.error?.message || 'auth.login.error_invalid');
         }
-        this.router.navigate(['/']);
       },
       error: () => {
-        this.router.navigate(['/']);
-      }
+        this.submitting.set(false);
+        this.errorMessage.set('auth.login.error_generic');
+      },
     });
+  }
+
+  private loadProfileAndNavigate(): void {
+    this.auth.getProfile().subscribe({
+      next: (res) => {
+        if (res.isSuccess) this.store.updateProfile(res.value);
+        void this.finishLogin();
+      },
+      error: () => void this.finishLogin(),
+    });
+  }
+
+  private async finishLogin(): Promise<void> {
+    await this.appContext.load();
+    await this.router.navigateByUrl(this.returnUrl && this.returnUrl !== '/login' ? this.returnUrl : '/');
   }
 }

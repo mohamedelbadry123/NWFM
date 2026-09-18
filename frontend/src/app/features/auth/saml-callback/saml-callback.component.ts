@@ -1,63 +1,64 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
-import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { AppContextService } from '../../../core/context/app-context.service';
 
 @Component({
   selector: 'app-saml-callback',
   standalone: true,
-  imports: [TranslateModule, ProgressSpinnerModule],
-  template: `
-    <div class="flex min-h-screen items-center justify-center bg-ink-50">
-      <div class="text-center">
-        @if (loading()) {
-          <p-progressSpinner strokeWidth="4" />
-          <p class="mt-4 text-ink-600">{{ 'auth.sso_callback.loading' | translate }}</p>
-        } @else if (error()) {
-          <div class="rounded-xl border border-red-200 bg-red-50 p-6">
-            <p class="text-red-700">{{ 'auth.sso_callback.error' | translate }}</p>
-            <a routerLink="/login" class="mt-3 inline-block text-primary underline">
-              {{ 'auth.access_denied.back_to_login' | translate }}
-            </a>
-          </div>
-        }
-      </div>
-    </div>
-  `
+  imports: [TranslateModule, ProgressSpinner],
+  templateUrl: './saml-callback.component.html',
+  styleUrl: './saml-callback.component.scss',
 })
 export class SamlCallbackComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly authService = inject(AuthService);
-  private readonly authStore = inject(AuthStore);
+  private readonly auth = inject(AuthService);
+  private readonly store = inject(AuthStore);
+  private readonly appContext = inject(AppContextService);
 
-  readonly loading = signal(true);
-  readonly error = signal(false);
+  protected readonly failed = signal(false);
 
   ngOnInit(): void {
     const code = this.route.snapshot.queryParamMap.get('code');
+    const returnUrl =
+      this.route.snapshot.queryParamMap.get('returnUrl') ??
+      sessionStorage.getItem('nwfm.sso.returnUrl');
+
     if (!code) {
-      this.loading.set(false);
-      this.error.set(true);
+      this.denied('exchangeFailed');
       return;
     }
 
-    this.authService.exchangeSsoCode(code).subscribe({
+    this.auth.exchangeSsoCode(code).subscribe({
       next: (response) => {
-        this.loading.set(false);
         if (response.isSuccess) {
-          this.authStore.setSession(response);
-          this.router.navigate(['/']);
+          this.store.setSession(response);
+          sessionStorage.removeItem('nwfm.sso.returnUrl');
+          this.auth.getProfile().subscribe({
+            next: async (res) => {
+              if (res.isSuccess) this.store.updateProfile(res.value);
+              await this.appContext.load();
+              await this.router.navigateByUrl(returnUrl && returnUrl !== '/login' ? returnUrl : '/');
+            },
+            error: async () => {
+              await this.appContext.load();
+              await this.router.navigateByUrl(returnUrl && returnUrl !== '/login' ? returnUrl : '/');
+            },
+          });
         } else {
-          this.error.set(true);
+          this.denied('exchangeFailed');
         }
       },
-      error: () => {
-        this.loading.set(false);
-        this.error.set(true);
-      }
+      error: () => this.denied('exchangeFailed'),
     });
+  }
+
+  private denied(reason: string): void {
+    this.failed.set(true);
+    void this.router.navigate(['/auth/access-denied'], { queryParams: { reason } });
   }
 }
