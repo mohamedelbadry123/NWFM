@@ -6,6 +6,7 @@ public sealed class RolePermission
 
     private RolePermission(string roleId, Guid permissionId)
     {
+        Id = Guid.NewGuid();
         RoleId = roleId;
         PermissionId = permissionId;
     }

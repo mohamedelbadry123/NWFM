@@ -19,6 +19,7 @@
     <Content Include="sql\procedures\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <EmbeddedResource Include="Persistence\Seed\*.json" />
   </ItemGroup>
 
   <ItemGroup>

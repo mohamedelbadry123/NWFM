@@ -52,8 +52,7 @@ builder.Services.AddControllers(o => o.Filters.AddService<TenantScopeFilter>())
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.CustomSchemaIds(t => !t.IsGenericType ? t.FullName!.Replace('+', '.') :
-        t.Namespace + "." + t.Name.Split('`')[0] + "Of" + string.Join("_", t.GetGenericArguments().Select(a => a.Name.Split('`')[0])));
+    c.CustomSchemaIds(OpenApiSchemaId);
 
     c.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
     {
@@ -111,9 +110,6 @@ app.MapControllers();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", application = "NWFM" }));
 
-app.MapGet("/api/app-context", (AppContext ctx) =>
-    Results.Ok(new { tenantId = ctx.OrganizationId }));
-
 // Auth database: migrate, SQL objects, seed — controlled by DatabaseStartup flags.
 await app.InitialiseAuthDatabaseAsync();
 
@@ -124,5 +120,14 @@ await using (var scope = app.Services.CreateAsyncScope())
 }
 
 app.Run();
+
+static string OpenApiSchemaId(Type type)
+{
+    if (!type.IsGenericType)
+        return type.FullName!.Replace('+', '.');
+
+    var name = $"{type.Namespace}.{type.Name.Split('`')[0]}".Replace('+', '.');
+    return name + "Of" + string.Join("_", type.GetGenericArguments().Select(OpenApiSchemaId));
+}
 
 public partial class Program { }

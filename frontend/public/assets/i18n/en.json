@@ -21,7 +21,15 @@
     "inactive": "Inactive",
     "optional": "Optional",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "actions": "Actions",
+    "appName": "NWFM",
+    "appFullName": "National Water Field Management",
+    "logout": "Sign out",
+    "language": "Language",
+    "english": "English",
+    "arabic": "العربية",
+    "toggleTheme": "Toggle theme"
   },
   "error": {
     "ProcessingPurpose.NotFound": "Processing purpose not found.",
@@ -1914,6 +1922,19 @@
       "error_generic": "Login failed. Please try again."
     },
     "logout": "Sign Out",
+    "welcome": "Welcome back",
+    "subtitle": "Sign in to continue to NWFM",
+    "heroTitle": "Field workflow, in one place",
+    "heroSubtitle": "Design, assign, and complete work with a shared process across the organization.",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "usernameRequired": "Username is required.",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "passwordRequired": "Password is required.",
+    "rememberMe": "Remember me",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
     "access_denied": {
       "title": "Access Denied",
       "message": "You do not have permission to access this resource.",
@@ -1922,6 +1943,108 @@
     "sso_callback": {
       "loading": "Completing sign-in…",
       "error": "SSO authentication failed. Please try again."
+    },
+    "sso": {
+      "signInWithSso": "Sign in with NWC SSO",
+      "redirecting": "Redirecting to SSO…",
+      "pleaseWait": "Please wait.",
+      "or": "or",
+      "administratorSignIn": "Administrator sign-in",
+      "completingSignIn": "Completing sign-in",
+      "denied": {
+        "title": "Access denied",
+        "tryAgain": "Try again",
+        "account": "Account:",
+        "notProvisioned": "This account is not provisioned in NWFM.",
+        "inactive": "This account is inactive.",
+        "noScope": "This account has no organization scope.",
+        "crewAccount": "Field-team accounts cannot sign in here.",
+        "exchangeFailed": "Sign-in could not be completed. Try again.",
+        "noNameId": "The identity provider did not return a user name.",
+        "unknown": "You do not have permission to access this resource."
+      }
+    }
+  },
+  "nav": {
+    "operations": "Operations",
+    "overview": "Overview",
+    "startWorkflow": "Start workflow",
+    "tasks": "Tasks",
+    "requests": "Requests",
+    "workload": "Workload",
+    "notifications": "Notifications",
+    "help": "Help",
+    "organization": "Organization",
+    "participants": "Participants",
+    "assignmentGroups": "Assignment groups",
+    "departments": "Departments",
+    "administration": "Administration",
+    "definitions": "Designer & definitions",
+    "bindings": "Bindings",
+    "instances": "Execution monitor",
+    "incidents": "Incidents",
+    "deadLetters": "Message recovery",
+    "calendars": "Business calendars",
+    "slaPolicies": "SLA policies",
+    "actionsCatalog": "Actions catalog",
+    "workflowCatalog": "Workflow catalog",
+    "lookups": "Lookups",
+    "users": "User accounts",
+    "rolePermissions": "Role permissions"
+  },
+  "lookups": {
+    "title": "Lookups",
+    "subtitle": "Maintain organization geography and departments.",
+    "new": "New item",
+    "code": "Code",
+    "name": "Name",
+    "nameEn": "Name (EN)",
+    "nameAr": "Name (AR)",
+    "status": "Status",
+    "cluster": "Cluster",
+    "cbu": "CBU",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "tabs": {
+      "departments": "Departments",
+      "clusters": "Clusters",
+      "cbus": "CBUs",
+      "branches": "Branches",
+      "operationAreas": "Operation areas"
+    }
+  },
+  "users": {
+    "title": "User accounts",
+    "subtitle": "Create and manage back-office logins.",
+    "newUser": "New user",
+    "editUser": "Edit user",
+    "userName": "Username",
+    "email": "Email",
+    "phoneNumber": "Phone",
+    "password": "Password",
+    "roles": "Roles",
+    "status": "Status",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "resetPassword": "Reset password",
+    "resetPasswordHint": "Set a new password for",
+    "passwordReset": "Password reset.",
+    "searchPlaceholder": "Search users",
+    "noUsers": "No users found.",
+    "confirmEnable": "Enable {{name}}?",
+    "confirmDisable": "Disable {{name}}?"
+  },
+  "admin": {
+    "rolePermissions": {
+      "title": "Role permissions",
+      "subtitle": "Choose which permissions each role can use.",
+      "hint": "Changes save per role. Administrator always has full access.",
+      "fullAccess": "Full access",
+      "columns": {
+        "permission": "Permission"
+      }
     }
   }
 }

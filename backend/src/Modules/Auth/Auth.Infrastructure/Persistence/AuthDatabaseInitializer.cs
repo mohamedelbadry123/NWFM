@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Auth.Domain.Constants;
 using Auth.Domain.Entities;
 using Auth.Infrastructure.Identity;
+using Auth.Infrastructure.Persistence.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ namespace Auth.Infrastructure.Persistence;
 /// Three-flag database initializer for the Auth module. Mirrors the reference app pattern:
 /// 1. ApplyMigrations  → EF Core MigrateAsync
 /// 2. ApplySqlObjects  → execute sql/procedures/*.sql (CREATE OR ALTER, split on GO)
-/// 3. SeedData         → idempotent roles, permissions, role-permission grants, admin user
+/// 3. SeedData         → idempotent roles, permissions, grants, lookups, admin user
 /// </summary>
 public sealed class AuthDatabaseInitializer
 {
@@ -157,10 +158,11 @@ public sealed class AuthDatabaseInitializer
 
     private async Task TrySeedAsync()
     {
-        // Seed order matters: roles → permissions → role-permission grants → admin user.
+        // Seed order: roles → permissions → grants → lookups → admin user.
         await SeedRolesAsync();
         await SeedPermissionsAsync();
         await SeedRolePermissionsAsync();
+        await AuthLookupSeedData.SeedAsync(_context);
         await SeedAdministratorAsync();
     }
 
@@ -182,9 +184,9 @@ public sealed class AuthDatabaseInitializer
             .Select(p => p.Code)
             .ToHashSetAsync(StringComparer.Ordinal);
 
-        var permissionsToSeed = NwfmPolicies.All
-            .Where(code => !existingCodes.Contains(code))
-            .Select(code => Permission.Create(code, "NWFM", code, code))
+        var permissionsToSeed = PermissionCatalog
+            .Where(p => !existingCodes.Contains(p.Code))
+            .Select(p => Permission.Create(p.Code, p.Module, p.NameEn, p.NameAr))
             .ToList();
 
         if (permissionsToSeed.Count > 0)
@@ -319,4 +321,25 @@ public sealed class AuthDatabaseInitializer
             ]
         };
     }
+
+    private static readonly (string Code, string Module, string NameEn, string NameAr)[] PermissionCatalog =
+    [
+        (NwfmPolicies.CanManageRolePermissions, "Admin", "Manage role permissions", "إدارة صلاحيات الأدوار"),
+        (NwfmPolicies.CanPurge, "Admin", "Purge data", "حذف البيانات"),
+        (NwfmPolicies.ManageUsers, "Admin", "Manage user accounts", "إدارة حسابات المستخدمين"),
+        (NwfmPolicies.ManageLookups, "Admin", "Manage reference data", "إدارة البيانات المرجعية"),
+        (NwfmPolicies.ViewWorkflows, "Workflow", "View workflows", "عرض سير العمل"),
+        (NwfmPolicies.StartWorkflows, "Workflow", "Start workflows", "بدء سير العمل"),
+        (NwfmPolicies.ClaimTasks, "Workflow", "Claim tasks", "استلام المهام"),
+        (NwfmPolicies.ManageDefinitions, "Workflow", "Manage definitions", "إدارة التعريفات"),
+        (NwfmPolicies.ManageBindings, "Workflow", "Manage bindings", "إدارة الارتباطات"),
+        (NwfmPolicies.ManageCalendars, "Workflow", "Manage calendars", "إدارة التقويم"),
+        (NwfmPolicies.ManageSlaPolicies, "Workflow", "Manage SLA policies", "إدارة سياسات الخدمة"),
+        (NwfmPolicies.ViewInstances, "Workflow", "View instances", "عرض التنفيذ"),
+        (NwfmPolicies.ManageIncidents, "Workflow", "Manage incidents", "إدارة الحوادث"),
+        (NwfmPolicies.ManageDeadLetters, "Workflow", "Manage dead letters", "إدارة الرسائل المتعثرة"),
+        (NwfmPolicies.ManageParticipants, "Workflow", "Manage participants", "إدارة المشاركين"),
+        (NwfmPolicies.ManageGroups, "Workflow", "Manage assignment groups", "إدارة مجموعات الإسناد"),
+        (NwfmPolicies.ViewWorkload, "Workflow", "View workload", "عرض عبء العمل")
+    ];
 }

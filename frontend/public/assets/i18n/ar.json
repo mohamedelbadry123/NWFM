@@ -21,7 +21,15 @@
     "inactive": "غير نشط",
     "optional": "اختياري",
     "prev": "السابق",
-    "next": "التالي"
+    "next": "التالي",
+    "actions": "إجراءات",
+    "appName": "NWFM",
+    "appFullName": "إدارة أعمال الميدان الوطنية",
+    "logout": "تسجيل الخروج",
+    "language": "اللغة",
+    "english": "English",
+    "arabic": "العربية",
+    "toggleTheme": "تبديل المظهر"
   },
   "error": {
     "ProcessingPurpose.NotFound": "غرض المعالجة غير موجود.",
@@ -1914,6 +1922,19 @@
       "error_generic": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى."
     },
     "logout": "تسجيل الخروج",
+    "welcome": "مرحباً بعودتك",
+    "subtitle": "سجّل الدخول للمتابعة إلى NWFM",
+    "heroTitle": "سير عمل الميدان في مكان واحد",
+    "heroSubtitle": "صمّم المهام وأسندها وأكملها عبر عملية مشتركة في المؤسسة.",
+    "username": "اسم المستخدم",
+    "usernamePlaceholder": "أدخل اسم المستخدم",
+    "usernameRequired": "اسم المستخدم مطلوب.",
+    "password": "كلمة المرور",
+    "passwordPlaceholder": "أدخل كلمة المرور",
+    "passwordRequired": "كلمة المرور مطلوبة.",
+    "rememberMe": "تذكرني",
+    "signIn": "تسجيل الدخول",
+    "signingIn": "جارٍ تسجيل الدخول…",
     "access_denied": {
       "title": "الوصول مرفوض",
       "message": "ليس لديك صلاحية للوصول إلى هذا المورد.",
@@ -1922,6 +1943,108 @@
     "sso_callback": {
       "loading": "جارٍ إكمال تسجيل الدخول…",
       "error": "فشل مصادقة SSO. يرجى المحاولة مرة أخرى."
+    },
+    "sso": {
+      "signInWithSso": "تسجيل الدخول عبر الدخول الموحد",
+      "redirecting": "جارٍ التحويل إلى الدخول الموحد…",
+      "pleaseWait": "يرجى الانتظار.",
+      "or": "أو",
+      "administratorSignIn": "دخول المسؤول",
+      "completingSignIn": "جارٍ إكمال تسجيل الدخول",
+      "denied": {
+        "title": "الوصول مرفوض",
+        "tryAgain": "حاول مرة أخرى",
+        "account": "الحساب:",
+        "notProvisioned": "هذا الحساب غير مُنشأ في NWFM.",
+        "inactive": "هذا الحساب غير نشط.",
+        "noScope": "هذا الحساب بلا نطاق تنظيمي.",
+        "crewAccount": "حسابات فرق الميدان لا يمكنها الدخول من هنا.",
+        "exchangeFailed": "تعذر إكمال تسجيل الدخول. حاول مرة أخرى.",
+        "noNameId": "لم يُرجع مزود الهوية اسم مستخدم.",
+        "unknown": "ليس لديك صلاحية للوصول إلى هذا المورد."
+      }
+    }
+  },
+  "nav": {
+    "operations": "التشغيل",
+    "overview": "نظرة عامة",
+    "startWorkflow": "بدء سير عمل",
+    "tasks": "المهام",
+    "requests": "الطلبات",
+    "workload": "عبء العمل",
+    "notifications": "الإشعارات",
+    "help": "المساعدة",
+    "organization": "المؤسسة",
+    "participants": "المشاركون",
+    "assignmentGroups": "مجموعات الإسناد",
+    "departments": "الأقسام",
+    "administration": "الإدارة",
+    "definitions": "التصميم والتعريفات",
+    "bindings": "الارتباطات",
+    "instances": "مراقبة التنفيذ",
+    "incidents": "الحوادث",
+    "deadLetters": "استعادة الرسائل",
+    "calendars": "تقويم العمل",
+    "slaPolicies": "سياسات الخدمة",
+    "actionsCatalog": "دليل الإجراءات",
+    "workflowCatalog": "دليل سير العمل",
+    "lookups": "البيانات المرجعية",
+    "users": "حسابات المستخدمين",
+    "rolePermissions": "صلاحيات الأدوار"
+  },
+  "lookups": {
+    "title": "البيانات المرجعية",
+    "subtitle": "إدارة الجغرافيا التنظيمية والأقسام.",
+    "new": "عنصر جديد",
+    "code": "الرمز",
+    "name": "الاسم",
+    "nameEn": "الاسم (إنجليزي)",
+    "nameAr": "الاسم (عربي)",
+    "status": "الحالة",
+    "cluster": "التجمع",
+    "cbu": "وحدة الأعمال",
+    "activate": "تفعيل",
+    "deactivate": "إيقاف",
+    "tabs": {
+      "departments": "الأقسام",
+      "clusters": "التجمعات",
+      "cbus": "وحدات الأعمال",
+      "branches": "الفروع",
+      "operationAreas": "مناطق التشغيل"
+    }
+  },
+  "users": {
+    "title": "حسابات المستخدمين",
+    "subtitle": "إنشاء وإدارة حسابات المكتب الخلفي.",
+    "newUser": "مستخدم جديد",
+    "editUser": "تعديل المستخدم",
+    "userName": "اسم المستخدم",
+    "email": "البريد الإلكتروني",
+    "phoneNumber": "الهاتف",
+    "password": "كلمة المرور",
+    "roles": "الأدوار",
+    "status": "الحالة",
+    "enabled": "مفعل",
+    "disabled": "موقوف",
+    "enable": "تفعيل",
+    "disable": "إيقاف",
+    "resetPassword": "إعادة تعيين كلمة المرور",
+    "resetPasswordHint": "تعيين كلمة مرور جديدة لـ",
+    "passwordReset": "تم إعادة تعيين كلمة المرور.",
+    "searchPlaceholder": "بحث في المستخدمين",
+    "noUsers": "لا يوجد مستخدمون.",
+    "confirmEnable": "تفعيل {{name}}؟",
+    "confirmDisable": "إيقاف {{name}}؟"
+  },
+  "admin": {
+    "rolePermissions": {
+      "title": "صلاحيات الأدوار",
+      "subtitle": "حدد الصلاحيات المتاحة لكل دور.",
+      "hint": "يُحفظ التغيير لكل دور. حساب المسؤول يملك صلاحية كاملة دائماً.",
+      "fullAccess": "صلاحية كاملة",
+      "columns": {
+        "permission": "الصلاحية"
+      }
     }
   }
 }
