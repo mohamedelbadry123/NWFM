@@ -45,6 +45,15 @@ public sealed class GetLookupsQueryHandler(IAuthDbContext context)
             query = query.Where(x => x.Code.Contains(term) || x.NameEn.Contains(term) || x.NameAr.Contains(term));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.ParentCode))
+        {
+            var parent = request.ParentCode.Trim();
+            query = query.Where(x => x.ParentCode == parent);
+        }
+
+        if (request.IsActive is bool isActive)
+            query = query.Where(x => x.IsActive == isActive);
+
         var totalCount = await query.CountAsync(ct);
         var items = await query
             .OrderBy(x => x.Code)

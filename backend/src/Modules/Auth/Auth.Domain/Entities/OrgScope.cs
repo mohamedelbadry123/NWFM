@@ -8,7 +8,7 @@ public sealed class OrgScope : Entity
 {
     private OrgScope() { }
 
-    private OrgScope(string ownerType, string ownerId, string? level, string? code, int? departmentId)
+    private OrgScope(string ownerType, string ownerId, string? level, string? code, string? departmentId)
     {
         OwnerType = ownerType;
         OwnerId = ownerId;
@@ -24,11 +24,11 @@ public sealed class OrgScope : Entity
     public string OwnerId { get; private set; } = default!;
     public string? Level { get; private set; }
     public string? Code { get; private set; }
-    public int? DepartmentId { get; private set; }
+    public string? DepartmentId { get; private set; }
     public bool IsActive { get; private set; }
     public bool HasTerritory => Level is not null && Code is not null;
 
-    public static OrgScope Create(string ownerType, string ownerId, string? level, string? code, int? departmentId)
+    public static OrgScope Create(string ownerType, string ownerId, string? level, string? code, string? departmentId)
     {
         if (!OrgScopeOwnerTypes.IsDefined(ownerType))
             throw new DomainException($"Unknown scope owner type '{ownerType}'.");

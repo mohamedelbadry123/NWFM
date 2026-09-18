@@ -3,6 +3,11 @@ import { AuthStore } from './auth.store';
 
 export const ADMINISTRATOR_ROLE = 'Administrator';
 
+export const ROLES = {
+  administrator: 'Administrator',
+  fieldTeam: 'FieldTeam',
+} as const;
+
 export const PERMISSIONS = {
   manageLookups: 'ManageLookups',
   manageUsers: 'ManageUsers',

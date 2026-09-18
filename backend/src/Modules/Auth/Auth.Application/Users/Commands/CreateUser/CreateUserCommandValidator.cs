@@ -1,3 +1,4 @@
+using Auth.Domain.Constants;
 using FluentValidation;
 
 namespace Auth.Application.Users.Commands.CreateUser;
@@ -17,5 +18,9 @@ public sealed class CreateUserCommandValidator : AbstractValidator<CreateUserCom
         RuleFor(x => x.Email)
             .EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.Email))
             .WithMessage("Invalid email format.");
+
+        RuleFor(x => x.Roles)
+            .Must(roles => roles is null || !roles.Contains(Roles.FieldTeam, StringComparer.Ordinal))
+            .WithMessage("The FieldTeam role cannot be assigned from user administration.");
     }
 }

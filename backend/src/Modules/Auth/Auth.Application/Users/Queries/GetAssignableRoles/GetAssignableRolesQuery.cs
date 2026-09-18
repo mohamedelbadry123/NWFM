@@ -4,10 +4,7 @@ using NWFM.Shared.Constants;
 using NWFM.Shared.Results;
 using NWFM.Shared.Security;
 
-namespace Auth.Application.Users.Queries.GetUserById;
+namespace Auth.Application.Users.Queries.GetAssignableRoles;
 
 [Authorize(Policy = NwfmPolicies.ManageUsers)]
-public sealed record GetUserByIdQuery : IRequest<Result<UserDetailDto>>
-{
-    public string UserId { get; init; } = default!;
-}
+public sealed record GetAssignableRolesQuery : IRequest<Result<IReadOnlyList<string>>>;

@@ -14,6 +14,7 @@ public sealed class OrgScopeConfiguration : IEntityTypeConfiguration<OrgScope>
         builder.Property(e => e.OwnerId).HasMaxLength(450).IsRequired();
         builder.Property(e => e.Level).HasMaxLength(50);
         builder.Property(e => e.Code).HasMaxLength(100);
+        builder.Property(e => e.DepartmentId).HasMaxLength(50);
         builder.Ignore(e => e.HasTerritory);
 
         builder.HasIndex(e => new { e.OwnerType, e.OwnerId });

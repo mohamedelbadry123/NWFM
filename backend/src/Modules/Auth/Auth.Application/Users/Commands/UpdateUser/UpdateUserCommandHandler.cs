@@ -1,11 +1,14 @@
 using Auth.Application.Common.Interfaces;
+using Auth.Application.Users;
 using Auth.Application.Users.Models;
 using MediatR;
 using NWFM.Shared.Results;
 
 namespace Auth.Application.Users.Commands.UpdateUser;
 
-public sealed class UpdateUserCommandHandler(IUserAccountService userAccountService)
+public sealed class UpdateUserCommandHandler(
+    IUserAccountService userAccountService,
+    IAuthDbContext db)
     : IRequestHandler<UpdateUserCommand, Result<UserDetailDto>>
 {
     public async Task<Result<UserDetailDto>> Handle(UpdateUserCommand request, CancellationToken ct)
@@ -20,15 +23,10 @@ public sealed class UpdateUserCommandHandler(IUserAccountService userAccountServ
         if (!updateResult.IsSuccess)
             return Result<UserDetailDto>.Failure(updateResult.Error);
 
-        var getResult = await userAccountService.GetUserAsync(request.UserId, ct);
-        if (!getResult.IsSuccess)
-            return Result<UserDetailDto>.Failure(getResult.Error);
+        var scopesResult = await UserOrgScopeWriter.ReplaceAsync(db, request.UserId, request.Scopes, ct);
+        if (!scopesResult.IsSuccess)
+            return Result<UserDetailDto>.Failure(scopesResult.Error);
 
-        var u = getResult.Value;
-        return Result<UserDetailDto>.Success(new UserDetailDto
-        {
-            Id = u.Id, UserName = u.UserName, Email = u.Email, PhoneNumber = u.PhoneNumber,
-            IsEnabled = u.IsEnabled, TeamId = u.TeamId, Roles = u.Roles
-        });
+        return await UserDetailLoader.LoadAsync(userAccountService, db, request.UserId, ct);
     }
 }

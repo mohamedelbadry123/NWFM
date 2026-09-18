@@ -1,3 +1,4 @@
+using Auth.Domain.Constants;
 using FluentValidation;
 
 namespace Auth.Application.Users.Commands.UpdateUser;
@@ -17,6 +18,8 @@ public sealed class UpdateUserCommandValidator : AbstractValidator<UpdateUserCom
 
         RuleFor(x => x.Roles)
             .NotNull()
-            .WithMessage("Roles list must not be null.");
+            .WithMessage("Roles list must not be null.")
+            .Must(roles => !roles.Contains(Roles.FieldTeam, StringComparer.Ordinal))
+            .WithMessage("The FieldTeam role cannot be assigned from user administration.");
     }
 }

@@ -9,4 +9,5 @@ public sealed class UserDetailDto
     public long? TeamId { get; init; }
     public bool IsEnabled { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = [];
+    public IReadOnlyList<OrgScopeAssignmentDto> Scopes { get; init; } = [];
 }

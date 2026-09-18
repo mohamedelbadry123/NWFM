@@ -26,7 +26,7 @@ public sealed class GetUsersQueryHandler(IUserAccountService userAccountService)
 
         var items = result.Value.Items.Select(u => new UserListItemDto
         {
-            Id = u.Id, UserName = u.UserName, Email = u.Email,
+            Id = u.Id, UserName = u.UserName, Email = u.Email, PhoneNumber = u.PhoneNumber,
             IsEnabled = u.IsEnabled, Roles = u.Roles
         }).ToList();
 

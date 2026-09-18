@@ -13,7 +13,7 @@ using NWFM.Shared.Results;
 namespace Auth.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = NwfmPolicies.ManageLookups)]
+[Authorize]
 [Route("api/v1/lookups")]
 public sealed class LookupsController(ISender sender) : ControllerBase
 {
@@ -22,14 +22,17 @@ public sealed class LookupsController(ISender sender) : ControllerBase
         Get("Department", query, ct);
 
     [HttpPost("departments")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> CreateDepartment([FromBody] CreateLookupRequest request, CancellationToken ct) =>
         Create("Department", request, ct);
 
     [HttpPut("departments/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> UpdateDepartment(Guid id, [FromBody] UpdateLookupRequest request, CancellationToken ct) =>
         Update("Department", id, request, ct);
 
     [HttpPut("departments/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetDepartmentStatus(Guid id, [FromBody] SetLookupStatusRequest request, CancellationToken ct) =>
         SetStatus("Department", id, request, ct);
 
@@ -38,14 +41,17 @@ public sealed class LookupsController(ISender sender) : ControllerBase
         Get("Cluster", query, ct);
 
     [HttpPost("clusters")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> CreateCluster([FromBody] CreateLookupRequest request, CancellationToken ct) =>
         Create("Cluster", request, ct);
 
     [HttpPut("clusters/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> UpdateCluster(Guid id, [FromBody] UpdateLookupRequest request, CancellationToken ct) =>
         Update("Cluster", id, request, ct);
 
     [HttpPut("clusters/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetClusterStatus(Guid id, [FromBody] SetLookupStatusRequest request, CancellationToken ct) =>
         SetStatus("Cluster", id, request, ct);
 
@@ -54,14 +60,17 @@ public sealed class LookupsController(ISender sender) : ControllerBase
         Get("Cbu", query, ct);
 
     [HttpPost("cbus")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> CreateCbu([FromBody] CreateLookupRequest request, CancellationToken ct) =>
         Create("Cbu", request, ct);
 
     [HttpPut("cbus/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> UpdateCbu(Guid id, [FromBody] UpdateLookupRequest request, CancellationToken ct) =>
         Update("Cbu", id, request, ct);
 
     [HttpPut("cbus/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetCbuStatus(Guid id, [FromBody] SetLookupStatusRequest request, CancellationToken ct) =>
         SetStatus("Cbu", id, request, ct);
 
@@ -70,14 +79,17 @@ public sealed class LookupsController(ISender sender) : ControllerBase
         Get("Branch", query, ct);
 
     [HttpPost("branches")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> CreateBranch([FromBody] CreateLookupRequest request, CancellationToken ct) =>
         Create("Branch", request, ct);
 
     [HttpPut("branches/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> UpdateBranch(Guid id, [FromBody] UpdateLookupRequest request, CancellationToken ct) =>
         Update("Branch", id, request, ct);
 
     [HttpPut("branches/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetBranchStatus(Guid id, [FromBody] SetLookupStatusRequest request, CancellationToken ct) =>
         SetStatus("Branch", id, request, ct);
 
@@ -86,14 +98,17 @@ public sealed class LookupsController(ISender sender) : ControllerBase
         Get("OperationArea", query, ct);
 
     [HttpPost("operation-areas")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> CreateOperationArea([FromBody] CreateLookupRequest request, CancellationToken ct) =>
         Create("OperationArea", request, ct);
 
     [HttpPut("operation-areas/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> UpdateOperationArea(Guid id, [FromBody] UpdateLookupRequest request, CancellationToken ct) =>
         Update("OperationArea", id, request, ct);
 
     [HttpPut("operation-areas/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetOperationAreaStatus(Guid id, [FromBody] SetLookupStatusRequest request, CancellationToken ct) =>
         SetStatus("OperationArea", id, request, ct);
 
@@ -104,7 +119,9 @@ public sealed class LookupsController(ISender sender) : ControllerBase
             LookupType = type,
             PageNumber = query.PageNumber,
             PageSize = query.PageSize,
-            SearchTerm = query.SearchTerm
+            SearchTerm = query.SearchTerm,
+            ParentCode = query.ParentCode,
+            IsActive = query.IsActive
         }, ct);
         return Ok(result);
     }

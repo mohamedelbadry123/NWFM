@@ -17,5 +17,5 @@ public sealed class AuthScopeDto
     public Guid ScopeId { get; init; }
     public string? Level { get; init; }
     public string? Code { get; init; }
-    public int? DepartmentId { get; init; }
+    public string? DepartmentId { get; init; }
 }

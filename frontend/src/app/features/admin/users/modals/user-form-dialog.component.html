@@ -1,32 +1,91 @@
-<p-dialog [(visible)]="visible" [header]="(isEdit() ? 'users.editUser' : 'users.newUser') | translate"
-  [modal]="true" [style]="{ width: '32rem' }">
-  <form [formGroup]="form" class="flex flex-col gap-3">
-    <div class="flex flex-col gap-1">
-      <label>{{ 'users.userName' | translate }}</label>
-      <input pInputText formControlName="userName" />
-    </div>
-    <div class="flex flex-col gap-1">
-      <label>{{ 'users.email' | translate }}</label>
-      <input pInputText formControlName="email" />
-    </div>
-    <div class="flex flex-col gap-1">
-      <label>{{ 'users.phoneNumber' | translate }}</label>
-      <input pInputText formControlName="phoneNumber" />
-    </div>
-    @if (!isEdit()) {
+<p-toast />
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '46rem' }"
+  [breakpoints]="{ '960px': '90vw' }"
+  [header]="(isEdit() ? 'users.editUser' : 'users.newUser') | translate"
+  (onShow)="onShow()"
+>
+  <form [formGroup]="form" class="flex flex-col gap-4">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
       <div class="flex flex-col gap-1">
-        <label>{{ 'users.password' | translate }}</label>
-        <p-password formControlName="password" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" />
+        <label class="text-sm font-medium">{{ 'users.userName' | translate }} *</label>
+        <input pInputText formControlName="userName" class="w-full" autocomplete="off" />
+        @if (form.controls.userName.touched && form.controls.userName.hasError('required')) {
+          <small class="text-red-500">{{ 'users.userNameRequired' | translate }}</small>
+        }
       </div>
-    }
-    <div class="flex flex-col gap-1">
-      <label>{{ 'users.roles' | translate }}</label>
-      <p-multiselect formControlName="roles" [options]="roles()" optionLabel="label" optionValue="value"
-        appendTo="body" styleClass="w-full" />
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'users.email' | translate }}</label>
+        <input pInputText formControlName="email" class="w-full" autocomplete="off" />
+        @if (form.controls.email.touched && form.controls.email.hasError('email')) {
+          <small class="text-red-500">{{ 'users.emailInvalid' | translate }}</small>
+        }
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'users.phoneNumber' | translate }}</label>
+        <input pInputText formControlName="phoneNumber" class="w-full" autocomplete="off" />
+      </div>
+
+      @if (!isEdit()) {
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-medium">{{ 'users.password' | translate }} *</label>
+          <p-password formControlName="password" [feedback]="false" [toggleMask]="true"
+            styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password" />
+          @if (form.controls.password.touched && form.controls.password.hasError('required')) {
+            <small class="text-red-500">{{ 'users.passwordRequired' | translate }}</small>
+          }
+          @if (form.controls.password.touched && form.controls.password.hasError('minlength')) {
+            <small class="text-red-500">{{ 'users.passwordTooShort' | translate }}</small>
+          }
+        </div>
+      }
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'users.roles' | translate }}</label>
+        <p-multiselect
+          formControlName="roles"
+          [options]="roles()"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'users.selectRoles' | translate"
+          display="chip"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+      <span class="text-sm font-semibold">{{ 'org.scope' | translate }}</span>
+      <app-org-scope-selector
+        mode="multi"
+        [initialScopes]="initialScopes()"
+        [disabled]="saving() || loading()"
+        (scopesChange)="onScopesChange($event)"
+      />
     </div>
   </form>
+
   <ng-template pTemplate="footer">
-    <p-button [label]="'common.cancel' | translate" severity="secondary" [text]="true" (onClick)="visible.set(false)" />
-    <p-button [label]="'common.save' | translate" [loading]="saving()" (onClick)="save()" />
+    <p-button
+      [label]="'common.cancel' | translate"
+      icon="pi pi-times"
+      [text]="true"
+      severity="secondary"
+      [disabled]="saving()"
+      (onClick)="cancel()"
+    />
+    <p-button
+      [label]="'common.save' | translate"
+      icon="pi pi-check"
+      [loading]="saving()"
+      [disabled]="saving() || loading()"
+      (onClick)="save()"
+    />
   </ng-template>
 </p-dialog>

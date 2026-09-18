@@ -2,18 +2,27 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiResult, PaginatedResult } from '../api/api-result';
+import { OrgScopeAssignment } from '../../shared/components/org-scope/org-scope.model';
 
 export interface UserListItem {
   id: string;
   userName: string;
   email?: string | null;
+  phoneNumber?: string | null;
   isEnabled: boolean;
   roles: string[];
 }
 
 export interface UserDetail extends UserListItem {
-  phoneNumber?: string | null;
   teamId?: number | null;
+  scopes?: OrgScopeAssignment[];
+}
+
+export interface UserWriteBody {
+  email?: string | null;
+  phoneNumber?: string | null;
+  roles: string[];
+  scopes: OrgScopeAssignment[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -32,11 +41,15 @@ export class UsersService {
     return this.http.get<ApiResult<UserDetail>>(`${this.baseUrl}/${id}`);
   }
 
-  create(body: { userName: string; email?: string | null; phoneNumber?: string | null; password: string; roles: string[] }): Observable<ApiResult<UserDetail>> {
+  getAssignableRoles(): Observable<ApiResult<string[]>> {
+    return this.http.get<ApiResult<string[]>>(`${this.baseUrl}/roles`);
+  }
+
+  create(body: UserWriteBody & { userName: string; password: string }): Observable<ApiResult<UserDetail>> {
     return this.http.post<ApiResult<UserDetail>>(this.baseUrl, body);
   }
 
-  update(id: string, body: { email?: string | null; phoneNumber?: string | null; roles: string[] }): Observable<ApiResult<UserDetail>> {
+  update(id: string, body: UserWriteBody): Observable<ApiResult<UserDetail>> {
     return this.http.put<ApiResult<UserDetail>>(`${this.baseUrl}/${id}`, body);
   }
 

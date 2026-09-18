@@ -1,11 +1,14 @@
 using Auth.Application.Common.Interfaces;
+using Auth.Application.Users;
 using Auth.Application.Users.Models;
 using MediatR;
 using NWFM.Shared.Results;
 
 namespace Auth.Application.Users.Commands.CreateUser;
 
-public sealed class CreateUserCommandHandler(IUserAccountService userAccountService)
+public sealed class CreateUserCommandHandler(
+    IUserAccountService userAccountService,
+    IAuthDbContext db)
     : IRequestHandler<CreateUserCommand, Result<UserDetailDto>>
 {
     public async Task<Result<UserDetailDto>> Handle(CreateUserCommand request, CancellationToken ct)
@@ -22,15 +25,10 @@ public sealed class CreateUserCommandHandler(IUserAccountService userAccountServ
         if (!createResult.IsSuccess)
             return Result<UserDetailDto>.Failure(createResult.Error);
 
-        var getResult = await userAccountService.GetUserAsync(createResult.Value, ct);
-        if (!getResult.IsSuccess)
-            return Result<UserDetailDto>.Failure(getResult.Error);
+        var scopesResult = await UserOrgScopeWriter.ReplaceAsync(db, createResult.Value, request.Scopes, ct);
+        if (!scopesResult.IsSuccess)
+            return Result<UserDetailDto>.Failure(scopesResult.Error);
 
-        var u = getResult.Value;
-        return Result<UserDetailDto>.Success(new UserDetailDto
-        {
-            Id = u.Id, UserName = u.UserName, Email = u.Email, PhoneNumber = u.PhoneNumber,
-            IsEnabled = u.IsEnabled, TeamId = u.TeamId, Roles = u.Roles
-        });
+        return await UserDetailLoader.LoadAsync(userAccountService, db, createResult.Value, ct);
     }
 }

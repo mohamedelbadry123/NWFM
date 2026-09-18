@@ -3,6 +3,7 @@ using Auth.Application.Users.Commands.ResetUserPassword;
 using Auth.Application.Users.Commands.SetUserStatus;
 using Auth.Application.Users.Commands.UpdateUser;
 using Auth.Application.Users.Models;
+using Auth.Application.Users.Queries.GetAssignableRoles;
 using Auth.Application.Users.Queries.GetUserById;
 using Auth.Application.Users.Queries.GetUsers;
 using NWFM.Shared.Constants;
@@ -24,6 +25,14 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetUsers([FromQuery] GetUsersQuery query, CancellationToken ct)
     {
         var result = await sender.Send(query, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("roles")]
+    [ProducesResponseType(typeof(Result<IReadOnlyList<string>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAssignableRoles(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetAssignableRolesQuery(), ct);
         return Ok(result);
     }
 

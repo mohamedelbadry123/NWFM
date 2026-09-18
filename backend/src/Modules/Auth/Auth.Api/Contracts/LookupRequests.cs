@@ -5,6 +5,8 @@ public sealed class LookupListQuery
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = 10;
     public string? SearchTerm { get; init; }
+    public string? ParentCode { get; init; }
+    public bool? IsActive { get; init; }
 }
 
 public sealed class CreateLookupRequest

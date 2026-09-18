@@ -1,9 +1,12 @@
 using Auth.Application.Lookups.Queries;
 using MediatR;
+using NWFM.Shared.Constants;
 using NWFM.Shared.Results;
+using NWFM.Shared.Security;
 
 namespace Auth.Application.Lookups.Commands.UpdateLookup;
 
+[Authorize(Policy = NwfmPolicies.ManageLookups)]
 public sealed record UpdateLookupCommand : IRequest<Result<LookupItemDto>>
 {
     public string LookupType { get; init; } = default!;

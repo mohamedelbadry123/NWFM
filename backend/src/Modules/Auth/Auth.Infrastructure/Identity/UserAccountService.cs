@@ -1,4 +1,5 @@
 using Auth.Application.Common.Interfaces;
+using Auth.Domain.Constants;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Results;
@@ -14,6 +15,8 @@ internal static class AuthErrors
         new("Auth.IdentityError", string.Join(" ", result.Errors.Select(e => e.Description)));
     public static Error UnknownRoles(IEnumerable<string> roles) =>
         new("Auth.UnknownRoles", $"Unknown role(s): {string.Join(", ", roles)}.");
+    public static readonly Error CrewRoleNotAllowed =
+        new("Auth.CrewRoleNotAllowed", "The FieldTeam role cannot be assigned from user administration.");
 }
 
 /// <summary>
@@ -197,6 +200,9 @@ public sealed class UserAccountService(
     {
         if (roles.Count == 0)
             return Result<bool>.Success(true);
+
+        if (roles.Contains(Roles.FieldTeam, StringComparer.Ordinal))
+            return Result<bool>.Failure(AuthErrors.CrewRoleNotAllowed);
 
         var known = await roleManager.Roles
             .AsNoTracking()
