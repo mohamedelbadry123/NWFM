@@ -5,8 +5,8 @@
     <ProjectReference Include="../Modules/Auth/Auth.Infrastructure/Auth.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Api/Workflow.Api.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Infrastructure/Workflow.Infrastructure.csproj" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7"><PrivateAssets>all</PrivateAssets></PackageReference>
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 </Project>
