@@ -1,0 +1,185 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.participants.title"
+    subtitleKey="workflow.participants.subtitle"
+    helpLink="/org/workflow/help">
+    <button
+      (click)="openModal()"
+      class="wf-btn-primary">
+      + {{ 'workflow.participants.register_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  <!-- Search -->
+  <div class="relative">
+    <input
+      [formControl]="searchCtrl"
+      type="search"
+      [placeholder]="'workflow.participants.search_placeholder' | translate"
+      class="wf-input !rounded-xl !ps-10 !pe-4 !py-2.5" />
+  </div>
+
+  <!-- Loading -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- Error -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  <!-- Empty -->
+  @if (!isLoading() && !loadError() && items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.participants.empty_title"
+      subtitleKey="workflow.participants.empty_sub" />
+  }
+
+  <!-- Table -->
+  @if (!isLoading() && !loadError() && items().length > 0) {
+    <app-workflow-table-shell titleKey="workflow.participants.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.participants.col_name' | translate }}</th>
+            <th>{{ 'workflow.participants.col_email' | translate }}</th>
+            <th>{{ 'workflow.participants.col_employee_no' | translate }}</th>
+            <th>{{ 'workflow.participants.col_registered' | translate }}</th>
+            <th>{{ 'workflow.participants.col_status' | translate }}</th>
+            <th class="text-end">{{ 'workflow.participants.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of items(); track p.id) {
+            <tr>
+              <td>
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-ink-900 dark:text-white text-xs font-bold flex-shrink-0"
+                    [style.background]="avatarBg(p.displayName ?? 'U')">
+                    {{ avatarInitial(p.displayName ?? 'U') }}
+                  </div>
+                  <span class="text-ink-900 dark:text-white font-medium">{{ p.displayName }}</span>
+                </div>
+              </td>
+              <td class="text-ink-700 dark:text-dark-200">{{ p.email }}</td>
+              <td class="text-ink-500 dark:text-dark-300">{{ p.employeeNumber ?? '—' }}</td>
+              <td class="text-ink-500 dark:text-dark-300">{{ formatDate(p.createdAt ?? '') }}</td>
+              <td>
+                @if (p.isActive) {
+                  <prv-status-pill tone="success" labelKey="common.active" />
+                } @else {
+                  <prv-status-pill tone="neutral" labelKey="common.inactive" />
+                }
+              </td>
+              <td class="text-end">
+                @if (p.isActive) {
+                  <button
+                    (click)="confirmDeactivate(p)"
+                    class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                    {{ 'workflow.participants.deactivate_btn' | translate }}
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-xs text-ink-500 dark:text-dark-300 mt-4">
+      <span>{{ 'workflow.common.showing' | translate: { start: rangeStart(), end: rangeEnd(), total: totalCount() } }}</span>
+      <div class="flex items-center gap-1">
+        <button (click)="prevPage()" [disabled]="page() === 1"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">‹</button>
+        @for (pn of pageNumbers(); track $index) {
+          @if (isNumber(pn)) {
+            <button (click)="goToPage(pn)"
+              [class]="pn === page() ? 'px-2 py-1 rounded bg-primary text-white' : 'px-2 py-1 rounded border border-dark-600 hover:bg-dark-700'">
+              {{ pn }}
+            </button>
+          } @else {
+            <span class="px-1">…</span>
+          }
+        }
+        <button (click)="nextPage()" [disabled]="page() >= totalPages()"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">›</button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Register Modal -->
+@if (showModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-lg mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.participants.modal_title' | translate }}</h2>
+        <button (click)="closeModal()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div [formGroup]="registerForm" class="space-y-4">
+  <label class="block text-sm">{{'workflow.participants.col_name' | translate}}<input formControlName="displayName" class="wf-input mt-1" required /></label>
+  <label class="block text-sm">{{'workflow.participants.name_ar' | translate}}<input formControlName="displayNameAr" class="wf-input mt-1" dir="rtl" /></label>
+  <label class="block text-sm">{{'workflow.participants.col_email' | translate}}<input formControlName="email" type="email" class="wf-input mt-1" required /></label>
+</div>
+<!-- Employee Number -->
+        <div [formGroup]="registerForm">
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.participants.employee_no_label' | translate }}
+            <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+          </label>
+          <input
+            formControlName="employeeNumber"
+            type="text"
+            [placeholder]="'workflow.participants.employee_no_placeholder' | translate"
+            class="wf-input" />
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeModal()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button
+          (click)="save()"
+          [disabled]="registerForm.invalid || saving()"
+          class="wf-btn-primary">
+          {{ saving() ? ('common.saving' | translate) : ('workflow.participants.register_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Deactivate Confirmation Dialog -->
+@if (confirmTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.participants.confirm_deactivate_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ 'workflow.participants.confirm_deactivate_body' | translate: { name: confirmTarget()?.displayName } }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="cancelDeactivate()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button
+          (click)="executeDeactivate()"
+          [disabled]="deactivating()"
+          class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors">
+          {{ deactivating() ? ('common.processing' | translate) : ('workflow.participants.deactivate_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

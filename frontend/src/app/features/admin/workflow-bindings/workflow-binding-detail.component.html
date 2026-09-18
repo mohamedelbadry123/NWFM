@@ -1,0 +1,408 @@
+<div class="p-5 sm:p-6 space-y-5">
+
+  <app-workflow-page-header
+    titleKey="workflow.bindings.detail.title"
+    helpLink="/admin/workflow/help">
+    <a routerLink="/admin/workflow/bindings"
+      class="wf-btn-secondary">
+      ← {{ 'workflow.bindings.detail.back' | translate }}
+    </a>
+  </app-workflow-page-header>
+
+  <!-- Loading -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- Error -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="reload()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  @if (!isLoading() && !loadError() && binding()) {
+    <!-- Overview -->
+    <div class="bg-white dark:bg-dark-800 border border-ink-200 dark:border-dark-700 rounded-2xl p-6 space-y-4">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="space-y-3">
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.overview' | translate }}</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <prv-status-pill
+              [tone]="modeTone(binding()!.mode)"
+              [label]="('workflow.bindings.mode.' + (binding()!.mode ?? 'Disabled').toLowerCase()) | translate" />
+            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-mono bg-ink-50 dark:bg-dark-900 border border-ink-200 dark:border-dark-600 text-primary-700 dark:text-primary-300">
+              {{ 'workflow.bindings.field.screen_key' | translate }}:
+              <span class="ms-1 text-ink-900 dark:text-white">{{ binding()!.screenKey || '—' }}</span>
+            </span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          @if (binding()!.workflowDefinitionId) {
+            <a [routerLink]="['/admin/workflow/definitions', binding()!.workflowDefinitionId, 'versions']"
+              class="px-3 py-1.5 text-xs text-primary border border-primary/40 rounded-xl hover:bg-primary/10 transition-colors">
+              {{ 'workflow.bindings.detail.open_versions' | translate }}
+            </a>
+          }
+          <a routerLink="/admin/workflow/help" fragment="bindings-saas"
+            class="px-3 py-1.5 text-xs text-ink-700 dark:text-dark-200 border border-ink-200 dark:border-dark-600 rounded-xl hover:bg-ink-100 dark:hover:bg-dark-700 transition-colors">
+            {{ 'workflow.bindings.detail.open_help' | translate }}
+          </a>
+          @if (binding()!.isActive) {
+            <button (click)="openConfirm('deactivate')"
+              class="px-3 py-1.5 text-xs text-red-400 border border-red-800/50 rounded-xl hover:bg-red-900/20 transition-colors">
+              {{ 'workflow.bindings.list.deactivate_btn' | translate }}
+            </button>
+          } @else {
+            <button (click)="openConfirm('activate')"
+              class="px-3 py-1.5 text-xs text-green-400 border border-green-800/50 rounded-xl hover:bg-green-900/20 transition-colors">
+              {{ 'workflow.bindings.list.activate_btn' | translate }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.definition' | translate }}</p>
+          <p class="text-ink-900 dark:text-white">{{ binding()!.workflowDefinitionName ?? binding()!.workflowDefinitionId }}</p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.organization' | translate }}</p>
+          <p class="text-ink-900 dark:text-white font-mono text-xs">{{ binding()!.organizationId }}</p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.module' | translate }}</p>
+          <p class="text-ink-900 dark:text-white">{{ binding()!.moduleKey }}</p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.entity' | translate }}</p>
+          <p class="text-ink-900 dark:text-white">{{ binding()!.entityType }}</p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.trigger' | translate }}</p>
+          <p class="text-ink-900 dark:text-white font-mono text-xs">{{ binding()!.triggerEvent }}</p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.version_policy' | translate }}</p>
+          <p class="text-ink-900 dark:text-white">
+            {{ ('workflow.bindings.version_policy.' + (binding()!.versionPolicy ?? 'LatestPublished').toLowerCase()) | translate }}
+            @if (binding()!.fixedWorkflowVersionId) {
+              <span class="text-ink-400 dark:text-dark-400 text-xs ms-1">({{ binding()!.fixedWorkflowVersionId }})</span>
+            }
+          </p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.execution_policy' | translate }}</p>
+          <p class="text-ink-900 dark:text-white">
+            {{ ('workflow.bindings.execution_policy.' + (binding()!.executionPolicy ?? 'StartNewInstance')) | translate }}
+          </p>
+        </div>
+        <div>
+          <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.list.col_status' | translate }}</p>
+          @if (binding()!.isActive) {
+            <prv-status-pill tone="success" labelKey="common.active" />
+          } @else {
+            <prv-status-pill tone="neutral" labelKey="common.inactive" />
+          }
+        </div>
+        @if (binding()!.startEventKey) {
+          <div class="col-span-2">
+            <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.start_event_key' | translate }}</p>
+            <p class="text-ink-900 dark:text-white font-mono text-xs">{{ binding()!.startEventKey }}</p>
+          </div>
+        }
+        @if (binding()!.startConditionExpression) {
+          <div class="col-span-2">
+            <p class="text-ink-400 dark:text-dark-400 text-xs mb-1">{{ 'workflow.bindings.field.start_condition' | translate }}</p>
+            <pre class="text-ink-900 dark:text-white font-mono text-xs bg-ink-50 dark:bg-dark-900 p-3 rounded-lg border border-ink-200 dark:border-dark-700 overflow-x-auto whitespace-pre-wrap">{{ binding()!.startConditionExpression }}</pre>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Readiness -->
+    @if (readiness(); as ready) {
+      <div class="bg-white dark:bg-dark-800 border border-ink-200 dark:border-dark-700 rounded-xl p-6 space-y-3"
+           [class.border-green-300]="ready.isReady"
+           [class.border-amber-300]="!ready.isReady">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.readiness_title' | translate }}</h2>
+          <prv-status-pill
+            [tone]="ready.isReady ? 'success' : 'warning'"
+            [labelKey]="ready.isReady ? 'workflow.bindings.detail.readiness_ready' : 'workflow.bindings.detail.readiness_blocked'" />
+        </div>
+        @if (ready.blockingReason) {
+          <p class="text-sm text-amber-800 dark:text-amber-300">{{ ready.blockingReason }}</p>
+        }
+        @if (ready.unmappedAssignmentKeys.length) {
+          <p class="text-xs text-ink-500 dark:text-dark-300">
+            {{ 'workflow.bindings.detail.readiness_unmapped' | translate }}:
+            <span class="font-mono">{{ ready.unmappedAssignmentKeys.join(', ') }}</span>
+          </p>
+        }
+      </div>
+    }
+
+    <!-- Simulate -->
+    <div class="bg-white dark:bg-dark-800 border border-ink-200 dark:border-dark-700 rounded-xl p-6 space-y-4">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.simulate_title' | translate }}</h2>
+          <p class="text-sm text-ink-500 dark:text-dark-300 mt-1">{{ 'workflow.bindings.wizard.simulate_hint' | translate }}</p>
+        </div>
+        <button type="button" (click)="runSimulate()" [disabled]="simulating()"
+          class="px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 transition-colors">
+          {{ simulating() ? ('common.processing' | translate) : ('workflow.bindings.detail.simulate_btn' | translate) }}
+        </button>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+          {{ 'workflow.bindings.wizard.simulate_payload' | translate }}
+        </label>
+        <textarea
+          rows="6"
+          [value]="samplePayloadJson()"
+          (input)="onSamplePayloadInput($event)"
+          class="w-full bg-ink-50 dark:bg-dark-900 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary resize-y"></textarea>
+      </div>
+      @if (simulateError()) {
+        <div class="rounded-lg bg-red-900/20 border border-red-800/40 p-3 text-sm text-red-400">
+          {{ simulateError() }}
+        </div>
+      }
+      @if (simulateResult(); as result) {
+        <div class="space-y-3">
+          <p class="text-sm font-medium"
+            [class]="(result.errors?.length ?? 0) > 0 ? 'text-red-400' : 'text-green-400'">
+            {{ ((result.errors?.length ?? 0) > 0
+              ? 'workflow.bindings.wizard.simulate_failed'
+              : 'workflow.bindings.wizard.simulate_success') | translate }}
+          </p>
+          @if (result.steps?.length) {
+            <div>
+              <p class="text-xs uppercase tracking-wide text-ink-400 dark:text-dark-400 mb-2">{{ 'workflow.bindings.wizard.simulate_steps' | translate }}</p>
+              <ol class="space-y-1 text-sm text-ink-900 dark:text-white">
+                @for (step of result.steps!; track $index) {
+                  <li class="font-mono text-xs bg-ink-50 dark:bg-dark-900 border border-ink-200 dark:border-dark-700 rounded px-3 py-2">
+                    {{ step.nodeKey }}
+                    @if (step.activityType) { <span class="text-ink-400 dark:text-dark-400 ms-2">{{ step.activityType }}</span> }
+                    @if (step.note) { <span class="text-ink-500 dark:text-dark-300 ms-2">— {{ step.note }}</span> }
+                  </li>
+                }
+              </ol>
+            </div>
+          }
+          @if (result.warnings?.length) {
+            <div>
+              <p class="text-xs uppercase tracking-wide text-amber-400 mb-2">{{ 'workflow.bindings.wizard.simulate_warnings' | translate }}</p>
+              <ul class="space-y-1 text-sm text-amber-200">
+                @for (w of result.warnings!; track $index) {
+                  <li>{{ w }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (result.errors?.length) {
+            <div>
+              <p class="text-xs uppercase tracking-wide text-red-400 mb-2">{{ 'workflow.bindings.wizard.simulate_errors' | translate }}</p>
+              <ul class="space-y-1 text-sm text-red-300">
+                @for (err of result.errors!; track $index) {
+                  <li>{{ err }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Assignment Mappings -->
+    <div class="bg-white dark:bg-dark-800 border border-ink-200 dark:border-dark-700 rounded-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.mappings_title' | translate }}</h2>
+        <button (click)="openAddMapping()"
+          class="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-400 transition-colors">
+          + {{ 'workflow.bindings.detail.add_mapping' | translate }}
+        </button>
+      </div>
+
+      @if (mappings().length === 0) {
+        <prv-empty-state titleKey="workflow.bindings.detail.no_mappings" />
+      } @else {
+        <app-workflow-table-shell>
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'workflow.bindings.detail.col_key' | translate }}</th>
+                <th>{{ 'workflow.bindings.detail.col_group' | translate }}</th>
+                <th class="text-end">{{ 'workflow.definitions.col_actions' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of mappings(); track m.id) {
+                <tr>
+                  <td>
+                    <span class="font-mono text-xs text-amber-400">{{ m.assignmentKey }}</span>
+                  </td>
+                  <td class="text-ink-900 dark:text-white text-sm">{{ groupName(m.assignmentGroupId) }}</td>
+                  <td class="text-end">
+                    <div class="flex items-center justify-end gap-3">
+                      <button (click)="openEditMapping(m)"
+                        class="text-xs text-primary hover:text-primary-300 transition-colors">
+                        {{ 'common.edit' | translate }}
+                      </button>
+                      <button (click)="openDeleteMapping(m)"
+                        class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                        {{ 'common.remove' | translate }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </app-workflow-table-shell>
+      }
+    </div>
+  }
+
+</div>
+
+<!-- Activate/Deactivate Confirmation -->
+@if (confirmAction()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">
+        {{ (confirmAction() === 'activate' ? 'workflow.bindings.list.confirm_activate_title' : 'workflow.bindings.list.confirm_deactivate_title') | translate }}
+      </h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ (confirmAction() === 'activate' ? 'workflow.bindings.list.confirm_activate_body' : 'workflow.bindings.list.confirm_deactivate_body') | translate }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="closeConfirm()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="executeConfirm()" [disabled]="actioning()"
+          [class]="'px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors ' +
+            (confirmAction() === 'activate' ? 'bg-green-600 text-white hover:bg-green-500' : 'bg-red-600 text-white hover:bg-red-500')">
+          {{ actioning() ? ('common.processing' | translate) : ('common.confirm' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Add Mapping Modal -->
+@if (showAddMapping()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-md mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.add_mapping' | translate }}</h2>
+        <button (click)="closeAddMapping()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="addMappingForm" (ngSubmit)="submitAddMapping()" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.bindings.detail.col_key' | translate }} <span class="text-red-400">*</span>
+          </label>
+          <input formControlName="assignmentKey" type="text"
+            placeholder="e.g. PRIVACY_REVIEW"
+            class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.bindings.detail.col_group' | translate }} <span class="text-red-400">*</span>
+          </label>
+          <select formControlName="assignmentGroupId"
+            class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary">
+            <option value="">{{ 'workflow.bindings.wizard.select_group' | translate }}</option>
+            @for (g of orgGroups(); track g.id) {
+              <option [value]="g.id">{{ g.name }} ({{ g.code }})</option>
+            }
+          </select>
+        </div>
+      </form>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeAddMapping()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitAddMapping()" [disabled]="addMappingSaving()"
+          class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 transition-colors">
+          {{ addMappingSaving() ? ('common.saving' | translate) : ('common.save' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Edit Mapping Modal -->
+@if (editMappingTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-md mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.edit_mapping' | translate }}</h2>
+        <button (click)="closeEditMapping()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-xs text-ink-400 dark:text-dark-400">
+          {{ 'workflow.bindings.detail.col_key' | translate }}:
+          <span class="font-mono text-amber-400 ms-1">{{ editMappingTarget()!.assignmentKey }}</span>
+        </p>
+        <form [formGroup]="editMappingForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.detail.col_group' | translate }} <span class="text-red-400">*</span>
+            </label>
+            <select formControlName="assignmentGroupId"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary">
+              @for (g of orgGroups(); track g.id) {
+                <option [value]="g.id">{{ g.name }} ({{ g.code }})</option>
+              }
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeEditMapping()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitEditMapping()" [disabled]="editMappingSaving()"
+          class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 transition-colors">
+          {{ editMappingSaving() ? ('common.saving' | translate) : ('common.save' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Delete Mapping Confirmation -->
+@if (deleteMappingTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.detail.confirm_delete_mapping' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ 'workflow.bindings.detail.confirm_delete_mapping_body' | translate }}
+        <span class="font-mono text-amber-400"> {{ deleteMappingTarget()!.assignmentKey }}</span>
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="closeDeleteMapping()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitDeleteMapping()" [disabled]="deleteMappingSaving()"
+          class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors">
+          {{ deleteMappingSaving() ? ('common.processing' | translate) : ('common.remove' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

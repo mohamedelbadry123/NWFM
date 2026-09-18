@@ -1,0 +1,16 @@
+<div class="pagination-bar">
+  <span class="pagination-info">
+    {{ rangeStart() }}–{{ rangeEnd() }} {{ 'PAGINATION.OF' | translate }} {{ totalCount() }} {{ itemsLabel() }}
+  </span>
+  <div class="pagination-controls">
+    <button type="button" class="pg-btn" [disabled]="page() <= 1" (click)="prevPage()">‹</button>
+    @for (p of pageNumbers(); track $index) {
+      @if (isNumber(p)) {
+        <button type="button" class="pg-num" [class.pg-num--active]="p === page()" (click)="goToPage(p)">{{ p }}</button>
+      } @else {
+        <span class="pg-ellipsis">…</span>
+      }
+    }
+    <button type="button" class="pg-btn" [disabled]="page() >= totalPages()" (click)="nextPage()">›</button>
+  </div>
+</div>

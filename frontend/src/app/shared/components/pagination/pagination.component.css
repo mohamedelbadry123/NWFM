@@ -1,0 +1,67 @@
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #E7EBF3;
+}
+
+.pagination-info { font-size: 0.8125rem; color: #5A6377; }
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.pg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #D3D9E6;
+  border-radius: 0.4375rem;
+  background: #fff;
+  color: #2E3550;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pg-btn:hover:not(:disabled) { background: #EEF2FE; border-color: #B9C7FB; color: #1A37A0; }
+.pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Flip the ‹ › chevron glyphs in RTL */
+:host-context(html[dir="rtl"]) .pg-btn { transform: scaleX(-1); }
+
+.pg-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 0.4375rem;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: #2E3550;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pg-num:hover { background: #EEF2FE; border-color: #DCE3FD; }
+.pg-num--active { background: #2450DE; color: #fff; border-color: #2450DE; font-weight: 600; }
+.pg-num--active:hover { background: #1D42C4; border-color: #1D42C4; }
+
+.pg-ellipsis { font-size: 0.875rem; color: #7E879D; padding: 0 0.25rem; }
+
+/* ── Dark mode ── */
+:host-context(html.dark) .pagination-bar { border-top-color: #242B5C; }
+:host-context(html.dark) .pagination-info { color: rgba(234, 236, 245, 0.6); }
+:host-context(html.dark) .pg-btn { background: #141838; border-color: #242B5C; color: rgba(234, 236, 245, 0.8); }
+:host-context(html.dark) .pg-btn:hover:not(:disabled) { background: rgba(36, 80, 222, 0.2); border-color: #323A6F; color: #B9C7FB; }
+:host-context(html.dark) .pg-num { color: rgba(234, 236, 245, 0.8); }
+:host-context(html.dark) .pg-num:hover { background: rgba(36, 80, 222, 0.18); border-color: #323A6F; }
+:host-context(html.dark) .pg-num--active { background: #2450DE; border-color: #2450DE; color: #fff; }
+:host-context(html.dark) .pg-ellipsis { color: rgba(234, 236, 245, 0.4); }

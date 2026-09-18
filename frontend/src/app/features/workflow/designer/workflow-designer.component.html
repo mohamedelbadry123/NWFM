@@ -1,0 +1,2314 @@
+<div
+  class="designer-shell flex flex-col overflow-hidden"
+  [attr.data-theme]="theme.isDark() ? 'dark' : 'light'"
+  [class.h-screen]="!isFullscreen()"
+  [class.designer-fullscreen]="isFullscreen()"
+>
+
+  <!-- ── Loading ── -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center h-full text-sm" style="color: var(--ds-text-3)">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- ── Error ── -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 h-full justify-center text-center">
+      <p class="text-sm" style="color: var(--ds-danger)">{{ loadError() }}</p>
+      <button type="button" (click)="goBack()" class="designer-btn-ghost">
+        ← {{ 'workflow.designer.back_to_versions' | translate }}
+      </button>
+    </div>
+  }
+
+  @if (!isLoading() && !loadError() && version()) {
+
+    <!-- ── Top bar ── -->
+    <div class="designer-topbar flex items-center justify-between px-3 py-2 shrink-0 gap-3">
+
+      <!-- Left: breadcrumb + title -->
+      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        <button type="button" (click)="goBack()" title="{{ 'workflow.designer.back_to_versions' | translate }}"
+          class="designer-icon-btn shrink-0"
+          [attr.aria-label]="'workflow.designer.back_to_versions' | translate">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <div class="flex flex-col min-w-0">
+          <span class="designer-title truncate leading-tight">
+            @if (definitionName()) { {{ definitionName() }} · }
+            {{ 'workflow.designer.title' | translate }}
+          </span>
+          <span class="designer-subtitle leading-tight">v{{ version()!.versionNumber }}</span>
+        </div>
+        <!-- Version status badge -->
+        @if (version()!.status === 'Published') {
+          <span class="designer-badge designer-badge-success shrink-0">{{ 'workflow.designer.status_published' | translate }}</span>
+        } @else if (version()!.status === 'Retired') {
+          <span class="designer-badge designer-badge-muted shrink-0">{{ 'workflow.designer.status_retired' | translate }}</span>
+        } @else {
+          <span class="designer-badge designer-badge-warn shrink-0">{{ 'workflow.designer.status_draft' | translate }}</span>
+        }
+        <!-- Validation badge -->
+        @if (validationResult()) {
+          @if (validationResult()!.isValid) {
+            <span class="designer-badge designer-badge-success shrink-0">{{ 'workflow.designer.valid_badge' | translate }}</span>
+          } @else {
+            <button type="button" (click)="showBottomDrawer.set(true); bottomTab.set('validation')"
+              class="designer-badge designer-badge-danger shrink-0 hover:brightness-110 transition-all">
+              {{ validationResult()!.errors?.length ?? 0 }} {{ 'workflow.designer.errors_badge' | translate }}
+            </button>
+          }
+        }
+      </div>
+
+      <!-- Center: main tab switcher -->
+      <div class="designer-segmented designer-topbar-center flex items-center gap-0.5 shrink-0">
+        <button type="button" (click)="switchTab('designer')"
+          [class]="activeTab() === 'designer' ? 'designer-segmented-active' : 'designer-segmented-idle'">
+          {{ 'workflow.designer.tab_canvas' | translate }}
+        </button>
+        <button type="button" (click)="switchTab('xml')"
+          [class]="activeTab() === 'xml' ? 'designer-segmented-active' : 'designer-segmented-idle'">
+          {{ 'workflow.designer.xml_tab' | translate }}
+        </button>
+      </div>
+
+      <!-- Right: actions -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        @if (!isReadonly()) {
+          <!-- Save status -->
+          <span class="text-[11px] font-medium shrink-0 px-1.5 tabular-nums"
+            [style.color]="saveStatus() === 'saved' ? 'var(--ds-success)' : saveStatus() === 'saving' ? 'var(--ds-text-3)' : 'var(--ds-warn)'">
+            @if (saveStatus() === 'saved')   { {{ 'workflow.designer.saved' | translate }} }
+            @if (saveStatus() === 'saving')  { {{ 'workflow.designer.saving' | translate }} }
+            @if (saveStatus() === 'unsaved') { {{ 'workflow.designer.unsaved' | translate }} }
+          </span>
+          <div class="designer-btn-group flex items-center">
+            <button type="button" (click)="undo()" title="{{ 'workflow.designer.undo' | translate }} (Ctrl+Z)"
+              class="designer-icon-btn rounded-e-none border-e-0"
+              [attr.aria-label]="'workflow.designer.undo' | translate">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 14L4 9m0 0l5-5M4 9h11a4 4 0 010 8h-1"/>
+              </svg>
+            </button>
+            <button type="button" (click)="redo()" title="{{ 'workflow.designer.redo' | translate }} (Ctrl+Y)"
+              class="designer-icon-btn rounded-s-none"
+              [attr.aria-label]="'workflow.designer.redo' | translate">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 14l5-5m0 0l-5-5m5 5H9a4 4 0 000 8h1"/>
+              </svg>
+            </button>
+          </div>
+          <button type="button" (click)="save()"
+            class="designer-btn-primary">
+            {{ 'workflow.designer.save_btn' | translate }}
+          </button>
+          <button type="button" (click)="validate()" [disabled]="validating()"
+            class="designer-btn-outline disabled:opacity-50">
+            {{ validating() ? '…' : ('workflow.designer.validate_btn' | translate) }}
+          </button>
+          <button type="button" (click)="publishVersion()" [disabled]="publishing()"
+            class="designer-btn-primary disabled:opacity-50">
+            {{ publishing() ? '…' : ('workflow.designer.publish_btn' | translate) }}
+          </button>
+          <button type="button" (click)="cloneVersion()" [disabled]="cloning()" title="{{ 'workflow.designer.clone_btn' | translate }}"
+            class="designer-icon-btn disabled:opacity-50"
+            [attr.aria-label]="'workflow.designer.clone_btn' | translate">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </button>
+        } @else {
+          <button type="button" (click)="cloneVersion()" [disabled]="cloning()"
+            class="designer-btn-ghost disabled:opacity-50">
+            {{ cloning() ? '…' : ('workflow.designer.clone_btn' | translate) }}
+          </button>
+          @if (version()!.status === 'Published') {
+            <button type="button" (click)="retireVersion()" [disabled]="retiring()"
+              class="px-3 py-1.5 text-xs font-medium border border-red-800/50 text-red-400 rounded-lg hover:bg-red-900/20 disabled:opacity-50 transition-colors">
+              {{ retiring() ? '…' : ('workflow.designer.retire_btn' | translate) }}
+            </button>
+          }
+        }
+
+        <div class="w-px h-5 mx-0.5" style="background: var(--ds-border)"></div>
+
+        <button type="button" (click)="openVariablesDrawer()"
+          [class]="(showBottomDrawer() && bottomTab() === 'variables') ? 'designer-icon-btn designer-icon-btn-active' : 'designer-icon-btn'"
+          title="{{ 'workflow.designer.variables_tab' | translate }}"
+          [attr.aria-label]="'workflow.designer.variables_tab' | translate">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+        </button>
+
+        <button type="button" (click)="toggleFullscreen()"
+          [class]="isFullscreen() ? 'designer-icon-btn designer-icon-btn-active' : 'designer-icon-btn'"
+          [title]="(isFullscreen() ? 'workflow.designer.fullscreen_exit' : 'workflow.designer.fullscreen_enter') | translate"
+          [attr.aria-pressed]="isFullscreen()"
+          [attr.aria-label]="(isFullscreen() ? 'workflow.designer.fullscreen_exit' : 'workflow.designer.fullscreen_enter') | translate">
+          @if (isFullscreen()) {
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
+            </svg>
+          } @else {
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/>
+            </svg>
+          }
+        </button>
+
+        <a [routerLink]="['/admin/workflow/help']" target="_blank"
+          class="designer-icon-btn"
+          title="{{ 'workflow.designer.help_btn' | translate }}"
+          [attr.aria-label]="'workflow.designer.help_btn' | translate">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── Read-only notice ── -->
+    @if (isReadonly()) {
+      <div class="designer-readonly px-4 py-2 text-xs text-center shrink-0">
+        {{ 'workflow.designer.readonly_notice' | translate }}
+      </div>
+    }
+
+    <!-- ── Main layout ── -->
+    <div class="flex flex-1 min-h-0">
+
+      <!-- ── Left: Node Palette ── -->
+      @if (activeTab() === 'designer') {
+        <div [class]="'palette-panel shrink-0 border-e flex flex-col overflow-hidden ' + (paletteCollapsed() ? 'w-14 is-collapsed' : 'w-64')">
+
+          @if (paletteCollapsed()) {
+            <!-- Collapsed: icon-only column -->
+            <div class="flex flex-col items-center pt-2 gap-1.5 px-1">
+              <button type="button" (click)="paletteCollapsed.set(false)"
+                class="designer-icon-btn"
+                [attr.title]="'workflow.designer.palette_title' | translate"
+                [attr.aria-label]="'workflow.designer.palette_title' | translate">›</button>
+              @for (p of paletteNodes; track p.type) {
+                <div draggable="true"
+                  [attr.title]="p.labelKey | translate"
+                  (dragstart)="onPaletteDragStart($event, p.type)"
+                  class="palette-item-icon w-9 h-9 cursor-grab hover:border-primary/50 transition-colors"
+                  [class.opacity-40]="isReadonly()">
+                  <span class="w-3 h-3 shrink-0" [style.background]="nodeColor(p.type)"
+                    [class.rounded-full]="p.type === 'Start' || p.type === 'End' || p.type === 'Timer' || p.type === 'WaitEvent'"
+                    [class.rotate-45]="isGateway(p.type)"
+                    [class.rounded-sm]="!isGateway(p.type) && p.type !== 'Start' && p.type !== 'End' && p.type !== 'Timer' && p.type !== 'WaitEvent'"></span>
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- Expanded: full palette -->
+            <div class="px-3 pt-3 pb-2.5 border-b shrink-0 space-y-2.5 designer-panel-header">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <p class="text-xs font-semibold tracking-tight" style="color: var(--ds-text)">
+                    {{ 'workflow.designer.palette_title' | translate }}
+                  </p>
+                  <p class="text-[10px] mt-0.5" style="color: var(--ds-text-3)">{{ 'workflow.designer.palette_hint' | translate }}</p>
+                </div>
+                <button type="button" (click)="paletteCollapsed.set(true)"
+                  class="designer-icon-btn"
+                  [attr.title]="'workflow.designer.palette_collapse' | translate"
+                  [attr.aria-label]="'workflow.designer.palette_collapse' | translate">‹</button>
+              </div>
+              <div class="designer-segmented flex items-center gap-0.5">
+                <button type="button" (click)="activeTool.set('select')"
+                  [class]="activeTool() === 'select' ? 'designer-segmented-active flex-1' : 'designer-segmented-idle flex-1'"
+                  [attr.title]="'workflow.designer.tool_select' | translate">
+                  {{ 'workflow.designer.tool_select' | translate }}
+                </button>
+                <button type="button" (click)="activeTool.set('pan')"
+                  [class]="activeTool() === 'pan' ? 'designer-segmented-active flex-1' : 'designer-segmented-idle flex-1'"
+                  [attr.title]="'workflow.designer.tool_pan' | translate">
+                  {{ 'workflow.designer.tool_pan' | translate }}
+                </button>
+              </div>
+              <input
+                [value]="paletteSearch()"
+                (input)="paletteSearch.set($any($event.target).value)"
+                type="search"
+                [attr.placeholder]="'workflow.designer.palette_search' | translate"
+                class="designer-field" />
+            </div>
+            <div class="flex-1 overflow-y-auto py-2 px-2">
+              @for (cat of paletteCategories; track cat.id) {
+                @let catNodes = paletteNodesInCategory(cat.id);
+                @if (catNodes.length > 0) {
+                  <div class="palette-cat px-1 mb-2">
+                    <p class="palette-cat-label">{{ cat.labelKey | translate }}</p>
+                    <div class="space-y-1.5">
+                      @for (p of catNodes; track p.type) {
+                        <div draggable="true"
+                          [attr.title]="p.descKey | translate"
+                          (dragstart)="onPaletteDragStart($event, p.type)"
+                          [class]="isReadonly() ? 'palette-item palette-item-disabled' : 'palette-item'">
+                          <span class="palette-item-icon">
+                            <span class="w-3 h-3 shrink-0" [style.background]="nodeColor(p.type)"
+                              [class.rounded-full]="p.type === 'Start' || p.type === 'End' || p.type === 'Timer' || p.type === 'WaitEvent'"
+                              [class.rotate-45]="isGateway(p.type)"
+                              [class.rounded-sm]="!isGateway(p.type) && p.type !== 'Start' && p.type !== 'End' && p.type !== 'Timer' && p.type !== 'WaitEvent'"></span>
+                          </span>
+                          <span class="min-w-0 flex-1">
+                            <span class="palette-item-title truncate">{{ p.labelKey | translate }}</span>
+                            <span class="palette-item-desc line-clamp-2">{{ p.descKey | translate }}</span>
+                          </span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              }
+              @if (filteredPalette().length === 0) {
+                <p class="text-xs text-center py-6 px-3" style="color: var(--ds-text-3)">{{ 'workflow.designer.palette_empty' | translate }}</p>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ── Center: Canvas or XML ── -->
+      <div class="designer-canvas-pane flex-1 min-w-0 relative overflow-hidden"
+        (drop)="onCanvasDrop($event)"
+        (dragover)="onCanvasDragOver($event)">
+
+        @if (activeTab() === 'designer') {
+          @if (drawingEdge()) {
+            <div class="connect-banner">
+              @if (drawingEdge()!.outcomeKey) {
+                {{ 'workflow.designer.connect_outcome_hint' | translate:{ key: drawingEdge()!.outcomeKey } }}
+              } @else {
+                {{ 'workflow.designer.connect_drag_hint' | translate }}
+              }
+            </div>
+          }
+
+          @if (showConnectGuide()) {
+            <div class="connect-guide" role="status">
+              <div class="connect-guide-card designer-pop">
+                <p class="connect-guide-title">{{ 'workflow.designer.connect_guide_title' | translate }}</p>
+                <ol class="connect-guide-steps">
+                  <li>{{ 'workflow.designer.connect_guide_s1' | translate }}</li>
+                  <li>{{ 'workflow.designer.connect_guide_s2' | translate }}</li>
+                  <li>{{ 'workflow.designer.connect_guide_s3' | translate }}</li>
+                  <li>{{ 'workflow.designer.connect_guide_s4' | translate }}</li>
+                </ol>
+                <button type="button" (click)="dismissConnectGuide()" class="designer-btn-primary connect-guide-btn">
+                  {{ 'workflow.designer.connect_guide_dismiss' | translate }}
+                </button>
+              </div>
+            </div>
+          }
+
+          <div #canvasScroll class="designer-canvas-scroll">
+          <svg #canvasSvg
+            class="select-none block"
+            [attr.width]="canvasWorld().width"
+            [attr.height]="canvasWorld().height"
+            [class.cursor-default]="activeTool() === 'select' && !drawingEdge()"
+            [class.cursor-grab]="activeTool() === 'pan' && !drawingEdge()"
+            [class.cursor-crosshair]="!!drawingEdge()"
+            (click)="onCanvasClick()"
+            (contextmenu)="onCanvasContextMenu($event)"
+            (mousedown)="onCanvasMouseDown($event)"
+            (mousemove)="onCanvasMouseMove($event)"
+            (wheel)="onWheel($event)"
+            style="touch-action: pan-x pan-y;">
+
+            <defs>
+              <!-- Normal arrow — larger, clearer -->
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 0 8 L 10 4 z" fill="#6b7280" />
+              </marker>
+              <!-- Selected arrow — purple -->
+              <marker id="arrow-selected" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 0 8 L 10 4 z" fill="#5040D6" />
+              </marker>
+              <!-- Default path arrow — green -->
+              <marker id="arrow-default" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 0 8 L 10 4 z" fill="#22c55e" />
+              </marker>
+              <!-- Error arrow — red -->
+              <marker id="arrow-error" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 0 8 L 10 4 z" fill="#ef4444" />
+              </marker>
+              <!-- Hover arrow — lighter gray -->
+              <marker id="arrow-hover" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+                <path d="M 0 0 L 0 8 L 10 4 z" fill="#9ca3af" />
+              </marker>
+              <!-- Dot grid background -->
+              <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                <circle cx="0" cy="0" r="0.9" [attr.fill]="gridDotFill()" />
+                <circle cx="24" cy="0" r="0.9" [attr.fill]="gridDotFill()" />
+                <circle cx="0" cy="24" r="0.9" [attr.fill]="gridDotFill()" />
+                <circle cx="24" cy="24" r="0.9" [attr.fill]="gridDotFill()" />
+              </pattern>
+            </defs>
+
+            <rect [attr.width]="canvasWorld().width" [attr.height]="canvasWorld().height" fill="url(#grid)" />
+
+            <g [attr.transform]="'translate(' + panX() + ',' + panY() + ') scale(' + zoom() + ')'">
+
+              <!-- Edges -->
+              @for (e of edges(); track e.id) {
+                <g class="edge-group" (click)="onEdgeClick($event, e.id)" (contextmenu)="onEdgeContextMenu($event, e.id)">
+                  <path [attr.d]="edgePath(e)" fill="none"
+                    [attr.stroke]="selectedEdgeId() === e.id ? edgeSelectedStroke() : (e.isDefault ? edgeDefaultStroke() : edgeStroke())"
+                    [attr.stroke-width]="selectedEdgeId() === e.id ? 2.75 : 2"
+                    [attr.marker-end]="selectedEdgeId() === e.id ? 'url(#arrow-selected)' : (e.isDefault ? 'url(#arrow-default)' : 'url(#arrow)')"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="cursor-pointer edge-path" />
+                  <!-- Wider transparent hit area -->
+                  <path [attr.d]="edgePath(e)" fill="none" stroke="transparent" stroke-width="18"
+                    stroke-linecap="round" stroke-linejoin="round" class="cursor-pointer" />
+                  <!-- Default-path label -->
+                  @if (e.isDefault) {
+                    <text [attr.x]="edgeLabelPos(e).x" [attr.y]="edgeLabelPos(e).y - 18"
+                      text-anchor="middle" font-size="9" fill="#22c55e" font-weight="600" class="pointer-events-none select-none">
+                      DEFAULT
+                    </text>
+                  }
+                  @if (e.labelEn || (e.outcomeKey && e.outcomeKey !== e.transitionKey)) {
+                    <text [attr.x]="edgeLabelPos(e).x" [attr.y]="edgeLabelPos(e).y - 8"
+                      text-anchor="middle" font-size="10" fill="#a78bfa" class="pointer-events-none select-none">
+                      {{ e.labelEn || e.outcomeKey }}
+                    </text>
+                  }
+                  @if (e.labelEn && e.outcomeKey && e.outcomeKey !== e.transitionKey) {
+                    <text [attr.x]="edgeLabelPos(e).x" [attr.y]="edgeLabelPos(e).y + 4"
+                      text-anchor="middle" font-size="9" fill="#6b7280" class="pointer-events-none select-none">
+                      {{ e.outcomeKey }}
+                    </text>
+                  }
+                  @if (selectedEdgeId() === e.id && !isReadonly()) {
+                    <g [attr.transform]="'translate(' + edgeLabelPos(e).x + ',' + edgeLabelPos(e).y + ')'">
+                      <circle r="8" fill="#1f1f1f" stroke="#5040D6" stroke-width="1"/>
+                      <text text-anchor="middle" dy="4" font-size="10" fill="#ef4444" class="cursor-pointer"
+                        (click)="deleteEdge(e.id)">×</text>
+                    </g>
+                  }
+                </g>
+              }
+
+              <!-- Drawing edge preview (smart orthogonal) -->
+              @if (drawingEdge()) {
+                <path
+                  [attr.d]="drawingEdgePath()"
+                  fill="none" stroke="#818cf8" stroke-width="2.5" stroke-dasharray="6,4"
+                  marker-end="url(#arrow-selected)" pointer-events="none" class="connect-preview" />
+                <circle [attr.cx]="drawingEdge()!.x2" [attr.cy]="drawingEdge()!.y2" r="5"
+                  fill="#5040D6" stroke="#c7d2fe" stroke-width="1.5" class="pointer-events-none" />
+              }
+
+              <!-- Nodes -->
+              @for (n of nodes(); track n.id) {
+                <g class="node"
+                  [class.is-selected]="selectedNodeId() === n.id"
+                  [class.is-connect-source]="drawingEdge()?.fromNodeId === n.id"
+                  [class.is-connect-target]="connectHoverNodeId() === n.id"
+                  (click)="onNodeClick($event, n.id)"
+                  (mousedown)="onNodeMouseDown($event, n.id)"
+                  (contextmenu)="onNodeContextMenu($event, n.id)">
+
+                  @if (n.type === 'Start') {
+                    <!-- Multi-select highlight -->
+                    @if (selectedNodeIds().includes(n.id) && selectedNodeId() !== n.id) {
+                      <circle [attr.cx]="n.x" [attr.cy]="n.y" r="33"
+                        fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,2" class="pointer-events-none" />
+                    }
+                    <!-- Start: outer ring on selection -->
+                    @if (selectedNodeId() === n.id) {
+                      <circle [attr.cx]="n.x" [attr.cy]="n.y" r="33"
+                        fill="#16a34a" fill-opacity="0.12" stroke="#4ade80" stroke-width="1.5" class="pointer-events-none" />
+                    }
+                    <!-- Start: green filled circle (r=26 → 52px diameter) -->
+                    <circle [attr.cx]="n.x" [attr.cy]="n.y" r="26"
+                      [attr.fill]="startFill(selectedNodeId() === n.id)"
+                      [attr.stroke]="startStroke(selectedNodeId() === n.id)"
+                      [attr.stroke-width]="selectedNodeId() === n.id ? 2.5 : 1.5"
+                      class="cursor-move" />
+                    <!-- Play triangle -->
+                    <polygon [attr.points]="(n.x-8)+','+(n.y-10)+' '+(n.x+11)+','+n.y+' '+(n.x-8)+','+(n.y+10)"
+                      fill="white" class="pointer-events-none" />
+                    <text [attr.x]="n.x" [attr.y]="n.y + 40" text-anchor="middle" font-size="11" [attr.fill]="nodeLabelFill()" font-weight="600" class="pointer-events-none select-none">
+                      {{ truncateText(n.name || 'Start', 12) }}
+                    </text>
+
+                  } @else if (n.type === 'End') {
+                    <!-- Multi-select highlight -->
+                    @if (selectedNodeIds().includes(n.id) && selectedNodeId() !== n.id) {
+                      <circle [attr.cx]="n.x" [attr.cy]="n.y" r="33"
+                        fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,2" class="pointer-events-none" />
+                    }
+                    <!-- End: outer glow on selection -->
+                    @if (selectedNodeId() === n.id) {
+                      <circle [attr.cx]="n.x" [attr.cy]="n.y" r="33"
+                        fill="#dc2626" fill-opacity="0.12" stroke="#f87171" stroke-width="1.5" class="pointer-events-none" />
+                    }
+                    <!-- End: dark red outer circle -->
+                    <circle [attr.cx]="n.x" [attr.cy]="n.y" r="26"
+                      [attr.fill]="endFill(selectedNodeId() === n.id)"
+                      [attr.stroke]="endStroke(selectedNodeId() === n.id)"
+                      [attr.stroke-width]="selectedNodeId() === n.id ? 2.5 : 1.5"
+                      class="cursor-move" />
+                    <!-- End: inner ring -->
+                    <circle [attr.cx]="n.x" [attr.cy]="n.y" r="20" fill="none" stroke="#dc2626" stroke-width="3" class="pointer-events-none" />
+                    <!-- Stop square inside -->
+                    <rect [attr.x]="n.x-9" [attr.y]="n.y-9" width="18" height="18" rx="2" fill="#dc2626" class="pointer-events-none" />
+                    <text [attr.x]="n.x" [attr.y]="n.y + 40" text-anchor="middle" font-size="11" [attr.fill]="nodeLabelFill()" font-weight="600" class="pointer-events-none select-none">
+                      {{ truncateText(n.name || 'End', 12) }}
+                    </text>
+
+                  } @else if (isGateway(n.type)) {
+                    <!-- Multi-select highlight -->
+                    @if (selectedNodeIds().includes(n.id) && selectedNodeId() !== n.id) {
+                      <polygon
+                        [attr.points]="n.x + ',' + (n.y - GATEWAY_R - 7) + ' ' + (n.x + GATEWAY_R + 7) + ',' + n.y + ' ' + n.x + ',' + (n.y + GATEWAY_R + 7) + ' ' + (n.x - GATEWAY_R - 7) + ',' + n.y"
+                        fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,2" class="pointer-events-none" />
+                    }
+                    <!-- Gateway: selected glow -->
+                    @if (selectedNodeId() === n.id) {
+                      <polygon
+                        [attr.points]="n.x + ',' + (n.y - GATEWAY_R - 5) + ' ' + (n.x + GATEWAY_R + 5) + ',' + n.y + ' ' + n.x + ',' + (n.y + GATEWAY_R + 5) + ' ' + (n.x - GATEWAY_R - 5) + ',' + n.y"
+                        [attr.fill]="nodeColor(n.type)" fill-opacity="0.12" class="pointer-events-none" />
+                    }
+                    <!-- Gateway: main diamond -->
+                    <polygon
+                      [attr.points]="n.x + ',' + (n.y - GATEWAY_R) + ' ' + (n.x + GATEWAY_R) + ',' + n.y + ' ' + n.x + ',' + (n.y + GATEWAY_R) + ' ' + (n.x - GATEWAY_R) + ',' + n.y"
+                      [attr.fill]="gatewayFill(selectedNodeId() === n.id)"
+                      [attr.stroke]="selectedNodeId() === n.id ? nodeColor(n.type) : nodeColor(n.type)"
+                      [attr.stroke-width]="selectedNodeId() === n.id ? 2.5 : 1.75"
+                      class="cursor-move" />
+                    <!-- Gateway symbol text (centered) -->
+                    <text [attr.x]="n.x" [attr.y]="n.y + 6" text-anchor="middle" font-size="18" font-weight="700"
+                      [attr.fill]="nodeColor(n.type)" class="pointer-events-none select-none">
+                      @if (n.type === 'ParallelGateway') { + }
+                      @else if (n.type === 'JoinGateway') { ⇉ }
+                      @else if (n.type === 'InclusiveGateway') { ○ }
+                      @else { × }
+                    </text>
+                    <!-- Gateway type label below -->
+                    <text [attr.x]="n.x" [attr.y]="n.y + GATEWAY_R + 16" text-anchor="middle" font-size="10.5" [attr.fill]="nodeLabelFill()" font-weight="600" class="pointer-events-none select-none">
+                      {{ truncateText(n.name || n.type, 14) }}
+                    </text>
+                    <!-- Outcome badge (top-right corner of diamond) -->
+                    @if (n.outcomes.length > 0) {
+                      <g [attr.transform]="'translate(' + (n.x + GATEWAY_R - 2) + ',' + (n.y - GATEWAY_R + 2) + ')'">
+                        <circle r="9" fill="#4f46e5" class="pointer-events-none" />
+                        <text text-anchor="middle" dy="3.5" font-size="8" fill="white" font-weight="700" class="pointer-events-none select-none">{{ n.outcomes.length }}</text>
+                      </g>
+                    }
+
+                  } @else {
+                    <!-- Task nodes: rounded rectangle with left accent bar -->
+                    <!-- Multi-select secondary highlight (dashed) -->
+                    @if (selectedNodeIds().includes(n.id) && selectedNodeId() !== n.id) {
+                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="NODE_W + 6" [attr.height]="NODE_H + 6" rx="12"
+                        fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,2" class="pointer-events-none" />
+                    }
+                    <!-- Shadow/glow for primary selected -->
+                    @if (selectedNodeId() === n.id) {
+                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="NODE_W + 6" [attr.height]="NODE_H + 6" rx="11"
+                        [attr.fill]="nodeColor(n.type)" fill-opacity="0.15" class="pointer-events-none" />
+                    }
+                    <!-- Main body -->
+                    <rect [attr.x]="n.x" [attr.y]="n.y" [attr.width]="NODE_W" [attr.height]="NODE_H" rx="9"
+                      [attr.fill]="taskFill(selectedNodeId() === n.id)"
+                      [attr.stroke]="taskStroke(selectedNodeId() === n.id)"
+                      [attr.stroke-width]="selectedNodeId() === n.id ? 2 : 1.25"
+                      class="cursor-move" />
+                    <!-- Left accent bar — full height minus corners -->
+                    <rect [attr.x]="n.x" [attr.y]="n.y + 9" width="4" [attr.height]="NODE_H - 18" rx="2"
+                      [attr.fill]="nodeColor(n.type)" class="pointer-events-none" />
+                    <!-- Separator line between top and bottom halves -->
+                    <line [attr.x1]="n.x + 6" [attr.y1]="n.y + NODE_H * 0.56"
+                      [attr.x2]="n.x + NODE_W - 4" [attr.y2]="n.y + NODE_H * 0.56"
+                      stroke="#312e81" stroke-width="0.5" class="pointer-events-none" />
+
+                    <!-- Top half: icon + name -->
+                    <!-- Type icon -->
+                    <text [attr.x]="n.x + 16" [attr.y]="n.y + 30"
+                      font-size="15" text-anchor="middle"
+                      [attr.fill]="nodeColor(n.type)" class="pointer-events-none select-none">
+                      @if (n.type === 'Timer')                { ⏱ }
+                      @else if (n.type === 'WaitEvent')       { ⏳ }
+                      @else if (n.type === 'ServiceTask')     { ⚙ }
+                      @else if (n.type === 'CallActivity')    { ⎘ }
+                      @else if (n.type === 'ScriptTask')      { 📝 }
+                      @else if (n.type === 'NotificationTask'){ ✉ }
+                      @else                                   { ✅ }
+                    </text>
+                    <!-- Node name -->
+                    <text [attr.x]="n.x + 28" [attr.y]="n.y + 30"
+                      font-size="12" [attr.fill]="nodeLabelFill()" font-weight="600" class="pointer-events-none select-none">
+                      {{ truncateText(n.name || n.type, 17) }}
+                    </text>
+                    <!-- Node key (muted, small) -->
+                    <text [attr.x]="n.x + 28" [attr.y]="n.y + 43"
+                      font-size="8.5" [attr.fill]="nodeSubLabelFill()" class="pointer-events-none select-none">
+                      {{ truncateText(n.nodeKey, 22) }}
+                    </text>
+
+                    <!-- Bottom half: sub-labels and badges -->
+                    @if (nodeSubLabel(n)) {
+                      <!-- Assignment key or Action key badge -->
+                      <rect [attr.x]="n.x + 8" [attr.y]="n.y + NODE_H * 0.58 + 3"
+                        [attr.width]="NODE_W - 16" height="15" rx="3"
+                        fill="var(--ds-primary-soft)" class="pointer-events-none" />
+                      <text [attr.x]="n.x + 12" [attr.y]="n.y + NODE_H * 0.58 + 14"
+                        font-size="9" fill="var(--ds-primary)" class="pointer-events-none select-none">
+                        @if (n.type === 'UserTask') { 👤 }@else { 🔑 }
+                        {{ truncateText(nodeSubLabel(n), 22) }}
+                      </text>
+                    }
+
+                    <!-- Outcome count pill (top-right) -->
+                    @if (n.outcomes.length > 0) {
+                      <g [attr.transform]="'translate(' + (n.x + NODE_W - 22) + ',' + (n.y + 11) + ')'">
+                        <rect x="-10" y="-8" width="22" height="15" rx="7" fill="#4f46e5" class="pointer-events-none" />
+                        <text text-anchor="middle" dy="4" font-size="8.5" fill="white" font-weight="600"
+                          class="pointer-events-none select-none">{{ n.outcomes.length }}▸</text>
+                      </g>
+                    }
+                    <!-- Action count pill (below outcome) -->
+                    @if (n.actions.length > 0) {
+                      <g [attr.transform]="'translate(' + (n.x + NODE_W - 22) + ',' + (n.y + 30) + ')'">
+                        <rect x="-10" y="-8" width="22" height="15" rx="7" fill="#0e7490" class="pointer-events-none" />
+                        <text text-anchor="middle" dy="4" font-size="8.5" fill="white" font-weight="600"
+                          class="pointer-events-none select-none">{{ n.actions.length }}⚡</text>
+                      </g>
+                    }
+                  }
+
+                  <!-- Connection ports -->
+                  @if (!isReadonly() && canHaveEdge(n.type)) {
+                    @if (n.type === 'ExclusiveGateway' && decisionOutcomePorts(n).length > 0) {
+                      @for (p of decisionOutcomePorts(n); track p.key) {
+                        <g class="outcome-port">
+                          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="16"
+                            fill="#000" fill-opacity="0" class="port-hit cursor-crosshair"
+                            (mousedown)="startEdge($event, n.id, p.key)">
+                            <title>{{ 'workflow.designer.decision_port_hint' | translate:{ key: p.key } }}</title>
+                          </circle>
+                          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="8"
+                            class="port-dot pointer-events-none"
+                            [class.port-dot-active]="drawingEdge()?.fromNodeId === n.id && drawingEdge()?.outcomeKey === p.key" />
+                          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3.5"
+                            fill="#e0e7ff" class="pointer-events-none" />
+                          <text [attr.x]="p.x + 12" [attr.y]="p.y + 3.5"
+                            font-size="8" font-weight="600" fill="#d97706"
+                            class="pointer-events-none select-none">{{ p.label }}</text>
+                        </g>
+                      }
+                    } @else {
+                      @let out = portOutPos(n);
+                      <circle [attr.cx]="out.x" [attr.cy]="out.y" r="16"
+                        fill="#000" fill-opacity="0" class="port-hit cursor-crosshair"
+                        (mousedown)="startEdge($event, n.id)">
+                        <title>{{ 'workflow.designer.connect_hint' | translate }}</title>
+                      </circle>
+                      <circle [attr.cx]="out.x" [attr.cy]="out.y" r="8"
+                        class="port-dot pointer-events-none"
+                        [class.port-dot-active]="selectedNodeId() === n.id || drawingEdge()?.fromNodeId === n.id" />
+                      <circle [attr.cx]="out.x" [attr.cy]="out.y" r="3.5"
+                        fill="#e0e7ff" class="pointer-events-none" />
+                    }
+                  }
+
+                  <!-- Inbound magnet while connecting -->
+                  @if (drawingEdge() && drawingEdge()!.fromNodeId !== n.id) {
+                    @let inn = portInPos(n);
+                    <circle [attr.cx]="inn.x" [attr.cy]="inn.y" r="14"
+                      class="port-magnet pointer-events-none"
+                      [class.port-magnet-hot]="connectHoverNodeId() === n.id" />
+                    <circle [attr.cx]="inn.x" [attr.cy]="inn.y" r="5"
+                      class="pointer-events-none"
+                      [attr.fill]="connectHoverNodeId() === n.id ? '#5040D6' : '#64748b'"
+                      [attr.stroke]="connectHoverNodeId() === n.id ? '#c7d2fe' : '#94a3b8'"
+                      stroke-width="1.5" />
+                  }
+
+                  <!-- Delete button (top-right when selected) -->
+                  @if (selectedNodeId() === n.id && !isReadonly() && !drawingEdge()) {
+                    @if (!isGateway(n.type) && n.type !== 'Start' && n.type !== 'End') {
+                      <g class="node-delete-btn"
+                        [attr.transform]="'translate(' + (n.x + NODE_W - 2) + ',' + (n.y - 2) + ')'"
+                        (click)="requestDeleteNode($event, n)"
+                        (mousedown)="$event.stopPropagation()">
+                        <title>{{ 'common.delete' | translate }}</title>
+                        <circle r="11" fill="#fee2e2" stroke="#ef4444" stroke-width="1.75" class="cursor-pointer"/>
+                        <text text-anchor="middle" dy="4.5" font-size="14" font-weight="700" fill="#dc2626"
+                          class="pointer-events-none select-none">×</text>
+                      </g>
+                    } @else if (n.type === 'Start' || n.type === 'End') {
+                      <g class="node-delete-btn"
+                        [attr.transform]="'translate(' + (n.x + 20) + ',' + (n.y - 20) + ')'"
+                        (click)="requestDeleteNode($event, n)"
+                        (mousedown)="$event.stopPropagation()">
+                        <title>{{ 'common.delete' | translate }}</title>
+                        <circle r="11" fill="#fee2e2" stroke="#ef4444" stroke-width="1.75" class="cursor-pointer"/>
+                        <text text-anchor="middle" dy="4.5" font-size="14" font-weight="700" fill="#dc2626"
+                          class="pointer-events-none select-none">×</text>
+                      </g>
+                    } @else {
+                      <g class="node-delete-btn"
+                        [attr.transform]="'translate(' + (n.x + GATEWAY_R + 2) + ',' + (n.y - GATEWAY_R - 6) + ')'"
+                        (click)="requestDeleteNode($event, n)"
+                        (mousedown)="$event.stopPropagation()">
+                        <title>{{ 'common.delete' | translate }}</title>
+                        <circle r="11" fill="#fee2e2" stroke="#ef4444" stroke-width="1.75" class="cursor-pointer"/>
+                        <text text-anchor="middle" dy="4.5" font-size="14" font-weight="700" fill="#dc2626"
+                          class="pointer-events-none select-none">×</text>
+                      </g>
+                    }
+                  }
+
+                  <!-- Quick-add button (appears when node is selected; offset from port) -->
+                  @if (selectedNodeId() === n.id && !isReadonly() && canHaveEdge(n.type) && !drawingEdge()) {
+                    <g class="quick-add-btn" (click)="quickAddSourceId.set(n.id)"
+                      [attr.transform]="'translate(' + quickAddBtnPos(n).x + ',' + quickAddBtnPos(n).y + ')'">
+                      <circle r="11" fill="#1e1b4b" stroke="#5040D6" stroke-width="1.5"/>
+                      <text text-anchor="middle" dy="4.5" font-size="16" fill="#818cf8"
+                        class="pointer-events-none select-none">+</text>
+                    </g>
+                  }
+                </g>
+              }
+
+              <!-- Marquee selection rect -->
+              @if (marquee()) {
+                <rect [attr.x]="marquee()!.x" [attr.y]="marquee()!.y"
+                  [attr.width]="marquee()!.w" [attr.height]="marquee()!.h"
+                  fill="#5040D6" fill-opacity="0.08"
+                  stroke="#5040D6" stroke-width="1" stroke-dasharray="4,2"
+                  class="pointer-events-none" />
+              }
+            </g>
+          </svg>
+          </div>
+
+          <!-- ── Quick-add node picker overlay ── -->
+          @if (quickAddSourceId() && !isReadonly()) {
+            <div class="absolute z-50 designer-pop p-3 w-52"
+              style="top: 50%; inset-inline-start: 50%; transform: translate(-50%, -50%)">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-semibold" style="color: var(--ds-text)">{{ 'workflow.designer.quick_add_title' | translate }}</p>
+                <button type="button" (click)="quickAddSourceId.set(null)"
+                  class="designer-icon-btn" style="width:1.5rem;height:1.5rem">✕</button>
+              </div>
+              <div class="space-y-0.5">
+                @for (p of paletteNodes; track p.type) {
+                  @if (p.type !== 'Start') {
+                    <button type="button" (click)="quickAddNode(p.type)"
+                      class="designer-menu-item w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-start">
+                      <span class="w-2.5 h-2.5 rounded-sm shrink-0" [style.background]="nodeColor(p.type)"></span>
+                      {{ p.labelKey | translate }}
+                    </button>
+                  }
+                }
+              </div>
+            </div>
+          }
+
+          <!-- ── Empty canvas onboarding ── -->
+          @if (showOnboarding() && !isReadonly() && !showTour()) {
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-4 sm:p-6">
+              <div class="pointer-events-auto relative w-full max-w-lg rounded-2xl border border-ink-200/80 bg-white/95 p-5 sm:p-6 shadow-xl backdrop-blur-sm dark:border-dark-600 dark:bg-dark-800/95"
+                role="dialog"
+                [attr.aria-label]="'workflow.designer.onboarding_title' | translate">
+                <button type="button" (click)="dismissOnboarding()"
+                  class="absolute end-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition hover:bg-ink-100 hover:text-red-600 dark:hover:bg-dark-700 dark:hover:text-red-400"
+                  [attr.aria-label]="'common.close' | translate"
+                  [attr.title]="'common.close' | translate">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div class="mb-5 pe-8 text-center sm:text-start">
+                  <div class="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                  </div>
+                  <h2 class="text-lg font-semibold tracking-tight text-ink-900 dark:text-white">{{ 'workflow.designer.onboarding_title' | translate }}</h2>
+                  <p class="mt-1 text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.designer.onboarding_subtitle' | translate }}</p>
+                </div>
+
+                <div class="space-y-2">
+                  <button type="button" (click)="startGuidedTour()"
+                    class="group flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary px-3.5 py-3 text-start text-white shadow-sm transition hover:bg-primary-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-semibold">{{ 'workflow.designer.onboarding_guided_tour' | translate }}</span>
+                      <span class="mt-0.5 block text-xs text-white/80">{{ 'workflow.designer.onboarding_guided_tour_hint' | translate }}</span>
+                    </span>
+                    <span class="text-white/70 transition group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" aria-hidden="true">›</span>
+                  </button>
+
+                  <button type="button" (click)="addStartNode()"
+                    class="flex w-full items-center gap-3 rounded-xl border border-ink-200 bg-ink-50/80 px-3.5 py-3 text-start transition hover:border-ink-300 hover:bg-ink-100 dark:border-dark-600 dark:bg-dark-900/60 dark:hover:border-dark-500 dark:hover:bg-dark-700">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-ink-900 dark:text-white">{{ 'workflow.designer.onboarding_start_blank' | translate }}</span>
+                      <span class="mt-0.5 block text-xs text-ink-500 dark:text-dark-400">{{ 'workflow.designer.onboarding_start_blank_hint' | translate }}</span>
+                    </span>
+                  </button>
+
+                  <a routerLink="/admin/workflow/definitions"
+                    class="flex w-full items-center gap-3 rounded-xl border border-ink-200 bg-ink-50/80 px-3.5 py-3 text-start no-underline transition hover:border-ink-300 hover:bg-ink-100 dark:border-dark-600 dark:bg-dark-900/60 dark:hover:border-dark-500 dark:hover:bg-dark-700">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                      </svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-ink-900 dark:text-white">{{ 'workflow.designer.onboarding_open_example' | translate }}</span>
+                      <span class="mt-0.5 block text-xs text-ink-500 dark:text-dark-400">{{ 'workflow.designer.onboarding_open_example_hint' | translate }}</span>
+                    </span>
+                  </a>
+
+                  <button type="button" (click)="activeTab.set('xml')"
+                    class="flex w-full items-center gap-3 rounded-xl border border-ink-200 bg-ink-50/80 px-3.5 py-3 text-start transition hover:border-ink-300 hover:bg-ink-100 dark:border-dark-600 dark:bg-dark-900/60 dark:hover:border-dark-500 dark:hover:bg-dark-700">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-600 dark:text-violet-400">
+                      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-ink-900 dark:text-white">{{ 'workflow.designer.onboarding_import_xml' | translate }}</span>
+                      <span class="mt-0.5 block text-xs text-ink-500 dark:text-dark-400">{{ 'workflow.designer.onboarding_import_xml_hint' | translate }}</span>
+                    </span>
+                  </button>
+                </div>
+
+                <div class="mt-5 border-t border-ink-100 pt-4 dark:border-dark-700">
+                  <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-400 dark:text-dark-400">{{ 'workflow.designer.onboarding_steps_title' | translate }}</p>
+                  <ol class="space-y-2">
+                    @for (tip of [
+                      'workflow.designer.onboarding_tip1',
+                      'workflow.designer.onboarding_tip2',
+                      'workflow.designer.onboarding_tip3'
+                    ]; track tip; let i = $index) {
+                      <li class="flex items-start gap-2.5 text-xs text-ink-600 dark:text-dark-300">
+                        <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink-100 text-[10px] font-semibold text-ink-600 dark:bg-dark-700 dark:text-dark-200">{{ i + 1 }}</span>
+                        <span>{{ tip | translate }}</span>
+                      </li>
+                    }
+                  </ol>
+                  <p class="mt-3 text-xs text-ink-400 dark:text-dark-500">{{ 'workflow.designer.onboarding_dismiss_hint' | translate }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- ── Guided tour overlay ── -->
+          @if (showTour()) {
+            <div class="absolute inset-0 z-30 flex items-end justify-center bg-ink-900/45 p-4 pb-10 backdrop-blur-[2px] dark:bg-dark-950/70 sm:items-center sm:pb-4"
+              role="dialog"
+              aria-modal="true"
+              [attr.aria-label]="'workflow.designer.onboarding_guided_tour' | translate">
+              <div class="relative w-full max-w-md overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-2xl dark:border-dark-600 dark:bg-dark-800">
+                <div class="h-1 bg-ink-100 dark:bg-dark-700">
+                  <div class="h-full bg-primary transition-all duration-300 ease-out"
+                    [style.width.%]="tourProgressPct()"></div>
+                </div>
+
+                <button type="button" (click)="finishTour()"
+                  class="absolute end-3 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition hover:bg-ink-100 hover:text-red-600 dark:hover:bg-dark-700 dark:hover:text-red-400"
+                  [attr.aria-label]="'common.close' | translate"
+                  [attr.title]="'workflow.designer.tour_skip' | translate">
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div class="flex items-center justify-between gap-3 pe-12 ps-5 pt-4">
+                  <span class="text-xs font-medium text-primary">
+                    {{ 'workflow.designer.tour_progress' | translate: { current: tourStep() + 1, total: tourTotal } }}
+                  </span>
+                  <button type="button" (click)="finishTour()"
+                    class="rounded-md px-2 py-1 text-xs text-ink-400 transition hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-dark-700 dark:hover:text-white"
+                    [attr.aria-label]="'workflow.designer.tour_skip' | translate">
+                    {{ 'workflow.designer.tour_skip' | translate }}
+                  </button>
+                </div>
+
+                <div class="px-5 py-4">
+                  <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                    <span class="text-sm font-bold">{{ tourStep() + 1 }}</span>
+                  </div>
+                  @switch (tourStep()) {
+                    @case (0) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step1_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step1_body' | translate }}</p>
+                    }
+                    @case (1) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step2_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step2_body' | translate }}</p>
+                    }
+                    @case (2) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step3_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step3_body' | translate }}</p>
+                    }
+                    @case (3) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step4_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step4_body' | translate }}</p>
+                    }
+                    @case (4) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step5_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step5_body' | translate }}</p>
+                    }
+                    @case (5) {
+                      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.designer.tour_step6_title' | translate }}</h3>
+                      <p class="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-dark-300">{{ 'workflow.designer.tour_step6_body' | translate }}</p>
+                    }
+                  }
+
+                  <div class="mt-5 flex items-center justify-center gap-1.5" role="tablist"
+                    [attr.aria-label]="'workflow.designer.tour_progress' | translate: { current: tourStep() + 1, total: tourTotal }">
+                    @for (dot of tourDots; track dot; let i = $index) {
+                      <button type="button" (click)="goToTourStep(i)"
+                        class="h-2 rounded-full transition-all"
+                        [class]="i === tourStep() ? 'w-5 bg-primary' : 'w-2 bg-ink-200 hover:bg-ink-300 dark:bg-dark-600 dark:hover:bg-dark-500'"
+                        [attr.aria-label]="'workflow.designer.tour_progress' | translate: { current: i + 1, total: tourTotal }"
+                        [attr.aria-current]="i === tourStep() ? 'step' : null"></button>
+                    }
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 border-t border-ink-100 px-5 py-3.5 dark:border-dark-700">
+                  @if (tourStep() > 0) {
+                    <button type="button" (click)="prevTourStep()"
+                      class="rounded-lg border border-ink-200 px-3 py-2 text-xs font-medium text-ink-700 transition hover:bg-ink-50 dark:border-dark-600 dark:text-dark-200 dark:hover:bg-dark-700">
+                      {{ 'workflow.designer.tour_prev' | translate }}
+                    </button>
+                  }
+                  @if (tourStep() < tourTotal - 1) {
+                    <button type="button" (click)="nextTourStep()"
+                      class="ms-auto flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-600 sm:flex-none sm:min-w-28">
+                      {{ 'workflow.designer.tour_next' | translate }}
+                    </button>
+                  } @else {
+                    <button type="button" (click)="finishTour()"
+                      class="ms-auto flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 sm:flex-none sm:min-w-28">
+                      {{ 'workflow.designer.tour_done' | translate }}
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Context menu -->
+          @if (contextMenu()) {
+            <div class="fixed inset-0 z-40" (click)="closeContextMenu()"></div>
+            <div class="designer-pop fixed z-50 min-w-52 py-1.5 overflow-hidden"
+              [style.left.px]="contextMenu()!.x"
+              [style.top.px]="contextMenu()!.y">
+
+              @if (contextMenu()!.nodeId) {
+                @if (selectedNodeIds().length > 1) {
+                  <div class="px-3 py-1.5 text-xs border-b mb-1" style="color: var(--ds-text-3); border-color: var(--ds-border)">
+                    {{ selectedNodeIds().length }} {{ 'workflow.designer.ctx_nodes_selected' | translate }}
+                  </div>
+                  <button type="button" (click)="executeContextAction('align-left')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_left' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('align-right')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_right' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('align-top')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_top' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('align-bottom')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_bottom' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('align-centerH')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_center_h' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('align-centerV')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_align_center_v' | translate }}</button>
+                  @if (selectedNodeIds().length >= 3) {
+                    <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                    <button type="button" (click)="executeContextAction('distribute-h')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_distribute_h' | translate }}</button>
+                    <button type="button" (click)="executeContextAction('distribute-v')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_distribute_v' | translate }}</button>
+                  }
+                  <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                  @if (!isReadonly()) {
+                    <button type="button" (click)="executeContextAction('delete-multi')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs" style="color: var(--ds-danger)">{{ 'workflow.designer.ctx_delete_nodes' | translate }} ({{ selectedNodeIds().length }})</button>
+                  }
+                } @else {
+                  <button type="button" (click)="executeContextAction('properties', contextMenu()!.nodeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_properties' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('center-node', contextMenu()!.nodeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_center' | translate }}</button>
+                  @if (!isReadonly()) {
+                    @if (contextNodeCanConnect()) {
+                      <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                      <button type="button" (click)="executeContextAction('connect-from', contextMenu()!.nodeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_connect' | translate }}</button>
+                      <button type="button" (click)="executeContextAction('add-next', contextMenu()!.nodeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_add_next' | translate }}</button>
+                    }
+                    <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                    <button type="button" (click)="executeContextAction('copy')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.copy' | translate }}</button>
+                    <button type="button" (click)="executeContextAction('cut')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.cut' | translate }}</button>
+                    <button type="button" (click)="executeContextAction('duplicate')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.duplicate' | translate }}</button>
+                    <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                    <button type="button" (click)="executeContextAction('delete', contextMenu()!.nodeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs" style="color: var(--ds-danger)">{{ 'workflow.designer.ctx_delete' | translate }}</button>
+                  }
+                }
+              } @else if (contextMenu()!.edgeId) {
+                <button type="button" (click)="executeContextAction('properties', undefined, contextMenu()!.edgeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_edit_transition' | translate }}</button>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="executeContextAction('set-default-edge', undefined, contextMenu()!.edgeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_set_default' | translate }}</button>
+                  <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                  <button type="button" (click)="executeContextAction('delete', undefined, contextMenu()!.edgeId)" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs" style="color: var(--ds-danger)">{{ 'workflow.designer.ctx_delete_edge' | translate }}</button>
+                }
+              } @else {
+                <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide" style="color: var(--ds-text-3)">{{ 'workflow.designer.ctx_canvas' | translate }}</p>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="executeContextAction('add-start')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_add_start' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('add-user-task')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_add_task' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('add-decision')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_add_decision' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('add-end')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_add_end' | translate }}</button>
+                  <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                  @if (clipboard()) {
+                    <button type="button" (click)="executeContextAction('paste')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.paste' | translate }}</button>
+                  }
+                  <button type="button" (click)="executeContextAction('undo')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.undo' | translate }}</button>
+                  <button type="button" (click)="executeContextAction('redo')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.redo' | translate }}</button>
+                  <div class="h-px my-1" style="background: var(--ds-border)"></div>
+                }
+                <button type="button" (click)="executeContextAction('auto-layout')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.auto_layout' | translate }}</button>
+                <button type="button" (click)="executeContextAction('select-all')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.ctx_select_all' | translate }}</button>
+                <button type="button" (click)="executeContextAction('fit')" class="designer-menu-item w-full text-start px-3 py-1.5 text-xs">{{ 'workflow.designer.fit_screen' | translate }}</button>
+              }
+            </div>
+          }
+
+          <!-- Canvas toolbar (top-left): Copy / Cut / Paste / Duplicate / Auto-Layout -->
+          @if (selectedNode() || clipboard() || nodes().length > 1) {
+            <div class="designer-float-toolbar absolute top-3 start-3 flex items-center gap-0.5 rounded-xl px-1.5 py-1">
+              @if (!isReadonly() && selectedNode()) {
+                <button type="button" (click)="copySelected()" title="{{ 'workflow.designer.copy' | translate }} (Ctrl+C)"
+                  class="designer-float-btn">{{ 'workflow.designer.copy' | translate }}</button>
+                <button type="button" (click)="cutSelected()" title="{{ 'workflow.designer.cut' | translate }} (Ctrl+X)"
+                  class="designer-float-btn">{{ 'workflow.designer.cut' | translate }}</button>
+                <button type="button" (click)="duplicateSelected()" title="{{ 'workflow.designer.duplicate' | translate }} (Ctrl+D)"
+                  class="designer-float-btn">{{ 'workflow.designer.duplicate' | translate }}</button>
+              }
+              @if (!isReadonly() && clipboard()) {
+                <button type="button" (click)="pasteClipboard()" title="{{ 'workflow.designer.paste' | translate }} (Ctrl+V)"
+                  class="designer-float-btn">{{ 'workflow.designer.paste' | translate }}</button>
+              }
+              @if (nodes().length > 1) {
+                @if (!isReadonly() && (selectedNode() || clipboard())) {
+                  <div class="w-px h-4 bg-dark-600 mx-0.5"></div>
+                }
+                <button type="button" (click)="autoLayout()" title="{{ 'workflow.designer.auto_layout' | translate }}"
+                  class="designer-float-btn designer-layout-btn">{{ 'workflow.designer.auto_layout' | translate }}</button>
+              }
+            </div>
+          }
+
+          <!-- Alignment toolbar (visible when 2+ nodes selected) -->
+          @if (selectedNodeIds().length >= 2 && !isReadonly()) {
+            <div class="designer-align-bar absolute top-3 start-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-lg px-2 py-1 z-10">
+              <span class="text-xs me-1.5" style="color: var(--ds-text-3)">{{ selectedNodeIds().length }} selected</span>
+              <button (click)="alignNodes('left')"    title="Align Left"           class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">|←</button>
+              <button (click)="alignNodes('centerV')" title="Center Vertically"    class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">⊡</button>
+              <button (click)="alignNodes('right')"   title="Align Right"          class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">→|</button>
+              <div class="w-px h-4 bg-dark-600 mx-0.5"></div>
+              <button (click)="alignNodes('top')"     title="Align Top"            class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">↑|</button>
+              <button (click)="alignNodes('centerH')" title="Center Horizontally"  class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">—</button>
+              <button (click)="alignNodes('bottom')"  title="Align Bottom"         class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">|↓</button>
+              @if (selectedNodeIds().length >= 3) {
+                <div class="w-px h-4 bg-dark-600 mx-0.5"></div>
+                <button (click)="distributeNodes('horizontal')" title="Distribute Horizontally" class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">⇔</button>
+                <button (click)="distributeNodes('vertical')"   title="Distribute Vertically"   class="w-7 h-6 flex items-center justify-center text-xs text-dark-300 hover:text-white hover:bg-dark-700 rounded transition-colors font-mono">⇕</button>
+              }
+              <div class="w-px h-4 bg-dark-600 mx-0.5"></div>
+              <button (click)="deleteSelectedMulti()" title="Delete selected nodes" class="w-7 h-6 flex items-center justify-center text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors">✕</button>
+            </div>
+          }
+
+          <!-- Zoom controls -->
+          <div class="designer-zoom-bar absolute bottom-3 end-3 flex items-center gap-0.5 rounded-xl px-1.5 py-1">
+            <button type="button" (click)="zoomOut()" title="{{ 'workflow.designer.zoom_out' | translate }}"
+              class="designer-zoom-btn" [attr.aria-label]="'workflow.designer.zoom_out' | translate">−</button>
+            <span class="text-[11px] font-medium tabular-nums min-w-[2.75rem] text-center" style="color: var(--ds-text-2)">{{ (zoom() * 100).toFixed(0) }}%</span>
+            <button type="button" (click)="zoomIn()" title="{{ 'workflow.designer.zoom_in' | translate }}"
+              class="designer-zoom-btn" [attr.aria-label]="'workflow.designer.zoom_in' | translate">+</button>
+            <div class="w-px h-4 mx-0.5" style="background: var(--ds-border)"></div>
+            <button type="button" (click)="fitScreen()" title="{{ 'workflow.designer.fit_screen' | translate }} (Ctrl+0)"
+              class="designer-zoom-btn" [attr.aria-label]="'workflow.designer.fit_screen' | translate">⊡</button>
+            <button type="button" (click)="resetView()" title="{{ 'workflow.designer.reset_view' | translate }}"
+              class="designer-zoom-btn" [attr.aria-label]="'workflow.designer.reset_view' | translate">⌂</button>
+            <div class="w-px h-4 mx-0.5" style="background: var(--ds-border)"></div>
+            <button type="button" (click)="toggleFullscreen()"
+              [class]="isFullscreen() ? 'designer-zoom-btn designer-zoom-btn-active' : 'designer-zoom-btn'"
+              [title]="(isFullscreen() ? 'workflow.designer.fullscreen_exit' : 'workflow.designer.fullscreen_enter') | translate"
+              [attr.aria-pressed]="isFullscreen()"
+              [attr.aria-label]="(isFullscreen() ? 'workflow.designer.fullscreen_exit' : 'workflow.designer.fullscreen_enter') | translate">
+              @if (isFullscreen()) {
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
+                </svg>
+              } @else {
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/>
+                </svg>
+              }
+            </button>
+          </div>
+        }
+
+        @if (activeTab() === 'xml') {
+          <div class="xml-viewer">
+            <div class="xml-toolbar">
+              <div class="xml-toolbar-meta">
+                <p class="xml-toolbar-title">{{ 'workflow.designer.xml_tab' | translate }}</p>
+                <p class="xml-toolbar-hint">{{ 'workflow.designer.xml_readonly_notice' | translate }}</p>
+              </div>
+              <div class="xml-stats" aria-hidden="true">
+                <span>{{ xmlStats().activities }} {{ 'workflow.designer.xml_activities' | translate }}</span>
+                <span>{{ xmlStats().transitions }} {{ 'workflow.designer.xml_transitions' | translate }}</span>
+                <span>{{ xmlStats().variables }} {{ 'workflow.designer.xml_variables' | translate }}</span>
+              </div>
+              <div class="xml-toolbar-actions">
+                <button type="button" (click)="xmlWrap.set(!xmlWrap())"
+                  class="designer-btn-ghost"
+                  [attr.aria-pressed]="xmlWrap()">
+                  {{ (xmlWrap() ? 'workflow.designer.xml_unwrap' : 'workflow.designer.xml_wrap') | translate }}
+                </button>
+                <button type="button" (click)="copyXml()"
+                  class="designer-btn-outline"
+                  [disabled]="!xmlContent()">
+                  {{ (xmlCopied() ? 'workflow.designer.xml_copied' : 'workflow.designer.copy') | translate }}
+                </button>
+              </div>
+            </div>
+
+            @if (!xmlContent()) {
+              <div class="xml-empty">{{ 'workflow.designer.xml_empty' | translate }}</div>
+            } @else {
+              <div class="xml-body" [class.is-wrap]="xmlWrap()" role="region"
+                [attr.aria-label]="'workflow.designer.xml_tab' | translate">
+                @for (line of xmlLines(); track line.number) {
+                  <div class="xml-line">
+                    <span class="xml-gutter">{{ line.number }}</span>
+                    <code class="xml-code">@for (tok of line.tokens; track $index) {<span [class]="'xml-tok xml-tok-' + tok.kind">{{ tok.text }}</span>}</code>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- ── Right: Inspector Panel (only when a node/edge is selected) ── -->
+      @if (inspectorVisible()) {
+        <div class="inspector-resize" (mousedown)="startInspectorResize($event)"></div>
+
+        <div class="inspector-panel shrink-0 border-s flex flex-col overflow-hidden inspector-slide-in"
+          [style.width.px]="inspectorWidth()"
+          [style.min-width.px]="MIN_INSPECTOR_W"
+          [style.max-width.px]="MAX_INSPECTOR_W">
+
+        <!-- ══ Transition inspector ══ -->
+        @if (selectedEdge() && !selectedNode()) {
+          <div class="px-4 py-3 border-b border-dark-700 shrink-0 flex items-center gap-2">
+            <span class="w-6 h-0.5 bg-primary shrink-0"></span>
+            <p class="text-xs font-semibold text-dark-300 uppercase tracking-wide">
+              {{ 'workflow.designer.transition_title' | translate }}
+            </p>
+          </div>
+          <div class="flex-1 overflow-y-auto">
+            <form [formGroup]="edgeForm" class="p-4 space-y-4">
+              <!-- Key (read-only) -->
+              <div>
+                <p class="text-xs text-dark-500 font-mono truncate">{{ selectedEdge()!.transitionKey }}</p>
+              </div>
+              <!-- From → To -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-dark-400 mb-1">
+                    {{ 'workflow.designer.transition_from' | translate }}
+                  </label>
+                  <p class="text-xs text-white truncate">{{ getNodeName(selectedEdge()!.fromNodeId) }}</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-dark-400 mb-1">
+                    {{ 'workflow.designer.transition_to' | translate }}
+                  </label>
+                  <p class="text-xs text-white truncate">{{ getNodeName(selectedEdge()!.toNodeId) }}</p>
+                </div>
+              </div>
+              <!-- Label EN -->
+              <div>
+                <label class="block text-xs font-medium text-dark-300 mb-1">
+                  {{ 'workflow.designer.transition_label_en' | translate }}
+                </label>
+                <input formControlName="labelEn" type="text"
+                  [readonly]="isReadonly()"
+                  placeholder="e.g. Approved"
+                  class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+              </div>
+              <!-- Label AR -->
+              <div>
+                <label class="block text-xs font-medium text-dark-300 mb-1">
+                  {{ 'workflow.designer.transition_label_ar' | translate }}
+                </label>
+                <input formControlName="labelAr" type="text" dir="rtl"
+                  [readonly]="isReadonly()"
+                  placeholder="مثال: موافق"
+                  class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+              </div>
+              <!-- Description EN -->
+              <div>
+                <label class="block text-xs font-medium text-dark-300 mb-1">
+                  {{ 'workflow.designer.transition_description' | translate }}
+                </label>
+                <input formControlName="descriptionEn" type="text"
+                  [readonly]="isReadonly()"
+                  placeholder="Optional description"
+                  class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+              </div>
+              <!-- Outcome key -->
+              <div>
+                <label class="block text-xs font-medium text-dark-300 mb-1">
+                  {{ 'workflow.designer.transition_outcome_key' | translate }}
+                </label>
+                @if (decisionSourceOutcomes().length > 0) {
+                  <select
+                    [value]="edgeForm.controls.outcomeKey.value"
+                    [attr.disabled]="isReadonly() ? true : null"
+                    (change)="pickEdgeOutcome($any($event.target).value)"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                    <option value="">{{ 'workflow.designer.transition_pick_outcome' | translate }}</option>
+                    @for (o of decisionSourceOutcomes(); track o.id) {
+                      <option [value]="o.key">{{ o.key }} — {{ o.label || o.labelAr }}</option>
+                    }
+                  </select>
+                  <p class="text-[11px] mt-1" style="color: var(--ds-text-3)">{{ 'workflow.designer.transition_pick_outcome_hint' | translate }}</p>
+                } @else {
+                  <input formControlName="outcomeKey" type="text"
+                    [readonly]="isReadonly()"
+                    placeholder="e.g. APPROVE"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                }
+              </div>
+              <!-- Condition -->
+              <div>
+                <label class="block text-xs font-medium text-dark-300 mb-1">
+                  {{ 'workflow.designer.transition_condition' | translate }}
+                </label>
+                <textarea formControlName="conditionExpression" rows="2"
+                  [readonly]="isReadonly()"
+                  placeholder="Leave empty for unconditional"
+                  class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-none"></textarea>
+              </div>
+              <!-- Is default + Priority -->
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-xs text-dark-300 cursor-pointer">
+                  <input type="checkbox" formControlName="isDefault"
+                    [attr.disabled]="isReadonly() ? true : null"
+                    class="rounded border-dark-500 bg-dark-700 text-primary focus:ring-primary" />
+                  {{ 'workflow.designer.transition_is_default' | translate }}
+                </label>
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.transition_priority' | translate }}
+                  </label>
+                  <input formControlName="priority" type="number" min="0"
+                    [readonly]="isReadonly()"
+                    class="w-16 bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                </div>
+              </div>
+              @if (!isReadonly()) {
+                <div class="flex gap-2 pt-2">
+                  <button type="button" (click)="applyEdgeProps()"
+                    class="flex-1 py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                  <button type="button" (click)="deleteEdge(selectedEdge()!.id)"
+                    class="px-3 py-1.5 text-xs font-medium border border-red-700 text-red-400 rounded hover:bg-red-900/20 transition-colors">
+                    {{ 'workflow.designer.transition_delete' | translate }}
+                  </button>
+                </div>
+              }
+            </form>
+          </div>
+        }
+
+        <!-- ══ Node inspector ══ -->
+        @if (selectedNode()) {
+          <!-- Header -->
+          <div class="px-4 py-3 border-b border-dark-700 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" [style.background]="nodeColor(selectedNode()!.type)"></span>
+              <span class="text-xs font-semibold text-white">{{ selectedNode()!.type }}</span>
+              <span class="text-xs text-dark-500 font-mono truncate">{{ selectedNode()!.nodeKey }}</span>
+            </div>
+          </div>
+
+          <!-- Tab bar (UserTask only) — 2-row 4-column grid, no horizontal scroll -->
+          @if (selectedNode()!.type === 'UserTask') {
+            <div class="sticky top-0 z-10 border-b shrink-0 designer-panel-header">
+              <!-- Row 1: General · Assignment · Outcomes · Actions -->
+              <div class="grid grid-cols-4 border-b border-dark-700/60">
+                @for (tab of userTaskTabs.slice(0, 4); track tab.id) {
+                  <button
+                    (click)="inspectorTab.set(tab.id)"
+                    [class]="inspectorTab() === tab.id
+                      ? 'py-2 text-xs text-primary border-b-2 border-primary font-semibold bg-primary/5 transition-colors'
+                      : 'py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
+                    {{ tab.labelKey | translate }}
+                  </button>
+                }
+              </div>
+              <!-- Row 2: SLA · Data · Form · Advanced -->
+              <div class="grid grid-cols-4">
+                @for (tab of userTaskTabs.slice(4); track tab.id) {
+                  <button
+                    (click)="inspectorTab.set(tab.id)"
+                    [class]="inspectorTab() === tab.id
+                      ? 'py-2 text-xs text-primary border-b-2 border-primary font-semibold bg-primary/5 transition-colors'
+                      : 'py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
+                    {{ tab.labelKey | translate }}
+                  </button>
+                }
+              </div>
+              <p class="px-3 py-2 text-[11px] leading-snug" style="color: var(--ds-text-3)">
+                {{ activeTabHelpKey() | translate }}
+              </p>
+            </div>
+          }
+
+          <!-- ── Tab content ── -->
+          <div class="flex-1 overflow-y-auto">
+
+            <!-- ─── General tab (all types) / non-UserTask single panel ─── -->
+            @if (selectedNode()!.type !== 'UserTask' || inspectorTab() === 'general') {
+              <form [formGroup]="propsForm" class="p-4 space-y-4">
+                <!-- Name EN -->
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_name' | translate }}
+                  </label>
+                  <input formControlName="name" type="text" [readonly]="isReadonly()"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                </div>
+                <!-- Name AR -->
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_name_ar' | translate }}
+                  </label>
+                  <input formControlName="nameAr" type="text" dir="rtl" [readonly]="isReadonly()"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                </div>
+
+                <!-- UserTask: description, instructions, priority -->
+                @if (selectedNode()!.type === 'UserTask') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_description' | translate }}
+                    </label>
+                    <textarea formControlName="description" rows="2" [readonly]="isReadonly()"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_description_ar' | translate }}
+                    </label>
+                    <textarea formControlName="descriptionAr" rows="2" dir="rtl" [readonly]="isReadonly()"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_instructions_en' | translate }}
+                    </label>
+                    <textarea formControlName="instructionsEn" rows="2" [readonly]="isReadonly()"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_instructions_ar' | translate }}
+                    </label>
+                    <textarea formControlName="instructionsAr" rows="2" dir="rtl" [readonly]="isReadonly()"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_node_priority' | translate }}
+                    </label>
+                    <input formControlName="nodePriority" type="number" min="0" [readonly]="isReadonly()"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  </div>
+                }
+
+                <!-- ServiceTask: action key + config JSON -->
+                @if (selectedNode()!.type === 'ServiceTask') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_action_key' | translate }}
+                    </label>
+                    <input formControlName="actionKey" type="text" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_action_key_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_service_action_hint' | translate }}</p>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_config_json' | translate }}
+                    </label>
+                    <textarea formControlName="configJson" rows="4" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_config_json_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  </div>
+                }
+
+                <!-- Timer type -->
+                @if (selectedNode()!.type === 'Timer') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_timer_type' | translate }}
+                    </label>
+                    <select formControlName="timerType" [attr.disabled]="isReadonly() ? true : null"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                      @for (opt of timerTypeOptions; track opt) {
+                        <option [value]="opt">{{ ('workflow.designer.timer_type.' + opt) | translate }}</option>
+                      }
+                    </select>
+                  </div>
+                  @if (propsForm.value.timerType === 'DueDate') {
+                    <div>
+                      <label class="block text-xs font-medium text-dark-300 mb-1">
+                        {{ 'workflow.designer.props_due_at' | translate }}
+                      </label>
+                      <input formControlName="dueAt" type="datetime-local" [readonly]="isReadonly()"
+                        class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    </div>
+                  }
+                  @if (propsForm.value.timerType === 'Duration') {
+                    <div>
+                      <label class="block text-xs font-medium text-dark-300 mb-1">
+                        {{ 'workflow.designer.props_duration' | translate }}
+                      </label>
+                      <input formControlName="duration" type="text" [readonly]="isReadonly()" placeholder="01:00:00"
+                        class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_duration_hint' | translate }}</p>
+                    </div>
+                  }
+                  @if (propsForm.value.timerType === 'ExternalSignal') {
+                    <div>
+                      <label class="block text-xs font-medium text-dark-300 mb-1">
+                        {{ 'workflow.designer.props_signal_key' | translate }}
+                      </label>
+                      <input formControlName="signalKey" type="text" [readonly]="isReadonly()"
+                        class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    </div>
+                  }
+                }
+
+                <!-- ExclusiveGateway (Decision) -->
+                @if (selectedNode()!.type === 'ExclusiveGateway') {
+                  <div class="rounded-lg border px-3 py-2.5 space-y-2" style="border-color: color-mix(in srgb, #d97706 35%, var(--ds-border)); background: color-mix(in srgb, #d97706 8%, transparent)">
+                    <p class="text-xs leading-relaxed" style="color: var(--ds-text-2)">
+                      {{ 'workflow.designer.props_exclusive_gateway_help' | translate }}
+                    </p>
+                    @if (incomingUserTask(selectedNode()!.id); as src) {
+                      <p class="text-[11px] font-medium" style="color: var(--ds-text)">
+                        {{ 'workflow.designer.props_exclusive_incoming' | translate }}:
+                        {{ src.name || src.nodeKey }}
+                      </p>
+                      @if (src.outcomes.length === 0) {
+                        <p class="text-[11px]" style="color: var(--ds-warn)">{{ 'workflow.designer.props_exclusive_no_outcomes' | translate }}</p>
+                      } @else {
+                        <ul class="space-y-1">
+                          @for (o of src.outcomes; track o.id) {
+                            @let wired = edgeForOutcome(selectedNode()!.id, o.key);
+                            <li class="flex items-center justify-between gap-2 text-[11px]">
+                              <span class="font-mono truncate" style="color: var(--ds-primary)">{{ o.key || '—' }}</span>
+                              @if (wired) {
+                                <button type="button" (click)="selectOutgoingEdge(wired.id)"
+                                  class="truncate text-start underline decoration-dotted" style="color: var(--ds-text-2)">
+                                  → {{ getNodeName(wired.toNodeId) }}
+                                </button>
+                              } @else {
+                                <button type="button"
+                                  (click)="beginOutcomeConnect(selectedNode()!.id, o.key)"
+                                  class="shrink-0 underline decoration-dotted" style="color: var(--ds-primary)">
+                                  {{ 'workflow.designer.props_exclusive_connect' | translate }}
+                                </button>
+                              }
+                            </li>
+                          }
+                        </ul>
+                      }
+                    } @else {
+                      <p class="text-[11px]" style="color: var(--ds-warn)">{{ 'workflow.designer.props_exclusive_no_incoming' | translate }}</p>
+                    }
+                    @if (outgoingEdgesOf(selectedNode()!.id).length > 0) {
+                      <p class="text-[11px] font-medium pt-1" style="color: var(--ds-text)">
+                        {{ 'workflow.designer.props_exclusive_outgoing' | translate }}
+                      </p>
+                      <ul class="space-y-1">
+                        @for (e of outgoingEdgesOf(selectedNode()!.id); track e.id) {
+                          <li>
+                            <button type="button" (click)="selectOutgoingEdge(e.id)"
+                              class="w-full text-start text-[11px] rounded px-2 py-1 hover:bg-primary/10"
+                              style="color: var(--ds-text-2)">
+                              → {{ getNodeName(e.toNodeId) }}
+                              @if (e.outcomeKey) { · {{ e.outcomeKey }} }
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+
+                <!-- InclusiveGateway -->
+                @if (selectedNode()!.type === 'InclusiveGateway') {
+                  <div class="rounded-lg border border-pink-800/40 bg-pink-900/10 px-3 py-2">
+                    <p class="text-xs text-pink-200">{{ 'workflow.designer.props_inclusive_gateway_help' | translate }}</p>
+                  </div>
+                }
+
+                <!-- CallActivity -->
+                @if (selectedNode()!.type === 'CallActivity') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_definition_key' | translate }}
+                    </label>
+                    <input formControlName="definitionKey" type="text" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_definition_key_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_definition_key_hint' | translate }}</p>
+                  </div>
+                  <label class="flex items-center gap-2 text-xs text-dark-200">
+                    <input type="checkbox" formControlName="waitForCompletion" [attr.disabled]="isReadonly() ? true : null"
+                      class="rounded border-dark-500 bg-dark-700 text-primary focus:ring-primary" />
+                    {{ 'workflow.designer.props_wait_for_completion' | translate }}
+                  </label>
+                  <p class="text-xs text-dark-500">{{ 'workflow.designer.props_call_activity_help' | translate }}</p>
+                }
+
+                <!-- NotificationTask -->
+                @if (selectedNode()!.type === 'NotificationTask') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_template_key' | translate }}
+                    </label>
+                    <input formControlName="templateKey" type="text" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_template_key_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_failure_policy' | translate }}
+                    </label>
+                    <select formControlName="failurePolicy" [attr.disabled]="isReadonly() ? true : null"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                      @for (opt of notifFailurePolicyOptions; track opt) {
+                        <option [value]="opt">{{ ('workflow.designer.failure_policy.' + opt) | translate }}</option>
+                      }
+                    </select>
+                  </div>
+                }
+
+                <!-- ScriptTask: set variables (safe script) -->
+                @if (selectedNode()!.type === 'ScriptTask') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_set_variables' | translate }}
+                    </label>
+                    <textarea formControlName="setVariablesJson" rows="6" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_set_variables_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_set_variables_hint' | translate }}</p>
+                  </div>
+                }
+
+                <!-- WaitEvent -->
+                @if (selectedNode()!.type === 'WaitEvent') {
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_event_key' | translate }}
+                    </label>
+                    <input formControlName="eventKey" type="text" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_event_key_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">
+                      {{ 'workflow.designer.props_correlation_variable' | translate }}
+                    </label>
+                    <input formControlName="correlationVariable" type="text" [readonly]="isReadonly()"
+                      [placeholder]="'workflow.designer.props_correlation_variable_placeholder' | translate"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_wait_event_hint' | translate }}</p>
+                  </div>
+                }
+
+                @if (!isReadonly()) {
+                  <button type="button" (click)="applyProps()"
+                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                }
+              </form>
+            }
+
+            <!-- ─── Assignment tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'assignment') {
+              <div class="p-4 space-y-4">
+                <p class="text-xs leading-relaxed rounded-xl px-3 py-2.5"
+                  style="background: color-mix(in srgb, var(--ds-primary, #6d28d9) 12%, transparent); color: var(--ds-text-2)">
+                  {{ 'workflow.designer.assignment_org_help' | translate }}
+                </p>
+
+                <form [formGroup]="propsForm" class="space-y-4">
+                  <div>
+                    <label class="block text-xs font-semibold mb-1.5" style="color: var(--ds-text)">
+                      {{ 'workflow.designer.props_assignment_group' | translate }}
+                      <span style="color: var(--ds-danger)">*</span>
+                    </label>
+                    @if (assignmentGroupsLoading()) {
+                      <p class="text-xs" style="color: var(--ds-text-3)">{{ 'common.loading' | translate }}</p>
+                    } @else if (assignmentGroups().length === 0) {
+                      <div class="rounded-lg border px-3 py-2.5 text-xs leading-relaxed"
+                        style="border-color: var(--ds-warn); color: var(--ds-text-2)">
+                        {{ 'workflow.designer.assignment_no_groups' | translate }}
+                      </div>
+                    } @else {
+                      <select
+                        [value]="propsForm.value.assignmentGroupId"
+                        [disabled]="isReadonly()"
+                        (change)="onAssignmentGroupChange($any($event.target).value)"
+                        class="w-full rounded-lg border px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60"
+                        style="background: var(--ds-surface-2, #1e293b); border-color: var(--ds-border); color: var(--ds-text)">
+                        <option value="">{{ 'workflow.designer.assignment_select_group' | translate }}</option>
+                        @for (g of assignmentGroups(); track g.id) {
+                          <option [value]="g.id">{{ assignmentGroupLabel(g) }}</option>
+                        }
+                      </select>
+                    }
+                    <p class="text-[11px] mt-1.5" style="color: var(--ds-text-3)">
+                      {{ 'workflow.designer.assignment_group_hint' | translate }}
+                    </p>
+                  </div>
+
+                  @if (!isReadonly()) {
+                    <button type="button" (click)="applyProps()"
+                      class="w-full py-2 text-xs font-semibold rounded-lg bg-primary text-white hover:opacity-90 transition-opacity">
+                      {{ 'workflow.designer.transition_apply' | translate }}
+                    </button>
+                  }
+                </form>
+              </div>
+            }
+
+            <!-- ─── Outcomes tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'outcomes') {
+              <div class="p-4 space-y-3">
+                <p class="text-xs leading-relaxed rounded-lg px-3 py-2" style="background: var(--ds-primary-soft); color: var(--ds-text-2)">
+                  {{ 'workflow.designer.props_outcomes_help' | translate }}
+                </p>
+                <p class="text-xs leading-relaxed rounded-lg px-3 py-2" style="background: var(--ds-surface-2); color: var(--ds-text-2)">
+                  {{ 'workflow.designer.props_redirect_help' | translate }}
+                </p>
+                @if (selectedNode()!.outcomes.length === 0) {
+                  <p class="text-xs text-dark-500 text-center py-4">
+                    {{ 'workflow.designer.props_outcomes_empty' | translate }}
+                  </p>
+                }
+                @for (outcome of selectedNode()!.outcomes; track outcome.id; let i = $index; let last = $last) {
+                  <div class="bg-dark-700 rounded-lg border border-dark-600 overflow-hidden">
+                    <!-- Outcome header row -->
+                    <div class="flex items-center gap-1.5 px-3 py-2 border-b border-dark-600 bg-dark-700/80">
+                      @if (!isReadonly()) {
+                        <div class="flex flex-col gap-0.5 shrink-0">
+                          <button type="button" (click)="moveOutcome(selectedNode()!.id, outcome.id, 'up')"
+                            [disabled]="i === 0"
+                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▲</button>
+                          <button type="button" (click)="moveOutcome(selectedNode()!.id, outcome.id, 'down')"
+                            [disabled]="last"
+                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▼</button>
+                        </div>
+                      }
+                      <span class="text-xs font-mono text-primary flex-1 truncate min-w-0">
+                        {{ outcome.key || '(no key)' }}
+                      </span>
+                      @if (outcome.isDefault) {
+                        <span class="text-xs text-amber-400 shrink-0">★</span>
+                      }
+                      @if (!isReadonly()) {
+                        <button type="button" (click)="removeOutcome(selectedNode()!.id, outcome.id)"
+                          class="text-dark-500 hover:text-red-400 text-xs shrink-0 transition-colors">✕</button>
+                      }
+                    </div>
+
+                    <!-- Outcome fields -->
+                    <div class="p-3 space-y-2">
+                      <!-- Key -->
+                      <input [value]="outcome.key" [readonly]="isReadonly()"
+                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'key', $any($event.target).value)"
+                        [placeholder]="'workflow.designer.props_outcome_key' | translate"
+                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      <!-- Label EN -->
+                      <input [value]="outcome.label" [readonly]="isReadonly()"
+                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'label', $any($event.target).value)"
+                        [placeholder]="'workflow.designer.props_outcome_label' | translate"
+                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      <!-- Label AR -->
+                      <input [value]="outcome.labelAr" [readonly]="isReadonly()" dir="rtl"
+                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'labelAr', $any($event.target).value)"
+                        [placeholder]="'workflow.designer.props_outcome_label_ar' | translate"
+                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      <!-- Result value -->
+                      <input [value]="outcome.resultValue" [readonly]="isReadonly()"
+                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'resultValue', $any($event.target).value)"
+                        [placeholder]="'workflow.designer.props_outcome_result_value' | translate"
+                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      <!-- Checkboxes -->
+                      <div class="flex flex-wrap gap-x-3 gap-y-1.5 pt-1">
+                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
+                          <input type="checkbox" [checked]="outcome.isDefault"
+                            [attr.disabled]="isReadonly() ? true : null"
+                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'isDefault', $any($event.target).checked)"
+                            class="rounded border-dark-500 bg-dark-600 text-primary" />
+                          {{ 'workflow.designer.props_is_default' | translate }}
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
+                          <input type="checkbox" [checked]="outcome.requiresComment"
+                            [attr.disabled]="isReadonly() ? true : null"
+                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'requiresComment', $any($event.target).checked)"
+                            class="rounded border-dark-500 bg-dark-600 text-primary" />
+                          {{ 'workflow.designer.props_outcome_requires_comment' | translate }}
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
+                          <input type="checkbox" [checked]="outcome.requiresAttachment"
+                            [attr.disabled]="isReadonly() ? true : null"
+                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'requiresAttachment', $any($event.target).checked)"
+                            class="rounded border-dark-500 bg-dark-600 text-primary" />
+                          {{ 'workflow.designer.props_outcome_requires_attachment' | translate }}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                }
+                @if (!isReadonly()) {
+                  <div class="flex flex-col gap-1.5">
+                    <button type="button" (click)="addStandardOutcomes(selectedNode()!.id)"
+                      class="w-full py-2 border border-dashed border-primary/40 text-primary hover:bg-primary/10 rounded text-xs transition-colors">
+                      {{ 'workflow.designer.props_add_standard_outcomes' | translate }}
+                    </button>
+                    <button type="button" (click)="addRedirectOutcome(selectedNode()!.id)"
+                      class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-primary/60 rounded text-xs transition-colors">
+                      + {{ 'workflow.designer.props_add_redirect' | translate }}
+                    </button>
+                    <button type="button" (click)="addOutcome(selectedNode()!.id)"
+                      class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-primary/60 rounded text-xs transition-colors">
+                      + {{ 'workflow.designer.props_add_outcome' | translate }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- ─── Actions tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'actions') {
+              <div class="p-4 space-y-3">
+                @if (selectedNode()!.actions.length === 0) {
+                  <p class="text-xs text-dark-500 text-center py-4">
+                    {{ 'workflow.designer.props_actions_title' | translate }}: no actions defined.
+                  </p>
+                }
+                @for (action of selectedNode()!.actions; track action.id; let i = $index; let last = $last) {
+                  <div class="bg-dark-700 rounded-lg border border-dark-600 overflow-hidden">
+                    <!-- Action header row -->
+                    <div class="flex items-center gap-1.5 px-3 py-2 border-b border-dark-600 bg-dark-700/80">
+                      @if (!isReadonly()) {
+                        <div class="flex flex-col gap-0.5 shrink-0">
+                          <button type="button" (click)="moveAction(selectedNode()!.id, action.id, 'up')"
+                            [disabled]="i === 0"
+                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▲</button>
+                          <button type="button" (click)="moveAction(selectedNode()!.id, action.id, 'down')"
+                            [disabled]="last"
+                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▼</button>
+                        </div>
+                      }
+                      <span class="text-xs font-mono text-cyan-400 flex-1 truncate min-w-0">
+                        {{ action.actionKey || '(no key)' }}
+                      </span>
+                      <span class="text-xs text-dark-500 shrink-0">{{ action.executionTrigger }}</span>
+                      @if (!isReadonly()) {
+                        <button type="button" (click)="removeAction(selectedNode()!.id, action.id)"
+                          class="text-dark-500 hover:text-red-400 text-xs shrink-0 transition-colors ms-1">✕</button>
+                      }
+                    </div>
+
+                    <!-- Action fields -->
+                    <div class="p-3 space-y-2">
+                      <!-- Active toggle + Sequence -->
+                      <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
+                          <input type="checkbox" [checked]="action.isActive"
+                            [attr.disabled]="isReadonly() ? true : null"
+                            (change)="updateActionField(selectedNode()!.id, action.id, 'isActive', $any($event.target).checked)"
+                            class="rounded border-dark-500 bg-dark-600 text-primary" />
+                          {{ 'workflow.designer.props_action_is_active' | translate }}
+                        </label>
+                        <span class="text-xs text-dark-500">
+                          {{ 'workflow.designer.props_action_sequence' | translate }}: {{ action.sequence }}
+                        </span>
+                      </div>
+                      <!-- Action key — catalog dropdown -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_action_key' | translate }}
+                        </label>
+                        @if (catalogLoading()) {
+                          <p class="text-xs text-dark-500">Loading catalog…</p>
+                        } @else if (actionCatalog().length > 0) {
+                          <select [value]="action.actionKey"
+                            [attr.disabled]="isReadonly() ? true : null"
+                            (change)="updateActionField(selectedNode()!.id, action.id, 'actionKey', $any($event.target).value)"
+                            class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                            <option value="">-- Select Action --</option>
+                            @for (entry of actionCatalog(); track entry.actionKey) {
+                              <option [value]="entry.actionKey">{{ entry.nameEn }} ({{ entry.actionKey }})</option>
+                            }
+                          </select>
+                        } @else {
+                          <input [value]="action.actionKey" [readonly]="isReadonly()"
+                            (input)="updateActionField(selectedNode()!.id, action.id, 'actionKey', $any($event.target).value)"
+                            [placeholder]="'workflow.designer.props_action_action_key' | translate"
+                            class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                        }
+                      </div>
+                      <!-- Execution trigger -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_trigger' | translate }}
+                        </label>
+                        <select [value]="action.executionTrigger"
+                          [attr.disabled]="isReadonly() ? true : null"
+                          (change)="updateActionField(selectedNode()!.id, action.id, 'executionTrigger', $any($event.target).value)"
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                          @for (t of executionTriggerOptions; track t) {
+                            <option [value]="t">{{ ('workflow.designer.execution_trigger.' + t) | translate }}</option>
+                          }
+                        </select>
+                      </div>
+                      <!-- Outcome key (shown for OnOutcome trigger) -->
+                      @if (action.executionTrigger === 'OnOutcome') {
+                        <input [value]="action.outcomeKey" [readonly]="isReadonly()"
+                          (input)="updateActionField(selectedNode()!.id, action.id, 'outcomeKey', $any($event.target).value)"
+                          [placeholder]="'workflow.designer.props_action_outcome_key' | translate"
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      }
+                      <!-- Condition expression -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_condition' | translate }}
+                        </label>
+                        <input [value]="action.conditionExpression" [readonly]="isReadonly()"
+                          (input)="updateActionField(selectedNode()!.id, action.id, 'conditionExpression', $any($event.target).value)"
+                          placeholder="e.g. $outcome == 'APPROVED'"
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      </div>
+                      <!-- Failure policy -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_failure_policy' | translate }}
+                        </label>
+                        <select [value]="action.failurePolicy"
+                          [attr.disabled]="isReadonly() ? true : null"
+                          (change)="updateActionField(selectedNode()!.id, action.id, 'failurePolicy', $any($event.target).value)"
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                          @for (p of actionFailurePolicyOptions; track p) {
+                            <option [value]="p">{{ ('workflow.designer.action_failure_policy.' + p) | translate }}</option>
+                          }
+                        </select>
+                      </div>
+                      <!-- Retry count (shown for Retry policy) -->
+                      @if (action.failurePolicy === 'Retry') {
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">
+                              {{ 'workflow.designer.props_action_retry_count' | translate }}
+                            </label>
+                            <input type="number" [value]="action.retryCount" [readonly]="isReadonly()"
+                              (input)="updateActionField(selectedNode()!.id, action.id, 'retryCount', +$any($event.target).value)"
+                              min="0" max="10"
+                              class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                          </div>
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">
+                              {{ 'workflow.designer.props_action_retry_delay' | translate }}
+                            </label>
+                            <input type="number" [value]="action.retryDelaySeconds" [readonly]="isReadonly()"
+                              (input)="updateActionField(selectedNode()!.id, action.id, 'retryDelaySeconds', +$any($event.target).value)"
+                              min="0"
+                              class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                          </div>
+                        </div>
+                      }
+                      <!-- Timeout -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_timeout' | translate }} (s)
+                        </label>
+                        <input type="number" [value]="action.timeoutSeconds" [readonly]="isReadonly()"
+                          (input)="updateActionField(selectedNode()!.id, action.id, 'timeoutSeconds', +$any($event.target).value)"
+                          min="0"
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                      </div>
+                      <!-- Input Mapping JSON -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_input_mapping' | translate }}
+                        </label>
+                        <textarea [value]="action.inputMappingJson" rows="3" [readonly]="isReadonly()"
+                          (blur)="updateActionField(selectedNode()!.id, action.id, 'inputMappingJson', $any($event.target).value)"
+                          placeholder='{}'
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                      </div>
+                      <!-- Output Mapping JSON -->
+                      <div>
+                        <label class="block text-xs text-dark-400 mb-1">
+                          {{ 'workflow.designer.props_action_output_mapping' | translate }}
+                        </label>
+                        <textarea [value]="action.outputMappingJson" rows="3" [readonly]="isReadonly()"
+                          (blur)="updateActionField(selectedNode()!.id, action.id, 'outputMappingJson', $any($event.target).value)"
+                          placeholder='{}'
+                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                      </div>
+                    </div>
+                  </div>
+                }
+                @if (!isReadonly()) {
+                  <button type="button" (click)="addAction(selectedNode()!.id)"
+                    class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-cyan-600/60 rounded text-xs transition-colors">
+                    + {{ 'workflow.designer.props_add_action' | translate }}
+                  </button>
+                }
+              </div>
+            }
+
+            <!-- ─── SLA tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'sla') {
+              <form [formGroup]="propsForm" class="p-4 space-y-4">
+                <!-- SLA Policy dropdown -->
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_sla_policy' | translate }}
+                  </label>
+                  @if (slaPoliciesLoading()) {
+                    <p class="text-xs text-dark-500">{{ 'common.loading' | translate }}</p>
+                  } @else {
+                    <select formControlName="slaPolicyId"
+                      [attr.disabled]="isReadonly() ? true : null"
+                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                      <option value="">{{ 'workflow.designer.sla_policy_placeholder' | translate }}</option>
+                      @for (p of slaPolicies(); track p.id) {
+                        <option [value]="p.id">{{ p.name }} ({{ p.policyCode }})</option>
+                      }
+                    </select>
+                  }
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_sla_duration_hours' | translate }}
+                  </label>
+                  <input formControlName="slaDurationHours" type="number" min="0" [readonly]="isReadonly()"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  <p class="text-xs text-dark-500 mt-1">Set to 0 to disable SLA enforcement.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_sla_escalation_key' | translate }}
+                  </label>
+                  <input formControlName="slaEscalationKey" type="text" [readonly]="isReadonly()"
+                    placeholder="e.g. SUPERVISOR_REVIEW"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_sla_escalation_hint' | translate }}</p>
+                </div>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="applyProps()"
+                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                }
+              </form>
+            }
+
+            <!-- ─── Data tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'data') {
+              <form [formGroup]="propsForm" class="p-4 space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_input_mapping' | translate }}
+                  </label>
+                  <textarea formControlName="inputMappingJson" rows="5" [readonly]="isReadonly()"
+                    placeholder='{&#10;  "requestId": "$.variables.requestId"&#10;}'
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_output_mapping' | translate }}
+                  </label>
+                  <textarea formControlName="outputMappingJson" rows="5" [readonly]="isReadonly()"
+                    placeholder='{&#10;  "reviewOutcome": "$.output.outcome"&#10;}'
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                </div>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="applyProps()"
+                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                }
+              </form>
+            }
+
+            <!-- ─── Form tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'form') {
+              <form [formGroup]="propsForm" class="p-4 space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_form_key' | translate }}
+                  </label>
+                  <input formControlName="formKey" type="text" [readonly]="isReadonly()"
+                    [placeholder]="'workflow.designer.props_form_key_placeholder' | translate"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                  <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_form_key_hint' | translate }}</p>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <label class="block text-xs font-medium text-dark-300">
+                      {{ 'workflow.designer.props_form_fields' | translate }}
+                    </label>
+                    @if (!isReadonly()) {
+                      <button type="button" (click)="addFormField()"
+                        class="text-xs text-primary hover:text-primary-300 transition-colors">
+                        + {{ 'workflow.designer.props_form_field_add' | translate }}
+                      </button>
+                    }
+                  </div>
+                  <p class="text-xs text-dark-500">{{ 'workflow.designer.props_form_fields_hint' | translate }}</p>
+
+                  @if (formFields().length === 0) {
+                    <p class="text-xs text-dark-500 italic">{{ 'workflow.designer.props_form_fields_empty' | translate }}</p>
+                  }
+
+                  <div class="space-y-3">
+                    @for (field of formFields(); track field.id) {
+                      <div class="rounded-lg border border-dark-600 bg-dark-900/50 p-3 space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_key' | translate }}</label>
+                            <input type="text" [value]="field.key" [readonly]="isReadonly()"
+                              (input)="updateFormField(field.id, 'key', $any($event.target).value)"
+                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                          </div>
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_type' | translate }}</label>
+                            <select [value]="field.type" [attr.disabled]="isReadonly() ? true : null"
+                              (change)="updateFormField(field.id, 'type', $any($event.target).value)"
+                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
+                              @for (t of formFieldTypes; track t) {
+                                <option [value]="t">{{ ('workflow.designer.form_field_type.' + t) | translate }}</option>
+                              }
+                            </select>
+                          </div>
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_label_en' | translate }}</label>
+                            <input type="text" [value]="field.labelEn" [readonly]="isReadonly()"
+                              (input)="updateFormField(field.id, 'labelEn', $any($event.target).value)"
+                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                          </div>
+                          <div>
+                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_label_ar' | translate }}</label>
+                            <input type="text" [value]="field.labelAr" [readonly]="isReadonly()" dir="rtl"
+                              (input)="updateFormField(field.id, 'labelAr', $any($event.target).value)"
+                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                          </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <label class="flex items-center gap-2 text-xs text-dark-200">
+                            <input type="checkbox" [checked]="field.required" [attr.disabled]="isReadonly() ? true : null"
+                              (change)="updateFormField(field.id, 'required', $any($event.target).checked)"
+                              class="rounded border-dark-500 bg-dark-700 text-primary focus:ring-primary" />
+                            {{ 'workflow.designer.props_form_field_required' | translate }}
+                          </label>
+                          @if (!isReadonly()) {
+                            <button type="button" (click)="removeFormField(field.id)"
+                              class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                              {{ 'workflow.designer.props_form_field_remove' | translate }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_instructions_en' | translate }}
+                  </label>
+                  <textarea formControlName="instructionsEn" rows="2" [readonly]="isReadonly()"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_instructions_ar' | translate }}
+                  </label>
+                  <textarea formControlName="instructionsAr" rows="2" [readonly]="isReadonly()" dir="rtl"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                </div>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="applyProps()"
+                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                }
+              </form>
+            }
+
+            <!-- ─── Advanced tab (UserTask) ─── -->
+            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'advanced') {
+              <form [formGroup]="propsForm" class="p-4 space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-dark-300 mb-1">
+                    {{ 'workflow.designer.props_config_json' | translate }}
+                    <span class="text-dark-500">({{ 'common.optional' | translate }})</span>
+                  </label>
+                  <textarea formControlName="configJson" rows="8" [readonly]="isReadonly()"
+                    [placeholder]="'workflow.designer.props_config_json_placeholder' | translate"
+                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
+                  <p class="text-xs text-dark-500 mt-1">Raw configuration JSON. Merged with SLA and Data mapping settings.</p>
+                </div>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="applyProps()"
+                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
+                    {{ 'workflow.designer.transition_apply' | translate }}
+                  </button>
+                }
+              </form>
+            }
+
+          </div><!-- end flex-1 overflow-y-auto -->
+        }<!-- end @if selectedNode() -->
+
+        </div><!-- end inspector panel -->
+      }<!-- end @if inspectorVisible -->
+    </div><!-- end flex main layout -->
+
+    <!-- ── Bottom drawer: Variables + Validation ── -->
+    @if (showBottomDrawer()) {
+      <div class="designer-drawer shrink-0 border-t flex flex-col overflow-hidden"
+        [style.height.px]="drawerHeight()">
+        <!-- Drawer resize handle (drag up to expand) -->
+        <div class="drawer-resize" (mousedown)="startDrawerResize($event)"></div>
+        <!-- Drawer tab bar + close -->
+        <div class="flex items-center justify-between border-b border-dark-700 px-4 shrink-0">
+          <div class="flex">
+            <button (click)="bottomTab.set('variables')"
+              [class]="bottomTab() === 'variables'
+                ? 'px-4 py-2 text-xs font-medium text-primary border-b-2 border-primary'
+                : 'px-4 py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
+              {{ 'workflow.designer.variables_tab' | translate }}
+            </button>
+            <button (click)="bottomTab.set('validation')"
+              [class]="bottomTab() === 'validation'
+                ? 'px-4 py-2 text-xs font-medium text-primary border-b-2 border-primary'
+                : 'px-4 py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
+              {{ 'workflow.designer.validation_panel_title' | translate }}
+              @if (validationResult() && !validationResult()!.isValid) {
+                <span class="ms-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-xs">
+                  {{ validationResult()!.errors?.length ?? 0 }}
+                </span>
+              }
+            </button>
+          </div>
+          <button (click)="showBottomDrawer.set(false)"
+            class="text-dark-500 hover:text-white text-xs transition-colors">✕</button>
+        </div>
+
+        <!-- ── Variables tab ── -->
+        @if (bottomTab() === 'variables') {
+          <div class="flex-1 overflow-y-auto">
+            @if (variables().length === 0) {
+              <div class="flex flex-col items-center justify-center h-20 gap-2">
+                <p class="text-xs text-dark-500">{{ 'workflow.designer.variables_empty' | translate }}</p>
+                @if (!isReadonly()) {
+                  <button type="button" (click)="addVariable()"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    + {{ 'workflow.designer.variables_add' | translate }}
+                  </button>
+                }
+              </div>
+            } @else {
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-dark-700 text-dark-400">
+                    <th class="text-start font-medium px-4 py-2 w-36">{{ 'workflow.designer.variables_key' | translate }}</th>
+                    <th class="text-start font-medium px-2 py-2 w-28">{{ 'workflow.designer.variables_name' | translate }}</th>
+                    <th class="text-start font-medium px-2 py-2 w-24">{{ 'workflow.designer.variables_type' | translate }}</th>
+                    <th class="text-start font-medium px-2 py-2 w-24">{{ 'workflow.designer.variables_default' | translate }}</th>
+                    <th class="text-center font-medium px-2 py-2 w-14">{{ 'workflow.designer.variables_is_required' | translate }}</th>
+                    <th class="text-center font-medium px-2 py-2 w-14">{{ 'workflow.designer.variables_is_sensitive' | translate }}</th>
+                    @if (!isReadonly()) { <th class="w-8"></th> }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of variables(); track v.id) {
+                    <tr class="border-b border-dark-700/50 hover:bg-dark-700/30">
+                      <td class="px-4 py-1.5">
+                        @if (!isReadonly()) {
+                          <input [value]="v.variableKey"
+                            (blur)="updateVariableField(v.id, 'variableKey', $any($event.target).value)"
+                            placeholder="VAR_KEY" class="bg-transparent text-white w-full border-b border-dark-600 focus:outline-none focus:border-primary uppercase text-xs" />
+                        } @else {
+                          <span class="font-mono text-white">{{ v.variableKey }}</span>
+                        }
+                      </td>
+                      <td class="px-2 py-1.5">
+                        @if (!isReadonly()) {
+                          <input [value]="v.name"
+                            (blur)="updateVariableField(v.id, 'name', $any($event.target).value)"
+                            placeholder="Name" class="bg-transparent text-white w-full border-b border-dark-600 focus:outline-none focus:border-primary text-xs" />
+                        } @else {
+                          <span class="text-dark-300">{{ v.name || '—' }}</span>
+                        }
+                      </td>
+                      <td class="px-2 py-1.5">
+                        @if (!isReadonly()) {
+                          <select [value]="v.dataType"
+                            (change)="updateVariableField(v.id, 'dataType', $any($event.target).value)"
+                            class="bg-dark-700 border border-dark-600 rounded px-1 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary w-full">
+                            @for (t of variableTypes; track t) {
+                              <option [value]="t">{{ t }}</option>
+                            }
+                          </select>
+                        } @else {
+                          <span class="text-dark-300">{{ v.dataType }}</span>
+                        }
+                      </td>
+                      <td class="px-2 py-1.5">
+                        @if (!isReadonly()) {
+                          <input [value]="v.defaultValue"
+                            (blur)="updateVariableField(v.id, 'defaultValue', $any($event.target).value)"
+                            placeholder="—" class="bg-transparent text-white w-full border-b border-dark-600 focus:outline-none focus:border-primary text-xs" />
+                        } @else {
+                          <span class="text-dark-400">{{ v.defaultValue || '—' }}</span>
+                        }
+                      </td>
+                      <td class="px-2 py-1.5 text-center">
+                        <input type="checkbox" [checked]="v.isRequired"
+                          [attr.disabled]="isReadonly() ? true : null"
+                          (change)="updateVariableField(v.id, 'isRequired', $any($event.target).checked)"
+                          class="rounded border-dark-500 bg-dark-700 text-primary" />
+                      </td>
+                      <td class="px-2 py-1.5 text-center">
+                        <input type="checkbox" [checked]="v.isSensitive"
+                          [attr.disabled]="isReadonly() ? true : null"
+                          (change)="updateVariableField(v.id, 'isSensitive', $any($event.target).checked)"
+                          class="rounded border-dark-500 bg-dark-700 text-primary" />
+                      </td>
+                      @if (!isReadonly()) {
+                        <td class="px-2 py-1.5">
+                          <button type="button" (click)="removeVariable(v.id)"
+                            class="text-dark-500 hover:text-red-400 transition-colors">✕</button>
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              @if (!isReadonly()) {
+                <div class="px-4 py-2">
+                  <button type="button" (click)="addVariable()"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    + {{ 'workflow.designer.variables_add' | translate }}
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        }
+
+        <!-- ── Validation tab ── -->
+        @if (bottomTab() === 'validation') {
+          <div class="flex-1 overflow-y-auto">
+            @if (!validationResult()) {
+              <div class="flex items-center justify-center h-16">
+                <p class="text-xs text-dark-500">Run validation to see results.</p>
+              </div>
+            } @else if (validationResult()!.isValid) {
+              <div class="px-4 py-3 text-xs text-green-400">
+                ✓ {{ 'workflow.designer.validation_valid' | translate }}
+              </div>
+            } @else {
+              <div class="divide-y divide-dark-700">
+                @for (err of validationResult()!.errors; track err.code) {
+                  <div class="flex items-start gap-2 px-4 py-2"
+                    [class.cursor-pointer]="!!err.nodeKey"
+                    (click)="navigateToError(err.nodeKey, err.code)">
+                    <span class="text-red-400 shrink-0">✕</span>
+                    <div class="min-w-0">
+                      <p class="text-xs text-red-300">{{ err.message }}</p>
+                      @if (err.nodeKey) {
+                        <p class="text-xs text-dark-500 mt-0.5">{{ err.nodeKey }} — click to navigate</p>
+                      }
+                    </div>
+                  </div>
+                }
+                @for (warn of validationResult()!.warnings; track warn.code) {
+                  <div class="flex items-start gap-2 px-4 py-2">
+                    <span class="text-amber-400 shrink-0">⚠</span>
+                    <p class="text-xs text-amber-300">{{ warn.message }}</p>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+  }<!-- end @if version() -->
+</div><!-- end root -->
+
+<!-- ── Delete node confirmation modal (above fullscreen shell) ── -->
+@if (deleteTarget()) {
+  <div class="designer-delete-overlay fixed inset-0 z-[200] flex items-center justify-center"
+    (click)="cancelDelete()">
+    <div class="designer-pop w-full max-w-sm mx-4 p-6 space-y-4"
+      (click)="$event.stopPropagation()">
+      <h3 class="text-base font-semibold" style="color: var(--ds-text)">{{ 'workflow.designer.delete_node_title' | translate }}</h3>
+      <p class="text-sm" style="color: var(--ds-text-2)">
+        {{ 'workflow.designer.delete_node_body' | translate: { name: deleteTarget()!.name } }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" (click)="cancelDelete()" class="designer-btn-ghost">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button type="button" (click)="confirmDeleteNode()"
+          class="px-4 py-2 text-sm font-medium rounded-lg text-white"
+          style="background: var(--ds-danger)">
+          {{ 'common.delete' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

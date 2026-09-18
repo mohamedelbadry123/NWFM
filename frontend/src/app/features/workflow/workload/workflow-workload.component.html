@@ -1,0 +1,58 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.workload.title"
+    subtitleKey="workflow.workload.subtitle"
+    [helpLink]="helpLink()" />
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl bg-red-900/20 border border-red-800/40 p-4 text-red-400">
+      <p>{{ loadError() }}</p>
+      <button type="button" (click)="load()" class="mt-3 px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <app-workflow-kpi-card labelKey="workflow.workload.kpi_open" [value]="data()?.totals?.open ?? 0" tone="primary" />
+      <app-workflow-kpi-card labelKey="workflow.workload.kpi_overdue" [value]="data()?.totals?.overdue ?? 0" tone="danger" />
+      <app-workflow-kpi-card labelKey="workflow.workload.kpi_completed_today" [value]="data()?.totals?.completedToday ?? 0" tone="success" />
+    </div>
+
+    @if (groups().length === 0) {
+      <prv-empty-state titleKey="workflow.workload.empty" />
+      <div class="flex justify-center -mt-8 mb-4">
+        <a [routerLink]="helpLink()" fragment="workload"
+          class="text-sm text-primary hover:text-primary-300 transition-colors">
+          {{ 'workflow.workload.empty_help_cta' | translate }}
+        </a>
+      </div>
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.workload.title">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.workload.col_group' | translate }}</th>
+              <th>{{ 'workflow.workload.col_pending' | translate }}</th>
+              <th>{{ 'workflow.workload.col_overdue' | translate }}</th>
+              <th>{{ 'workflow.workload.col_claimed' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of groups(); track g.groupId ?? g.name) {
+              <tr>
+                <td class="text-ink-900 dark:text-white">{{ g.name ?? g.groupId ?? '—' }}</td>
+                <td class="text-ink-700 dark:text-dark-200">{{ g.pendingCount ?? 0 }}</td>
+                <td class="text-red-300">{{ g.overdueCount ?? 0 }}</td>
+                <td class="text-primary-300">{{ g.claimedCount ?? 0 }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-workflow-table-shell>
+    }
+  }
+</div>

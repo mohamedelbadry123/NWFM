@@ -1,0 +1,232 @@
+/* ── Tailwind CSS ────────────────────────────────────────────────────────────── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Poppins — primary UI typeface (new brand identity), self-hosted ────────── */
+@font-face {
+  font-family: 'Poppins';
+  src: url('/assets/fonts/Poppins-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('/assets/fonts/Poppins-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('/assets/fonts/Poppins-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Poppins';
+  src: url('/assets/fonts/Poppins-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ── DIN NEXT — stubs (place woff2 files in public/assets/fonts/ when ready) ── */
+@font-face {
+  font-family: 'DIN NEXT';
+  src: url('/assets/fonts/DINNext-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DIN NEXT';
+  src: url('/assets/fonts/DINNext-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DIN NEXT';
+  src: url('/assets/fonts/DINNext-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DIN NEXT';
+  src: url('/assets/fonts/DINNext-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ── LT ARABIC — stubs (place woff2 files in public/assets/fonts/ when ready) ─ */
+@font-face {
+  font-family: 'LT ARABIC';
+  src: url('/assets/fonts/LTArabic-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LT ARABIC';
+  src: url('/assets/fonts/LTArabic-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LT ARABIC';
+  src: url('/assets/fonts/LTArabic-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LT ARABIC';
+  src: url('/assets/fonts/LTArabic-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ── CSS Custom Properties — Design Tokens (Privora new identity) ───────────── */
+:root {
+  --color-primary:       #2450DE;  /* Clarity Blue  — primary action        */
+  --color-primary-hover: #1D42C4;
+  --color-primary-tint:  #EEF2FE;
+  --color-navy:          #171A56;  /* Trust Navy    — text / dark surface   */
+  --color-teal:          #2BC3AC;  /* Assurance Teal — success / secondary  */
+  --color-accent:        #5A9FD8;  /* Intelligence Blue — accent / info     */
+  --color-dark:          #171A56;
+  --font-sans:           'Poppins', 'DIN NEXT', 'LT ARABIC', system-ui, sans-serif;
+}
+
+/* ── HugeIcons (free stroke set) ───────────────────────────────────────────────
+   The @hugeicons/angular renderer emits <svg fill="none"> without applying a stroke,
+   so the stroke-style glyphs would be invisible. Paint them in the current text
+   colour here; icons inherit size from the component's width/height. */
+hugeicons-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Design-system form controls (prv-*) — reusable across feature forms ────── */
+.prv-label { display: block; font-size: 13px; font-weight: 600; color: #2E3550; margin-bottom: 6px; }
+.prv-required { color: #F04438; }
+.prv-input, .prv-select, .prv-textarea {
+  width: 100%; height: 44px; padding: 0 14px; border-radius: 10px;
+  background: #FFFFFF; border: 1.5px solid #D3D9E6; color: #171A56; font-size: 14px;
+  outline: none; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.prv-select { padding-inline-end: 34px; cursor: pointer; }
+.prv-textarea { height: auto; min-height: 96px; padding: 11px 14px; resize: vertical; }
+.prv-input::placeholder, .prv-textarea::placeholder { color: #7E879D; }
+.prv-input:hover, .prv-select:hover, .prv-textarea:hover { border-color: #B0B8CB; }
+.prv-input:focus, .prv-select:focus, .prv-textarea:focus { border-color: #2450DE; box-shadow: 0 0 0 4px rgba(36,80,222,.12); }
+.prv-input--error, .prv-select--error, .prv-textarea--error { border-color: #F04438; }
+.prv-input--error:focus, .prv-textarea--error:focus { box-shadow: 0 0 0 4px rgba(240,68,56,.12); }
+.prv-input:disabled, .prv-select:disabled, .prv-textarea:disabled { background: #F4F6FB; color: #7E879D; cursor: not-allowed; }
+.prv-field-error { display: block; font-size: 12px; color: #DC2626; margin-top: 5px; }
+.prv-hint { display: block; font-size: 12px; color: #7E879D; margin-top: 5px; }
+.prv-hint--ok { color: #039855; }
+html.dark .prv-label { color: rgba(234,236,245,.82); }
+html.dark .prv-input, html.dark .prv-select, html.dark .prv-textarea { background: #0F1430; border-color: #2E3868; color: #EAECF5; }
+html.dark .prv-input:hover, html.dark .prv-select:hover, html.dark .prv-textarea:hover { border-color: #3E4A87; }
+html.dark .prv-input:focus, html.dark .prv-select:focus, html.dark .prv-textarea:focus { border-color: #2450DE; box-shadow: 0 0 0 4px rgba(36,80,222,.28); }
+html.dark .prv-input:disabled, html.dark .prv-select:disabled, html.dark .prv-textarea:disabled { background: #161D40; color: rgba(234,236,245,.4); }
+
+/* ── Base ────────────────────────────────────────────────────────────────────── */
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  background-color: #FFFFFF;
+  color: #171A56;
+  margin: 0;
+  padding: 0;
+}
+
+html.dark body {
+  background: #0A0E22;
+  color: #EAECF5;
+}
+
+/* ── RTL/LTR transition ──────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  transition: direction 0s;
+}
+
+/* ── Keyboard focus ring ──────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Per-page font rules (matching dashboard.html design) ─────────────────── */
+html[lang="en"] body { font-family: 'Poppins', 'DIN NEXT', system-ui, sans-serif; letter-spacing: -0.005em; }
+html[lang="ar"] body,
+html[dir="rtl"] { font-family: 'LT ARABIC', 'IBM Plex Sans Arabic', system-ui, sans-serif; letter-spacing: 0; }
+
+/* ── Arabic typography: "Hint-medium" spec ─────────────────────────────────── */
+.hint-medium { font-size: 12px; font-weight: 500; line-height: 1; text-align: start; }
+html[dir="rtl"] .text-xs,
+html[dir="rtl"] .text-\[10px\],
+html[dir="rtl"] .hint-medium {
+  font-size: 12px; font-weight: 500; line-height: 1; text-align: start; letter-spacing: 0;
+}
+html[dir="rtl"] .text-center .text-xs,
+html[dir="rtl"] .text-center .text-\[10px\] { text-align: center; }
+html[dir="rtl"] .text-end .text-xs,
+html[dir="rtl"] .text-end.text-xs { text-align: end; }
+html[dir="rtl"] h1 { line-height: 1.15 !important; }
+html[dir="rtl"] h2 { line-height: 1.2 !important; }
+
+@keyframes pulseDot { 0%,100% { opacity:1; transform: scale(1); } 50% { opacity:.5; transform: scale(.85); } }
+.pulse-dot { animation: pulseDot 1.8s ease-in-out infinite; }
+
+.btn-primary { background:#2450DE; color:white; transition: background .15s ease, transform .15s ease, box-shadow .15s ease; }
+.btn-primary:hover { background:#1D42C4; box-shadow: 0 12px 28px -10px rgba(36,80,222,.55); }
+
+/* Language pill */
+.lang-pill { position: relative; display:inline-flex; align-items:center; background:#EEF2FE; border:1px solid #DCE3FD; border-radius:999px; padding:3px; }
+.lang-pill button { position:relative; z-index:1; font-size:12px; font-weight:600; padding: 5px 12px; border-radius: 999px; color:#1A37A0; transition: color .2s ease; min-width: 44px; }
+.lang-pill button.active { color:#FFFFFF; }
+.lang-pill .thumb { position:absolute; top:3px; bottom:3px; width: calc(50% - 3px); background:#5040D6; border-radius:999px; transition: transform .25s ease; inset-inline-start: 3px; }
+
+/* ── Workflow surfaces (light + dark) ─────────────────────────────────────── */
+@layer components {
+  .wf-card {
+    @apply rounded-2xl border border-ink-200 bg-white shadow-sm
+      dark:border-surface-600 dark:bg-surface-800 dark:shadow-black/20;
+  }
+  .wf-input {
+    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900
+      placeholder:text-ink-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary
+      dark:border-surface-600 dark:bg-surface-900 dark:text-white dark:placeholder:text-ink-400;
+  }
+  .wf-btn-secondary {
+    @apply inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5
+      text-sm font-medium text-ink-800 transition-colors hover:border-primary/40 hover:bg-ink-50
+      dark:border-surface-600 dark:bg-surface-900/40 dark:text-white dark:hover:border-primary/40 dark:hover:bg-surface-800;
+  }
+  .wf-btn-primary {
+    @apply inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5
+      text-sm font-medium text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-400
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .wf-modal {
+    @apply w-full rounded-xl border border-ink-200 bg-white shadow-2xl
+      dark:border-surface-600 dark:bg-surface-800;
+  }
+  .wf-title {
+    @apply text-ink-900 dark:text-white;
+  }
+  .wf-muted {
+    @apply text-ink-500 dark:text-ink-300;
+  }
+}

@@ -1,0 +1,59 @@
+<div class="ss-root">
+  <button
+    type="button"
+    class="ss-trigger"
+    [class.ss-trigger--open]="isOpen()"
+    [class.ss-trigger--error]="invalid()"
+    [class.ss-trigger--disabled]="disabled()"
+    [disabled]="disabled()"
+    (click)="toggleOpen()"
+  >
+    @if (selectedOption(); as opt) {
+      <span class="ss-trigger-label">{{ opt.label }}</span>
+    } @else {
+      <span class="ss-trigger-placeholder">{{ placeholder() }}</span>
+    }
+
+    <span class="ss-trigger-icons">
+      @if (selectedOption() && !disabled()) {
+        <span class="ss-clear" role="button" tabindex="0" (click)="clear($event)" [attr.aria-label]="clearAriaLabel()">&times;</span>
+      }
+      <svg class="ss-chevron" [class.ss-chevron--open]="isOpen()" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+      </svg>
+    </span>
+  </button>
+
+  @if (isOpen()) {
+    <div class="ss-dropdown">
+      <input
+        class="ss-search-input"
+        type="text"
+        autocomplete="off"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+        (click)="$event.stopPropagation()"
+        [placeholder]="searchPlaceholder()"
+      />
+      <div class="ss-options">
+        @if (filteredOptions().length === 0) {
+          <p class="ss-empty">{{ noResultsText() }}</p>
+        } @else {
+          @for (opt of filteredOptions(); track opt.value) {
+            <button
+              type="button"
+              class="ss-option"
+              [class.ss-option--selected]="opt.value === value()"
+              (click)="select(opt)"
+            >
+              <span class="ss-option-label">{{ opt.label }}</span>
+              @if (opt.sublabel) {
+                <span class="ss-option-sublabel">{{ opt.sublabel }}</span>
+              }
+            </button>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>

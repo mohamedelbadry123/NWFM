@@ -1,0 +1,78 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.notifications.title"
+    subtitleKey="workflow.notifications.subtitle"
+    helpLink="/org/workflow/help" />
+
+  @if (loadError()) {
+    <div class="wf-card border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+      {{ loadError()! | translate }}
+      <button type="button" class="ms-3 underline" (click)="load(page())">{{ 'common.retry' | translate }}</button>
+    </div>
+  }
+
+  @if (isLoading()) {
+    <div class="wf-card overflow-hidden">
+      @for (_ of [1, 2, 3, 4, 5]; track _) {
+        <div class="animate-pulse border-b border-ink-100 px-4 py-4 dark:border-dark-700">
+          <div class="mb-2 h-3 w-1/3 rounded bg-ink-200 dark:bg-dark-600"></div>
+          <div class="h-3 w-2/3 rounded bg-ink-100 dark:bg-dark-700"></div>
+        </div>
+      }
+    </div>
+  } @else if (items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.notifications.empty_title"
+      descriptionKey="workflow.notifications.empty_desc" />
+  } @else {
+    <app-workflow-table-shell>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-start text-xs uppercase tracking-wide text-ink-500 dark:text-dark-400">
+            <th class="px-4 py-3 font-medium">{{ 'workflow.notifications.col_template' | translate }}</th>
+            <th class="px-4 py-3 font-medium">{{ 'workflow.notifications.col_channels' | translate }}</th>
+            <th class="px-4 py-3 font-medium">{{ 'workflow.notifications.col_status' | translate }}</th>
+            <th class="px-4 py-3 font-medium">{{ 'workflow.notifications.col_when' | translate }}</th>
+            <th class="px-4 py-3 font-medium">{{ 'workflow.notifications.col_correlation' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (n of items(); track n.id) {
+            <tr class="border-t border-ink-100 dark:border-dark-700/80">
+              <td class="px-4 py-3">
+                <p class="font-medium text-ink-900 dark:text-white">{{ n.templateKey }}</p>
+                @if (n.variablesJsonTruncated) {
+                  <p class="mt-0.5 font-mono text-xs text-ink-500 dark:text-dark-400 truncate max-w-md">{{ n.variablesJsonTruncated }}</p>
+                }
+              </td>
+              <td class="px-4 py-3 text-ink-700 dark:text-dark-200">{{ n.channels }}</td>
+              <td class="px-4 py-3">
+                <prv-status-pill [tone]="statusTone(n.status)" [label]="n.status" />
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-ink-600 dark:text-dark-300">
+                {{ n.createdAt | date: 'medium' }}
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-ink-500 dark:text-dark-400">
+                {{ n.correlationId || '—' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    @if (totalPages() > 1) {
+      <div class="flex items-center justify-end gap-2">
+        <button type="button" class="wf-btn-secondary px-3 py-1.5 text-xs"
+          [disabled]="page() <= 1"
+          (click)="load(page() - 1)"
+          [attr.aria-label]="'common.prev' | translate">‹</button>
+        <span class="text-xs text-ink-500 dark:text-dark-400">{{ page() }} / {{ totalPages() }}</span>
+        <button type="button" class="wf-btn-secondary px-3 py-1.5 text-xs"
+          [disabled]="page() >= totalPages()"
+          (click)="load(page() + 1)"
+          [attr.aria-label]="'common.next' | translate">›</button>
+      </div>
+    }
+  }
+</div>

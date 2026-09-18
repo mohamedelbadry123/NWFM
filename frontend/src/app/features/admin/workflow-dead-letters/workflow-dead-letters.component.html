@@ -1,0 +1,89 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.dead_letters.title"
+    subtitleKey="workflow.dead_letters.subtitle"
+    helpLink="/admin/workflow/help" />
+
+  <div class="flex gap-2 border-b border-ink-200 dark:border-dark-700">
+    <button
+      type="button"
+      (click)="setTab('inbox')"
+      [class]="activeTab() === 'inbox'
+        ? 'px-4 py-2 text-sm font-medium text-white border-b-2 border-primary -mb-px'
+        : 'px-4 py-2 text-sm text-ink-500 hover:text-ink-900 dark:text-dark-300 dark:hover:text-white transition-colors'">
+      {{ 'workflow.dead_letters.tab_inbox' | translate }}
+    </button>
+    <button
+      type="button"
+      (click)="setTab('outbox')"
+      [class]="activeTab() === 'outbox'
+        ? 'px-4 py-2 text-sm font-medium text-white border-b-2 border-primary -mb-px'
+        : 'px-4 py-2 text-sm text-ink-500 hover:text-ink-900 dark:text-dark-300 dark:hover:text-white transition-colors'">
+      {{ 'workflow.dead_letters.tab_outbox' | translate }}
+    </button>
+  </div>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl bg-red-900/20 border border-red-800/40 p-4 text-red-400">
+      <p>{{ loadError() }}</p>
+      <button type="button" (click)="load()" class="mt-3 px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else if (items().length === 0) {
+    <prv-empty-state titleKey="workflow.dead_letters.empty" />
+    <div class="flex justify-center -mt-8 mb-4">
+      <a routerLink="/admin/workflow/help" fragment="dead-letters"
+        class="text-sm text-primary hover:text-primary-300 transition-colors">
+        {{ 'workflow.dead_letters.empty_help_cta' | translate }}
+      </a>
+    </div>
+  } @else {
+    <app-workflow-table-shell titleKey="workflow.dead_letters.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.dead_letters.col_message_id' | translate }}</th>
+            <th>{{ 'workflow.dead_letters.col_module' | translate }}</th>
+            <th>{{ 'workflow.dead_letters.col_entity' | translate }}</th>
+            <th>{{ 'workflow.dead_letters.col_status' | translate }}</th>
+            <th>{{ 'workflow.dead_letters.col_error' | translate }}</th>
+            <th>{{ 'workflow.dead_letters.col_created' | translate }}</th>
+            <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of items(); track row.id ?? row.messageId) {
+            <tr>
+              <td class="text-ink-900 dark:text-white font-mono text-xs">{{ row.messageId ?? '—' }}</td>
+              <td class="text-ink-700 dark:text-dark-200">{{ row.moduleKey ?? '—' }}</td>
+              <td class="text-ink-700 dark:text-dark-200">{{ entityLabel(row) }}</td>
+              <td class="text-ink-700 dark:text-dark-200">{{ row.status ?? '—' }}</td>
+              <td class="text-red-300 text-xs max-w-xs truncate" [title]="row.errorMessage ?? ''">
+                {{ row.errorMessage ?? '—' }}
+              </td>
+              <td class="text-ink-500 dark:text-dark-300 text-xs">
+                {{ row.createdAt ? (row.createdAt | date: 'medium') : '—' }}
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  (click)="replay(row)"
+                  [disabled]="replayingId() === row.id || !row.id"
+                  class="rounded-xl bg-primary px-3 py-1.5 text-xs text-white hover:bg-primary-400 transition-colors disabled:opacity-50">
+                  {{ replayingId() === row.id
+                    ? ('common.processing' | translate)
+                    : ('workflow.dead_letters.replay_btn' | translate) }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+  }
+</div>

@@ -1,0 +1,82 @@
+<div class="p-5 sm:p-6 space-y-6">
+  <app-workflow-page-header
+    [titleKey]="titleKey()"
+    [subtitleKey]="subtitleKey()"
+    [helpLink]="helpLink()">
+    @if (audience() === 'admin') {
+      <a routerLink="/admin/workflow/bindings/new"
+        class="wf-btn-primary">
+        {{ 'workflow.hub.cta_new_binding' | translate }}
+      </a>
+      <a routerLink="/admin/workflow/definitions"
+        class="wf-btn-secondary">
+        {{ 'workflow.hub.cta_definitions' | translate }}
+      </a>
+    } @else {
+      <a routerLink="/org/workflow/tasks"
+        class="wf-btn-primary">
+        {{ 'workflow.hub.cta_my_tasks' | translate }}
+      </a>
+    }
+  </app-workflow-page-header>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <app-workflow-kpi-card
+      labelKey="workflow.hub.kpi_design"
+      [value]="audience() === 'admin' ? ('workflow.hub.kpi_design_value' | translate) : ('workflow.hub.kpi_ready_value' | translate)"
+      hintKey="workflow.hub.kpi_design_hint"
+      tone="primary" />
+    <app-workflow-kpi-card
+      labelKey="workflow.hub.kpi_runtime"
+      [value]="audience() === 'admin' ? ('workflow.hub.kpi_runtime_value' | translate) : ('workflow.hub.kpi_tasks_value' | translate)"
+      hintKey="workflow.hub.kpi_runtime_hint"
+      tone="success" />
+    <app-workflow-kpi-card
+      labelKey="workflow.hub.kpi_ops"
+      [value]="audience() === 'admin' ? ('workflow.hub.kpi_ops_value' | translate) : ('workflow.hub.kpi_teams_value' | translate)"
+      hintKey="workflow.hub.kpi_ops_hint"
+      tone="warning" />
+    <app-workflow-kpi-card
+      labelKey="workflow.hub.kpi_learn"
+      [value]="('workflow.hub.kpi_learn_value' | translate)"
+      hintKey="workflow.hub.kpi_learn_hint"
+      tone="default" />
+  </div>
+
+  <section>
+    <div class="mb-3 flex items-center justify-between gap-3">
+      <h2 class="text-sm font-semibold uppercase tracking-widest text-ink-500 dark:text-dark-300">{{ 'workflow.hub.sections_title' | translate }}</h2>
+      <a [routerLink]="helpLink()" class="text-xs font-medium text-primary-200 hover:text-primary-100">{{ 'workflow.hub.open_manual' | translate }}</a>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      @for (item of links(); track item.link) {
+        <a
+          [routerLink]="item.link"
+          class="group wf-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
+          [class]="toneBorder(item.tone)">
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <span class="inline-flex size-9 items-center justify-center rounded-xl text-xs font-bold" [class]="toneAccent(item.tone)">
+              {{ initial(item.titleKey) }}
+            </span>
+            <span class="text-ink-400 dark:text-dark-500 group-hover:text-primary-200 transition-colors" aria-hidden="true">→</span>
+          </div>
+          <h3 class="text-sm font-semibold text-ink-900 dark:text-white">{{ item.titleKey | translate }}</h3>
+          <p class="mt-1 text-xs leading-relaxed text-ink-500 dark:text-dark-300">{{ item.descKey | translate }}</p>
+        </a>
+      }
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-white to-ink-50 p-5 dark:from-primary/15 dark:via-dark-800 dark:to-dark-800">
+    <h2 class="text-sm font-semibold text-ink-900 dark:text-white">{{ 'workflow.hub.path_title' | translate }}</h2>
+    <p class="mt-1 text-xs text-ink-500 dark:text-dark-300 max-w-3xl">{{ 'workflow.hub.path_body' | translate }}</p>
+    <ol class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+      @for (step of pathSteps(); track step) {
+        <li class="flex items-start gap-3 rounded-xl border border-ink-200 bg-white px-3 py-3 dark:border-dark-700/80 dark:bg-dark-900/40">
+          <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">{{ step }}</span>
+          <span class="text-xs text-ink-700 dark:text-dark-200">{{ ('workflow.hub.path_step_' + audience() + '_' + step) | translate }}</span>
+        </li>
+      }
+    </ol>
+  </section>
+</div>

@@ -1,0 +1,326 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.groups.title"
+    subtitleKey="workflow.groups.subtitle"
+    helpLink="/org/workflow/help">
+    <button
+      (click)="openCreate()"
+      class="wf-btn-primary">
+      + {{ 'workflow.groups.new_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  <!-- Search -->
+  <input
+    [formControl]="searchCtrl"
+    type="search"
+    [placeholder]="'workflow.groups.search_placeholder' | translate"
+    class="wf-input !rounded-xl !px-4 !py-2.5" />
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">{{ 'common.loading' | translate }}</div>
+  }
+
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  @if (!isLoading() && !loadError() && items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.groups.empty_title"
+      subtitleKey="workflow.groups.empty_sub" />
+  }
+
+  @if (!isLoading() && !loadError() && items().length > 0) {
+    <app-workflow-table-shell titleKey="workflow.groups.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.groups.col_code' | translate }}</th>
+            <th>{{ 'workflow.groups.col_name' | translate }}</th>
+            <th>{{ 'workflow.groups.col_strategy' | translate }}</th>
+            <th>{{ 'workflow.groups.col_members' | translate }}</th>
+            <th>{{ 'workflow.groups.col_status' | translate }}</th>
+            <th class="text-end">{{ 'workflow.groups.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (g of items(); track g.id) {
+            <tr>
+              <td class="text-ink-500 dark:text-dark-300 font-mono text-xs">{{ g.code }}</td>
+              <td>
+                <p class="text-ink-900 dark:text-white font-medium">{{ g.name }}</p>
+                @if (g.nameAr) { <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5">{{ g.nameAr }}</p> }
+              </td>
+              <td class="text-ink-700 dark:text-dark-200">
+                {{ 'workflow.strategy.' + g.assignmentStrategy | translate }}
+              </td>
+              <td class="text-ink-700 dark:text-dark-200">{{ g.memberCount ?? 0 }}</td>
+              <td>
+                @if (g.isActive) {
+                  <prv-status-pill tone="success" labelKey="common.active" />
+                } @else {
+                  <prv-status-pill tone="neutral" labelKey="common.inactive" />
+                }
+              </td>
+              <td>
+                <div class="flex items-center justify-end gap-3">
+                  <button (click)="viewDetail(g)" class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    {{ 'workflow.groups.members_btn' | translate }}
+                  </button>
+                  <button
+                    (click)="openEdit(g)"
+                    class="text-xs text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white transition-colors">
+                    {{ 'common.edit' | translate }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-xs text-ink-500 dark:text-dark-300 mt-4">
+      <span>{{ 'workflow.common.showing' | translate: { start: rangeStart(), end: rangeEnd(), total: totalCount() } }}</span>
+      <div class="flex items-center gap-1">
+        <button (click)="prevPage()" [disabled]="page() === 1" class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">‹</button>
+        @for (pn of pageNumbers(); track $index) {
+          @if (isNumber(pn)) {
+            <button (click)="goToPage(pn)" [class]="pn === page() ? 'px-2 py-1 rounded bg-primary text-white' : 'px-2 py-1 rounded border border-dark-600 hover:bg-dark-700'">{{ pn }}</button>
+          } @else {
+            <span class="px-1">…</span>
+          }
+        }
+        <button (click)="nextPage()" [disabled]="page() >= totalPages()" class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">›</button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Create/Edit Form Panel -->
+@if (showForm()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-lg mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">
+          {{ (isCreateMode() ? 'workflow.groups.form_create_title' : 'workflow.groups.form_edit_title') | translate }}
+        </h2>
+        <button (click)="closeForm()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="groupForm" (ngSubmit)="saveGroup()" class="p-6 space-y-4">
+        @if (isCreateMode()) {
+          <div class="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-600 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-300 space-y-1">
+            <p>{{ 'workflow.groups.field_code_auto' | translate }}</p>
+            @if (suggestedCode()) {
+              <p class="font-mono text-ink-800 dark:text-dark-100">
+                {{ 'workflow.groups.field_code_preview' | translate }}:
+                <span class="font-semibold">{{ suggestedCode() }}</span>
+              </p>
+            }
+          </div>
+        } @else {
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <label class="block text-xs font-medium text-ink-500 dark:text-dark-300">{{ 'workflow.groups.field_code' | translate }} *</label>
+              <button type="button" (click)="applySuggestedCode()"
+                class="text-[11px] text-primary hover:text-primary-300 transition-colors">
+                {{ 'workflow.groups.field_code_from_name' | translate }}
+              </button>
+            </div>
+            <input formControlName="code" type="text"
+              [placeholder]="'workflow.groups.field_code_placeholder' | translate"
+              class="wf-input font-mono uppercase"
+              (blur)="normalizeCode()" />
+            <p class="text-xs text-ink-400 dark:text-dark-500 mt-1">{{ 'workflow.groups.field_code_hint' | translate }}</p>
+            @if (groupForm.get('code')?.invalid && groupForm.get('code')?.touched) {
+              <p class="text-xs text-red-500 mt-1">{{ 'workflow.groups.field_code_required' | translate }}</p>
+            }
+          </div>
+        }
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.field_name' | translate }} *</label>
+          <input formControlName="name" type="text"
+            [placeholder]="'workflow.groups.field_name_placeholder' | translate"
+            class="wf-input" />
+          @if (groupForm.get('name')?.invalid && groupForm.get('name')?.touched) {
+            <p class="text-xs text-red-400 mt-1">{{ 'workflow.groups.field_name_required' | translate }}</p>
+          }
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.field_name_ar' | translate }}</label>
+          <input formControlName="nameAr" type="text" dir="rtl"
+            [placeholder]="'workflow.groups.field_name_ar_placeholder' | translate"
+            class="wf-input" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.field_strategy' | translate }} *</label>
+          <select formControlName="assignmentStrategy"
+            class="wf-input">
+            @for (s of strategies; track s) {
+              <option [value]="s">{{ 'workflow.strategy.' + s | translate }}</option>
+            }
+          </select>
+        </div>
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" (click)="closeForm()" class="wf-btn-secondary">
+            {{ 'common.cancel' | translate }}
+          </button>
+          <button type="submit" [disabled]="groupForm.invalid || saving()"
+            class="wf-btn-primary">
+            {{ saving() ? ('common.saving' | translate) : ('common.save' | translate) }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Detail / Members Panel -->
+@if (showDetail()) {
+  <div class="fixed inset-0 z-40 flex">
+    <div class="flex-1" (click)="closeDetail()"></div>
+    <div class="w-full max-w-md bg-white dark:bg-dark-800 border-s border-ink-200 dark:border-dark-700 flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <div>
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ detailGroup()?.name ?? '' }}</h2>
+          <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5 font-mono">{{ detailGroup()?.code ?? '' }}</p>
+        </div>
+        <button (click)="closeDetail()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6 space-y-4">
+        @if (detailLoading()) {
+          <p class="text-sm text-ink-400 dark:text-dark-400 text-center py-8">{{ 'common.loading' | translate }}</p>
+        }
+        @if (!detailLoading()) {
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-medium text-ink-700 dark:text-dark-200">{{ 'workflow.groups.members_label' | translate }}
+              ({{ detailGroup()?.members?.length ?? 0 }})</h3>
+            <button
+              (click)="openAddMember()"
+              class="text-xs text-primary hover:text-primary-300 transition-colors">
+              + {{ 'workflow.groups.add_member_btn' | translate }}
+            </button>
+          </div>
+
+          @if (detailGroup()?.members?.length === 0) {
+            <p class="text-xs text-ink-400 dark:text-dark-400 text-center py-4">{{ 'workflow.groups.no_members' | translate }}</p>
+          }
+
+          @for (m of detailGroup()?.members ?? []; track m.id) {
+            <div class="flex items-center justify-between py-2 border-b border-ink-200 dark:border-dark-700">
+              <div>
+                <p class="text-sm text-ink-900 dark:text-white">{{ m.displayName }}</p>
+                <p class="text-xs text-ink-400 dark:text-dark-400">{{ m.email }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs" [class]="m.canClaim ? 'text-primary' : 'text-ink-400 dark:text-dark-400'">
+                    {{ (m.canClaim ? 'workflow.groups.can_claim' : 'workflow.groups.cannot_claim') | translate }}
+                  </span>
+                  @if (m.isPrimary) {
+                    <span class="text-xs text-amber-400">{{ 'workflow.groups.is_primary' | translate }}</span>
+                  }
+                </div>
+              </div>
+              <button
+                (click)="confirmRemove(detailGroup()!.id!, m.participantId!, m.displayName!)"
+                class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                {{ 'common.remove' | translate }}
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Add Member Modal -->
+@if (showAddMember()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-md mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.groups.add_member_title' | translate }}</h2>
+        <button (click)="closeAddMember()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="addMemberForm" (ngSubmit)="addMember()" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.member_participant' | translate }} *</label>
+          @if (participantsLoading()) {
+            <p class="text-xs text-ink-400 dark:text-dark-400">{{ 'common.loading' | translate }}</p>
+          }
+          @if (!participantsLoading()) {
+            <select formControlName="participantId"
+              class="wf-input">
+              <option value="">{{ 'workflow.groups.select_participant' | translate }}</option>
+              @for (p of participants(); track p.id) {
+                <option [value]="p.id">{{ p.displayName }} — {{ p.email }}</option>
+              }
+            </select>
+          }
+        </div>
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input formControlName="canClaim" type="checkbox" class="accent-primary" />
+            <span class="text-sm text-ink-700 dark:text-dark-200">{{ 'workflow.groups.can_claim' | translate }}</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input formControlName="isPrimary" type="checkbox" class="accent-primary" />
+            <span class="text-sm text-ink-700 dark:text-dark-200">{{ 'workflow.groups.is_primary' | translate }}</span>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.valid_from' | translate }}</label>
+            <input formControlName="validFrom" type="date"
+              class="wf-input" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">{{ 'workflow.groups.valid_to' | translate }}</label>
+            <input formControlName="validTo" type="date"
+              class="wf-input" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" (click)="closeAddMember()" class="wf-btn-secondary">
+            {{ 'common.cancel' | translate }}
+          </button>
+          <button type="submit" [disabled]="addMemberForm.invalid || addingMember()"
+            class="wf-btn-primary">
+            {{ addingMember() ? ('common.saving' | translate) : ('workflow.groups.add_member_btn' | translate) }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- Remove member confirmation -->
+@if (confirmRemoveMember()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.groups.confirm_remove_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ 'workflow.groups.confirm_remove_body' | translate: { name: confirmRemoveMember()?.name } }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="cancelRemove()" class="wf-btn-secondary">{{ 'common.cancel' | translate }}</button>
+        <button (click)="executeRemove()" [disabled]="removingMember()"
+          class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors">
+          {{ removingMember() ? ('common.processing' | translate) : ('common.remove' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

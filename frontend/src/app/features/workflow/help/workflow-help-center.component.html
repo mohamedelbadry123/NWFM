@@ -1,0 +1,255 @@
+<div class="flex h-full flex-col bg-ink-50 dark:bg-dark-900">
+
+  <!-- Top bar -->
+  <div class="shrink-0 border-b border-ink-200 dark:border-dark-700 px-4 pt-4 sm:px-6">
+    <app-workflow-page-header
+      titleKey="workflow.help.title"
+      subtitleKey="workflow.help.subtitle">
+      <a [routerLink]="backLink"
+        class="wf-btn-secondary">
+        ← {{ backLinkKey | translate }}
+      </a>
+    </app-workflow-page-header>
+  </div>
+
+  <header class="shrink-0 border-b border-ink-200 dark:border-dark-700 bg-white/90 dark:bg-dark-800/80 px-4 py-3 sm:px-6">
+    <div class="flex flex-wrap items-center gap-2">
+      @for (tab of [
+        { id: 'paths', key: 'workflow.help.tab_paths' },
+        { id: 'guides', key: 'workflow.help.tab_guides' },
+        { id: 'glossary', key: 'workflow.help.tab_glossary' },
+        { id: 'keyboard', key: 'workflow.help.tab_keyboard' }
+      ]; track tab.id) {
+        <button type="button"
+          (click)="setTab($any(tab.id))"
+          [class]="activeTab() === tab.id
+            ? 'rounded-full bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary border border-primary/40'
+            : 'rounded-full bg-ink-100 px-3 py-1.5 text-xs text-ink-600 border border-ink-200 hover:text-ink-900 hover:border-ink-300 dark:bg-dark-700/60 dark:text-dark-300 dark:border-dark-600 dark:hover:text-white dark:hover:border-dark-500'">
+          {{ tab.key | translate }}
+        </button>
+      }
+
+      <span class="mx-1 hidden h-4 w-px bg-dark-600 sm:inline-block" aria-hidden="true"></span>
+
+      @for (aud of [
+        { id: 'all', key: 'workflow.help.audience_all' },
+        { id: 'admin', key: 'workflow.help.audience_admin' },
+        { id: 'org', key: 'workflow.help.audience_org' }
+      ]; track aud.id) {
+        <button type="button"
+          (click)="setAudience($any(aud.id))"
+          [class]="audienceFilter() === aud.id
+            ? 'rounded px-2.5 py-1 text-xs font-medium text-white bg-primary border border-primary'
+            : 'rounded px-2.5 py-1 text-xs text-ink-500 border border-transparent hover:text-ink-800 hover:bg-ink-100 dark:text-dark-400 dark:hover:text-dark-200 dark:hover:bg-dark-700/50'">
+          {{ aud.key | translate }}
+        </button>
+      }
+
+      <div class="ms-auto w-full sm:w-64">
+        <label class="sr-only" for="workflow-help-search">{{ 'workflow.help.search_placeholder' | translate }}</label>
+        <div class="relative">
+          <svg class="pointer-events-none absolute inset-inline-start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400 dark:text-dark-500"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.6-5.4a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+          </svg>
+          <input
+            id="workflow-help-search"
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+            type="search"
+            [placeholder]="'workflow.help.search_placeholder' | translate"
+            class="w-full rounded border border-ink-200 dark:border-dark-600 bg-ink-100 dark:bg-dark-700 py-1.5 pe-3 ps-8 text-xs text-ink-900 dark:text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+
+    <!-- Left nav (paths / guides) -->
+    @if (activeTab() === 'paths' || activeTab() === 'guides') {
+      <aside class="hidden w-64 shrink-0 flex-col overflow-hidden border-e border-ink-200 dark:border-dark-700 bg-white dark:bg-dark-800 md:flex">
+        <nav class="flex-1 overflow-y-auto py-2">
+          @if (activeTab() === 'paths') {
+            <p class="px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-ink-400 dark:text-dark-500">
+              {{ 'workflow.help.tab_paths' | translate }}
+            </p>
+            @if (learningPaths().length === 0) {
+              <p class="px-4 py-3 text-xs text-ink-400 dark:text-dark-500">{{ 'workflow.help.empty_search' | translate }}</p>
+            }
+            @for (path of learningPaths(); track path.id) {
+              <button type="button"
+                (click)="selectGuide(path.id)"
+                [class]="activeGuideId() === path.id
+                  ? 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white bg-primary/15 border-s-2 border-primary font-medium text-start'
+                  : 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-ink-600 hover:text-ink-900 hover:bg-ink-50 text-start transition-colors border-s-2 border-transparent dark:text-dark-300 dark:hover:text-white dark:hover:bg-dark-700'">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-ink-100 dark:bg-dark-700 text-[10px] font-semibold text-primary">
+                  {{ categoryBadge(path.category) }}
+                </span>
+                <span class="truncate">{{ path.titleKey | translate }}</span>
+              </button>
+            }
+          } @else {
+            @for (group of navGroups; track group.category) {
+              @if (guidesForCategory(group.category).length > 0) {
+                <p class="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400 dark:text-dark-500">
+                  {{ group.titleKey | translate }}
+                </p>
+                @for (guide of guidesForCategory(group.category); track guide.id) {
+                  <button type="button"
+                    (click)="selectGuide(guide.id)"
+                    [class]="activeGuideId() === guide.id
+                      ? 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white bg-primary/15 border-s-2 border-primary font-medium text-start'
+                      : 'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-ink-600 hover:text-ink-900 hover:bg-ink-50 text-start transition-colors border-s-2 border-transparent dark:text-dark-300 dark:hover:text-white dark:hover:bg-dark-700'">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-ink-100 dark:bg-dark-700 text-[10px] font-semibold text-primary">
+                      {{ categoryBadge(guide.category) }}
+                    </span>
+                    <span class="truncate">{{ guide.titleKey | translate }}</span>
+                  </button>
+                }
+              }
+            }
+            @if (nonPathGuides().length === 0) {
+              <p class="px-4 py-3 text-xs text-ink-400 dark:text-dark-500">{{ 'workflow.help.empty_search' | translate }}</p>
+            }
+          }
+        </nav>
+      </aside>
+    }
+
+    <!-- Content pane -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-8">
+
+      @if (activeTab() === 'glossary') {
+        <div class="mx-auto max-w-3xl">
+          <h2 class="mb-6 text-2xl font-semibold text-ink-900 dark:text-white">{{ 'workflow.help.tab_glossary' | translate }}</h2>
+          <div class="space-y-3">
+            @for (entry of glossary; track entry.termKey) {
+              <div class="rounded-lg border border-ink-200 dark:border-dark-700 bg-white dark:bg-dark-800 px-5 py-4">
+                <dt class="mb-1 text-sm font-semibold text-ink-900 dark:text-white">{{ entry.termKey | translate }}</dt>
+                <dd class="text-xs text-ink-500 dark:text-dark-300">{{ entry.definitionKey | translate }}</dd>
+              </div>
+            }
+          </div>
+        </div>
+      } @else if (activeTab() === 'keyboard') {
+        <div class="mx-auto max-w-2xl">
+          <h2 class="mb-6 text-2xl font-semibold text-ink-900 dark:text-white">{{ 'workflow.help.tab_keyboard' | translate }}</h2>
+          <div class="overflow-hidden rounded-xl border border-ink-200 dark:border-dark-700 bg-white dark:bg-dark-800">
+            <table class="w-full text-sm">
+              <thead class="bg-ink-100 dark:bg-dark-700">
+                <tr>
+                  <th class="px-4 py-2 text-start text-xs uppercase text-ink-400 dark:text-dark-400">{{ 'workflow.help.keyboard_col_shortcut' | translate }}</th>
+                  <th class="px-4 py-2 text-start text-xs uppercase text-ink-400 dark:text-dark-400">{{ 'workflow.help.keyboard_col_action' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-ink-200 dark:divide-dark-700">
+                @for (item of keyboardShortcuts; track item.key) {
+                  <tr class="hover:bg-ink-50 dark:hover:bg-dark-700/40">
+                    <td class="px-4 py-2.5">
+                      <kbd class="rounded border border-ink-200 dark:border-dark-600 bg-ink-100 dark:bg-dark-700 px-2 py-0.5 font-mono text-xs text-ink-900 dark:text-white">{{ item.key }}</kbd>
+                    </td>
+                    <td class="px-4 py-2.5 text-xs text-ink-700 dark:text-dark-200">{{ item.actionKey | translate }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      } @else {
+        @if (activeGuide(); as guide) {
+          <article class="mx-auto max-w-3xl">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <span class="rounded border border-ink-200 dark:border-dark-600 bg-ink-100 dark:bg-dark-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-dark-300">
+                {{ audienceBadgeKey(guide.audience) | translate }}
+              </span>
+              <span class="rounded border border-ink-200 bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-primary dark:border-dark-600 dark:bg-dark-700/80">
+                {{ categoryBadge(guide.category) }}
+              </span>
+            </div>
+            <h2 class="text-2xl font-semibold text-ink-900 dark:text-white">{{ guide.titleKey | translate }}</h2>
+            <p class="mt-2 text-sm text-ink-500 dark:text-dark-300">{{ guide.summaryKey | translate }}</p>
+
+            <!-- Mobile guide picker -->
+            <div class="mt-4 md:hidden">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400 dark:text-dark-500"
+                for="workflow-help-mobile-guide">{{ 'workflow.help.mobile_guide_label' | translate }}</label>
+              <select
+                id="workflow-help-mobile-guide"
+                class="w-full rounded border border-ink-200 dark:border-dark-600 bg-ink-100 dark:bg-dark-700 px-3 py-2 text-xs text-ink-900 dark:text-white"
+                [value]="guide.id"
+                (change)="selectGuide($any($event.target).value)">
+                @if (activeTab() === 'paths') {
+                  @for (path of learningPaths(); track path.id) {
+                    <option [value]="path.id">{{ path.titleKey | translate }}</option>
+                  }
+                } @else {
+                  @for (g of nonPathGuides(); track g.id) {
+                    <option [value]="g.id">{{ g.titleKey | translate }}</option>
+                  }
+                }
+              </select>
+            </div>
+
+            <ol class="mt-8 space-y-4">
+              @for (step of guide.steps; track step.titleKey; let i = $index) {
+                <li class="rounded-xl border border-ink-200 dark:border-dark-700 bg-white dark:bg-dark-800 p-5">
+                  <div class="flex items-start gap-3">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
+                      {{ i + 1 }}
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <h3 class="text-sm font-semibold text-ink-900 dark:text-white">{{ step.titleKey | translate }}</h3>
+                      <p class="mt-2 text-xs leading-relaxed text-ink-500 dark:text-dark-300">{{ step.bodyKey | translate }}</p>
+
+                      @if (step.tipKey) {
+                        <div class="mt-3 flex gap-2 rounded-lg border border-amber-800/40 bg-amber-900/15 px-3 py-2">
+                          <svg class="mt-0.5 h-4 w-4 shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5m0-4h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z" />
+                          </svg>
+                          <div>
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-400">{{ 'workflow.help.tip_label' | translate }}</p>
+                            <p class="mt-0.5 text-xs text-amber-100/90">{{ step.tipKey | translate }}</p>
+                          </div>
+                        </div>
+                      }
+
+                      @if (step.link && step.linkLabelKey) {
+                        <a [routerLink]="step.link"
+                          class="mt-3 inline-flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors">
+                          {{ step.linkLabelKey | translate }}
+                          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                          </svg>
+                        </a>
+                      }
+                    </div>
+                  </div>
+                </li>
+              }
+            </ol>
+
+            @if (relatedGuides().length > 0) {
+              <div class="mt-8">
+                <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-dark-500">{{ 'workflow.help.related_label' | translate }}</h3>
+                <div class="flex flex-wrap gap-2">
+                  @for (related of relatedGuides(); track related.id) {
+                    <button type="button"
+                      (click)="selectGuide(related.id)"
+                      class="rounded-full border border-ink-200 dark:border-dark-600 bg-white dark:bg-dark-800 px-3 py-1.5 text-xs text-ink-700 dark:text-dark-200 hover:border-primary/40 hover:text-primary transition-colors">
+                      {{ related.titleKey | translate }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </article>
+        } @else {
+          <div class="mx-auto max-w-3xl rounded-xl border border-ink-200 dark:border-dark-700 bg-white dark:bg-dark-800 p-8 text-center">
+            <p class="text-sm text-ink-400 dark:text-dark-400">{{ 'workflow.help.empty_search' | translate }}</p>
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>

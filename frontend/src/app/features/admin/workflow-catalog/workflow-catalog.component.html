@@ -1,0 +1,107 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    [titleKey]="titleKey()"
+    [subtitleKey]="subtitleKey()"
+    helpLink="/admin/workflow/help" />
+
+  <div class="flex flex-wrap gap-2" role="tablist">
+    <a routerLink="/admin/workflow/systems" role="tab"
+      [attr.aria-selected]="view() === 'systems'"
+      [class]="tabClass('systems')">
+      {{ 'workflow.catalog.tab_systems' | translate }}
+    </a>
+    <a routerLink="/admin/workflow/modules" role="tab"
+      [attr.aria-selected]="view() === 'modules'"
+      [class]="tabClass('modules')">
+      {{ 'workflow.catalog.tab_modules' | translate }}
+    </a>
+    <a routerLink="/admin/workflow/screens" role="tab"
+      [attr.aria-selected]="view() === 'screens'"
+      [class]="tabClass('screens')">
+      {{ 'workflow.catalog.tab_screens' | translate }}
+    </a>
+  </div>
+
+  <p class="text-xs text-ink-400 dark:text-dark-400">{{ 'workflow.catalog.reuse_notice' | translate }}</p>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl bg-red-900/20 border border-red-800/40 p-4 text-red-400">{{ loadError()! | translate }}</div>
+  } @else if (view() === 'systems') {
+    <app-workflow-table-shell titleKey="workflow.catalog.systems.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.catalog.col_key' | translate }}</th>
+            <th>{{ 'workflow.catalog.col_name' | translate }}</th>
+            <th>{{ 'workflow.catalog.col_status' | translate }}</th>
+            <th>{{ 'workflow.catalog.col_modules' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-mono text-xs text-ink-900 dark:text-white">NWFM</td>
+            <td class="text-ink-900 dark:text-white">{{ 'workflow.catalog.host_name' | translate }}</td>
+            <td class="text-ink-700 dark:text-dark-200">{{ 'common.active' | translate }}</td>
+            <td class="text-ink-700 dark:text-dark-200">{{ catalog().length }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+  } @else if (view() === 'modules') {
+    @if (catalog().length === 0) {
+      <prv-empty-state titleKey="workflow.catalog.empty" />
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.catalog.modules.title">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.catalog.col_key' | translate }}</th>
+              <th>{{ 'workflow.catalog.col_name' | translate }}</th>
+              <th>{{ 'workflow.catalog.col_screens' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (mod of catalog(); track mod.moduleKey) {
+              <tr>
+                <td class="font-mono text-xs text-ink-900 dark:text-white">{{ mod.moduleKey }}</td>
+                <td class="text-ink-900 dark:text-white">{{ moduleName(mod) }}</td>
+                <td class="text-ink-700 dark:text-dark-200">{{ mod.entityTypes?.length ?? 0 }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-workflow-table-shell>
+    }
+  } @else {
+    @if (screens().length === 0) {
+      <prv-empty-state titleKey="workflow.catalog.empty" />
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.catalog.screens.title">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.catalog.col_module' | translate }}</th>
+              <th>{{ 'workflow.catalog.col_screen_key' | translate }}</th>
+              <th>{{ 'workflow.catalog.col_name' | translate }}</th>
+              <th>{{ 'workflow.catalog.col_triggers' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of screens(); track row.moduleKey + row.entityType) {
+              <tr>
+                <td class="text-ink-700 dark:text-dark-200">{{ row.moduleName }}</td>
+                <td class="font-mono text-xs text-ink-900 dark:text-white">{{ row.entityType }}</td>
+                <td class="text-ink-900 dark:text-white">{{ row.entityName }}</td>
+                <td class="text-ink-700 dark:text-dark-200">{{ row.triggerCount }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-workflow-table-shell>
+    }
+  }
+</div>

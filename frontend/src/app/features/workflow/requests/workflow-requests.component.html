@@ -1,0 +1,182 @@
+<div class="space-y-5 p-5 sm:p-6">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.requests.title"
+    subtitleKey="workflow.runtime.requests.subtitle"
+    helpLink="/org/workflow/help">
+    <button type="button" (click)="load()" class="wf-btn-secondary">
+      {{ 'workflow.runtime.refresh_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="wf-card flex flex-wrap items-end gap-3 p-4">
+    <div class="min-w-[16rem] flex-1">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="requestSearch">
+        {{ 'workflow.runtime.requests.search' | translate }}
+      </label>
+      <input
+        id="requestSearch"
+        formControlName="search"
+        type="search"
+        class="wf-input"
+        [placeholder]="'workflow.runtime.requests.search_placeholder' | translate" />
+    </div>
+    <div class="w-40">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="requestStatus">
+        {{ 'workflow.runtime.col_status' | translate }}
+      </label>
+      <select id="requestStatus" formControlName="status" class="wf-input">
+        <option value="">{{ 'workflow.runtime.requests.status_all' | translate }}</option>
+        <option value="Running">{{ 'workflow.runtime.status_InProgress' | translate }}</option>
+        <option value="Completed">{{ 'workflow.runtime.status_Completed' | translate }}</option>
+        <option value="Failed">{{ 'workflow.runtime.status_Failed' | translate }}</option>
+        <option value="Cancelled">{{ 'workflow.runtime.status_Cancelled' | translate }}</option>
+        <option value="Suspended">{{ 'workflow.runtime.status_OnHold' | translate }}</option>
+      </select>
+    </div>
+    <div class="w-48">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="requestGroup">
+        {{ 'workflow.runtime.col_group_owner' | translate }}
+      </label>
+      <select id="requestGroup" formControlName="originalGroupId" class="wf-input">
+        <option value="">{{ 'workflow.runtime.requests.group_all' | translate }}</option>
+        @for (group of groups(); track group.id) {
+          <option [value]="group.id">{{ groupLabel(group) }}</option>
+        }
+      </select>
+    </div>
+    <div class="w-40">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="requestSla">
+        {{ 'workflow.runtime.col_remaining_sla' | translate }}
+      </label>
+      <select id="requestSla" formControlName="slaStatus" class="wf-input">
+        <option value="">{{ 'workflow.runtime.sla.filter_all' | translate }}</option>
+        <option value="ok">{{ 'workflow.runtime.sla.filter_ok' | translate }}</option>
+        <option value="warning">{{ 'workflow.runtime.sla.filter_warning' | translate }}</option>
+        <option value="breached">{{ 'workflow.runtime.sla.filter_breached' | translate }}</option>
+      </select>
+    </div>
+    <button type="submit" class="wf-btn-primary !px-4 !py-2">
+      {{ 'workflow.runtime.requests.apply_filters' | translate }}
+    </button>
+    <button type="button" (click)="clearFilters()" class="wf-btn-secondary">
+      {{ 'workflow.runtime.requests.clear_filters' | translate }}
+    </button>
+  </form>
+
+  @if (isLoading()) {
+    <div class="wf-card space-y-3 p-4" aria-busy="true">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-ink-100 dark:bg-dark-700/70"></div>
+      }
+    </div>
+  } @else if (loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-sm text-red-500">{{ loadError()! | translate }}</p>
+      <button type="button" (click)="load()" class="wf-btn-secondary">{{ 'common.retry' | translate }}</button>
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <app-workflow-kpi-card labelKey="workflow.runtime.requests.kpi_total" [value]="kpis().total ?? 0" />
+      <app-workflow-kpi-card labelKey="workflow.runtime.requests.kpi_in_progress" [value]="kpis().inProgress ?? 0" tone="primary" />
+      <app-workflow-kpi-card labelKey="workflow.runtime.requests.kpi_completed" [value]="kpis().completed ?? 0" tone="success" />
+      <app-workflow-kpi-card
+        labelKey="workflow.runtime.requests.kpi_breached"
+        [value]="kpis().breached ?? 0"
+        [tone]="(kpis().breached ?? 0) > 0 ? 'danger' : 'default'" />
+    </div>
+
+    @if (items().length === 0) {
+      <prv-empty-state
+        titleKey="workflow.runtime.requests.empty"
+        subtitleKey="workflow.runtime.requests.empty_help" />
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.runtime.requests.table_title">
+        <div toolbar class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            (click)="toggleSortBySla()"
+            class="rounded-lg border px-3 py-1.5 text-xs font-medium"
+            [class]="sortBySla()
+              ? 'border-primary/40 bg-primary/10 text-primary-700 dark:text-primary-200'
+              : 'border-ink-200 text-ink-600 hover:bg-ink-50 dark:border-dark-600 dark:text-dark-200'">
+            {{ 'workflow.runtime.requests.suggest_sort_sla' | translate }}
+          </button>
+          <button
+            type="button"
+            (click)="toggleHighlightBreached()"
+            class="rounded-lg border px-3 py-1.5 text-xs font-medium"
+            [class]="highlightBreached()
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-200'
+              : 'border-ink-200 text-ink-600 hover:bg-ink-50 dark:border-dark-600 dark:text-dark-200'">
+            {{ 'workflow.runtime.requests.suggest_highlight' | translate }}
+          </button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.runtime.col_request_id' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_service_name' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_current_step' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_group_owner' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_request_date' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_status' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_sla_duration' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_remaining_sla' | translate }}</th>
+              <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of items(); track item.id) {
+              <tr
+                class="cursor-pointer {{ cardAccent(item) }} {{ rowClass(item) }}"
+                (click)="selectRow(item); openProgress(item)">
+                <td>
+                  <span class="font-mono text-xs font-semibold text-ink-800 dark:text-dark-100">{{ item.requestNumber ?? '—' }}</span>
+                </td>
+                <td>
+                  <p class="font-medium text-ink-900 dark:text-white">{{ serviceName(item) }}</p>
+                </td>
+                <td class="text-sm text-ink-700 dark:text-dark-200">{{ currentStep(item) }}</td>
+                <td class="text-sm text-ink-600 dark:text-dark-300">{{ item.originalAssignedGroupName ?? '—' }}</td>
+                <td class="whitespace-nowrap text-ink-500 dark:text-dark-300">{{ item.requestDate | date:'mediumDate' }}</td>
+                <td>
+                  <prv-status-pill [tone]="statusTone(item.status)" [labelKey]="'workflow.runtime.status_' + displayStatus(item.status)" />
+                </td>
+                <td class="font-mono text-xs tabular-nums text-ink-600 dark:text-dark-300">{{ formatSlaDuration(item.currentTaskSlaMinutes) }}</td>
+                <td>
+                  <app-workflow-sla-clock [minutes]="item.remainingSlaMinutes" [status]="item.status" />
+                </td>
+                <td class="text-end">
+                  <div class="flex flex-wrap items-center justify-end gap-3" (click)="$event.stopPropagation()">
+                    @if (item.workflowInstanceId) {
+                      <button type="button" class="text-xs font-medium text-ink-500 hover:text-primary dark:text-dark-300" (click)="openLiveGraph($event, item.workflowInstanceId)">
+                        {{ 'workflow.runtime.progress.live_graph_btn' | translate }}
+                      </button>
+                    }
+                    <button type="button" class="text-xs font-medium text-primary hover:text-primary-300" (click)="openProgress(item)">
+                      {{ 'workflow.runtime.open_btn' | translate }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div footer class="flex items-center justify-between gap-3 border-t border-ink-200 px-4 py-3 text-xs text-ink-500 dark:border-dark-700 dark:text-dark-300">
+          <span>{{ 'workflow.common.showing' | translate: { start: pageStart(), end: pageEnd(), total: totalCount() } }}</span>
+          <div class="flex items-center gap-1">
+            <button type="button" (click)="prevPage()" [disabled]="page() <= 1" class="wf-btn-secondary !px-2 !py-1 disabled:opacity-40">‹</button>
+            <span class="px-2 tabular-nums">{{ page() }} / {{ totalPages() }}</span>
+            <button type="button" (click)="nextPage()" [disabled]="page() >= totalPages()" class="wf-btn-secondary !px-2 !py-1 disabled:opacity-40">›</button>
+          </div>
+        </div>
+      </app-workflow-table-shell>
+    }
+  }
+
+  @if (liveGraphInstanceId(); as instanceId) {
+    <app-workflow-live-graph-dialog [instanceId]="instanceId" (closed)="closeLiveGraph()" />
+  }
+</div>

@@ -1,0 +1,297 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.versions.title"
+    subtitleKey="workflow.versions.subtitle"
+    helpLink="/admin/workflow/help">
+    <a routerLink="/admin/workflow/definitions"
+      class="wf-btn-secondary">
+      ← {{ 'workflow.versions.back_btn' | translate }}
+    </a>
+    <a routerLink="/admin/workflow/help" fragment="open-draft-draw"
+      class="wf-btn-secondary">
+      {{ 'workflow.versions.open_help' | translate }}
+    </a>
+    <button
+      (click)="openDraftModal()"
+      class="wf-btn-primary">
+      + {{ 'workflow.versions.new_draft_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  @if (definition()?.name) {
+    <p class="text-sm text-ink-600 dark:text-dark-300 -mt-2">{{ definition()!.name }}</p>
+  }
+
+  <!-- Guided next-step banner -->
+  @if (!isLoading() && !loadError() && guidedNextStep()) {
+    @let step = guidedNextStep()!;
+    <div [class]="'flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ' +
+      (step.style === 'blue'   ? 'bg-sky-50 border-sky-200 text-sky-800 dark:bg-blue-900/20 dark:border-blue-800/40 dark:text-blue-300' :
+       step.style === 'amber'  ? 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-300' :
+       step.style === 'green'  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800/40 dark:text-green-300' :
+                                 'bg-primary/5 border-primary/20 text-primary-700 dark:bg-primary/10 dark:border-primary/30 dark:text-primary-300')">
+      <span class="text-base shrink-0">
+        @if (step.style === 'blue')   { ① }
+        @else if (step.style === 'amber') { ② }
+        @else if (step.style === 'green') { ③ }
+        @else                         { ④ }
+      </span>
+      <p>{{ step.key | translate }}</p>
+    </div>
+  }
+
+  <!-- Loading -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- Error -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  <!-- Empty -->
+  @if (!isLoading() && !loadError() && items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.versions.empty_title"
+      subtitleKey="workflow.versions.empty_sub">
+      <div actions class="mt-5">
+        <button (click)="openDraftModal()"
+          class="wf-btn-primary">
+          + {{ 'workflow.versions.new_draft_btn' | translate }}
+        </button>
+      </div>
+    </prv-empty-state>
+  }
+
+  <!-- Table -->
+  @if (!isLoading() && !loadError() && items().length > 0) {
+    <app-workflow-table-shell titleKey="workflow.versions.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.versions.col_version' | translate }}</th>
+            <th>{{ 'workflow.versions.col_status' | translate }}</th>
+            <th>{{ 'workflow.versions.col_validation' | translate }}</th>
+            <th>{{ 'workflow.versions.col_published_at' | translate }}</th>
+            <th>{{ 'workflow.versions.col_created' | translate }}</th>
+            <th class="text-end">{{ 'workflow.versions.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (v of items(); track v.id) {
+            <tr>
+              <td>
+                <span class="font-medium text-ink-900 dark:text-white">v{{ v.versionNumber }}</span>
+                @if (v.changeSummary) {
+                  <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5">{{ v.changeSummary }}</p>
+                }
+              </td>
+              <td>
+                <prv-status-pill
+                  [tone]="statusTone(v.status)"
+                  [labelKey]="'workflow.versions.status_' + v.status" />
+              </td>
+              <td>
+                <span [class]="'text-xs font-medium ' + validationClass(v.validationStatus)">
+                  {{ 'workflow.versions.validation_' + v.validationStatus | translate }}
+                </span>
+              </td>
+              <td class="text-ink-500 dark:text-dark-300">{{ formatDate(v.publishedAt) }}</td>
+              <td class="text-ink-500 dark:text-dark-300">{{ formatDate(v.createdAt) }}</td>
+              <td class="text-end">
+                <div class="flex items-center justify-end gap-3">
+                  <a [routerLink]="[v.id, 'designer']"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    {{ 'workflow.versions.designer_btn' | translate }}
+                  </a>
+                  @if (v.status === 'Draft') {
+                    <button (click)="validate(v)"
+                      class="text-xs text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white transition-colors">
+                      {{ 'workflow.versions.validate_btn' | translate }}
+                    </button>
+                    <button (click)="confirmPublish(v)"
+                      [disabled]="v.validationStatus !== 'Valid'"
+                      class="text-xs text-green-400 hover:text-green-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      {{ 'workflow.versions.publish_btn' | translate }}
+                    </button>
+                  }
+                  @if (v.status === 'Published') {
+                    <button (click)="openCloneModal(v)"
+                      class="text-xs text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white transition-colors">
+                      {{ 'workflow.versions.clone_btn' | translate }}
+                    </button>
+                    <button (click)="confirmRetire(v)"
+                      class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                      {{ 'workflow.versions.retire_btn' | translate }}
+                    </button>
+                  }
+                  @if (v.status === 'Retired') {
+                    <button (click)="openCloneModal(v)"
+                      class="text-xs text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white transition-colors">
+                      {{ 'workflow.versions.clone_btn' | translate }}
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-xs text-ink-500 dark:text-dark-300 mt-4">
+      <span>{{ 'workflow.common.showing' | translate: { start: rangeStart(), end: rangeEnd(), total: totalCount() } }}</span>
+      <div class="flex items-center gap-1">
+        <button (click)="prevPage()" [disabled]="page() === 1"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">‹</button>
+        <button (click)="nextPage()" [disabled]="page() >= totalPages()"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">›</button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Create Draft Modal -->
+@if (showDraftModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
+    <div class="wf-modal max-w-md mx-4">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.versions.modal_draft_title' | translate }}</h2>
+        <button (click)="closeDraftModal()"
+          class="text-ink-400 hover:text-ink-900 dark:text-dark-400 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="draftForm" (ngSubmit)="submitDraft()" class="p-6 space-y-4">
+        @if (draftError()) {
+          <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300">
+            {{ draftError() }}
+          </p>
+        }
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.versions.field_change_summary' | translate }}
+            <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+          </label>
+          <textarea
+            formControlName="changeSummary"
+            rows="3"
+            [placeholder]="'workflow.versions.field_change_summary_placeholder' | translate"
+            class="wf-input resize-none"></textarea>
+        </div>
+      </form>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeDraftModal()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitDraft()" [disabled]="saving()"
+          class="wf-btn-primary">
+          {{ saving() ? ('common.saving' | translate) : ('common.create' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Clone Modal -->
+@if (showCloneModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
+    <div class="wf-modal max-w-md mx-4">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.versions.modal_clone_title' | translate }}</h2>
+        <button (click)="closeCloneModal()"
+          class="text-ink-400 hover:text-ink-900 dark:text-dark-400 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="cloneForm" (ngSubmit)="submitClone()" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.versions.field_change_summary' | translate }}
+            <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+          </label>
+          <textarea
+            formControlName="changeSummary"
+            rows="3"
+            [placeholder]="'workflow.versions.field_change_summary_placeholder' | translate"
+            class="wf-input resize-none"></textarea>
+        </div>
+      </form>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeCloneModal()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="submitClone()" [disabled]="saving()"
+          class="wf-btn-primary">
+          {{ saving() ? ('common.saving' | translate) : ('workflow.versions.clone_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Publish Confirmation -->
+@if (confirmPublishTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
+    <div class="wf-modal max-w-md mx-4 p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.versions.confirm_publish_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ 'workflow.versions.confirm_publish_body' | translate: { version: confirmPublishTarget()!.versionNumber } }}
+      </p>
+      @if (publishPreview(); as preview) {
+        <div class="rounded-lg border border-ink-200 dark:border-dark-600 bg-ink-50 dark:bg-dark-900/40 p-3 space-y-2 text-xs">
+          <p class="text-ink-700 dark:text-dark-200">
+            {{ 'workflow.versions.preview_counts' | translate: { activities: preview.activityCount, transitions: preview.transitionCount } }}
+          </p>
+          @if (preview.warnings.length) {
+            <ul class="list-disc ps-4 text-amber-800 dark:text-amber-300">
+              @for (w of preview.warnings; track w) { <li>{{ w }}</li> }
+            </ul>
+          }
+          @if (preview.blockingReasons.length) {
+            <ul class="list-disc ps-4 text-red-700 dark:text-red-300">
+              @for (b of preview.blockingReasons; track b) { <li>{{ b }}</li> }
+            </ul>
+          }
+        </div>
+      }
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="cancelPublish()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="executePublish()" [disabled]="actioning() || (publishPreview() !== null && !publishPreview()!.canPublish)"
+          class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors">
+          {{ actioning() ? ('common.processing' | translate) : ('workflow.versions.publish_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Retire Confirmation -->
+@if (confirmRetireTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.versions.confirm_retire_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ 'workflow.versions.confirm_retire_body' | translate: { version: confirmRetireTarget()!.versionNumber } }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="cancelRetire()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="executeRetire()" [disabled]="actioning()"
+          class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors">
+          {{ actioning() ? ('common.processing' | translate) : ('workflow.versions.retire_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

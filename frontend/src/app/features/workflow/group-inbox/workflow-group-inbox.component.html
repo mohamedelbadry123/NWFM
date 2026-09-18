@@ -1,0 +1,105 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.group_inbox.title"
+    subtitleKey="workflow.runtime.group_inbox.subtitle"
+    helpLink="/org/workflow/help" />
+
+  <div class="flex gap-6 min-h-0">
+    <!-- Group list sidebar -->
+    <aside class="w-56 shrink-0">
+      <div class="rounded-2xl border border-ink-200 dark:border-dark-700 overflow-hidden bg-white dark:bg-dark-800">
+        @if (isLoadingGroups()) {
+          <div class="flex items-center justify-center py-8 text-ink-500 dark:text-dark-300 text-sm">
+            {{ 'common.loading' | translate }}
+          </div>
+        } @else if (groups().length === 0) {
+          <p class="p-4 text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.runtime.group_inbox.no_groups' | translate }}</p>
+        } @else {
+          @for (group of groups(); track group.id) {
+            <button
+              (click)="selectGroup(group.id!)"
+              class="w-full px-4 py-3 text-start text-sm border-b border-dark-700/50 transition-colors last:border-0"
+              [class]="selectedGroupId() === group.id
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'bg-white text-ink-700 hover:bg-ink-50 dark:bg-dark-900 dark:text-dark-200 dark:hover:bg-dark-800'">
+              {{ group.name }}
+            </button>
+          }
+        }
+      </div>
+    </aside>
+
+    <!-- Work items -->
+    <div class="flex-1 min-w-0">
+      @if (isLoadingItems()) {
+        <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+          {{ 'common.loading' | translate }}
+        </div>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center gap-3 py-16 text-center">
+          <p class="text-red-400 text-sm">{{ loadError() }}</p>
+        </div>
+      } @else if (items().length === 0) {
+        <prv-empty-state titleKey="workflow.runtime.group_inbox.empty" />
+      } @else {
+        <app-workflow-table-shell titleKey="workflow.runtime.group_inbox.title">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'workflow.runtime.col_activity' | translate }}</th>
+                <th>{{ 'workflow.runtime.col_status' | translate }}</th>
+                <th>{{ 'workflow.runtime.col_created' | translate }}</th>
+                <th>{{ 'workflow.runtime.col_due' | translate }}</th>
+                <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.id) {
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      @if (isOverdue(item.dueAt, item.status)) {
+                        <span class="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                      } @else {
+                        <span class="w-2 h-2 rounded-full bg-dark-600 shrink-0"></span>
+                      }
+                      <span class="font-mono text-xs text-ink-500 dark:text-dark-300 truncate max-w-[100px]" [title]="item.activityInstanceId ?? ''">
+                        {{ item.activityInstanceId ? item.activityInstanceId.slice(-8) : '—' }}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <prv-status-pill
+                      [tone]="statusTone(item.status)"
+                      [labelKey]="'workflow.runtime.status_' + item.status" />
+                  </td>
+                  <td class="text-ink-500 dark:text-dark-300">{{ item.createdAt | date:'mediumDate' }}</td>
+                  <td>
+                    @if (item.dueAt) {
+                      <div [class]="isOverdue(item.dueAt, item.status) ? 'text-red-400 text-xs' : 'text-dark-300 text-xs'">
+                        <div>{{ item.dueAt | date:'mediumDate' }}</div>
+                        <div class="mt-0.5 opacity-80">
+                          {{ dueRelativeLabel(item.dueAt, item.status).key | translate: dueRelativeLabel(item.dueAt, item.status).params }}
+                        </div>
+                      </div>
+                    } @else {
+                      <span class="text-ink-400 dark:text-dark-500 text-xs">—</span>
+                    }
+                  </td>
+                  <td class="text-end">
+                    @if (item.status === 'Pending') {
+                      <button (click)="claim(item.id!, $event)" [disabled]="claimingId() === item.id"
+                        class="text-xs text-primary hover:text-primary-300 disabled:opacity-50 transition-colors">
+                        {{ claimingId() === item.id ? ('common.processing' | translate) : ('workflow.runtime.claim_btn' | translate) }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </app-workflow-table-shell>
+      }
+    </div>
+  </div>
+</div>

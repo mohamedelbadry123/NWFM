@@ -1,0 +1,85 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.calendars.title"
+    subtitleKey="workflow.calendars.subtitle"
+    helpLink="/admin/workflow/help">
+    <button
+      (click)="openCreate()"
+      class="wf-btn-primary">
+      {{ 'workflow.calendars.create_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl bg-red-900/20 border border-red-800/40 p-4 text-red-400">{{ loadError() }}</div>
+  } @else if (items().length === 0) {
+    <prv-empty-state titleKey="workflow.calendars.empty" />
+  } @else {
+    <app-workflow-table-shell titleKey="workflow.calendars.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.calendars.col_code' | translate }}</th>
+            <th>{{ 'workflow.calendars.col_name' | translate }}</th>
+            <th>{{ 'workflow.calendars.col_name_ar' | translate }}</th>
+            <th>{{ 'workflow.calendars.col_timezone' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of items(); track c.id) {
+            <tr>
+              <td class="font-mono text-xs text-ink-900 dark:text-white">{{ c.code }}</td>
+              <td class="text-ink-900 dark:text-white">{{ c.name }}</td>
+              <td class="text-ink-700 dark:text-dark-200" dir="rtl">{{ c.nameAr ?? '—' }}</td>
+              <td class="text-ink-700 dark:text-dark-200">{{ c.timeZone }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+  }
+</div>
+
+@if (showCreate()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div class="wf-modal max-w-md p-6" role="dialog" aria-modal="true">
+      <div class="mb-4 flex items-start justify-between gap-3">
+        <h2 class="wf-title text-lg font-semibold">{{ 'workflow.calendars.create_title' | translate }}</h2>
+        <button type="button" (click)="closeCreate()"
+          class="text-ink-400 hover:text-ink-900 dark:text-dark-400 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+        <div>
+          <label class="block text-sm text-ink-700 dark:text-dark-200 mb-1">{{ 'workflow.calendars.field_code' | translate }}</label>
+          <input formControlName="code" class="wf-input" />
+        </div>
+        <div>
+          <label class="block text-sm text-ink-700 dark:text-dark-200 mb-1">{{ 'workflow.calendars.field_name' | translate }}</label>
+          <input formControlName="name" class="wf-input" />
+        </div>
+        <div>
+          <label class="block text-sm text-ink-700 dark:text-dark-200 mb-1">{{ 'workflow.calendars.field_name_ar' | translate }}</label>
+          <input formControlName="nameAr" dir="rtl" class="wf-input" />
+        </div>
+        <div>
+          <label class="block text-sm text-ink-700 dark:text-dark-200 mb-1">{{ 'workflow.calendars.field_timezone' | translate }}</label>
+          <input formControlName="timeZone" placeholder="UTC" class="wf-input" />
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" (click)="closeCreate()" class="wf-btn-secondary">
+            {{ 'common.cancel' | translate }}
+          </button>
+          <button type="submit" [disabled]="form.invalid || saving()"
+            class="wf-btn-primary">
+            {{ saving() ? ('common.processing' | translate) : ('common.create' | translate) }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

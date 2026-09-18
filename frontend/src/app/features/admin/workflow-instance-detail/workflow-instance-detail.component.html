@@ -1,0 +1,137 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.admin.detail_title"
+    subtitleKey="workflow.runtime.admin.detail_subtitle"
+    helpLink="/admin/workflow/help">
+    <button
+      (click)="router.navigate(['/admin/workflow/instances'])"
+      class="wf-btn-secondary">
+      ← {{ 'workflow.runtime.admin.back' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300">{{ loadError() }}</div>
+  } @else if (progress()?.instance) {
+    <div class="space-y-5">
+      <div class="wf-card p-5 sm:p-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-widest text-ink-400 dark:text-dark-400">
+              {{ orgLabel(progress()!.instance!.organizationId) }}
+            </p>
+            <h2 class="mt-1 text-xl font-semibold text-ink-900 dark:text-white">
+              {{ pretty(progress()!.instance!.currentActivityNodeKey) }}
+            </h2>
+            <p class="mt-1 text-sm text-ink-500 dark:text-dark-300">
+              {{ 'workflow.runtime.col_started' | translate }}
+              {{ progress()!.instance!.startedAt | date:'medium' }}
+            </p>
+          </div>
+          <prv-status-pill
+            [tone]="statusTone(instanceStatus())"
+            [labelKey]="'workflow.runtime.status_' + instanceStatus()" />
+        </div>
+
+        @if (progress()!.instance!.failureReason) {
+          <p class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300">
+            {{ progress()!.instance!.failureReason }}
+          </p>
+        }
+
+        @if (actionError()) {
+          <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-900/20 dark:text-red-300">{{ actionError() }}</div>
+        }
+
+        <div class="mt-5 flex flex-wrap gap-2">
+          @if (instanceStatus() === 'Running') {
+            <button (click)="suspend()" [disabled]="isActioning()" class="wf-btn-secondary">
+              {{ isActioning() ? ('common.processing' | translate) : ('workflow.runtime.admin.suspend_btn' | translate) }}
+            </button>
+          }
+          @if (instanceStatus() === 'Suspended') {
+            <button (click)="resume()" [disabled]="isActioning()" class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-400 disabled:opacity-50">
+              {{ isActioning() ? ('common.processing' | translate) : ('workflow.runtime.admin.resume_btn' | translate) }}
+            </button>
+          }
+          @if (instanceStatus() === 'Failed') {
+            <button (click)="retry()" [disabled]="isActioning()" class="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-primary-400 disabled:opacity-50">
+              {{ isActioning() ? ('common.processing' | translate) : ('workflow.runtime.admin.retry_btn' | translate) }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <app-workflow-live-graph [instanceId]="instanceId" [admin]="true" />
+
+      <section class="rounded-2xl border border-ink-200 bg-white p-5 dark:border-dark-600 dark:bg-dark-800">
+        <h2 class="mb-4 text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.runtime.progress.activities' | translate }}</h2>
+        @if (stepList().length === 0) {
+          <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.runtime.progress.activities_empty' | translate }}</p>
+        } @else {
+          <ol class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @for (activity of stepList(); track activity.id; let i = $index) {
+              <li class="flex items-start gap-3 rounded-xl border border-ink-100 bg-ink-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/40">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white
+                  {{ activity.status === 'Completed' ? 'bg-green-500' : activity.status === 'Active' ? 'bg-primary' : activity.status === 'Failed' ? 'bg-red-500' : 'bg-ink-300 dark:bg-dark-600' }}">
+                  {{ i + 1 }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-semibold text-ink-900 dark:text-white">{{ activityName(activity) }}</p>
+                  @if (activity.startedAt) {
+                    <p class="mt-0.5 text-xs text-ink-500 dark:text-dark-300">{{ activity.startedAt | date:'dd MMM yyyy, HH:mm' }}</p>
+                  }
+                </div>
+                <prv-status-pill [tone]="activity.status === 'Completed' ? 'success' : activity.status === 'Active' ? 'info' : activity.status === 'Failed' ? 'danger' : 'neutral'" [labelKey]="activityStatusKey(activity.status)" />
+              </li>
+            }
+          </ol>
+        }
+      </section>
+
+      <section class="rounded-2xl border border-ink-200 bg-white p-5 dark:border-dark-600 dark:bg-dark-800">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.runtime.progress.timeline' | translate }}</h2>
+          @if (timeline().length > 0) {
+            <button type="button" (click)="exportTimeline()" class="wf-btn-secondary !px-3 !py-1.5 text-xs">
+              {{ 'workflow.runtime.export_timeline' | translate }}
+            </button>
+          }
+        </div>
+        <app-workflow-history-timeline [events]="timeline()" />
+      </section>
+
+      @if (incidents().length > 0) {
+        <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-800/40 dark:bg-amber-900/10">
+          <h2 class="mb-3 text-base font-semibold text-amber-900 dark:text-amber-200">{{ 'workflow.runtime.admin.incidents' | translate }}</h2>
+          <ul class="space-y-2">
+            @for (inc of incidents(); track inc.id) {
+              <li class="rounded-xl border border-amber-200/80 bg-white p-3 dark:border-amber-800/30 dark:bg-dark-800/70">
+                <p class="text-sm font-medium text-ink-900 dark:text-white">{{ inc.title }}</p>
+                <p class="mt-1 text-xs text-ink-500 dark:text-dark-300">{{ inc.severity }} · {{ inc.status }}</p>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (timers().length > 0) {
+        <section class="rounded-2xl border border-ink-200 bg-white p-5 dark:border-dark-600 dark:bg-dark-800">
+          <h2 class="mb-3 text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.runtime.admin.timers' | translate }}</h2>
+          <ul class="space-y-2">
+            @for (t of timers(); track t.id) {
+              <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-ink-50 px-3 py-2 text-sm dark:bg-dark-900/40">
+                <span class="font-medium text-ink-900 dark:text-white">{{ pretty(t.timerType) }}</span>
+                <span class="text-xs text-ink-500 dark:text-dark-300">{{ t.dueAt | date:'medium' }} · {{ t.status }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,40 @@
+namespace Workflow.Application.Queries.ListAllWorkflowInstances;
+
+using MediatR;
+using NWFM.Shared.Results;
+using Workflow.Application.Abstractions;
+using Workflow.Application.DTOs;
+using Workflow.Domain.Repositories;
+
+public sealed class ListAllWorkflowInstancesQueryHandler
+    : IRequestHandler<ListAllWorkflowInstancesQuery, Result<PaginatedResult<WorkflowInstanceDto>>>
+{
+    private readonly IWorkflowFeatureGate _gate;
+    private readonly IWorkflowInstanceRepository _repo;
+
+    public ListAllWorkflowInstancesQueryHandler(IWorkflowFeatureGate gate, IWorkflowInstanceRepository repo)
+    {
+        _gate = gate;
+        _repo = repo;
+    }
+
+    public async Task<Result<PaginatedResult<WorkflowInstanceDto>>> Handle(
+        ListAllWorkflowInstancesQuery request, CancellationToken cancellationToken)
+    {
+        var gateResult = _gate.EnsureEnabled();
+        if (gateResult.IsFailure) return Result.Failure<PaginatedResult<WorkflowInstanceDto>>(gateResult.Error);
+
+        var (items, total) = await _repo.GetPagedAllAsync(
+            request.PageNumber, request.PageSize, request.OrganizationId, cancellationToken);
+
+        var dtos = items.Select(i => new WorkflowInstanceDto(
+            i.Id, i.OrganizationId, i.WorkflowBindingId, i.PinnedWorkflowVersionId,
+            i.IdempotencyKey, i.BusinessEntityId, i.CorrelationId, i.Status,
+            i.StartedAt, i.CompletedAt, i.CancelledAt, i.SuspendedAt,
+            i.FailureReason, i.StartedByUserId, i.CurrentActivityNodeKey,
+            i.CreatedAt, i.UpdatedAt)).ToList();
+
+        return Result.Success(new PaginatedResult<WorkflowInstanceDto>(
+            dtos, total, request.PageNumber, request.PageSize));
+    }
+}

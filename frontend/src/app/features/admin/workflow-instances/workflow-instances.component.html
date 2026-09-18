@@ -1,0 +1,93 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.admin.title"
+    subtitleKey="workflow.runtime.admin.subtitle"
+    helpLink="/admin/workflow/help" />
+
+  <!-- Filter bar -->
+  <div class="flex items-center gap-3 flex-wrap">
+    <select
+      [(ngModel)]="selectedOrgId"
+      [disabled]="orgsLoading()"
+      class="w-72 rounded-xl border border-ink-200 dark:border-dark-600 bg-white dark:bg-dark-800 px-3 py-2 text-sm text-ink-900 dark:text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50">
+      <option value="">{{ 'workflow.runtime.admin.filter_org_all' | translate }}</option>
+      @for (org of orgs(); track org.id) {
+        <option [value]="org.id">{{ org.name }}</option>
+      }
+    </select>
+    <button
+      (click)="applyFilter()"
+      class="rounded-xl bg-primary px-4 py-2 text-sm text-white hover:bg-primary-400 transition-colors">
+      {{ 'common.search' | translate }}
+    </button>
+    <button
+      (click)="load()"
+      class="rounded-xl border border-ink-200 dark:border-dark-600 px-4 py-2 text-sm text-ink-700 dark:text-dark-200 hover:bg-ink-100 dark:hover:bg-dark-700 transition-colors">
+      {{ 'common.retry' | translate }}
+    </button>
+  </div>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="rounded-xl bg-red-900/20 border border-red-800/40 p-4 text-red-400">{{ loadError() }}</div>
+  } @else if (items().length === 0) {
+    <prv-empty-state titleKey="workflow.runtime.admin.empty" />
+  } @else {
+    <app-workflow-table-shell titleKey="workflow.runtime.admin.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.runtime.col_instance_id' | translate }}</th>
+            <th>{{ 'workflow.runtime.col_org' | translate }}</th>
+            <th>{{ 'workflow.runtime.col_status' | translate }}</th>
+            <th>{{ 'workflow.runtime.col_started' | translate }}</th>
+            <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (instance of items(); track instance.id) {
+            <tr class="cursor-pointer" (click)="openDetail(instance.id!)">
+              <td class="font-mono text-xs text-ink-700 dark:text-dark-200">{{ instance.id!.slice(0,8) }}…</td>
+              <td class="text-ink-700 dark:text-dark-200">{{ orgLabel(instance.organizationId) }}</td>
+              <td>
+                <prv-status-pill [tone]="statusTone(instance.status)" [label]="instance.status ?? ''" />
+              </td>
+              <td class="text-ink-700 dark:text-dark-200">{{ instance.startedAt | date:'mediumDate' }}</td>
+              <td class="text-end">
+                <button
+                  (click)="$event.stopPropagation(); openDetail(instance.id!)"
+                  class="rounded-xl bg-primary px-3 py-1.5 text-xs text-white hover:bg-primary-400 transition-colors">
+                  {{ 'common.view' | translate }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    @if (totalPages() > 1) {
+      <div class="flex items-center justify-between text-sm text-ink-500 dark:text-dark-300">
+        <span>{{ 'workflow.common.showing' | translate: { start: (page()-1)*pageSize+1, end: page()*pageSize, total: totalCount() } }}</span>
+        <div class="flex gap-2">
+          <button
+            (click)="prevPage()"
+            [disabled]="page() <= 1"
+            class="rounded-lg border border-ink-200 dark:border-dark-600 px-3 py-1.5 hover:bg-ink-100 dark:hover:bg-dark-700 disabled:opacity-40 transition-colors">
+            ‹
+          </button>
+          <span class="px-3 py-1.5">{{ page() }} / {{ totalPages() }}</span>
+          <button
+            (click)="nextPage()"
+            [disabled]="page() >= totalPages()"
+            class="rounded-lg border border-ink-200 dark:border-dark-600 px-3 py-1.5 hover:bg-ink-100 dark:hover:bg-dark-700 disabled:opacity-40 transition-colors">
+            ›
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

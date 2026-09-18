@@ -1,0 +1,152 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.bindings.list.title"
+    subtitleKey="workflow.bindings.list.subtitle"
+    helpLink="/admin/workflow/help">
+    <a routerLink="/admin/workflow/bindings/new"
+      class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-primary/25 hover:bg-primary-400 transition-colors">
+      + {{ 'workflow.bindings.list.new_btn' | translate }}
+    </a>
+  </app-workflow-page-header>
+
+  <!-- Loading -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- Error -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  <!-- Empty -->
+  @if (!isLoading() && !loadError() && items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.bindings.list.empty_title"
+      subtitleKey="workflow.bindings.list.empty_sub"
+      ctaKey="workflow.bindings.list.create_first"
+      ctaLink="/admin/workflow/bindings/new" />
+  }
+
+  <!-- Table -->
+  @if (!isLoading() && !loadError() && items().length > 0) {
+    <app-workflow-table-shell titleKey="workflow.bindings.list.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.bindings.list.col_definition' | translate }}</th>
+            <th>{{ 'workflow.bindings.list.col_trigger' | translate }}</th>
+            <th>{{ 'workflow.bindings.list.col_mode' | translate }}</th>
+            <th>{{ 'workflow.bindings.list.col_version_policy' | translate }}</th>
+            <th>{{ 'workflow.bindings.list.col_status' | translate }}</th>
+            <th class="text-end">{{ 'workflow.bindings.list.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of items(); track b.id) {
+            <tr>
+              <td>
+                <p class="text-ink-900 dark:text-white font-medium text-xs">{{ b.workflowDefinitionName ?? b.workflowDefinitionId }}</p>
+                <p class="text-ink-400 dark:text-dark-400 text-xs mt-0.5">{{ 'workflow.bindings.list.org_label' | translate }}: {{ b.organizationId }}</p>
+              </td>
+              <td>
+                <p class="text-ink-900 dark:text-white text-xs">{{ b.moduleKey }} / {{ b.entityType }}</p>
+                <p class="text-ink-400 dark:text-dark-400 text-xs mt-0.5 font-mono">{{ b.triggerEvent }}</p>
+              </td>
+              <td>
+                <prv-status-pill
+                  [tone]="modeTone(b.mode)"
+                  [label]="('workflow.bindings.mode.' + (b.mode ?? 'Disabled').toLowerCase()) | translate" />
+              </td>
+              <td class="text-ink-500 dark:text-dark-300 text-xs">
+                {{ ('workflow.bindings.version_policy.' + (b.versionPolicy ?? 'LatestPublished').toLowerCase()) | translate }}
+              </td>
+              <td>
+                @if (b.isActive) {
+                  <prv-status-pill tone="success" labelKey="common.active" />
+                } @else {
+                  <prv-status-pill tone="neutral" labelKey="common.inactive" />
+                }
+              </td>
+              <td class="text-end">
+                <div class="flex items-center justify-end gap-3">
+                  <a [routerLink]="['/admin/workflow/bindings', b.id]"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    {{ 'common.view' | translate }}
+                  </a>
+                  @if (b.isActive) {
+                    <button (click)="openDeactivate(b)"
+                      class="text-xs text-red-400 hover:text-red-300 transition-colors">
+                      {{ 'workflow.bindings.list.deactivate_btn' | translate }}
+                    </button>
+                  } @else {
+                    <button (click)="openActivate(b)"
+                      class="text-xs text-green-400 hover:text-green-300 transition-colors">
+                      {{ 'workflow.bindings.list.activate_btn' | translate }}
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-xs text-ink-500 dark:text-dark-300 mt-4">
+      <span>{{ 'workflow.common.showing' | translate: { start: rangeStart(), end: rangeEnd(), total: totalCount() } }}</span>
+      <div class="flex items-center gap-1">
+        <button (click)="prevPage()" [disabled]="page() === 1"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">‹</button>
+        <button (click)="nextPage()" [disabled]="page() >= totalPages()"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">›</button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Deactivate Confirmation -->
+@if (confirmDeactivate()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.list.confirm_deactivate_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.list.confirm_deactivate_body' | translate }}</p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="closeDeactivate()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="executeDeactivate()" [disabled]="actioning()"
+          class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors">
+          {{ actioning() ? ('common.processing' | translate) : ('workflow.bindings.list.deactivate_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Activate Confirmation -->
+@if (confirmActivate()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.list.confirm_activate_title' | translate }}</h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.list.confirm_activate_body' | translate }}</p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="closeActivate()" class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button (click)="executeActivate()" [disabled]="actioning()"
+          class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors">
+          {{ actioning() ? ('common.processing' | translate) : ('workflow.bindings.list.activate_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

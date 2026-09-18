@@ -1,0 +1,188 @@
+<div class="space-y-5 p-5 sm:p-6">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.tasks.title"
+    subtitleKey="workflow.runtime.tasks.subtitle"
+    helpLink="/org/workflow/help">
+    <button type="button" (click)="load()" class="wf-btn-secondary">
+      {{ 'workflow.runtime.refresh_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="wf-card flex flex-wrap items-end gap-3 p-4">
+    <div class="min-w-[16rem] flex-1">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="taskSearch">
+        {{ 'workflow.runtime.tasks.search' | translate }}
+      </label>
+      <input
+        id="taskSearch"
+        formControlName="search"
+        type="search"
+        class="wf-input"
+        [placeholder]="'workflow.runtime.tasks.search_placeholder' | translate" />
+    </div>
+    <div class="w-44">
+      <label class="mb-1 block text-xs font-medium text-ink-500 dark:text-dark-300" for="taskSla">
+        {{ 'workflow.runtime.col_remaining_sla' | translate }}
+      </label>
+      <select id="taskSla" formControlName="slaStatus" class="wf-input">
+        <option value="">{{ 'workflow.runtime.sla.filter_all' | translate }}</option>
+        <option value="ok">{{ 'workflow.runtime.sla.filter_ok' | translate }}</option>
+        <option value="warning">{{ 'workflow.runtime.sla.filter_warning' | translate }}</option>
+        <option value="breached">{{ 'workflow.runtime.sla.filter_breached' | translate }}</option>
+      </select>
+    </div>
+    <button type="submit" class="wf-btn-primary !px-4 !py-2">
+      {{ 'workflow.runtime.requests.apply_filters' | translate }}
+    </button>
+    <button type="button" (click)="resetFilters()" class="wf-btn-secondary">
+      {{ 'workflow.runtime.requests.clear_filters' | translate }}
+    </button>
+  </form>
+
+  @if (isLoading()) {
+    <div class="wf-card space-y-3 p-4" aria-busy="true">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-ink-100 dark:bg-dark-700/70"></div>
+      }
+    </div>
+  } @else if (loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-sm text-red-500">{{ loadError()! | translate }}</p>
+      <button type="button" (click)="load()" class="wf-btn-secondary">{{ 'common.retry' | translate }}</button>
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <button type="button" class="rounded-2xl text-start" [class.ring-2]="view() === 'available'" [class.ring-primary]="view() === 'available'" (click)="setView('available')">
+        <app-workflow-kpi-card
+          labelKey="workflow.runtime.tasks.kpi_available"
+          [value]="available().length"
+          hintKey="workflow.runtime.tasks.kpi_available_hint"
+          [tone]="view() === 'available' ? 'primary' : 'default'" />
+      </button>
+      <button type="button" class="rounded-2xl text-start" [class.ring-2]="view() === 'claimedByMe'" [class.ring-primary]="view() === 'claimedByMe'" (click)="setView('claimedByMe')">
+        <app-workflow-kpi-card
+          labelKey="workflow.runtime.tasks.kpi_claimed"
+          [value]="claimed().length"
+          hintKey="workflow.runtime.tasks.kpi_claimed_hint"
+          [tone]="view() === 'claimedByMe' ? 'primary' : 'default'" />
+      </button>
+      <button type="button" class="rounded-2xl text-start" [class.ring-2]="view() === 'overdue'" [class.ring-primary]="view() === 'overdue'" (click)="setView('overdue')">
+        <app-workflow-kpi-card
+          labelKey="workflow.runtime.tasks.kpi_overdue"
+          [value]="overdue().length"
+          hintKey="workflow.runtime.tasks.kpi_overdue_hint"
+          [tone]="overdue().length > 0 ? 'danger' : 'default'" />
+      </button>
+      <app-workflow-kpi-card
+        labelKey="workflow.runtime.tasks.kpi_completed_today"
+        [value]="completedToday()"
+        hintKey="workflow.runtime.tasks.kpi_completed_today_hint"
+        tone="success" />
+    </div>
+
+    @if (claimError()) {
+      <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+        {{ claimError()! | translate }}
+      </div>
+    }
+
+    @if (filteredItems().length === 0) {
+      <prv-empty-state
+        [titleKey]="'workflow.runtime.tasks.empty_' + view()"
+        subtitleKey="workflow.runtime.tasks.empty_help" />
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.runtime.tasks.table_title">
+        <div toolbar class="flex flex-wrap items-center gap-1 rounded-lg bg-ink-100 p-1 dark:bg-dark-800" role="tablist">
+          <button type="button" role="tab" [attr.aria-selected]="view() === 'available'" [class]="viewTabClass('available')" (click)="setView('available')">
+            {{ 'workflow.runtime.tasks.tab_available' | translate }}
+            <span class="ms-1 tabular-nums opacity-70">{{ available().length }}</span>
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="view() === 'claimedByMe'" [class]="viewTabClass('claimedByMe')" (click)="setView('claimedByMe')">
+            {{ 'workflow.runtime.tasks.tab_claimed' | translate }}
+            <span class="ms-1 tabular-nums opacity-70">{{ claimed().length }}</span>
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="view() === 'overdue'" [class]="viewTabClass('overdue')" (click)="setView('overdue')">
+            {{ 'workflow.runtime.tasks.tab_overdue' | translate }}
+            <span class="ms-1 tabular-nums opacity-70">{{ overdue().length }}</span>
+          </button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.runtime.col_request_id' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_service_name' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_current_step' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_request_date' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_status' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_remaining_sla' | translate }}</th>
+              <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of pagedItems(); track item.id) {
+              <tr
+                class="cursor-pointer {{ cardAccent(item) }} {{ rowSelectedClass(item) }}"
+                (click)="selectRow(item); openTask(item.id)">
+                <td>
+                  <span class="font-mono text-xs font-semibold text-ink-800 dark:text-dark-100">{{ item.requestNumber ?? '—' }}</span>
+                </td>
+                <td>
+                  <p class="font-medium text-ink-900 dark:text-white">{{ serviceName(item) }}</p>
+                </td>
+                <td>
+                  <p class="text-sm text-ink-700 dark:text-dark-200">{{ currentStep(item) }}</p>
+                  @if (item.assignmentGroupName) {
+                    <p class="mt-0.5 text-xs text-ink-400 dark:text-dark-400">{{ item.assignmentGroupName }}</p>
+                  }
+                </td>
+                <td class="whitespace-nowrap text-ink-500 dark:text-dark-300">{{ item.requestDate | date:'mediumDate' }}</td>
+                <td>
+                  <prv-status-pill [tone]="statusTone(item)" [labelKey]="'workflow.runtime.status_' + displayStatus(item)" />
+                </td>
+                <td>
+                  <app-workflow-sla-clock [minutes]="item.remainingSlaMinutes" [status]="item.status" />
+                </td>
+                <td class="text-end">
+                  <div class="flex flex-wrap items-center justify-end gap-3" (click)="$event.stopPropagation()">
+                    @if (item.workflowInstanceId) {
+                      <button type="button" class="text-xs font-medium text-ink-500 hover:text-primary dark:text-dark-300" (click)="openLiveGraph($event, item.workflowInstanceId)">
+                        {{ 'workflow.runtime.progress.live_graph_btn' | translate }}
+                      </button>
+                    }
+                    @if (item.status === 'Pending') {
+                      <button
+                        type="button"
+                        (click)="claim(item.id, $event)"
+                        [disabled]="claimingId() === item.id"
+                        class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-400 disabled:opacity-50">
+                        {{ claimingId() === item.id ? ('common.processing' | translate) : ('workflow.runtime.claim_btn' | translate) }}
+                      </button>
+                    } @else {
+                      <a [routerLink]="['/org/workflow/tasks', item.id]" class="text-xs font-medium text-primary hover:text-primary-300">
+                        {{ 'workflow.runtime.open_btn' | translate }}
+                      </a>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div footer class="flex items-center justify-between gap-3 border-t border-ink-200 px-4 py-3 text-xs text-ink-500 dark:border-dark-700 dark:text-dark-300">
+          <span>{{ 'workflow.common.showing' | translate: { start: pageStart(), end: pageEnd(), total: filteredItems().length } }}</span>
+          <div class="flex items-center gap-1">
+            <button type="button" (click)="prevPage()" [disabled]="page() <= 1" class="wf-btn-secondary !px-2 !py-1 disabled:opacity-40">‹</button>
+            <span class="px-2 tabular-nums">{{ page() }} / {{ totalPages() }}</span>
+            <button type="button" (click)="nextPage()" [disabled]="page() >= totalPages()" class="wf-btn-secondary !px-2 !py-1 disabled:opacity-40">›</button>
+          </div>
+        </div>
+      </app-workflow-table-shell>
+    }
+  }
+
+  @if (liveGraphInstanceId(); as instanceId) {
+    <app-workflow-live-graph-dialog [instanceId]="instanceId" (closed)="closeLiveGraph()" />
+  }
+</div>

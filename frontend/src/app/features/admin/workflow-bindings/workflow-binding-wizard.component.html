@@ -1,0 +1,545 @@
+@if (loading()) {
+  <div class="flex items-center justify-center min-h-screen text-ink-500 dark:text-dark-300 text-sm">
+    {{ 'common.loading' | translate }}
+  </div>
+} @else {
+<div class="p-5 sm:p-6 max-w-3xl mx-auto space-y-5">
+
+  <app-workflow-page-header
+    titleKey="workflow.bindings.wizard.title"
+    helpLink="/admin/workflow/help">
+    <button (click)="cancel()"
+      class="wf-btn-secondary">
+      ← {{ 'common.back' | translate }}
+    </button>
+  </app-workflow-page-header>
+  <p class="text-sm text-ink-500 dark:text-dark-300 -mt-2">
+    {{ 'workflow.bindings.wizard.step_label' | translate: { current: step(), total: totalSteps } }}
+    — {{ ('workflow.bindings.wizard.step.' + stepTitle(step())) | translate }}
+  </p>
+  <p class="text-xs text-ink-400 dark:text-dark-400">{{ 'workflow.bindings.wizard.saas_helper' | translate }}</p>
+
+  <!-- Progress bar -->
+  <div class="h-1.5 bg-ink-100 dark:bg-dark-700 rounded-full overflow-hidden">
+    <div class="h-full bg-primary rounded-full transition-all duration-300"
+      [style.width.%]="(step() / totalSteps) * 100"></div>
+  </div>
+
+  <!-- Step content -->
+  <div class="bg-white dark:bg-dark-800 border border-ink-200 dark:border-dark-700 rounded-xl p-6">
+
+    <!-- Step 1: Select Organization -->
+    @if (step() === 1) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_org' | translate }}</h2>
+        <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.step.select_org_hint' | translate }}</p>
+        <div class="space-y-2 max-h-80 overflow-y-auto">
+          @for (org of orgs(); track org.id) {
+            <button (click)="selectOrg(org)"
+              [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors text-sm ' +
+                (selectedOrg()?.id === org.id
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              {{ org.name }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 2: Select Module -->
+    @if (step() === 2) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_module' | translate }}</h2>
+        <div class="grid grid-cols-2 gap-3">
+          @for (m of catalog(); track m.moduleKey) {
+            <button (click)="selectModule(m)"
+              [class]="'text-start px-4 py-4 rounded-lg border transition-colors ' +
+                (selectedModule()?.moduleKey === m.moduleKey
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium text-sm">{{ m.nameEn }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-1" dir="rtl">{{ m.nameAr }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 3: Select Entity Type -->
+    @if (step() === 3) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_entity' | translate }}</h2>
+        <div class="space-y-2">
+          @for (e of entityTypes(); track e.entityType) {
+            <button (click)="selectEntity(e)"
+              [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors text-sm ' +
+                (selectedEntity()?.entityType === e.entityType
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium">{{ e.nameEn }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5" dir="rtl">{{ e.nameAr }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 4: Select Trigger Event -->
+    @if (step() === 4) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_trigger' | translate }}</h2>
+        <div class="space-y-2">
+          @for (t of triggerEvents(); track t.eventKey) {
+            <button (click)="selectTrigger(t)"
+              [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors text-sm ' +
+                (selectedTrigger()?.eventKey === t.eventKey
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium">{{ t.nameEn }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5" dir="rtl">{{ t.nameAr }}</p>
+              <p class="text-xs font-mono text-ink-400 dark:text-dark-500 mt-1">{{ t.eventKey }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 5: Select Workflow Definition -->
+    @if (step() === 5) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_definition' | translate }}</h2>
+        <div class="space-y-2 max-h-80 overflow-y-auto">
+          @for (d of definitions(); track d.id) {
+            <button (click)="selectDefinition(d)"
+              [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors text-sm ' +
+                (selectedDefinition()?.id === d.id
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium">{{ d.name }}</p>
+              <p class="text-xs font-mono text-ink-400 dark:text-dark-500 mt-0.5">{{ d.definitionKey }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 6: Binding Mode -->
+    @if (step() === 6) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_mode' | translate }}</h2>
+        <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.mode_hint' | translate }}</p>
+        <div class="space-y-3">
+          @for (m of bindingModes; track m) {
+            <button (click)="setMode(m)"
+              [class]="'w-full text-start px-4 py-4 rounded-lg border transition-colors ' +
+                (mode() === m
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium text-sm">{{ modeLabelKey(m) | translate }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-1">{{ modeHintKey(m) | translate }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 7: Version Policy -->
+    @if (step() === 7) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.select_version' | translate }}</h2>
+        <div class="space-y-3">
+          @for (p of ['Latest', 'Fixed']; track p) {
+            <button (click)="setVersionPolicy(p === 'Latest' ? 'Latest' : 'Fixed')"
+              [class]="'w-full text-start px-4 py-4 rounded-lg border transition-colors ' +
+                (versionPolicy() === p
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium text-sm">{{ ('workflow.bindings.version_policy.' + p.toLowerCase()) | translate }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-1">{{ ('workflow.bindings.version_policy.' + p.toLowerCase() + '_hint') | translate }}</p>
+            </button>
+          }
+        </div>
+        @if (versionPolicy() === 'Fixed') {
+          <div class="mt-4 space-y-2">
+            <p class="text-xs font-medium text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.select_published_version' | translate }}</p>
+            @if (publishedVersions().length === 0) {
+              <p class="text-xs text-amber-400">{{ 'workflow.bindings.wizard.no_published_versions' | translate }}</p>
+            } @else {
+              <div class="space-y-2">
+                @for (v of publishedVersions(); track v.id) {
+                  <button (click)="selectVersion(v)"
+                    [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors text-sm ' +
+                      (selectedVersion()?.id === v.id
+                        ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                        : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+                    v{{ v.versionNumber }} — {{ v.changeSummary ?? ('workflow.bindings.wizard.no_summary' | translate) }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <div class="mt-6 space-y-3">
+          <h3 class="text-sm font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.field.execution_policy' | translate }}</h3>
+          <p class="text-xs text-ink-500 dark:text-dark-400">{{ 'workflow.bindings.execution_policy.hint' | translate }}</p>
+          @for (p of executionPolicies; track p) {
+            <button type="button" (click)="setExecutionPolicy(p)"
+              [class]="'w-full text-start px-4 py-3 rounded-lg border transition-colors ' +
+                (executionPolicy() === p
+                  ? 'border-primary bg-primary/10 text-ink-900 dark:text-white'
+                  : 'border-ink-200 bg-white text-ink-700 hover:border-primary/40 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-200')">
+              <p class="font-medium text-sm">{{ ('workflow.bindings.execution_policy.' + p) | translate }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-400 mt-1">{{ ('workflow.bindings.execution_policy.' + p + '_hint') | translate }}</p>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 8: Screen + Start Condition + Mappings -->
+    @if (step() === 8) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.start_condition' | translate }}</h2>
+        <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.start_condition_hint' | translate }}</p>
+        <form [formGroup]="conditionForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.field.screen_key' | translate }}
+            </label>
+            <input formControlName="screenKey" type="text"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary"
+              [placeholder]="'workflow.bindings.field.screen_key_placeholder' | translate" />
+            <p class="text-xs text-ink-400 dark:text-dark-500 mt-1">{{ 'workflow.bindings.field.screen_key_hint' | translate }}</p>
+            @if (screenSuggestions().length > 0) {
+              <div class="flex flex-wrap gap-2 mt-2">
+                @for (s of screenSuggestions(); track s.key) {
+                  <button type="button" (click)="selectScreenKey(s.key)"
+                    class="px-2.5 py-1 text-xs rounded-lg border border-ink-200 dark:border-dark-600 bg-ink-50 dark:bg-dark-900 text-ink-700 dark:text-dark-200 hover:border-primary hover:text-ink-900 dark:hover:text-white transition-colors">
+                    {{ s.labelEn }}
+                    <span class="text-ink-400 dark:text-dark-500 ms-1 font-mono">{{ s.key }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.field.description' | translate }}
+              <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+            </label>
+            <textarea formControlName="description" rows="2"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              [placeholder]="'workflow.bindings.field.description_placeholder' | translate"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.field.start_event_key' | translate }}
+              <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+            </label>
+            <input formControlName="startEventKey" type="text"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary"
+              [placeholder]="'workflow.bindings.field.start_event_key_placeholder' | translate" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.field.start_condition' | translate }}
+              <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+            </label>
+            <textarea formControlName="startConditionExpression" rows="3"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              [placeholder]="'workflow.bindings.field.start_condition_placeholder' | translate"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.field.condition_json' | translate }}
+              <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+            </label>
+            <textarea formControlName="conditionJson" rows="3"
+              class="w-full bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              [placeholder]="'workflow.bindings.field.condition_json_placeholder' | translate"></textarea>
+          </div>
+        </form>
+
+        <!-- Input mapping key-value rows -->
+        <div class="space-y-2 pt-2 border-t border-ink-200 dark:border-dark-700">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.field.input_mapping' | translate }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-500 mt-0.5">{{ 'workflow.bindings.field.input_mapping_hint' | translate }}</p>
+            </div>
+            <button type="button" (click)="addInputRow()"
+              class="text-xs text-primary hover:text-primary-300 transition-colors">
+              + {{ 'workflow.bindings.wizard.add_mapping_row' | translate }}
+            </button>
+          </div>
+          @for (row of inputMappingRows(); track $index; let i = $index) {
+            <div class="flex items-center gap-2">
+              <input [value]="row.key" (input)="updateInputRow(i, 'key', $any($event.target).value)"
+                type="text" [placeholder]="'workflow.bindings.wizard.mapping_key' | translate"
+                class="flex-1 bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary" />
+              <span class="text-ink-400 dark:text-dark-500 text-xs">→</span>
+              <input [value]="row.value" (input)="updateInputRow(i, 'value', $any($event.target).value)"
+                type="text" [placeholder]="'workflow.bindings.wizard.mapping_value' | translate"
+                class="flex-1 bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary" />
+              <button type="button" (click)="removeInputRow(i)"
+                class="text-ink-400 dark:text-dark-500 hover:text-red-400 text-sm px-1">×</button>
+            </div>
+          }
+        </div>
+
+        <!-- Outcome mapping key-value rows -->
+        <div class="space-y-2 pt-2 border-t border-ink-200 dark:border-dark-700">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-medium text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.field.outcome_mapping' | translate }}</p>
+              <p class="text-xs text-ink-400 dark:text-dark-500 mt-0.5">{{ 'workflow.bindings.field.outcome_mapping_hint' | translate }}</p>
+            </div>
+            <button type="button" (click)="addOutcomeRow()"
+              class="text-xs text-primary hover:text-primary-300 transition-colors">
+              + {{ 'workflow.bindings.wizard.add_mapping_row' | translate }}
+            </button>
+          </div>
+          @for (row of outcomeMappingRows(); track $index; let i = $index) {
+            <div class="flex items-center gap-2">
+              <input [value]="row.key" (input)="updateOutcomeRow(i, 'key', $any($event.target).value)"
+                type="text" [placeholder]="'workflow.bindings.wizard.mapping_key' | translate"
+                class="flex-1 bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary" />
+              <span class="text-ink-400 dark:text-dark-500 text-xs">→</span>
+              <input [value]="row.value" (input)="updateOutcomeRow(i, 'value', $any($event.target).value)"
+                type="text" [placeholder]="'workflow.bindings.wizard.mapping_value' | translate"
+                class="flex-1 bg-ink-100 dark:bg-dark-700 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-sm text-ink-900 dark:text-white font-mono placeholder-dark-400 focus:outline-none focus:ring-1 focus:ring-primary" />
+              <button type="button" (click)="removeOutcomeRow(i)"
+                class="text-ink-400 dark:text-dark-500 hover:text-red-400 text-sm px-1">×</button>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 9: Groups already on the canvas -->
+    @if (step() === 9) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.groups_ready' | translate }}</h2>
+        <div class="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-transparent p-4 text-sm leading-relaxed text-ink-700 dark:text-dark-200">
+          {{ 'workflow.bindings.wizard.groups_ready_body' | translate }}
+        </div>
+        @if (canvasAssignmentsLoading()) {
+          <p class="text-sm text-ink-400">{{ 'common.loading' | translate }}</p>
+        } @else if (canvasAssignments().length === 0) {
+          <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.no_user_tasks' | translate }}</p>
+        } @else {
+          <ul class="space-y-2">
+            @for (row of canvasAssignments(); track $index) {
+              <li class="flex items-center justify-between gap-3 rounded-xl border px-4 py-3"
+                [class]="row.assigned
+                  ? 'border-green-600/30 bg-green-50 dark:bg-green-900/15'
+                  : 'border-amber-600/30 bg-amber-50 dark:bg-amber-900/15'">
+                <div>
+                  <p class="text-[11px] uppercase tracking-wide text-ink-400 dark:text-dark-400">{{ 'workflow.bindings.wizard.canvas_task' | translate }}</p>
+                  <p class="text-sm font-medium text-ink-900 dark:text-white">{{ row.activityName }}</p>
+                </div>
+                <div class="text-end">
+                  <p class="text-[11px] uppercase tracking-wide text-ink-400 dark:text-dark-400">{{ 'workflow.bindings.wizard.canvas_group' | translate }}</p>
+                  <p class="text-sm font-semibold" [class]="row.assigned ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'">
+                    {{ row.assigned ? row.groupName : ('workflow.bindings.wizard.unassigned_group' | translate) }}
+                  </p>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    <!-- Step 10: Review -->
+    @if (step() === 10) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.review' | translate }}</h2>
+        <div class="space-y-3">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.organization' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1 font-medium">{{ selectedOrg()?.name }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.definition' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1 font-medium">{{ selectedDefinition()?.name }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.module' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1">{{ selectedModule()?.nameEn }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.entity' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1">{{ selectedEntity()?.nameEn }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.trigger' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1 font-mono text-xs">{{ selectedTrigger()?.eventKey }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.mode' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1">{{ modeLabelKey(mode()) | translate }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.screen_key' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1 font-mono text-xs">{{ conditionForm.value.screenKey || '—' }}</p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.wizard.review.version_policy' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1">
+                {{ ('workflow.bindings.version_policy.' + versionPolicy().toLowerCase()) | translate }}
+                @if (selectedVersion()) { <span class="text-xs text-ink-400 dark:text-dark-400"> — v{{ selectedVersion()!.versionNumber }}</span> }
+              </p>
+            </div>
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs">{{ 'workflow.bindings.field.execution_policy' | translate }}</p>
+              <p class="text-ink-900 dark:text-white mt-1">
+                {{ ('workflow.bindings.execution_policy.' + executionPolicy()) | translate }}
+              </p>
+            </div>
+          </div>
+          @if (canvasAssignments().length > 0) {
+            <div class="p-3 bg-ink-50 dark:bg-dark-900 rounded-lg border border-ink-200 dark:border-dark-700">
+              <p class="text-ink-400 dark:text-dark-400 text-xs mb-2">{{ 'workflow.bindings.wizard.review.assignments' | translate }}</p>
+              <div class="space-y-1">
+                @for (row of canvasAssignments(); track $index) {
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="text-ink-900 dark:text-white">{{ row.activityName }}</span>
+                    <span class="text-ink-400 dark:text-dark-500">→</span>
+                    <span [class]="row.assigned ? 'text-green-600 dark:text-green-300' : 'text-amber-500'">
+                      {{ row.assigned ? row.groupName : ('workflow.bindings.wizard.unassigned_group' | translate) }}
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Step 11: Simulate -->
+    @if (step() === 11) {
+      <div class="space-y-4">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.bindings.wizard.step.simulate' | translate }}</h2>
+        <p class="text-sm text-ink-500 dark:text-dark-300">{{ 'workflow.bindings.wizard.simulate_hint' | translate }}</p>
+
+        @if (!createdBindingId()) {
+          <div class="rounded-lg border border-amber-800/40 bg-amber-900/15 px-4 py-3 text-sm text-amber-200">
+            {{ 'workflow.bindings.wizard.simulate_disabled' | translate }}
+          </div>
+        } @else {
+          <div>
+            <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+              {{ 'workflow.bindings.wizard.simulate_payload' | translate }}
+            </label>
+            <textarea
+              [value]="samplePayloadJson()"
+              (input)="samplePayloadJson.set($any($event.target).value)"
+              rows="8"
+              class="w-full bg-ink-50 dark:bg-dark-900 border border-ink-200 dark:border-dark-600 rounded-lg px-3 py-2 text-xs text-ink-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-primary resize-y"></textarea>
+          </div>
+          <button
+            type="button"
+            (click)="runSimulate()"
+            [disabled]="simulating()"
+            class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 transition-colors">
+            {{ simulating()
+              ? ('common.processing' | translate)
+              : ('workflow.bindings.wizard.simulate_btn' | translate) }}
+          </button>
+        }
+
+        @if (simulateError()) {
+          <div class="rounded-lg border border-red-800/40 bg-red-900/20 px-4 py-3 text-sm text-red-300">
+            {{ simulateError() }}
+          </div>
+        }
+
+        @if (simulateResult(); as result) {
+          <div class="rounded-xl border border-ink-200 dark:border-dark-600 bg-ink-50 dark:bg-dark-900 p-4 space-y-4">
+            <p class="text-sm font-medium text-ink-900 dark:text-white">
+              {{ ((result.errors?.length ?? 0) === 0
+                ? 'workflow.bindings.wizard.simulate_success'
+                : 'workflow.bindings.wizard.simulate_failed') | translate }}
+            </p>
+
+            @if (result.steps?.length) {
+              <div>
+                <p class="text-xs uppercase tracking-wide text-ink-400 dark:text-dark-400 mb-2">{{ 'workflow.bindings.wizard.simulate_steps' | translate }}</p>
+                <ul class="space-y-1.5">
+                  @for (s of result.steps; track $index) {
+                    <li class="text-xs text-ink-700 dark:text-dark-200 flex gap-2">
+                      <span class="text-primary shrink-0">{{ s.activityType ?? '—' }}</span>
+                      <span>{{ s.nodeKey || '—' }}</span>
+                      @if (s.note) {
+                        <span class="text-ink-400 dark:text-dark-400">— {{ s.note }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (result.warnings?.length) {
+              <div>
+                <p class="text-xs uppercase tracking-wide text-amber-400 mb-2">{{ 'workflow.bindings.wizard.simulate_warnings' | translate }}</p>
+                <ul class="space-y-1">
+                  @for (w of result.warnings; track $index) {
+                    <li class="text-xs text-amber-200">{{ w }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (result.errors?.length) {
+              <div>
+                <p class="text-xs uppercase tracking-wide text-red-400 mb-2">{{ 'workflow.bindings.wizard.simulate_errors' | translate }}</p>
+                <ul class="space-y-1">
+                  @for (e of result.errors; track $index) {
+                    <li class="text-xs text-red-300">{{ e }}</li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+
+  <!-- Navigation -->
+  <div class="flex items-center justify-between">
+    <button (click)="back()" [disabled]="step() === 1 || (step() === 11 && !!createdBindingId())"
+      class="px-4 py-2 text-sm text-ink-500 dark:text-dark-300 hover:text-ink-900 dark:hover:text-white border border-ink-200 dark:border-dark-600 rounded-lg disabled:opacity-40 transition-colors">
+      ← {{ 'common.back' | translate }}
+    </button>
+    <div class="flex items-center gap-3">
+      <button (click)="cancel()" class="px-4 py-2 text-sm text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white transition-colors">
+        {{ 'common.cancel' | translate }}
+      </button>
+      @if (step() < 10) {
+        <button (click)="next()" [disabled]="!stepValid()"
+          class="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          {{ 'common.next' | translate }} →
+        </button>
+      } @else if (step() === 10) {
+        <button (click)="submit()" [disabled]="!stepValid() || saving()"
+          class="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          {{ saving() ? ('common.saving' | translate) : ('workflow.bindings.wizard.create_btn' | translate) }}
+        </button>
+      } @else {
+        <button (click)="finish()"
+          class="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-400 transition-colors">
+          {{ 'workflow.bindings.wizard.finish_btn' | translate }}
+        </button>
+      }
+    </div>
+  </div>
+
+</div>
+}

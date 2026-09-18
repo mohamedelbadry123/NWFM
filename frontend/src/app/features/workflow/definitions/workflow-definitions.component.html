@@ -1,0 +1,258 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.definitions.title"
+    subtitleKey="workflow.definitions.subtitle"
+    helpLink="/admin/workflow/help">
+    <button
+      (click)="openCreate()"
+      [disabled]="needsOrg()"
+      class="wf-btn-primary disabled:opacity-50">
+      + {{ 'workflow.definitions.new_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  <div class="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/15 via-white to-primary/5 p-5 dark:from-primary/20 dark:via-dark-800 dark:to-dark-900">
+    <p class="text-xs font-semibold uppercase tracking-widest text-primary mb-3">{{ 'workflow.definitions.cycle_title' | translate }}</p>
+    <ol class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+      @for (step of [1,2,3,4]; track step) {
+        <li class="flex items-start gap-2.5 rounded-xl border border-primary/15 bg-white/90 px-3 py-2.5 dark:border-primary/20 dark:bg-dark-900/60">
+          <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">{{ step }}</span>
+          <span class="text-xs leading-snug text-ink-700 dark:text-dark-200">{{ ('workflow.definitions.cycle_step_' + step) | translate }}</span>
+        </li>
+      }
+    </ol>
+  </div>
+
+  
+
+  <!-- KPI cards -->
+  @if (!isLoading() && !loadError()) {
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <app-workflow-kpi-card labelKey="workflow.definitions.kpi_total" [value]="totalCount()" />
+      <app-workflow-kpi-card labelKey="workflow.definitions.kpi_active" [value]="activeCount()" tone="success" />
+      <app-workflow-kpi-card labelKey="workflow.definitions.kpi_inactive" [value]="inactiveCount()" />
+      <app-workflow-kpi-card labelKey="workflow.definitions.kpi_versions" [value]="totalVersions()" tone="primary" />
+    </div>
+  }
+
+  <!-- Search -->
+  <div class="relative">
+    <input
+      [formControl]="searchCtrl"
+      type="search"
+      [placeholder]="'workflow.definitions.search_placeholder' | translate"
+      class="wf-input !rounded-xl !ps-10 !pe-4 !py-2.5" />
+  </div>
+
+  <!-- Loading -->
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  }
+
+  <!-- Error -->
+  @if (!isLoading() && loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  }
+
+  <!-- Empty -->
+  @if (!isLoading() && !loadError() && items().length === 0) {
+    <prv-empty-state
+      titleKey="workflow.definitions.empty_title"
+      subtitleKey="workflow.definitions.empty_sub" />
+  }
+
+  <!-- Table -->
+  @if (!isLoading() && !loadError() && items().length > 0) {
+    <app-workflow-table-shell titleKey="workflow.definitions.title">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'workflow.definitions.col_name' | translate }}</th>
+            <th>{{ 'workflow.definitions.col_key' | translate }}</th>
+            <th>{{ 'workflow.definitions.col_versions' | translate }}</th>
+            <th>{{ 'workflow.definitions.col_created' | translate }}</th>
+            <th>{{ 'workflow.definitions.col_status' | translate }}</th>
+            <th class="text-end">{{ 'workflow.definitions.col_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of items(); track d.id) {
+            <tr>
+              <td>
+                <div class="flex items-start gap-2">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <p class="text-ink-900 dark:text-white font-medium">{{ d.name }}</p>
+                      
+                    </div>
+                    @if (d.description) {
+                      <p class="text-xs text-ink-400 dark:text-dark-400 mt-0.5">{{ d.description }}</p>
+                    }
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="font-mono text-xs text-ink-700 dark:text-dark-200 bg-ink-100 dark:bg-dark-700 px-2 py-0.5 rounded">{{ d.definitionKey }}</span>
+              </td>
+              <td class="text-ink-500 dark:text-dark-300">{{ d.versionCount }}</td>
+              <td class="text-ink-500 dark:text-dark-300">{{ formatDate(d.createdAt) }}</td>
+              <td>
+                @if (d.isActive) {
+                  <prv-status-pill tone="success" labelKey="common.active" />
+                } @else {
+                  <prv-status-pill tone="neutral" labelKey="common.inactive" />
+                }
+              </td>
+              <td class="text-end">
+                <div class="flex items-center justify-end gap-3">
+                  <!-- Example quick actions -->
+                  
+                  <a [routerLink]="[d.id, 'versions']"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    {{ 'workflow.definitions.open_versions_btn' | translate }}
+                  </a>
+                  <button type="button" (click)="openLatestDraftDesigner(d)"
+                    [disabled]="openingDesignerId() === d.id"
+                    class="text-xs text-primary hover:text-primary-300 disabled:opacity-50 transition-colors">
+                    {{ openingDesignerId() === d.id
+                      ? ('common.processing' | translate)
+                      : ('workflow.definitions.open_designer_btn' | translate) }}
+                  </button>
+                  <button (click)="confirmToggle(d)"
+                    [class]="d.isActive ? 'text-xs text-red-400 hover:text-red-300 transition-colors' : 'text-xs text-green-400 hover:text-green-300 transition-colors'">
+                    {{ d.isActive ? ('workflow.definitions.deactivate_btn' | translate) : ('workflow.definitions.activate_btn' | translate) }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-workflow-table-shell>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between text-xs text-ink-500 dark:text-dark-300 mt-4">
+      <span>{{ 'workflow.common.showing' | translate: { start: rangeStart(), end: rangeEnd(), total: totalCount() } }}</span>
+      <div class="flex items-center gap-1">
+        <button (click)="prevPage()" [disabled]="page() === 1"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">‹</button>
+        <button (click)="nextPage()" [disabled]="page() >= totalPages()"
+          class="px-2 py-1 rounded border border-ink-200 dark:border-dark-600 disabled:opacity-40 hover:bg-ink-100 dark:hover:bg-dark-700">›</button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Create Definition Modal -->
+@if (showCreateModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-lg mx-4 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-ink-200 dark:border-dark-700">
+        <h2 class="text-base font-semibold text-ink-900 dark:text-white">{{ 'workflow.definitions.modal_create_title' | translate }}</h2>
+        <button (click)="closeCreate()"
+          class="text-ink-400 dark:text-dark-400 hover:text-ink-900 dark:hover:text-white"
+          [attr.aria-label]="'common.close' | translate">✕</button>
+      </div>
+      <form [formGroup]="createForm" (ngSubmit)="submitCreate()" class="p-6 space-y-4">
+        
+        <!-- Definition Key -->
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.definitions.field_key' | translate }} <span class="text-red-400">*</span>
+          </label>
+          <input
+            formControlName="definitionKey"
+            type="text"
+            [placeholder]="'workflow.definitions.field_key_placeholder' | translate"
+            class="wf-input" />
+          @if (createForm.get('definitionKey')?.invalid && createForm.get('definitionKey')?.touched) {
+            <p class="text-xs text-red-400 mt-1">{{ 'workflow.definitions.field_key_hint' | translate }}</p>
+          }
+        </div>
+        <!-- Name EN -->
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.definitions.field_name' | translate }} <span class="text-red-400">*</span>
+          </label>
+          <input
+            formControlName="name"
+            type="text"
+            [placeholder]="'workflow.definitions.field_name_placeholder' | translate"
+            class="wf-input" />
+        </div>
+        <!-- Name AR -->
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.definitions.field_name_ar' | translate }}
+            <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+          </label>
+          <input
+            formControlName="nameAr"
+            type="text"
+            dir="rtl"
+            [placeholder]="'workflow.definitions.field_name_ar_placeholder' | translate"
+            class="wf-input" />
+        </div>
+        <!-- Description EN -->
+        <div>
+          <label class="block text-xs font-medium text-ink-500 dark:text-dark-300 mb-1">
+            {{ 'workflow.definitions.field_description' | translate }}
+            <span class="text-ink-400 dark:text-dark-500 ms-1">({{ 'common.optional' | translate }})</span>
+          </label>
+          <textarea
+            formControlName="description"
+            rows="2"
+            [placeholder]="'workflow.definitions.field_description_placeholder' | translate"
+            class="wf-input resize-none"></textarea>
+        </div>
+      </form>
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-ink-200 dark:border-dark-700">
+        <button (click)="closeCreate()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button
+          (click)="submitCreate()"
+          [disabled]="createForm.invalid || saving()"
+          class="wf-btn-primary">
+          {{ saving() ? ('common.saving' | translate) : ('workflow.definitions.create_btn' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Toggle Confirmation Dialog -->
+@if (confirmTarget()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="wf-modal max-w-sm mx-4 shadow-2xl p-6 space-y-4">
+      <h3 class="text-base font-semibold text-ink-900 dark:text-white">
+        {{ confirmTarget()!.isActive ? ('workflow.definitions.confirm_deactivate_title' | translate) : ('workflow.definitions.confirm_activate_title' | translate) }}
+      </h3>
+      <p class="text-sm text-ink-500 dark:text-dark-300">
+        {{ confirmTarget()!.isActive
+          ? ('workflow.definitions.confirm_deactivate_body' | translate: { name: confirmTarget()!.name })
+          : ('workflow.definitions.confirm_activate_body' | translate: { name: confirmTarget()!.name }) }}
+      </p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button (click)="cancelToggle()" class="wf-btn-secondary">
+          {{ 'common.cancel' | translate }}
+        </button>
+        <button
+          (click)="executeToggle()"
+          [disabled]="toggling()"
+          [class]="confirmTarget()!.isActive
+            ? 'px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors'
+            : 'px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors'">
+          {{ toggling() ? ('common.processing' | translate) : (confirmTarget()!.isActive ? ('workflow.definitions.deactivate_btn' | translate) : ('workflow.definitions.activate_btn' | translate)) }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

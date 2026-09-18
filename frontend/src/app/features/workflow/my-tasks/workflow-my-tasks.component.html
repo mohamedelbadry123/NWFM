@@ -1,0 +1,97 @@
+<div class="p-5 sm:p-6 space-y-5">
+  <app-workflow-page-header
+    titleKey="workflow.runtime.my_tasks.title"
+    subtitleKey="workflow.runtime.my_tasks.subtitle"
+    helpLink="/org/workflow/help">
+    <button (click)="load()"
+      class="wf-btn-secondary">
+      ↺ {{ 'workflow.runtime.refresh_btn' | translate }}
+    </button>
+  </app-workflow-page-header>
+
+  @if (isLoading()) {
+    <div class="flex items-center justify-center py-16 text-ink-500 dark:text-dark-300 text-sm">
+      {{ 'common.loading' | translate }}
+    </div>
+  } @else if (loadError()) {
+    <div class="flex flex-col items-center gap-3 py-16 text-center">
+      <p class="text-red-400 text-sm">{{ loadError() }}</p>
+      <button (click)="load()" class="px-3 py-1 text-xs border border-ink-200 dark:border-dark-600 text-ink-700 dark:text-dark-200 rounded hover:bg-ink-100 dark:hover:bg-dark-700">
+        {{ 'common.retry' | translate }}
+      </button>
+    </div>
+  } @else {
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <app-workflow-kpi-card labelKey="workflow.runtime.my_tasks.kpi_total" [value]="items().length" />
+      <app-workflow-kpi-card labelKey="workflow.runtime.my_tasks.kpi_pending" [value]="pendingCount()" tone="warning" />
+      <app-workflow-kpi-card labelKey="workflow.runtime.my_tasks.kpi_claimed" [value]="claimedCount()" tone="primary" />
+      <app-workflow-kpi-card
+        labelKey="workflow.runtime.my_tasks.kpi_overdue"
+        [value]="overdueCount()"
+        [tone]="overdueCount() > 0 ? 'danger' : 'default'" />
+    </div>
+
+    @if (items().length === 0) {
+      <prv-empty-state titleKey="workflow.runtime.my_tasks.empty" />
+    } @else {
+      <app-workflow-table-shell titleKey="workflow.runtime.my_tasks.title">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'workflow.runtime.col_activity' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_group' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_status' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_created' | translate }}</th>
+              <th>{{ 'workflow.runtime.col_due' | translate }}</th>
+              <th class="text-end">{{ 'workflow.runtime.col_actions' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of items(); track item.id) {
+              <tr class="cursor-pointer" (click)="openTask(item.id!)">
+                <td>
+                  <div class="flex items-center gap-2">
+                    @if (isOverdue(item.dueAt, item.status)) {
+                      <span class="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                    } @else {
+                      <span class="w-2 h-2 rounded-full bg-dark-600 shrink-0"></span>
+                    }
+                    <span class="font-mono text-xs text-ink-500 dark:text-dark-300 truncate max-w-[120px]" [title]="item.activityInstanceId ?? ''">
+                      {{ item.activityInstanceId ? item.activityInstanceId.slice(-8) : '—' }}
+                    </span>
+                  </div>
+                </td>
+                <td class="text-ink-900 dark:text-white">{{ item.assignmentGroupName ?? '—' }}</td>
+                <td>
+                  <prv-status-pill
+                    [tone]="statusTone(item.status)"
+                    [labelKey]="'workflow.runtime.status_' + item.status" />
+                </td>
+                <td class="text-ink-500 dark:text-dark-300">{{ item.createdAt | date:'mediumDate' }}</td>
+                <td>
+                  @if (item.dueAt) {
+                    <div [class]="isOverdue(item.dueAt, item.status) ? 'text-red-400 text-xs' : 'text-dark-300 text-xs'">
+                      <div>{{ item.dueAt | date:'mediumDate' }}</div>
+                      <div class="mt-0.5 opacity-80">
+                        {{ dueRelativeLabel(item.dueAt, item.status).key | translate: dueRelativeLabel(item.dueAt, item.status).params }}
+                      </div>
+                    </div>
+                  } @else {
+                    <span class="text-ink-400 dark:text-dark-500 text-xs">—</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <button (click)="$event.stopPropagation(); openTask(item.id!)"
+                    class="text-xs text-primary hover:text-primary-300 transition-colors">
+                    {{ 'workflow.runtime.open_btn' | translate }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-workflow-table-shell>
+    }
+  }
+</div>
