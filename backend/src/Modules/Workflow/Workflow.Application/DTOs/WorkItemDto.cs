@@ -28,4 +28,7 @@ public sealed record WorkItemDto(
     int? SlaDurationMinutes = null,
     int? RemainingSlaMinutes = null,
     string? OriginalGroupName = null,
-    IReadOnlyList<ActivityOutcomeDefinitionDto>? AvailableOutcomes = null);
+    IReadOnlyList<ActivityOutcomeDefinitionDto>? AvailableOutcomes = null,
+    IReadOnlyList<Workflow.Application.Helpers.WorkflowTaskField>? FormFields = null,
+    IReadOnlyDictionary<string, object?>? FormValues = null,
+    string? InstructionsEn = null, string? InstructionsAr = null);

@@ -114,7 +114,7 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
         var list = new List<WorkflowVariableDefinition>(doc.Variables.Count);
         foreach (var v in doc.Variables)
         {
-            if (!Enum.TryParse<VariableDataType>(v.DataTypeName, true, out var dataType))
+            if (!Enum.TryParse<VariableDataType>(v.DataTypeName == "Number" ? "Decimal" : v.DataTypeName, true, out var dataType))
                 dataType = VariableDataType.String;
 
             list.Add(WorkflowVariableDefinition.Create(

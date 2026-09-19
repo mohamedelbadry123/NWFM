@@ -22,7 +22,7 @@ assert.equal((await request('/api/workflow/participants/'+participant.data.id,{m
 assert.equal((await request('/api/workflow/work-items/my',{participant:participant.data.id})).status,400,'An inactive participant cannot act');
 assert.equal((await request('/api/app-context')).status,200,'Participant deactivation must not block startup');
 const bindings=(await request('/api/workflow/bindings')).data.items;
-const binding=bindings.find(b=>b.moduleKey==='Standalone'&&b.isActive&&b.mode==='Active');assert.ok(binding);
+const binding=bindings.find(b=>b.moduleKey==='Standalone'&&b.entityType==='WorkflowRequest'&&b.isActive&&b.mode==='Active');assert.ok(binding,'The seeded WorkflowRequest binding must be active');
 const key=randomUUID();const startBody={workflowBindingId:binding.id,businessEntityId:'SMOKE-'+key,idempotencyKey:key};
 const started=await request('/api/workflow/runtime/instances',{method:'POST',body:startBody});assert.equal(started.status,201,JSON.stringify(started.data));
 const duplicate=await request('/api/workflow/runtime/instances',{method:'POST',body:startBody});assert.ok([400,409].includes(duplicate.status));

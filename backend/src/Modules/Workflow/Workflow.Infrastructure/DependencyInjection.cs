@@ -10,6 +10,7 @@ using Workflow.Infrastructure.Background;
 using Workflow.Infrastructure.Persistence;
 using Workflow.Infrastructure.Persistence.Repositories;
 using Workflow.Infrastructure.Services;
+using Workflow.Application.Integrations;
 
 public static class DependencyInjection
 {
@@ -27,6 +28,7 @@ public static class DependencyInjection
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", "Workflow")));
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
+        services.AddTransient(typeof(MediatR.IPipelineBehavior<,>), typeof(WorkflowRuntimeCommandLock<,>));
         services.AddScoped<IWorkflowParticipantRepository, WorkflowParticipantRepository>();
         services.AddScoped<IWorkflowAssignmentGroupRepository, WorkflowAssignmentGroupRepository>();
         services.AddScoped<IWorkflowDepartmentRepository, WorkflowDepartmentRepository>();
@@ -67,7 +69,16 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowAssignmentResolver, WorkflowAssignmentResolver>();
         services.AddScoped<IWorkflowCandidateFactory, WorkflowCandidateFactory>();
         services.AddScoped<IWorkflowInboxWriter, WorkflowInboxWriter>();
-        services.AddScoped<IWorkflowRuntimeEngine, WorkflowRuntimeEngine>();
+        services.AddScoped<WorkflowRuntimeEngine>();
+        services.AddScoped<IWorkflowRuntimeEngine, SerializedWorkflowRuntimeEngine>();
+        services.AddDataProtection();
+        services.AddScoped<WorkflowIntegrations>();
+        services.AddScoped<IWorkflowIntegrations>(sp => sp.GetRequiredService<WorkflowIntegrations>());
+        services.AddScoped<IWorkflowIntegrationRuntime>(sp => sp.GetRequiredService<WorkflowIntegrations>());
+        services.AddScoped<WorkflowIntegrationTransport>();
+        services.AddScoped<WorkflowIntegrationProcessor>();
+        services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowActionProvider, HttpWorkflowActionProvider>();
+        services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowActionProvider, WorkflowVariableActionProvider>();
         services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowTriggerService, WorkflowTriggerService>();
 
         // Advanced engine scaffolding
@@ -83,7 +94,8 @@ public static class DependencyInjection
 
         services.AddHostedService<WorkflowTimerHostedService>();
         services.AddHostedService<WorkflowOutboxHostedService>();
-        services.AddHostedService<WorkflowInboxHostedService>();
+        services.AddHostedService<WorkflowInboxHostedService>();
+        services.AddHostedService<WorkflowIntegrationHostedService>();
         return services;
     }
 }

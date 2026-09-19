@@ -5,6 +5,7 @@ public sealed class WorkflowSettings
     public const string SectionName = "WorkflowSettings";
 
     public bool IsEnabled { get; set; }
+    public bool AllowPrivateConnections { get; set; }
 
     /// <summary>
     /// When true, seeds the designer example workflow on startup.

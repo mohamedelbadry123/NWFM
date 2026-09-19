@@ -17,7 +17,7 @@ export class AppComponent {
     {url:'/org/workflow/workload',en:'Workload',ar:'عبء العمل'}, {url:'/org/workflow/notifications',en:'Notifications',ar:'الإشعارات'},
     {url:'/admin/workflow/incidents',en:'Incidents',ar:'الحوادث'}, {url:'/admin/workflow/dead-letters',en:'Message recovery',ar:'استعادة الرسائل'},
     {url:'/admin/workflow/calendars',en:'Business calendars',ar:'تقويم العمل'}, {url:'/admin/workflow/sla-policies',en:'SLA policies',ar:'سياسات الخدمة'},
-    {url:'/admin/workflow/actions-catalog',en:'Actions catalog',ar:'دليل الإجراءات'}, {url:'/admin/workflow/modules',en:'Workflow catalog',ar:'دليل سير العمل'},
+    {url:'/admin/workflow/actions-catalog',en:'Actions catalog',ar:'دليل الإجراءات'}, {url:'/admin/workflow/integrations',en:'Integrations',ar:'التكاملات'}, {url:'/admin/workflow/modules',en:'Workflow catalog',ar:'دليل سير العمل'},
     {url:'/org/workflow/help',en:'Help',ar:'المساعدة'}
   ];
 }

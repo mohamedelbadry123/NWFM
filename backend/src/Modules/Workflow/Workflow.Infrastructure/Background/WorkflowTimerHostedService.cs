@@ -171,7 +171,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
                     continue;
 
                 var instance = await instanceRepo.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
-                if (instance is null)
+                if (instance is null || instance.Status != WorkflowInstanceStatus.Running)
                     continue;
 
                 var activityDef = await db.ActivityDefinitions
@@ -183,20 +183,23 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
 
                 var policy = await ResolveSlaPolicyAsync(
                     slaRepo, item.OrganizationId, activityDef?.ConfigurationJson, cancellationToken);
-                if (policy is null || string.IsNullOrWhiteSpace(policy.EscalationAssignmentKey))
+                using var configuration = JsonDocument.Parse(activityDef?.ConfigurationJson ?? "{}");
+                var escalationKey = configuration.RootElement.TryGetProperty("slaEscalationKey", out var configuredKey)
+                    ? configuredKey.GetString() : policy?.EscalationAssignmentKey;
+                if (string.IsNullOrWhiteSpace(escalationKey))
                     continue;
 
                 var groupResult = await assignmentResolver.ResolveGroupAsync(
                     item.OrganizationId,
                     instance.WorkflowBindingId,
-                    policy.EscalationAssignmentKey,
+                    escalationKey,
                     cancellationToken);
 
                 if (groupResult.IsFailure)
                 {
                     _logger.LogWarning(
                         "Escalation AssignmentKey {Key} not mapped for work item {WorkItemId}: {Error}",
-                        policy.EscalationAssignmentKey, item.Id, groupResult.Error.Message);
+                        escalationKey, item.Id, groupResult.Error.Message);
                     continue;
                 }
 
@@ -216,7 +219,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
                     WorkflowEventType.EscalationApplied,
                     now,
                     activityNodeKey: activity.ActivityNodeKey,
-                    payloadJson: $"{{\"workItemId\":\"{item.Id}\",\"newGroupId\":\"{groupResult.Value}\",\"policyCode\":\"{policy.PolicyCode}\"}}",
+                    payloadJson: JsonSerializer.Serialize(new { workItemId = item.Id, newGroupId = groupResult.Value, policyCode = policy?.PolicyCode }),
                     cancellationToken: cancellationToken);
 
                 await events.AppendAsync(

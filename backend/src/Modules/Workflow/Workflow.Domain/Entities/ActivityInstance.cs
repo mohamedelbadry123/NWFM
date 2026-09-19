@@ -20,6 +20,9 @@ public sealed class ActivityInstance : Entity, ITenantAware
     public DateTime? CompletedAt { get; private set; }
     public DateTime? FailedAt { get; private set; }
     public string? FailureReason { get; private set; }
+    public Guid? ExecutionTokenId { get; private set; }
+    public void AttachToken(Guid? tokenId) => ExecutionTokenId = tokenId;
+    public void Reopen() { Status = ActivityInstanceStatus.Active; FailedAt = null; FailureReason = null; }
 
     private ActivityInstance() { }
 

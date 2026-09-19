@@ -11,6 +11,8 @@ using Workflow.Domain.Entities;
 /// </summary>
 public interface IWorkflowRuntimeEngine
 {
+    Task<Result> CompleteExternalActivityAsync(Guid activityInstanceId, IReadOnlyDictionary<string, object?> outputs,
+        string outcome, string? error, DateTime now, CancellationToken cancellationToken = default);
     /// <summary>
     /// Starts a new instance from the Start activity and advances until a UserTask or End is reached.
     /// Returns the created instance.

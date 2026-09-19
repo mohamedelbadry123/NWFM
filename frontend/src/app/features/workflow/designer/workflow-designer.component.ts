@@ -17,6 +17,9 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
+import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
+import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
+import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { canvasWorldSize, layoutWorkflowGraph, mapCanvasIdsToActivities, nodesAreCollapsed } from './workflow-canvas-layout';
@@ -64,6 +67,7 @@ export interface FormFieldRow {
   labelAr: string;
   type: FormFieldType;
   required: boolean;
+  options?: string;
 }
 
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
@@ -107,7 +111,7 @@ export interface CanvasVariable {
   variableKey: string;
   name: string;
   nameAr: string;
-  dataType: 'String' | 'Number' | 'Boolean' | 'DateTime' | 'Guid' | 'Json';
+  dataType: 'String' | 'Number' | 'Integer' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime' | 'Guid' | 'Json';
   defaultValue: string;
   isRequired: boolean;
   isSensitive: boolean;
@@ -283,7 +287,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslateModule, RouterLink],
+  imports: [ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -402,6 +406,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     correlationVariable:    [''],
     definitionKey:          [''],
     waitForCompletion:      [true],
+    callVersionId:          [''],
+    callInputMappingsJson:  ['{}'],
+    callOutputMappingsJson: ['{}'],
   });
 
   protected readonly formFieldTypes: FormFieldType[] = ['text', 'textarea', 'number', 'date', 'select'];
@@ -420,11 +427,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   });
 
   // ── Enums / options
-  protected readonly timerTypeOptions: TimerTypeOption[] = ['DueDate', 'Duration', 'ExternalSignal'];
+  protected readonly timerTypeOptions: TimerTypeOption[] = ['DueDate', 'Duration'];
   protected readonly notifFailurePolicyOptions: NotificationFailurePolicyOption[] = ['Continue', 'Retry', 'FailWorkflow'];
   protected readonly executionTriggerOptions = ['OnEnter', 'OnComplete', 'OnOutcome', 'OnFailure'];
   protected readonly actionFailurePolicyOptions = ['Continue', 'Retry', 'FailActivity', 'FailWorkflow', 'CreateIncident'];
-  protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Number', 'Boolean', 'DateTime', 'Guid', 'Json'];
+  protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Integer', 'Decimal', 'Boolean', 'Date', 'DateTime', 'Guid', 'Json'];
 
   // ── Inspector tab definitions
   protected readonly userTaskTabs: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
@@ -606,15 +613,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly GATEWAY_R = GATEWAY_R;
 
   ngOnInit(): void {
-    const defId = this.route.snapshot.paramMap.get('definitionId') ?? '';
-    const verId = this.route.snapshot.paramMap.get('versionId') ?? '';
-    this.definitionId.set(defId);
-    this.versionId.set(verId);
-
-    this.loadVersion();
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      this.definitionId.set(params.get('definitionId') ?? '');
+      this.versionId.set(params.get('versionId') ?? '');
+      this.selectedNodeId.set(null);
+      this.selectedEdgeId.set(null);
+      this.selectedNodeIds.set([]);
+      this.validationResult.set(null);
+      this.saveStatus.set('saved');
+      this.undoStack = [];
+      this.redoStack = [];
+      this.loadVersion();
+      this.loadDefinitionName();
+    });
     this.loadActionCatalog();
     this.loadSlaPolicies();
-    this.loadDefinitionName();
 
     this.autosave$.pipe(
       debounceTime(2000),
@@ -647,10 +660,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private loadVersion(): void {
     this.isLoading.set(true);
-    this.versionsService.getById(this.definitionId(), this.versionId())
+    const requestedVersion = this.versionId();
+    this.versionsService.getById(this.definitionId(), requestedVersion)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: v => {
+          if (this.versionId() !== requestedVersion) return;
           this.version.set(v);
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
@@ -687,14 +702,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           labelAr:      e.labelAr      ?? '',
           descriptionEn: e.descriptionEn ?? '',
         })));
-        this.variables.set(state.variables ?? []);
+        this.variables.set(state.variables?.length ? state.variables : this.projectVariables(v));
         return;
       } catch { /* fall through */ }
     }
 
     this.nodes.set((v.activities ?? []).map((a, i) => this.activityToCanvasNode(a, i)));
     this.edges.set(this.transitionsToEdges(v));
-    this.variables.set([]);
+    this.variables.set(this.projectVariables(v));
+  }
+
+  private projectVariables(v: WorkflowVersionDetailDto): CanvasVariable[] {
+    return (v.variables ?? []).map(variable => ({ id: variable.id || crypto.randomUUID(), variableKey: variable.variableKey || '',
+      name: variable.name || '', nameAr: variable.nameAr || '', dataType: (variable.dataType || 'String') as CanvasVariable['dataType'],
+      defaultValue: variable.defaultValue || '', isRequired: !!variable.isRequired, isSensitive: !!variable.isSensitive,
+      description: variable.description || '', descriptionAr: variable.descriptionAr || '' }));
   }
 
   private activityToCanvasNode(a: ActivityDefinitionDto, i: number): CanvasNode {
@@ -2108,6 +2130,22 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.markUnsaved();
   }
 
+  protected applyIntegrationConfiguration(configurationJson: string): void {
+    if (this.isReadonly()) return;
+    const nodeId = this.selectedNodeId();
+    this.pushUndo();
+    this.nodes.update(nodes => nodes.map(n => n.id === nodeId
+      ? { ...n, configurationJson, actionKey: n.type === 'ServiceTask' ? 'http.request' : n.actionKey } : n));
+    const node = this.nodes().find(n => n.id === nodeId);
+    if (node) this.patchPropsFromNode(node);
+    this.markUnsaved();
+  }
+
+  protected applyTypedVariables(values: string): void {
+    this.applyIntegrationConfiguration(JSON.stringify({ ...this.parseConfig(this.selectedNode()?.configurationJson || '{}'),
+      assignmentFormat: 'typed', setVariables: JSON.parse(values) }));
+  }
+
   // ── Edge props form ───────────────────────────────────────────────────────
 
   protected applyEdgeProps(): void {
@@ -2458,7 +2496,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       allowSelfClaim:        typeof cfg['allowSelfClaim'] === 'boolean' ? cfg['allowSelfClaim'] as boolean : false,
       configJson:            node.configurationJson || '',
       timerType:             (cfg['timerType'] as TimerTypeOption) || 'Duration',
-      dueAt:                 typeof cfg['dueAt'] === 'string' ? (cfg['dueAt'] as string).slice(0, 16) : '',
+      dueAt:                 typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
       duration:              typeof cfg['duration'] === 'string' ? cfg['duration'] as string : '',
       signalKey:             typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] as string : '',
       templateKey:           typeof cfg['templateKey'] === 'string' ? cfg['templateKey'] as string : '',
@@ -2474,11 +2512,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         : (cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
           ? JSON.stringify(cfg['formSchemaJson'], null, 2)
           : ''),
-      setVariablesJson:      this.formatSetVariables(cfg['setVariables']),
-      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] as string : '',
+      setVariablesJson:      this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
+      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] : typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] : '',
       correlationVariable:   typeof cfg['correlationVariable'] === 'string' ? cfg['correlationVariable'] as string : '',
       definitionKey:         typeof cfg['definitionKey'] === 'string' ? cfg['definitionKey'] as string : '',
       waitForCompletion:     typeof cfg['waitForCompletion'] === 'boolean' ? cfg['waitForCompletion'] as boolean : true,
+      callVersionId:         typeof cfg['versionId'] === 'string' ? cfg['versionId'] as string : '',
+      callInputMappingsJson: JSON.stringify(cfg['inputMappings'] || {}, null, 2),
+      callOutputMappingsJson: JSON.stringify(cfg['outputMappings'] || {}, null, 2),
     });
     this.formFields.set(this.parseFormFields(cfg['formFields']));
   }
@@ -2497,6 +2538,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         labelAr: typeof row['labelAr'] === 'string' ? row['labelAr'] : '',
         type,
         required: !!row['required'],
+        options: Array.isArray(row['options']) ? (row['options'] as string[]).join(', ') : '',
       };
     });
   }
@@ -2562,15 +2604,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private buildConfigurationJson(type: NodeType, v: typeof this.propsForm.value): string {
+    const existing = this.parseConfig(
+      this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
+    );
     if (type === 'Timer') {
-      const cfg: Record<string, string> = { timerType: (v.timerType as string) || 'Duration' };
-      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = v.dueAt.length === 16 ? `${v.dueAt}:00Z` : v.dueAt;
+      const cfg: Record<string, unknown> = { ...existing, timerType: (v.timerType as string) || 'Duration' };
+      delete cfg['dueAt'];
+      delete cfg['duration'];
+      delete cfg['signalKey'];
+      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = toUtcDateTime(v.dueAt);
       if (v.timerType === 'Duration' && v.duration)  cfg['duration'] = v.duration;
       if (v.timerType === 'ExternalSignal' && v.signalKey) cfg['signalKey'] = v.signalKey;
       return JSON.stringify(cfg);
     }
     if (type === 'NotificationTask') {
-      return JSON.stringify({ templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
+      return JSON.stringify({ ...existing, templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
     }
     if (type === 'UserTask') {
       const existing = this.parseConfig(
@@ -2596,12 +2644,13 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       setOrDelete('outputMappingJson', v.outputMappingJson, !!v.outputMappingJson?.trim());
       setOrDelete('formKey', v.formKey, !!v.formKey?.trim());
       const fields = this.formFields()
-        .map(({ key, labelEn, labelAr, type: fieldType, required }) => ({
+        .map(({ key, labelEn, labelAr, type: fieldType, required, options }) => ({
           key: key.trim(),
           labelEn: labelEn.trim(),
           labelAr: labelAr.trim(),
           type: fieldType,
           required: !!required,
+          ...(fieldType === 'select' ? { options: (options || '').split(',').map(s => s.trim()).filter(Boolean) } : {}),
         }))
         .filter(f => f.key.length > 0);
       if (fields.length > 0) cfg['formFields'] = fields;
@@ -2615,22 +2664,31 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       return Object.keys(cfg).length ? JSON.stringify(cfg) : '';
     }
     if (type === 'CallActivity') {
+      const parseMapping = (text: string | null | undefined) => { try { return JSON.parse(text || '{}') as unknown; } catch { return text; } };
       return JSON.stringify({
+        ...existing,
         definitionKey: v.definitionKey ?? '',
         waitForCompletion: v.waitForCompletion ?? true,
+        versionId: v.callVersionId?.trim() || null,
+        inputMappings: parseMapping(v.callInputMappingsJson),
+        outputMappings: parseMapping(v.callOutputMappingsJson),
       });
     }
     if (type === 'ScriptTask') {
       const raw = (v.setVariablesJson ?? '').trim();
-      if (!raw) return JSON.stringify({ setVariables: {} });
+      // Legacy assignments are replaced when the user edits the canonical field.
+      delete existing['assignments'];
+      if (!raw) return JSON.stringify({ ...existing, setVariables: {} });
       try {
-        return JSON.stringify({ setVariables: JSON.parse(raw) as unknown });
+        return JSON.stringify({ ...existing, setVariables: JSON.parse(raw) as unknown });
       } catch {
-        return JSON.stringify({ setVariables: raw });
+        return JSON.stringify({ ...existing, setVariables: raw });
       }
     }
     if (type === 'WaitEvent') {
+      delete existing['signalKey'];
       return JSON.stringify({
+        ...existing,
         eventKey: v.eventKey ?? '',
         correlationVariable: v.correlationVariable ?? '',
       });

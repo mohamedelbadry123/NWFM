@@ -16,6 +16,8 @@ public sealed class WorkflowExecutionToken : Entity, ITenantAware
     public ExecutionTokenStatus Status { get; private set; }
     public string? JoinNodeKey { get; private set; }
     public Guid? ParentTokenId { get; private set; }
+    public Guid? ForkActivityInstanceId { get; private set; }
+    public bool JoinConsumed { get; private set; }
     public DateTime? CompletedAt { get; private set; }
     public DateTime? CancelledAt { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
@@ -29,7 +31,8 @@ public sealed class WorkflowExecutionToken : Entity, ITenantAware
         string branchKey,
         DateTime createdAt,
         string? joinNodeKey = null,
-        Guid? parentTokenId = null)
+        Guid? parentTokenId = null,
+        Guid? forkActivityInstanceId = null)
     {
         return new WorkflowExecutionToken
         {
@@ -41,9 +44,12 @@ public sealed class WorkflowExecutionToken : Entity, ITenantAware
             Status                  = ExecutionTokenStatus.Active,
             JoinNodeKey             = joinNodeKey,
             ParentTokenId           = parentTokenId,
+            ForkActivityInstanceId  = forkActivityInstanceId,
             CreatedAt               = createdAt,
         };
     }
+
+    public void ConsumeJoin() => JoinConsumed = true;
 
     public void Complete(DateTime completedAt)
     {

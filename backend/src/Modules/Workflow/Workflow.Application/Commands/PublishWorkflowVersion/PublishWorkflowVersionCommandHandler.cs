@@ -9,6 +9,8 @@ using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
 using Workflow.Application.Helpers;
 using Workflow.Domain.Repositories;
+using NWFM.Shared.Integration.Workflow;
+using Workflow.Application.Integrations;
 
 public sealed class PublishWorkflowVersionCommandHandler
     : IRequestHandler<PublishWorkflowVersionCommand, Result<WorkflowVersionDto>>
@@ -17,17 +19,22 @@ public sealed class PublishWorkflowVersionCommandHandler
     private readonly IWorkflowDefinitionRepository _definitionRepo;
     private readonly IWorkflowVersionRepository _versionRepo;
     private readonly IWorkflowXmlCompiler _compiler;
+    private readonly IWorkflowActionRegistry? _actionRegistry;
+    private readonly IWorkflowIntegrations? _integrations;
 
     public PublishWorkflowVersionCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitionRepo,
         IWorkflowVersionRepository versionRepo,
-        IWorkflowXmlCompiler compiler)
+        IWorkflowXmlCompiler compiler,
+        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null)
     {
         _gate = gate;
         _definitionRepo = definitionRepo;
         _versionRepo = versionRepo;
         _compiler = compiler;
+        _actionRegistry = actionRegistry;
+        _integrations = integrations;
     }
 
     public async Task<Result<WorkflowVersionDto>> Handle(
@@ -65,7 +72,8 @@ public sealed class PublishWorkflowVersionCommandHandler
         }
         else
         {
-            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings);
+            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings, _actionRegistry);
+            if (_integrations is not null) errors.AddRange(await _integrations.ValidateConnectionsAsync(compileResult.Value!, cancellationToken));
         }
 
         var isValid = errors.Count == 0;

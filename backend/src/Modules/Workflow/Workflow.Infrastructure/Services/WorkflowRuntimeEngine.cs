@@ -10,6 +10,7 @@ using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 using Workflow.Infrastructure.Persistence;
+using Workflow.Application.Integrations;
 
 /// <summary>
 /// Generic workflow engine. Handles Start, UserTask, ExclusiveGateway, ServiceTask,
@@ -17,7 +18,7 @@ using Workflow.Infrastructure.Persistence;
 /// CallActivity, ScriptTask, WaitEvent, and End.
 /// Never executes Draft versions.
 /// </summary>
-internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
+internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 {
     private readonly WorkflowDbContext _db;
     private readonly IWorkflowBindingRepository _bindingRepo;
@@ -45,6 +46,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
     private readonly IWorkflowExecutionTokenRepository _tokenRepo;
     private readonly IWorkflowOutcomeDispatcher _outcomeDispatcher;
     private readonly IWorkflowRequestProjector _requestProjector;
+    private readonly IWorkflowIntegrationRuntime? _integrations;
 
     public WorkflowRuntimeEngine(
         WorkflowDbContext db,
@@ -72,7 +74,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         IWorkflowNotificationPublisher notificationPublisher,
         IWorkflowExecutionTokenRepository tokenRepo,
         IWorkflowOutcomeDispatcher outcomeDispatcher,
-        IWorkflowRequestProjector requestProjector)
+        IWorkflowRequestProjector requestProjector,
+        IWorkflowIntegrationRuntime? integrations = null)
     {
         _db                     = db;
         _bindingRepo            = bindingRepo;
@@ -100,9 +103,17 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         _tokenRepo              = tokenRepo;
         _outcomeDispatcher      = outcomeDispatcher;
         _requestProjector       = requestProjector;
+        _integrations           = integrations;
     }
 
-    public async Task<Result<WorkflowInstance>> StartAsync(
+    public Task<Result<WorkflowInstance>> StartAsync(Guid organizationId, Guid workflowBindingId, string businessEntityId,
+        string idempotencyKey, DateTime now, string? correlationId = null, Guid? startedByUserId = null,
+        Guid? parentInstanceId = null, string? parentActivityNodeKey = null, Guid? pinnedWorkflowVersionId = null,
+        CancellationToken cancellationToken = default)
+        => StartCoreAsync(organizationId, workflowBindingId, businessEntityId, idempotencyKey, now, correlationId,
+            startedByUserId, parentInstanceId, parentActivityNodeKey, pinnedWorkflowVersionId, cancellationToken);
+
+    private async Task<Result<WorkflowInstance>> StartCoreAsync(
         Guid organizationId,
         Guid workflowBindingId,
         string businessEntityId,
@@ -113,8 +124,12 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         Guid? parentInstanceId = null,
         string? parentActivityNodeKey = null,
         Guid? pinnedWorkflowVersionId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, object?>? initialVariables = null,
+        Guid? parentActivityInstanceId = null)
     {
+        var existingInstance = await _instanceRepo.GetByIdempotencyKeyAsync(organizationId, idempotencyKey, cancellationToken);
+        if (existingInstance is not null) return Result.Success(existingInstance);
         var binding = await _bindingRepo.GetByIdAsync(workflowBindingId, cancellationToken);
         if (binding is null)
             return Result.Failure<WorkflowInstance>(WorkflowErrors.Binding.NotFound);
@@ -147,16 +162,26 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             organizationId, workflowBindingId, version.Id, idempotencyKey,
             businessEntityId, startActivity.NodeKey, now, correlationId, startedByUserId,
             parentInstanceId, parentActivityNodeKey);
+        instance.AttachParentActivity(parentActivityInstanceId);
 
         await _instanceRepo.AddAsync(instance, cancellationToken);
+        foreach (var variable in version.Variables.Where(v => v.DefaultValue is not null))
+        {
+            var value = variable.DataType == VariableDataType.String ? JsonSerializer.Serialize(variable.DefaultValue) : variable.DefaultValue!;
+            try { using var parsed = JsonDocument.Parse(value); }
+            catch (JsonException) { value = JsonSerializer.Serialize(variable.DefaultValue); }
+            await UpsertVariableAsync(instance, variable.VariableKey, value, variable.DataType, now, cancellationToken);
+        }
+        if (initialVariables is not null)
+            foreach (var (key, value) in initialVariables)
+                await UpsertVariableAsync(instance, key, JsonSerializer.Serialize(value), VariableDataType.Json, now, cancellationToken);
 
         await UpsertVariableAsync(instance, "BusinessEntityId", JsonSerializer.Serialize(businessEntityId),
             VariableDataType.String, now, cancellationToken);
         await UpsertVariableAsync(instance, "OrganizationId", JsonSerializer.Serialize(organizationId.ToString()),
             VariableDataType.String, now, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(correlationId))
-            await UpsertVariableAsync(instance, "CorrelationId", JsonSerializer.Serialize(correlationId),
-                VariableDataType.String, now, cancellationToken);
+        await UpsertVariableAsync(instance, "CorrelationId", JsonSerializer.Serialize(correlationId ?? instance.Id.ToString("N")),
+            VariableDataType.String, now, cancellationToken);
         if (startedByUserId is Guid starter && starter != Guid.Empty)
         {
             await UpsertVariableAsync(instance, "StartedByUserId", JsonSerializer.Serialize(starter.ToString()),
@@ -195,7 +220,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (instance is null)
             return Result.Failure(WorkflowErrors.Instance.NotFound);
 
-        if (instance.Status != WorkflowInstanceStatus.Running)
+        if (instance.Status != WorkflowInstanceStatus.Running
+            && !(completedWorkItemId == Guid.Empty && instance.Status == WorkflowInstanceStatus.Failed))
             return Result.Failure(WorkflowErrors.Instance.NotRunning);
 
         var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
@@ -250,9 +276,59 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var currentActivity = version.Activities.FirstOrDefault(a => a.NodeKey == currentNodeKey);
         if (currentActivity is null)
             return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-
-        WorkflowExecutionToken? activeToken = null;
+        if (completedWorkItem is not null && currentAI?.Status == ActivityInstanceStatus.Completed)
+            return Result.Success();
         if (completedWorkItem is not null)
+        {
+            try
+            {
+                var taskConfig = Workflow.Application.Helpers.WorkflowTaskForm.Parse(currentActivity.ConfigurationJson);
+                var fields = JsonSerializer.Deserialize<Dictionary<string, object?>>(completedWorkItem.FormDataJson ?? "{}") ?? [];
+                fields["outcome"] = completedWorkItem.ActionTaken;
+                fields["comment"] = completedWorkItem.CommentText;
+                var mapped = IntegrationValueMapper.Map(JsonSerializer.Serialize(new { output = fields }), Workflow.Application.Helpers.WorkflowTaskForm.Mappings(taskConfig.OutputMappingJson));
+                foreach (var (key, value) in mapped) await UpsertVariableAsync(instance, key, JsonSerializer.Serialize(value), VariableDataType.Json, now, cancellationToken);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+            { currentAI?.Fail(ex.Message, now); instance.Fail(ex.Message, now); await _db.SaveChangesAsync(cancellationToken); return Result.Failure(new Error("Workflow.Form.Mapping", ex.Message)); }
+        }
+
+        // An explicit retry re-enters the failed activity. It must never complete the
+        // activity or traverse its outgoing edge before the external action succeeds.
+        if (completedWorkItemId == Guid.Empty)
+        {
+            var failedActivity = activityInstances
+                .Where(a => a.ActivityNodeKey == currentNodeKey)
+                .OrderByDescending(a => a.StartedAt)
+                .FirstOrDefault();
+            if (failedActivity?.Status != ActivityInstanceStatus.Failed
+                || currentActivity.ActivityType is not (ActivityType.ServiceTask or ActivityType.UserTask))
+                return Result.Failure(new Error("Workflow.Activity.NotRetryable",
+                    "Only a failed service activity can be retried through this operation."));
+            if (currentActivity.ActionKey == "http.request")
+                return Result.Failure(new Error("Workflow.Activity.UseOperationReplay", "Retry this API call from Integrations so its original operation identifier is preserved."));
+
+            instance.Resume(now);
+            if (currentActivity.ActivityType == ActivityType.UserTask)
+            {
+                failedActivity.Reopen();
+                var priorWorkItem = await _db.WorkItems.FirstOrDefaultAsync(w => w.ActivityInstanceId == failedActivity.Id && w.Status == WorkItemStatus.Completed, cancellationToken);
+                if (priorWorkItem is not null) return await AdvanceAsync(instance.Id, priorWorkItem.Id, now, cancellationToken);
+            }
+            var retryResult = await AdvanceFromNodeAsync(
+                instance, version, currentNodeKey, now, cancellationToken,
+                failedActivity.ExecutionTokenId is Guid failedTokenId ? await _tokenRepo.GetByIdAsync(failedTokenId, cancellationToken) : null, currentActivity.ActivityType == ActivityType.UserTask ? failedActivity : null);
+            if (retryResult.IsFailure)
+                instance.Fail(retryResult.Error.Message, now);
+            await _db.SaveChangesAsync(cancellationToken);
+            var retryBinding = await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken);
+            await ProjectRequestAsync(instance, retryBinding, now, cancellationToken);
+            return retryResult;
+        }
+
+        WorkflowExecutionToken? activeToken = currentAI?.ExecutionTokenId is Guid tokenId
+            ? await _tokenRepo.GetByIdAsync(tokenId, cancellationToken) : null;
+        if (completedWorkItem is not null && activeToken is null)
         {
             var incomingBranchKeys = version.Transitions
                 .Where(t => t.ToActivityDefinitionId == currentActivity.Id)
@@ -263,6 +339,14 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                     && incomingBranchKeys.Contains(t.BranchKey));
         }
 
+        if (currentAI is not null)
+        {
+            foreach (var trigger in new[] { ActionExecutionTrigger.OnOutcome, ActionExecutionTrigger.OnComplete })
+            {
+                var hooks = await ExecuteHooksAsync(instance, currentActivity, currentAI, trigger, completedWorkItem?.ActionTaken, now, cancellationToken);
+                if (hooks.IsFailure) { await _db.SaveChangesAsync(cancellationToken); return hooks; }
+            }
+        }
         currentAI?.Complete(now);
 
         await _events.AppendAsync(
@@ -318,6 +402,10 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (timer.Status != WorkflowTimerStatus.Pending)
             return Result.Failure(WorkflowErrors.Timer.NotPending);
 
+        if (timer.TimerType == WorkflowTimerType.ExternalSignal)
+            return Result.Failure(new Error("Workflow.Timer.ExternalSignalRequired",
+                "An external-signal timer cannot be resumed by the clock."));
+
         if (timer.DueAt > now)
             return Result.Failure(WorkflowErrors.Timer.NotPending);
 
@@ -362,7 +450,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
         instance.AdvanceTo(nextKey, now);
 
-        var result = await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken);
+        var timerToken = timerAi?.ExecutionTokenId is Guid tokenId ? await _tokenRepo.GetByIdAsync(tokenId, cancellationToken) : null;
+        var result = await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken, timerToken);
         if (result.IsFailure)
             instance.Fail(result.Error.Message, now);
 
@@ -392,51 +481,22 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (version is null)
             return Result.Failure(WorkflowErrors.Version.NotFound);
 
-        var waitNodeKey = instance.CurrentActivityNodeKey;
-        var waitActivity = version.Activities.FirstOrDefault(a =>
-            a.NodeKey == waitNodeKey && a.ActivityType == ActivityType.WaitEvent);
-
-        if (waitActivity is null)
-            return Result.Failure(WorkflowErrors.Instance.UnhandledActivityType);
-
-        if (!string.IsNullOrWhiteSpace(signalKey)
-            && !string.IsNullOrWhiteSpace(waitActivity.ConfigurationJson))
-        {
-            var expected = TryReadSignalKey(waitActivity.ConfigurationJson);
-            if (expected is not null
-                && !string.Equals(expected, signalKey, StringComparison.OrdinalIgnoreCase))
-            {
-                return Result.Failure(WorkflowErrors.Timer.SignalKeyRequired);
-            }
-        }
-
-        var activityInstances = await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
-        var waitAi = activityInstances.LastOrDefault(a =>
-            a.ActivityNodeKey == waitNodeKey
-            && a.ActivityType == ActivityType.WaitEvent
-            && a.Status == ActivityInstanceStatus.Active);
-        waitAi?.Complete(now);
-
-        await _events.AppendAsync(
-            instance.OrganizationId, instance.Id, WorkflowEventType.ActivityCompleted, now,
-            waitNodeKey, cancellationToken: cancellationToken);
-
-        var nextKey = GetSingleOutgoing(version, waitNodeKey);
-        if (nextKey is null)
-            return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-
-        instance.AdvanceTo(nextKey, now);
-
-        var result = await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken);
-        if (result.IsFailure)
-            instance.Fail(result.Error.Message, now);
-
-        await _db.SaveChangesAsync(cancellationToken);
-        var binding = await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken);
-        await ProjectRequestAsync(instance, binding, now, cancellationToken);
-        return result;
+        var active = (await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
+            .Where(a => a.ActivityType == ActivityType.WaitEvent && a.Status == ActivityInstanceStatus.Active).ToList();
+        if (active.Count == 0) return Result.Failure(new Error("Workflow.Event.NoActiveWait", "No active internal event wait exists."));
+        if (string.IsNullOrWhiteSpace(signalKey)) return Result.Failure(new Error("Workflow.Event.KeyMismatch", "A non-empty matching signal key is required."));
+        var matches = active.Where(ai => version.Activities.Any(a => a.NodeKey == ai.ActivityNodeKey
+            && string.Equals(TryReadSignalKey(a.ConfigurationJson ?? "{}"), signalKey, StringComparison.OrdinalIgnoreCase)
+            && !HasWebhookConnection(a.ConfigurationJson))).ToList();
+        if (matches.Count != 1) return Result.Failure(new Error("Workflow.Event.KeyMismatch", "The signal must identify exactly one active internal event wait."));
+        return await CompleteExternalActivityAsync(matches[0].Id, new Dictionary<string, object?>(), "received", null, now, cancellationToken);
     }
 
+    private static bool HasWebhookConnection(string? json)
+    {
+        try { return IntegrationJson.Read<EventActivityConfiguration>(json).ConnectionId != Guid.Empty; }
+        catch (JsonException) { return false; }
+    }
     public async Task<Result> ResumeFromCallActivityAsync(
         Guid parentInstanceId,
         string callActivityNodeKey,
@@ -464,35 +524,32 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             a.ActivityNodeKey == callActivityNodeKey
             && a.ActivityType == ActivityType.CallActivity
             && a.Status == ActivityInstanceStatus.Active);
-        callAi?.Complete(now);
-
-        await _events.AppendAsync(
-            instance.OrganizationId, instance.Id, WorkflowEventType.ActivityCompleted, now,
-            callActivityNodeKey, cancellationToken: cancellationToken);
-
-        var nextKey = GetSingleOutgoing(version, callActivityNodeKey);
-        if (nextKey is null)
-            return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-
-        instance.AdvanceTo(nextKey, now);
-
-        var result = await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken);
-        if (result.IsFailure)
-            instance.Fail(result.Error.Message, now);
-
-        await _db.SaveChangesAsync(cancellationToken);
-        var binding = await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken);
-        await ProjectRequestAsync(instance, binding, now, cancellationToken);
-        return result;
+        if (callAi is null) return Result.Success(); // already resumed, including synchronous children
+        var child = await _db.WorkflowInstances.Where(c => c.ParentInstanceId == instance.Id
+            && c.ParentActivityNodeKey == callActivityNodeKey
+            && (c.ParentActivityInstanceId == callAi.Id || c.ParentActivityInstanceId == null))
+            .OrderByDescending(c => c.StartedAt).FirstOrDefaultAsync(cancellationToken);
+        if (child is null || child.Status is WorkflowInstanceStatus.Running or WorkflowInstanceStatus.Suspended or WorkflowInstanceStatus.Pending)
+            return Result.Success();
+        var config = ParseCallActivityConfig(callActivity.ConfigurationJson);
+        var outputs = new Dictionary<string, object?>();
+        if (child.Status == WorkflowInstanceStatus.Completed)
+        {
+            var childValues = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(child.Id, cancellationToken));
+            try { outputs = IntegrationValueMapper.Map(JsonSerializer.Serialize(childValues), config.OutputMappings); }
+            catch (InvalidOperationException ex) { return await CompleteExternalActivityAsync(callAi.Id, outputs, "error", ex.Message, now, cancellationToken); }
+        }
+        return await CompleteExternalActivityAsync(callAi.Id, outputs,
+            child.Status == WorkflowInstanceStatus.Completed ? "success" : "error",
+            child.Status == WorkflowInstanceStatus.Completed ? null : "The child workflow failed or was cancelled.", now, cancellationToken);
     }
-
     private async Task<Result> AdvanceFromNodeAsync(
         WorkflowInstance instance,
         WorkflowVersion version,
         string fromNodeKey,
         DateTime now,
         CancellationToken cancellationToken,
-        WorkflowExecutionToken? activeToken = null)
+        WorkflowExecutionToken? activeToken = null, ActivityInstance? retryExecution = null)
     {
         var visited = new HashSet<string>();
         var currentNodeKey = fromNodeKey;
@@ -523,16 +580,31 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
                 case ActivityType.UserTask:
                 {
-                    var activityInst = await CreateActivityInstanceAsync(
+                    var activityInst = retryExecution ?? await CreateActivityInstanceAsync(
                         instance, currentActivity, now, cancellationToken);
+                    activityInst.AttachToken(currentToken?.Id);
 
-                    var rule = currentActivity.AssignmentRules.FirstOrDefault(r => r.IsActive);
+                    var hooks = await ExecuteHooksAsync(instance, currentActivity, activityInst, ActionExecutionTrigger.OnEnter, null, now, cancellationToken);
+                    if (hooks.IsFailure) return hooks;
+
+                    var assignmentValues = (await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
+                        .ToDictionary(v => v.VariableName, v => v.ValueJson, StringComparer.OrdinalIgnoreCase);
+                    var rules = currentActivity.AssignmentRules.Where(r => r.IsActive)
+                        .OrderBy(r => r.IsFallback).ThenBy(r => r.Priority).ToList();
+                    var rule = rules.FirstOrDefault(r => string.IsNullOrWhiteSpace(r.Expression)
+                        || Workflow.Application.Helpers.WorkflowCondition.Evaluate(r.Expression, assignmentValues));
                     Guid? groupId = rule?.ReferenceId;
                     var assignmentKey = rule?.AssignmentKey;
 
                     var groupResult = await _assignmentResolver.ResolveGroupAsync(
                         instance.OrganizationId, instance.WorkflowBindingId,
                         assignmentKey, groupId, cancellationToken);
+                    if (groupResult.IsFailure)
+                    {
+                        var fallback = IntegrationJson.Read<Workflow.Application.Helpers.WorkflowTaskConfiguration>(currentActivity.ConfigurationJson).FallbackAssignmentKey;
+                        if (!string.IsNullOrWhiteSpace(fallback)) groupResult = await _assignmentResolver.ResolveGroupAsync(
+                            instance.OrganizationId, instance.WorkflowBindingId, fallback, null, cancellationToken);
+                    }
                     if (groupResult.IsFailure) return Result.Failure(groupResult.Error);
 
                     var dueAt = await ResolveUserTaskDueAtAsync(
@@ -613,7 +685,19 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
                 case ActivityType.WaitEvent:
                 {
-                    await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+                    var waitInstance = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+                    waitInstance.AttachToken(currentToken?.Id);
+                    EventActivityConfiguration eventConfig;
+                    try { eventConfig = IntegrationJson.Read<EventActivityConfiguration>(currentActivity.ConfigurationJson); }
+                    catch (JsonException) { eventConfig = new(); }
+                    if (eventConfig.ConnectionId != Guid.Empty)
+                    {
+                        if (_integrations is null) return Result.Failure(new Error("Workflow.Integration.Unavailable", "Integration runtime is unavailable."));
+                        var variables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
+                        var registration = await _integrations.RegisterWaitAsync(instance.Id, waitInstance.Id,
+                            currentActivity.ConfigurationJson!, variables, cancellationToken);
+                        if (registration.IsFailure) return registration;
+                    }
 
                     await _events.AppendAsync(
                         instance.OrganizationId, instance.Id,
@@ -627,6 +711,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
                 case ActivityType.ServiceTask:
                 {
+                    if (currentActivity.ActionKey == "http.request")
+                        return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Http", now, cancellationToken);
                     var serviceResult = await ExecuteServiceTaskAsync(
                         instance, currentActivity, now, cancellationToken);
                     if (serviceResult.IsFailure)
@@ -643,6 +729,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 {
                     var activityInst = await CreateActivityInstanceAsync(
                         instance, currentActivity, now, cancellationToken);
+                    activityInst.AttachToken(currentToken?.Id);
 
                     var timerConfig = ParseTimerConfig(currentActivity.ConfigurationJson);
                     var dueAt = ResolveTimerDueAt(timerConfig, now);
@@ -677,6 +764,18 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
                 case ActivityType.NotificationTask:
                 {
+                    var emailConfig = IntegrationJson.Read<EmailActivityConfiguration>(currentActivity.ConfigurationJson);
+                    if (emailConfig.Channels.Contains("Email", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (emailConfig.Channels.Contains("InApp", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var inAppVariables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
+                            await _notificationPublisher.PublishAsync(new WorkflowNotificationRequest(instance.OrganizationId,
+                                emailConfig.TemplateKey, WorkflowNotificationChannel.InApp, inAppVariables,
+                                instance.CorrelationId ?? instance.Id.ToString(), emailConfig.RecipientUserIds), cancellationToken);
+                        }
+                        return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Email", now, cancellationToken);
+                    }
                     var notifResult = await ExecuteNotificationTaskAsync(
                         instance, currentActivity, now, cancellationToken);
                     if (notifResult.IsFailure)
@@ -692,21 +791,21 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 case ActivityType.ParallelGateway:
                 {
                     var forkResult = await ExecuteParallelGatewayAsync(
-                        instance, version, currentActivity, now, cancellationToken);
+                        instance, version, currentActivity, now, cancellationToken, currentToken);
                     return forkResult;
                 }
 
                 case ActivityType.InclusiveGateway:
                 {
                     var inclusiveResult = await ExecuteInclusiveGatewayAsync(
-                        instance, version, currentActivity, now, cancellationToken);
+                        instance, version, currentActivity, now, cancellationToken, currentToken);
                     return inclusiveResult;
                 }
 
                 case ActivityType.CallActivity:
                 {
                     var callResult = await ExecuteCallActivityAsync(
-                        instance, version, currentActivity, now, cancellationToken);
+                        instance, version, currentActivity, now, cancellationToken, currentToken);
                     return callResult;
                 }
 
@@ -721,7 +820,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                     if (joinResult.Result.IsFailure)
                         return joinResult.Result;
 
-                    currentToken = null;
+                    currentToken = currentToken?.ParentTokenId is Guid parentTokenId ? await _tokenRepo.GetByIdAsync(parentTokenId, cancellationToken) : null;
                     currentNodeKey = joinResult.NextNodeKey!;
                     instance.AdvanceTo(currentNodeKey, now);
                     break;
@@ -730,7 +829,15 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 case ActivityType.End:
                 {
                     var endActivity = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+                    endActivity.AttachToken(currentToken?.Id);
                     endActivity.Complete(now);
+                    if (currentToken is not null)
+                    {
+                        currentToken.Complete(now);
+                        await _db.SaveChangesAsync(cancellationToken);
+                        if ((await _tokenRepo.GetByInstanceIdAsync(instance.Id, cancellationToken)).Any(t => t.Status == ExecutionTokenStatus.Active))
+                            return Result.Success();
+                    }
                     instance.Complete(now);
 
                     await _events.AppendAsync(
@@ -738,14 +845,10 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                         WorkflowEventType.InstanceCompleted, now, currentNodeKey,
                         cancellationToken: cancellationToken);
 
-                    await DispatchOutcomeAsync(instance, now, cancellationToken);
+                    if (instance.ParentInstanceId is null) await DispatchOutcomeAsync(instance, now, cancellationToken);
 
-                    if (instance.ParentInstanceId is Guid parentId
-                        && !string.IsNullOrWhiteSpace(instance.ParentActivityNodeKey))
-                    {
-                        await ResumeFromCallActivityAsync(
-                            parentId, instance.ParentActivityNodeKey, now, cancellationToken);
-                    }
+                    // The durable child worker resumes asynchronous parents under
+                    // their own lock. Avoid acquiring parent locks from child transactions.
 
                     return Result.Success();
                 }
@@ -770,9 +873,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (provider is null)
             return Result.Failure(WorkflowErrors.Action.NotFound);
 
-        var priorAttempts = (await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
-            .Count(a => a.ActivityNodeKey == activity.NodeKey);
-        var attempt = priorAttempts + 1;
+        var completedExecutions = (await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
+            .Count(a => a.ActivityNodeKey == activity.NodeKey && a.Status == ActivityInstanceStatus.Completed);
 
         var activityInst = await CreateActivityInstanceAsync(instance, activity, now, cancellationToken);
 
@@ -784,13 +886,16 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var variables = await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var inputVars = BuildInputVariables(variables);
 
-        var idempotencyKey = $"{instance.Id}:{activity.NodeKey}:{attempt}";
+        // Retries share an operation key; a later successful traversal gets a new key.
+        var idempotencyKey = $"{instance.Id}:{activity.NodeKey}:{completedExecutions + 1}";
         var context = new WorkflowActionExecutionContext(
             instance.OrganizationId,
             instance.Id,
             actionKey,
             inputVars,
-            idempotencyKey);
+            idempotencyKey,
+            activity.ConfigurationJson,
+            activityInst.Id);
 
         WorkflowActionExecutionResult execResult;
         try
@@ -831,13 +936,9 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 WorkflowEventType.IncidentOpened, now, activity.NodeKey,
                 cancellationToken: cancellationToken);
 
-            if (execResult.IsRetryable)
-            {
-                // Leave Failed activity + open incident; halt without failing instance
-                instance.AdvanceTo(activity.NodeKey, now);
-                return Result.Success();
-            }
-
+            // Until durable automatic retries are introduced, all failures stop at
+            // the failed node and use the existing explicit retry operation.
+            instance.AdvanceTo(activity.NodeKey, now);
             instance.Fail(execResult.ErrorMessage ?? WorkflowErrors.Action.ExecutionFailed.Message, now);
             return Result.Failure(WorkflowErrors.Action.ExecutionFailed);
         }
@@ -952,7 +1053,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         WorkflowVersion version,
         ActivityDefinition currentActivity,
         DateTime now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, WorkflowExecutionToken? parentToken = null)
     {
         var activityInst = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
         activityInst.Complete(now);
@@ -985,24 +1086,10 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             if (nextActivity is null)
                 return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
 
-            var existing = await _tokenRepo.GetByBranchAsync(
-                instance.Id, transition.TransitionKey, cancellationToken);
-            WorkflowExecutionToken token;
-            if (existing is not null)
-            {
-                token = existing;
-            }
-            else
-            {
-                token = WorkflowExecutionToken.Create(
-                    instance.OrganizationId,
-                    instance.Id,
-                    currentActivity.NodeKey,
-                    transition.TransitionKey,
-                    now,
-                    joinNodeKey);
-                await _tokenRepo.AddAsync(token, cancellationToken);
-            }
+            var token = WorkflowExecutionToken.Create(instance.OrganizationId, instance.Id,
+                currentActivity.NodeKey, $"{activityInst.Id:N}:{branches.Count}", now,
+                joinNodeKey, parentToken?.Id, activityInst.Id);
+            await _tokenRepo.AddAsync(token, cancellationToken);
 
             await _events.AppendAsync(
                 instance.OrganizationId, instance.Id,
@@ -1037,7 +1124,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         WorkflowVersion version,
         ActivityDefinition currentActivity,
         DateTime now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, WorkflowExecutionToken? parentToken = null)
     {
         var activityInst = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
         activityInst.Complete(now);
@@ -1075,24 +1162,10 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             if (nextActivity is null)
                 return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
 
-            var existing = await _tokenRepo.GetByBranchAsync(
-                instance.Id, transition.TransitionKey, cancellationToken);
-            WorkflowExecutionToken token;
-            if (existing is not null)
-            {
-                token = existing;
-            }
-            else
-            {
-                token = WorkflowExecutionToken.Create(
-                    instance.OrganizationId,
-                    instance.Id,
-                    currentActivity.NodeKey,
-                    transition.TransitionKey,
-                    now,
-                    joinNodeKey);
-                await _tokenRepo.AddAsync(token, cancellationToken);
-            }
+            var token = WorkflowExecutionToken.Create(instance.OrganizationId, instance.Id,
+                currentActivity.NodeKey, $"{activityInst.Id:N}:{branches.Count}", now,
+                joinNodeKey, parentToken?.Id, activityInst.Id);
+            await _tokenRepo.AddAsync(token, cancellationToken);
 
             await RecordTransitionTakenAsync(
                 instance, currentActivity.NodeKey, nextActivity.NodeKey, transition, now, cancellationToken);
@@ -1130,7 +1203,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         WorkflowVersion version,
         ActivityDefinition currentActivity,
         DateTime now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        WorkflowExecutionToken? activeToken = null)
     {
         var config = ParseCallActivityConfig(currentActivity.ConfigurationJson);
         if (string.IsNullOrWhiteSpace(config.DefinitionKey))
@@ -1141,12 +1215,28 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (definition is null || !definition.IsActive)
             return Result.Failure(WorkflowErrors.Definition.NotFound);
 
-        var childVersion = await _versionRepo.GetLatestPublishedWithProjectionAsync(
-            definition.Id, cancellationToken);
-        if (childVersion is null)
+        var childVersion = config.VersionId.HasValue
+            ? await _versionRepo.GetByIdWithProjectionAsync(config.VersionId.Value, cancellationToken)
+            : await _versionRepo.GetLatestPublishedWithProjectionAsync(definition.Id, cancellationToken);
+        if (childVersion is null || childVersion.WorkflowDefinitionId != definition.Id || childVersion.Status != WorkflowVersionStatus.Published)
             return Result.Failure(WorkflowErrors.Instance.CallActivityNoPublishedVersion);
 
-        await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+        var ancestor = instance;
+        for (var depth = 0; ; depth++)
+        {
+            if (depth >= 15 || ancestor.PinnedWorkflowVersionId == childVersion.Id)
+                return Result.Failure(new Error("Workflow.Call.Recursion", "Child workflows cannot recursively call an ancestor or exceed 16 levels."));
+            if (ancestor.ParentInstanceId is not Guid ancestorId) break;
+            var parent = await _instanceRepo.GetByIdAsync(ancestorId, cancellationToken);
+            if (parent is null) break;
+            ancestor = parent;
+        }
+        Dictionary<string, object?> childInputs;
+        try { childInputs = IntegrationValueMapper.Map(JsonSerializer.Serialize(BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))), config.InputMappings); }
+        catch (InvalidOperationException ex) { return Result.Failure(new Error("Workflow.Call.InputMapping", ex.Message)); }
+
+        var createdCall = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+        createdCall.AttachToken(activeToken?.Id);
 
         await _events.AppendAsync(
             instance.OrganizationId, instance.Id,
@@ -1155,9 +1245,9 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             cancellationToken: cancellationToken);
 
         var childIdempotency =
-            $"call:{instance.Id}:{currentActivity.NodeKey}:{childVersion.Id}:{Guid.NewGuid():N}";
+            $"call:{instance.Id}:{createdCall.Id}";
 
-        var childResult = await StartAsync(
+        var childResult = await StartCoreAsync(
             instance.OrganizationId,
             instance.WorkflowBindingId,
             instance.BusinessEntityId,
@@ -1166,9 +1256,9 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             correlationId: instance.CorrelationId ?? instance.Id.ToString("N"),
             startedByUserId: instance.StartedByUserId,
             parentInstanceId: instance.Id,
-            parentActivityNodeKey: currentActivity.NodeKey,
+            parentActivityNodeKey: config.WaitForCompletion ? currentActivity.NodeKey : null,
             pinnedWorkflowVersionId: childVersion.Id,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken, initialVariables: childInputs, parentActivityInstanceId: createdCall.Id);
 
         if (childResult.IsFailure)
             return Result.Failure(childResult.Error);
@@ -1181,6 +1271,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
         if (config.WaitForCompletion)
         {
+            if (childResult.Value.Status is WorkflowInstanceStatus.Completed or WorkflowInstanceStatus.Failed or WorkflowInstanceStatus.Cancelled)
+                return await ResumeFromCallActivityAsync(instance.Id, currentActivity.NodeKey, now, cancellationToken);
             // Child may have completed synchronously and already resumed the parent.
             if (callAi is null)
                 return Result.Success();
@@ -1190,38 +1282,28 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         }
 
         // Fire-and-forget child: complete CallActivity and continue parent.
-        callAi?.Complete(now);
+        if (callAi is null) return Result.Success(); // already resumed, including synchronous children
+        callAi.Complete(now);
 
         var nextKey = GetSingleOutgoing(version, currentActivity.NodeKey);
         if (nextKey is null)
             return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
 
         instance.AdvanceTo(nextKey, now);
-        return await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken);
+        return await AdvanceFromNodeAsync(instance, version, nextKey, now, cancellationToken, activeToken);
     }
 
     private static CallActivityConfig ParseCallActivityConfig(string? configurationJson)
+        => IntegrationJson.Read<CallActivityConfig>(configurationJson);
+
+    private sealed class CallActivityConfig
     {
-        if (string.IsNullOrWhiteSpace(configurationJson))
-            return new CallActivityConfig(null, true);
-
-        try
-        {
-            using var doc = JsonDocument.Parse(configurationJson);
-            var root = doc.RootElement;
-            var key = root.TryGetProperty("definitionKey", out var dk) ? dk.GetString() : null;
-            var wait = !root.TryGetProperty("waitForCompletion", out var w)
-                       || w.ValueKind != JsonValueKind.False;
-            return new CallActivityConfig(key, wait);
-        }
-        catch
-        {
-            return new CallActivityConfig(null, true);
-        }
+        public string? DefinitionKey { get; set; }
+        public Guid? VersionId { get; set; }
+        public bool WaitForCompletion { get; set; } = true;
+        public Dictionary<string, string> InputMappings { get; set; } = [];
+        public Dictionary<string, string> OutputMappings { get; set; } = [];
     }
-
-    private sealed record CallActivityConfig(string? DefinitionKey, bool WaitForCompletion);
-
     private async Task<(Result Result, bool Halt, string? NextNodeKey)> ExecuteJoinGatewayAsync(
         WorkflowInstance instance,
         WorkflowVersion version,
@@ -1232,12 +1314,15 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
     {
         var tokens = await _tokenRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var joinTokens = tokens
-            .Where(t => string.Equals(t.JoinNodeKey, currentActivity.NodeKey, StringComparison.Ordinal))
+            .Where(t => string.Equals(t.JoinNodeKey, currentActivity.NodeKey, StringComparison.Ordinal)
+                && t.ForkActivityInstanceId == activeToken?.ForkActivityInstanceId)
             .ToList();
 
-        var tokenToComplete = activeToken is { Status: ExecutionTokenStatus.Active }
-            ? activeToken
-            : joinTokens.FirstOrDefault(t => t.Status == ExecutionTokenStatus.Active);
+        if (activeToken?.JoinConsumed == true)
+            return (Result.Success(), true, null);
+        var tokenToComplete = activeToken ?? joinTokens.SingleOrDefault(t => t.Status == ExecutionTokenStatus.Active);
+        if (tokenToComplete is not null && tokenToComplete.JoinNodeKey != currentActivity.NodeKey)
+            return (Result.Failure(new Error("Workflow.Join.Mismatch", "A branch reached a different join than its configured fork.")), true, null);
 
         if (tokenToComplete is not null
             && tokenToComplete.Status == ExecutionTokenStatus.Active
@@ -1256,7 +1341,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
         tokens = await _tokenRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         joinTokens = tokens
-            .Where(t => string.Equals(t.JoinNodeKey, currentActivity.NodeKey, StringComparison.Ordinal))
+            .Where(t => string.Equals(t.JoinNodeKey, currentActivity.NodeKey, StringComparison.Ordinal)
+                && t.ForkActivityInstanceId == activeToken?.ForkActivityInstanceId)
             .ToList();
 
         if (joinTokens.Count > 0 && joinTokens.Any(t => t.Status != ExecutionTokenStatus.Completed))
@@ -1265,10 +1351,9 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             return (Result.Success(), Halt: true, NextNodeKey: null);
         }
 
-        var priorEvents = await _eventRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
-        var alreadyJoined = priorEvents.Any(e =>
-            e.EventType == WorkflowEventType.JoinCompleted
-            && string.Equals(e.ActivityNodeKey, currentActivity.NodeKey, StringComparison.Ordinal));
+        var alreadyJoined = joinTokens.Any(t => t.JoinConsumed);
+        if (alreadyJoined) return (Result.Success(), true, null);
+        foreach (var joined in joinTokens) joined.ConsumeJoin();
 
         if (!alreadyJoined)
         {
@@ -1459,15 +1544,16 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             DateTime? dueAt = null;
             if (root.TryGetProperty("dueAt", out var dueProp)
                 && dueProp.ValueKind == JsonValueKind.String
-                && DateTime.TryParse(dueProp.GetString(), out var parsedDue))
+                && DateTimeOffset.TryParse(dueProp.GetString(), System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var parsedDue))
             {
-                dueAt = DateTime.SpecifyKind(parsedDue, DateTimeKind.Utc);
+                dueAt = parsedDue.UtcDateTime;
             }
 
             TimeSpan? duration = null;
             if (root.TryGetProperty("duration", out var durProp)
                 && durProp.ValueKind == JsonValueKind.String
-                && TimeSpan.TryParse(durProp.GetString(), out var parsedDur))
+                && TimeSpan.TryParse(durProp.GetString(), System.Globalization.CultureInfo.InvariantCulture, out var parsedDur))
             {
                 duration = parsedDur;
             }
@@ -1711,7 +1797,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             }
 
             if (policy is null || !policy.IsActive)
-                return null;
+                return root.TryGetProperty("slaDurationHours", out var hours) && hours.TryGetDouble(out var duration) && duration > 0
+                    ? now.AddHours(Math.Min(duration, 87600)) : null;
 
             return await _calendarService.CalculateDueAtAsync(
                 policy.BusinessCalendarId,
@@ -1756,11 +1843,15 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         foreach (var (name, rawValue) in assignments)
         {
             if (!allowedNames.Contains(name))
-                continue; // whitelist — skip unknown variables (no arbitrary create)
+                return Result.Failure(new Error("Workflow.Variable.Unknown", $"Define variable '{name}' before assigning it."));
 
             var valueJson = ResolveScriptValue(rawValue, existingVars);
+            using var valueDocument = JsonDocument.Parse(valueJson);
+            var valueType = version.Variables.FirstOrDefault(v => v.VariableKey == name)?.DataType
+                ?? (valueDocument.RootElement.ValueKind switch { JsonValueKind.Number => VariableDataType.Decimal,
+                    JsonValueKind.True or JsonValueKind.False => VariableDataType.Boolean, JsonValueKind.String => VariableDataType.String, _ => VariableDataType.Json });
             await UpsertVariableAsync(
-                instance, name, valueJson, VariableDataType.String, now, cancellationToken);
+                instance, name, valueJson, valueType, now, cancellationToken);
 
             // refresh local map for subsequent copies
             var refreshed = await _variableRepo.GetByNameAsync(instance.Id, name, cancellationToken);
@@ -1794,6 +1885,20 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         {
             using var doc = JsonDocument.Parse(configurationJson);
             var root = doc.RootElement;
+
+            // The designer writes an object; retain the legacy array representation.
+            var typed = root.TryGetProperty("assignmentFormat", out var format) && format.ValueKind == JsonValueKind.String && format.GetString() == "typed";
+            if (root.TryGetProperty("setVariables", out var variableObject)
+                && variableObject.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in variableObject.EnumerateObject())
+                {
+                    var value = !typed && prop.Value.ValueKind == JsonValueKind.String
+                        ? prop.Value.GetString() ?? string.Empty
+                        : prop.Value.GetRawText();
+                    result.Add((prop.Name, value));
+                }
+            }
 
             if (root.TryGetProperty("setVariables", out var setVars) && setVars.ValueKind == JsonValueKind.Array)
             {
@@ -1838,7 +1943,7 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if ((trimmed.StartsWith('"') && trimmed.EndsWith('"'))
             || (trimmed.StartsWith('\'') && trimmed.EndsWith('\'')))
         {
-            var inner = trimmed[1..^1];
+            var inner = trimmed.StartsWith('"') ? JsonSerializer.Deserialize<string>(trimmed) : trimmed[1..^1];
             return JsonSerializer.Serialize(inner);
         }
 
@@ -1865,6 +1970,11 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         try
         {
             using var doc = JsonDocument.Parse(configurationJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+            // eventKey is the designer contract; signalKey is retained for legacy XML.
+            if (doc.RootElement.TryGetProperty("eventKey", out var eventKey))
+                return eventKey.ValueKind == JsonValueKind.String ? eventKey.GetString() : null;
             if (doc.RootElement.TryGetProperty("signalKey", out var sk)
                 && sk.ValueKind == JsonValueKind.String)
             {

@@ -81,6 +81,21 @@ public sealed class CompleteWorkItemCommandHandler
         if (isRedirect)
             return await RedirectAsync(item, request, cancellationToken);
 
+        var formInstance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
+        if (formInstance is not null && formInstance.Status != WorkflowInstanceStatus.Running)
+            return Result.Failure<WorkItemDto>(WorkflowErrors.Instance.NotRunning);
+        var formActivity = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+        var formVersion = formInstance is null ? null : await _versions.GetByIdWithProjectionAsync(formInstance.PinnedWorkflowVersionId, cancellationToken);
+        var formDefinition = formVersion?.Activities.FirstOrDefault(a => a.NodeKey == formActivity?.ActivityNodeKey);
+        try
+        {
+            var formConfig = WorkflowTaskForm.Parse(formDefinition?.ConfigurationJson);
+            var formError = WorkflowTaskForm.Validate(formConfig, request.FormValues ?? []);
+            if (formError is not null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", formError));
+            item.SetFormData(System.Text.Json.JsonSerializer.Serialize(request.FormValues ?? []));
+        }
+        catch (System.Text.Json.JsonException) { return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The task form configuration is invalid.")); }
+
         var now = DateTime.UtcNow;
         item.Complete(request.UserId, request.ActionTaken, now, request.Comment);
 
