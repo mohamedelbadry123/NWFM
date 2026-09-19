@@ -3,6 +3,7 @@ namespace Workflow.Application.Helpers;
 using Workflow.Application.DTOs;
 using Workflow.Application.Models;
 using Workflow.Domain.Enums;
+using NWFM.Shared.Integration.Workflow;
 
 /// <summary>
 /// Shared graph rules for Validate and Publish so the designer badge and Publish agree.
@@ -12,7 +13,8 @@ public static class WorkflowGraphValidator
     public static void Validate(
         WorkflowXmlDocument doc,
         List<WorkflowValidationIssueDto> errors,
-        List<WorkflowValidationIssueDto> warnings)
+        List<WorkflowValidationIssueDto> warnings,
+        IWorkflowActionRegistry? actionRegistry = null)
     {
         var nodeKeys = new HashSet<string>(doc.Activities.Select(a => a.NodeKey));
 
@@ -90,17 +92,7 @@ public static class WorkflowGraphValidator
         ValidateGateways(doc, errors, warnings, ActivityType.ExclusiveGateway);
         ValidateGateways(doc, errors, warnings, ActivityType.InclusiveGateway);
 
-        var callActivities = doc.Activities.Where(a =>
-            string.Equals(a.ActivityTypeName, ActivityType.CallActivity.ToString(), StringComparison.OrdinalIgnoreCase));
-        foreach (var call in callActivities)
-        {
-            if (string.IsNullOrWhiteSpace(call.ConfigurationJson)
-                || !call.ConfigurationJson.Contains("definitionKey", StringComparison.OrdinalIgnoreCase))
-            {
-                errors.Add(new WorkflowValidationIssueDto("CALL_ACTIVITY_CONFIG",
-                    $"CallActivity '{call.NodeKey}' must include ConfigurationJson with definitionKey.", call.NodeKey));
-            }
-        }
+        WorkflowActivityConfigurationValidator.Validate(doc, errors, warnings, actionRegistry);
 
         foreach (var a in doc.Activities)
         {

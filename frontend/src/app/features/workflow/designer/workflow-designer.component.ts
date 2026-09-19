@@ -17,6 +17,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
+import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { canvasWorldSize, layoutWorkflowGraph, mapCanvasIdsToActivities, nodesAreCollapsed } from './workflow-canvas-layout';
@@ -2458,7 +2459,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       allowSelfClaim:        typeof cfg['allowSelfClaim'] === 'boolean' ? cfg['allowSelfClaim'] as boolean : false,
       configJson:            node.configurationJson || '',
       timerType:             (cfg['timerType'] as TimerTypeOption) || 'Duration',
-      dueAt:                 typeof cfg['dueAt'] === 'string' ? (cfg['dueAt'] as string).slice(0, 16) : '',
+      dueAt:                 typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
       duration:              typeof cfg['duration'] === 'string' ? cfg['duration'] as string : '',
       signalKey:             typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] as string : '',
       templateKey:           typeof cfg['templateKey'] === 'string' ? cfg['templateKey'] as string : '',
@@ -2474,8 +2475,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         : (cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
           ? JSON.stringify(cfg['formSchemaJson'], null, 2)
           : ''),
-      setVariablesJson:      this.formatSetVariables(cfg['setVariables']),
-      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] as string : '',
+      setVariablesJson:      this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
+      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] : typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] : '',
       correlationVariable:   typeof cfg['correlationVariable'] === 'string' ? cfg['correlationVariable'] as string : '',
       definitionKey:         typeof cfg['definitionKey'] === 'string' ? cfg['definitionKey'] as string : '',
       waitForCompletion:     typeof cfg['waitForCompletion'] === 'boolean' ? cfg['waitForCompletion'] as boolean : true,
@@ -2562,15 +2563,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private buildConfigurationJson(type: NodeType, v: typeof this.propsForm.value): string {
+    const existing = this.parseConfig(
+      this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
+    );
     if (type === 'Timer') {
-      const cfg: Record<string, string> = { timerType: (v.timerType as string) || 'Duration' };
-      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = v.dueAt.length === 16 ? `${v.dueAt}:00Z` : v.dueAt;
+      const cfg: Record<string, unknown> = { ...existing, timerType: (v.timerType as string) || 'Duration' };
+      delete cfg['dueAt'];
+      delete cfg['duration'];
+      delete cfg['signalKey'];
+      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = toUtcDateTime(v.dueAt);
       if (v.timerType === 'Duration' && v.duration)  cfg['duration'] = v.duration;
       if (v.timerType === 'ExternalSignal' && v.signalKey) cfg['signalKey'] = v.signalKey;
       return JSON.stringify(cfg);
     }
     if (type === 'NotificationTask') {
-      return JSON.stringify({ templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
+      return JSON.stringify({ ...existing, templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
     }
     if (type === 'UserTask') {
       const existing = this.parseConfig(
@@ -2616,21 +2623,26 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }
     if (type === 'CallActivity') {
       return JSON.stringify({
+        ...existing,
         definitionKey: v.definitionKey ?? '',
         waitForCompletion: v.waitForCompletion ?? true,
       });
     }
     if (type === 'ScriptTask') {
       const raw = (v.setVariablesJson ?? '').trim();
-      if (!raw) return JSON.stringify({ setVariables: {} });
+      // Legacy assignments are replaced when the user edits the canonical field.
+      delete existing['assignments'];
+      if (!raw) return JSON.stringify({ ...existing, setVariables: {} });
       try {
-        return JSON.stringify({ setVariables: JSON.parse(raw) as unknown });
+        return JSON.stringify({ ...existing, setVariables: JSON.parse(raw) as unknown });
       } catch {
-        return JSON.stringify({ setVariables: raw });
+        return JSON.stringify({ ...existing, setVariables: raw });
       }
     }
     if (type === 'WaitEvent') {
+      delete existing['signalKey'];
       return JSON.stringify({
+        ...existing,
         eventKey: v.eventKey ?? '',
         correlationVariable: v.correlationVariable ?? '',
       });

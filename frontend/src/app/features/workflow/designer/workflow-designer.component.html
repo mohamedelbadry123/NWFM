@@ -1390,7 +1390,7 @@
                       <label class="block text-xs font-medium text-dark-300 mb-1">
                         {{ 'workflow.designer.props_due_at' | translate }}
                       </label>
-                      <input formControlName="dueAt" type="datetime-local" [readonly]="isReadonly()"
+                      <input formControlName="dueAt" type="datetime-local" step="any" [readonly]="isReadonly()"
                         class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
                     </div>
                   }

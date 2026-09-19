@@ -9,6 +9,7 @@ using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
 using Workflow.Application.Helpers;
 using Workflow.Domain.Repositories;
+using NWFM.Shared.Integration.Workflow;
 
 public sealed class PublishWorkflowVersionCommandHandler
     : IRequestHandler<PublishWorkflowVersionCommand, Result<WorkflowVersionDto>>
@@ -17,17 +18,20 @@ public sealed class PublishWorkflowVersionCommandHandler
     private readonly IWorkflowDefinitionRepository _definitionRepo;
     private readonly IWorkflowVersionRepository _versionRepo;
     private readonly IWorkflowXmlCompiler _compiler;
+    private readonly IWorkflowActionRegistry? _actionRegistry;
 
     public PublishWorkflowVersionCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitionRepo,
         IWorkflowVersionRepository versionRepo,
-        IWorkflowXmlCompiler compiler)
+        IWorkflowXmlCompiler compiler,
+        IWorkflowActionRegistry? actionRegistry = null)
     {
         _gate = gate;
         _definitionRepo = definitionRepo;
         _versionRepo = versionRepo;
         _compiler = compiler;
+        _actionRegistry = actionRegistry;
     }
 
     public async Task<Result<WorkflowVersionDto>> Handle(
@@ -65,7 +69,7 @@ public sealed class PublishWorkflowVersionCommandHandler
         }
         else
         {
-            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings);
+            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings, _actionRegistry);
         }
 
         var isValid = errors.Count == 0;

@@ -64,6 +64,8 @@ To regenerate the Angular client after an API change, start the backend, then ru
 
 ## Boundaries and extension points
 
+Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_ENHANCEMENT_PLAN.md) and [activity audit](WORKFLOW_ACTIVITY_AUDIT.md), including verified paths and integration features still under development.
+
 - The only feature module is Workflow. The backend host supplies a minimal tenant and participant context.
 - `ICurrentTenant` and `IWorkflowActorContext` are the future authentication integration points. The `UserId` fields retained in Workflow are stable actor identifiers, not references to an Identity database.
 - The frontend sends `X-Workflow-Participant-Id`; this is attribution, not proof of identity. Tenant selection comes from backend configuration. Tenant headers, route values, or body values cannot override it.

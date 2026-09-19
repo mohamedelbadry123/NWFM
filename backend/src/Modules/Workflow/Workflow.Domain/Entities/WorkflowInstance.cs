@@ -115,6 +115,7 @@ public sealed class WorkflowInstance : Entity, ITenantAware
     {
         Status      = WorkflowInstanceStatus.Running;
         SuspendedAt = null;
+        FailureReason = null;
         SetUpdated(updatedAt);
     }
 

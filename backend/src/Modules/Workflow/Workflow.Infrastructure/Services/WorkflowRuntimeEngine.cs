@@ -195,7 +195,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (instance is null)
             return Result.Failure(WorkflowErrors.Instance.NotFound);
 
-        if (instance.Status != WorkflowInstanceStatus.Running)
+        if (instance.Status != WorkflowInstanceStatus.Running
+            && !(completedWorkItemId == Guid.Empty && instance.Status == WorkflowInstanceStatus.Failed))
             return Result.Failure(WorkflowErrors.Instance.NotRunning);
 
         var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
@@ -250,6 +251,30 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var currentActivity = version.Activities.FirstOrDefault(a => a.NodeKey == currentNodeKey);
         if (currentActivity is null)
             return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+
+        // An explicit retry re-enters the failed activity. It must never complete the
+        // activity or traverse its outgoing edge before the external action succeeds.
+        if (completedWorkItemId == Guid.Empty)
+        {
+            var failedActivity = activityInstances
+                .Where(a => a.ActivityNodeKey == currentNodeKey)
+                .OrderByDescending(a => a.StartedAt)
+                .FirstOrDefault();
+            if (failedActivity?.Status != ActivityInstanceStatus.Failed
+                || currentActivity.ActivityType != ActivityType.ServiceTask)
+                return Result.Failure(new Error("Workflow.Activity.NotRetryable",
+                    "Only a failed service activity can be retried through this operation."));
+
+            instance.Resume(now);
+            var retryResult = await AdvanceFromNodeAsync(
+                instance, version, currentNodeKey, now, cancellationToken);
+            if (retryResult.IsFailure)
+                instance.Fail(retryResult.Error.Message, now);
+            await _db.SaveChangesAsync(cancellationToken);
+            var retryBinding = await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken);
+            await ProjectRequestAsync(instance, retryBinding, now, cancellationToken);
+            return retryResult;
+        }
 
         WorkflowExecutionToken? activeToken = null;
         if (completedWorkItem is not null)
@@ -317,6 +342,10 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
         if (timer.Status != WorkflowTimerStatus.Pending)
             return Result.Failure(WorkflowErrors.Timer.NotPending);
+
+        if (timer.TimerType == WorkflowTimerType.ExternalSignal)
+            return Result.Failure(new Error("Workflow.Timer.ExternalSignalRequired",
+                "An external-signal timer cannot be resumed by the clock."));
 
         if (timer.DueAt > now)
             return Result.Failure(WorkflowErrors.Timer.NotPending);
@@ -399,31 +428,30 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (waitActivity is null)
             return Result.Failure(WorkflowErrors.Instance.UnhandledActivityType);
 
-        if (!string.IsNullOrWhiteSpace(signalKey)
-            && !string.IsNullOrWhiteSpace(waitActivity.ConfigurationJson))
-        {
-            var expected = TryReadSignalKey(waitActivity.ConfigurationJson);
-            if (expected is not null
-                && !string.Equals(expected, signalKey, StringComparison.OrdinalIgnoreCase))
-            {
-                return Result.Failure(WorkflowErrors.Timer.SignalKeyRequired);
-            }
-        }
+        var expected = TryReadSignalKey(waitActivity.ConfigurationJson ?? "{}");
+        if (string.IsNullOrWhiteSpace(expected) || string.IsNullOrWhiteSpace(signalKey)
+            || !string.Equals(expected, signalKey, StringComparison.OrdinalIgnoreCase))
+            return Result.Failure(new Error("Workflow.Event.KeyMismatch",
+                "The signal must match the event key configured on the waiting activity."));
 
         var activityInstances = await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var waitAi = activityInstances.LastOrDefault(a =>
             a.ActivityNodeKey == waitNodeKey
             && a.ActivityType == ActivityType.WaitEvent
             && a.Status == ActivityInstanceStatus.Active);
-        waitAi?.Complete(now);
-
-        await _events.AppendAsync(
-            instance.OrganizationId, instance.Id, WorkflowEventType.ActivityCompleted, now,
-            waitNodeKey, cancellationToken: cancellationToken);
+        if (waitAi is null)
+            return Result.Failure(new Error("Workflow.Event.NoActiveWait",
+                "No active event wait exists for this activity."));
 
         var nextKey = GetSingleOutgoing(version, waitNodeKey);
         if (nextKey is null)
             return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+
+        waitAi.Complete(now);
+
+        await _events.AppendAsync(
+            instance.OrganizationId, instance.Id, WorkflowEventType.ActivityCompleted, now,
+            waitNodeKey, cancellationToken: cancellationToken);
 
         instance.AdvanceTo(nextKey, now);
 
@@ -770,9 +798,8 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (provider is null)
             return Result.Failure(WorkflowErrors.Action.NotFound);
 
-        var priorAttempts = (await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
-            .Count(a => a.ActivityNodeKey == activity.NodeKey);
-        var attempt = priorAttempts + 1;
+        var completedExecutions = (await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
+            .Count(a => a.ActivityNodeKey == activity.NodeKey && a.Status == ActivityInstanceStatus.Completed);
 
         var activityInst = await CreateActivityInstanceAsync(instance, activity, now, cancellationToken);
 
@@ -784,13 +811,16 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var variables = await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var inputVars = BuildInputVariables(variables);
 
-        var idempotencyKey = $"{instance.Id}:{activity.NodeKey}:{attempt}";
+        // Retries share an operation key; a later successful traversal gets a new key.
+        var idempotencyKey = $"{instance.Id}:{activity.NodeKey}:{completedExecutions + 1}";
         var context = new WorkflowActionExecutionContext(
             instance.OrganizationId,
             instance.Id,
             actionKey,
             inputVars,
-            idempotencyKey);
+            idempotencyKey,
+            activity.ConfigurationJson,
+            activityInst.Id);
 
         WorkflowActionExecutionResult execResult;
         try
@@ -831,13 +861,9 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 WorkflowEventType.IncidentOpened, now, activity.NodeKey,
                 cancellationToken: cancellationToken);
 
-            if (execResult.IsRetryable)
-            {
-                // Leave Failed activity + open incident; halt without failing instance
-                instance.AdvanceTo(activity.NodeKey, now);
-                return Result.Success();
-            }
-
+            // Until durable automatic retries are introduced, all failures stop at
+            // the failed node and use the existing explicit retry operation.
+            instance.AdvanceTo(activity.NodeKey, now);
             instance.Fail(execResult.ErrorMessage ?? WorkflowErrors.Action.ExecutionFailed.Message, now);
             return Result.Failure(WorkflowErrors.Action.ExecutionFailed);
         }
@@ -1459,15 +1485,16 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             DateTime? dueAt = null;
             if (root.TryGetProperty("dueAt", out var dueProp)
                 && dueProp.ValueKind == JsonValueKind.String
-                && DateTime.TryParse(dueProp.GetString(), out var parsedDue))
+                && DateTimeOffset.TryParse(dueProp.GetString(), System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var parsedDue))
             {
-                dueAt = DateTime.SpecifyKind(parsedDue, DateTimeKind.Utc);
+                dueAt = parsedDue.UtcDateTime;
             }
 
             TimeSpan? duration = null;
             if (root.TryGetProperty("duration", out var durProp)
                 && durProp.ValueKind == JsonValueKind.String
-                && TimeSpan.TryParse(durProp.GetString(), out var parsedDur))
+                && TimeSpan.TryParse(durProp.GetString(), System.Globalization.CultureInfo.InvariantCulture, out var parsedDur))
             {
                 duration = parsedDur;
             }
@@ -1795,6 +1822,19 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             using var doc = JsonDocument.Parse(configurationJson);
             var root = doc.RootElement;
 
+            // The designer writes an object; retain the legacy array representation.
+            if (root.TryGetProperty("setVariables", out var variableObject)
+                && variableObject.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in variableObject.EnumerateObject())
+                {
+                    var value = prop.Value.ValueKind == JsonValueKind.String
+                        ? prop.Value.GetString() ?? string.Empty
+                        : prop.Value.GetRawText();
+                    result.Add((prop.Name, value));
+                }
+            }
+
             if (root.TryGetProperty("setVariables", out var setVars) && setVars.ValueKind == JsonValueKind.Array)
             {
                 foreach (var item in setVars.EnumerateArray())
@@ -1865,6 +1905,11 @@ internal sealed class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         try
         {
             using var doc = JsonDocument.Parse(configurationJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+            // eventKey is the designer contract; signalKey is retained for legacy XML.
+            if (doc.RootElement.TryGetProperty("eventKey", out var eventKey))
+                return eventKey.ValueKind == JsonValueKind.String ? eventKey.GetString() : null;
             if (doc.RootElement.TryGetProperty("signalKey", out var sk)
                 && sk.ValueKind == JsonValueKind.String)
             {

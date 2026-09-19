@@ -23,7 +23,7 @@ using global::Workflow.Infrastructure.Services;
 /// Case C: Start → ParallelGateway → {ServiceTask1, ServiceTask2} → JoinGateway → End
 ///         → instance Completed after both branches complete
 /// </summary>
-public sealed class WorkflowRuntimeEnginePathTests : IDisposable
+public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
 {
     private readonly Guid _orgId = Guid.NewGuid();
     private readonly WorkflowDbContext _db;
