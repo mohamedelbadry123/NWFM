@@ -7,6 +7,8 @@ using Workflow.Application.Abstractions;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Workflow.Infrastructure.Persistence;
 
 /// <summary>
 /// Implements IWorkflowTriggerService — the cross-module contract used by other modules
@@ -22,6 +24,7 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
     private readonly IWorkflowInboxWriter _inboxWriter;
     private readonly IWorkflowIntegrationInboxRepository _inboxRepo;
     private readonly ILogger<WorkflowTriggerService> _logger;
+    private readonly WorkflowDbContext? _db;
 
     public WorkflowTriggerService(
         IWorkflowBindingResolver bindingResolver,
@@ -29,7 +32,7 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
         IWorkflowRuntimeEngine engine,
         IWorkflowInboxWriter inboxWriter,
         IWorkflowIntegrationInboxRepository inboxRepo,
-        ILogger<WorkflowTriggerService> logger)
+        ILogger<WorkflowTriggerService> logger, WorkflowDbContext? db = null)
     {
         _bindingResolver = bindingResolver;
         _instanceRepo    = instanceRepo;
@@ -37,6 +40,7 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
         _inboxWriter     = inboxWriter;
         _inboxRepo       = inboxRepo;
         _logger          = logger;
+        _db              = db;
     }
 
     public async Task TriggerAsync(
@@ -182,6 +186,14 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
         DateTime now,
         CancellationToken cancellationToken)
     {
+        if (_db is not null)
+        {
+            await WorkflowExecutionLock.RunAsync(_db, "instance:" + existingInstance.Id, async () => { await SignalCore(); return true; }, cancellationToken);
+        }
+        else await SignalCore();
+
+        async Task SignalCore()
+        {
         var inbox = await _inboxWriter.WritePendingAsync(
             organizationId,
             messageId,
@@ -196,7 +208,17 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
             binding.Id,
             cancellationToken);
 
+        Guid? targetActivity = null;
+        if (_db is not null)
+        {
+            var waits = await _db.ActivityInstances.Where(a => a.WorkflowInstanceId == existingInstance.Id
+                && a.ActivityType == ActivityType.WaitEvent && a.Status == ActivityInstanceStatus.Active).ToListAsync(cancellationToken);
+            var definitions = await _db.ActivityDefinitions.Where(a => a.WorkflowVersionId == existingInstance.PinnedWorkflowVersionId).ToListAsync(cancellationToken);
+            targetActivity = waits.FirstOrDefault(a => definitions.Any(d => d.NodeKey == a.ActivityNodeKey && MatchesEvent(d.ConfigurationJson, triggerEvent)))?.Id;
+        }
+        inbox.SetSignalTarget(existingInstance.Id, targetActivity);
         inbox.MarkProcessing(now);
+        await _inboxRepo.SaveChangesAsync(cancellationToken);
 
         try
         {
@@ -227,6 +249,15 @@ internal sealed class WorkflowTriggerService : IWorkflowTriggerService
                 "Exception signaling instance {InstanceId} for {Module}/{Entity}/{Trigger} in org {OrgId}",
                 existingInstance.Id, moduleKey, entityType, triggerEvent, organizationId);
         }
+        }
+    }
+
+    private static bool MatchesEvent(string? json, string key)
+    {
+        try { using var document = JsonDocument.Parse(json ?? "{}"); var root = document.RootElement;
+            return (root.TryGetProperty("eventKey", out var value) || root.TryGetProperty("signalKey", out value))
+                && value.ValueKind == JsonValueKind.String && string.Equals(value.GetString(), key, StringComparison.OrdinalIgnoreCase); }
+        catch (JsonException) { return false; }
     }
 
     /// <summary>

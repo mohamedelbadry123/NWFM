@@ -47,6 +47,8 @@ public sealed class WorkflowInstance : Entity, ITenantAware
 
     /// <summary>NodeKey of the CallActivity on the parent that spawned this child.</summary>
     public string? ParentActivityNodeKey { get; private set; }
+    public Guid? ParentActivityInstanceId { get; private set; }
+    public void AttachParentActivity(Guid? activityInstanceId) => ParentActivityInstanceId = activityInstanceId;
 
     public byte[] RowVersion { get; private set; } = [];
 

@@ -1348,11 +1348,12 @@
                     </label>
                     <input formControlName="nodePriority" type="number" min="0" [readonly]="isReadonly()"
                       class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    <p class="text-xs mt-1">{{ locale.isRtl() ? 'استخدم القيمة صفر. أولوية قائمة المهام غير مدعومة؛ أولوية التوجيه تُحدد على الأسهم.' : 'Use zero. Task queue priority is not supported; routing priority is configured on arrows.' }}</p>
                   </div>
                 }
 
                 <!-- ServiceTask: action key + config JSON -->
-                @if (selectedNode()!.type === 'ServiceTask') {
+                @if (selectedNode()!.type === 'ServiceTask' && selectedNode()!.actionKey && selectedNode()!.actionKey !== 'http.request') {
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_action_key' | translate }}
@@ -1497,33 +1498,14 @@
                     {{ 'workflow.designer.props_wait_for_completion' | translate }}
                   </label>
                   <p class="text-xs text-dark-500">{{ 'workflow.designer.props_call_activity_help' | translate }}</p>
-                }
-
-                <!-- NotificationTask -->
-                @if (selectedNode()!.type === 'NotificationTask') {
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_template_key' | translate }}
-                    </label>
-                    <input formControlName="templateKey" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_template_key_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_failure_policy' | translate }}
-                    </label>
-                    <select formControlName="failurePolicy" [attr.disabled]="isReadonly() ? true : null"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                      @for (opt of notifFailurePolicyOptions; track opt) {
-                        <option [value]="opt">{{ ('workflow.designer.failure_policy.' + opt) | translate }}</option>
-                      }
-                    </select>
-                  </div>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'معرف الإصدار المنشور (فارغ = الأحدث)' : 'Published version ID (blank = latest)' }}<input formControlName="callVersionId" [readonly]="isReadonly()" class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white" /></label>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'مدخلات الطفل: متغير الطفل ← مسار متغير الأب' : 'Child inputs: child variable → parent variable path' }}<textarea formControlName="callInputMappingsJson" [readonly]="isReadonly()" rows="3" placeholder='{"amount":"amount"}' class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white"></textarea></label>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'مخرجات الطفل: متغير الأب ← مسار متغير الطفل' : 'Child outputs: parent variable → child variable path' }}<textarea formControlName="callOutputMappingsJson" [readonly]="isReadonly()" rows="3" placeholder='{"result":"childResult"}' class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white"></textarea></label>
                 }
 
                 <!-- ScriptTask: set variables (safe script) -->
                 @if (selectedNode()!.type === 'ScriptTask') {
+                  <app-workflow-variable-editor [value]="propsForm.value.setVariablesJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" (valueChange)="applyTypedVariables($event)" />
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_set_variables' | translate }}
@@ -1535,27 +1517,15 @@
                   </div>
                 }
 
-                <!-- WaitEvent -->
-                @if (selectedNode()!.type === 'WaitEvent') {
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_event_key' | translate }}
-                    </label>
-                    <input formControlName="eventKey" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_event_key_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_correlation_variable' | translate }}
-                    </label>
-                    <input formControlName="correlationVariable" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_correlation_variable_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_wait_event_hint' | translate }}</p>
-                  </div>
+                @if (selectedNode()!.type === 'ServiceTask' && (!selectedNode()!.actionKey || selectedNode()!.actionKey === 'http.request')) {
+                  <app-workflow-integration-editor kind="ServiceTask" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
                 }
-
+                @if (selectedNode()!.type === 'NotificationTask') {
+                  <app-workflow-integration-editor kind="NotificationTask" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
+                @if (selectedNode()!.type === 'WaitEvent') {
+                  <app-workflow-integration-editor kind="WaitEvent" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
                 @if (!isReadonly()) {
                   <button type="button" (click)="applyProps()"
                     class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
@@ -1988,7 +1958,7 @@
                   <input formControlName="formKey" type="text" [readonly]="isReadonly()"
                     [placeholder]="'workflow.designer.props_form_key_placeholder' | translate"
                     class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_form_key_hint' | translate }}</p>
+                  <p class="text-xs text-dark-500 mt-1">{{ locale.isRtl() ? 'مرجع وصفي للنموذج. يتم عرض الحقول المحددة أدناه؛ لا يتم تحميل نموذج خارجي.' : 'A reference label for this form. The fields below are rendered; no external form is loaded.' }}</p>
                 </div>
 
                 <div class="space-y-2">
@@ -2042,6 +2012,11 @@
                               class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
                           </div>
                         </div>
+                        @if (field.type === 'select') {
+                          <label class="block text-xs text-dark-400">{{ locale.isRtl() ? 'الخيارات مفصولة بفواصل' : 'Options separated by commas' }}
+                            <input [value]="field.options || ''" [readonly]="isReadonly()" (input)="updateFormField(field.id, 'options', $any($event.target).value)" class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white" />
+                          </label>
+                        }
                         <div class="flex items-center justify-between">
                           <label class="flex items-center gap-2 text-xs text-dark-200">
                             <input type="checkbox" [checked]="field.required" [attr.disabled]="isReadonly() ? true : null"

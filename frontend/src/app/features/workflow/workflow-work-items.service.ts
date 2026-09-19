@@ -11,7 +11,11 @@ import { apiWorkflowWorkItemsGroupGroupIdGet } from '@shared/models/fn/work-item
 import type { WorkItemDto } from '@shared/models/models/Workflow/Application/DTOs/work-item-dto';
 import type { CompleteWorkItemPayload, WorkflowWorkItemExtras } from '@core/models/workflow-ops.models';
 
-export type WorkflowWorkItemView = WorkItemDto & WorkflowWorkItemExtras;
+export type WorkflowWorkItemView = WorkItemDto & WorkflowWorkItemExtras & {
+  instructionsEn?: string; instructionsAr?: string;
+  formFields?: { key: string; labelEn: string; labelAr: string; type: string; required: boolean; options?: string[] }[];
+  formValues?: Record<string, unknown>;
+};
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowWorkItemsService {

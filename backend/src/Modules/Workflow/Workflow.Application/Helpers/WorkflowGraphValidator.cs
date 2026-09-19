@@ -48,6 +48,8 @@ public static class WorkflowGraphValidator
 
         foreach (var t in doc.Transitions)
         {
+            if (!string.IsNullOrWhiteSpace(t.ConditionExpression) && !WorkflowCondition.IsValid(t.ConditionExpression))
+                errors.Add(new("TRANSITION_CONDITION_INVALID", $"Transition '{t.Key}' must use comparisons (==, !=, >, >=, <, <=), &&, || or parentheses.", t.FromNodeKey));
             if (!nodeKeys.Contains(t.FromNodeKey))
                 errors.Add(new WorkflowValidationIssueDto("INVALID_TRANSITION_FROM",
                     $"Transition '{t.Key}' references unknown FromNodeKey '{t.FromNodeKey}'."));
@@ -91,6 +93,22 @@ public static class WorkflowGraphValidator
 
         ValidateGateways(doc, errors, warnings, ActivityType.ExclusiveGateway);
         ValidateGateways(doc, errors, warnings, ActivityType.InclusiveGateway);
+
+        var joins = doc.Activities.Where(a => a.ActivityTypeName == nameof(ActivityType.JoinGateway)).Select(a => a.NodeKey).ToHashSet();
+        foreach (var fork in doc.Activities.Where(a => a.ActivityTypeName is nameof(ActivityType.ParallelGateway) or nameof(ActivityType.InclusiveGateway)))
+        {
+            try
+            {
+                using var config = System.Text.Json.JsonDocument.Parse(fork.ConfigurationJson ?? "{}");
+                if (config.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                var join = config.RootElement.TryGetProperty("joinNodeKey", out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String ? value.GetString() : null;
+                if (string.IsNullOrWhiteSpace(join) && joins.Count > 1)
+                    errors.Add(new("FORK_JOIN_REQUIRED", "Select the matching Join for each fork when a workflow has multiple joins.", fork.NodeKey));
+                else if (!string.IsNullOrWhiteSpace(join) && !joins.Contains(join))
+                    errors.Add(new("FORK_JOIN_INVALID", "The selected join must refer to a Join activity in this workflow.", fork.NodeKey));
+            }
+            catch (System.Text.Json.JsonException) { /* Configuration validator supplies the diagnostic. */ }
+        }
 
         WorkflowActivityConfigurationValidator.Validate(doc, errors, warnings, actionRegistry);
 

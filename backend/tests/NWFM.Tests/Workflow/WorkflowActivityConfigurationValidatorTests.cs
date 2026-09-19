@@ -20,7 +20,7 @@ public sealed class WorkflowActivityConfigurationValidatorTests
 {
     [Theory]
     [InlineData("WaitEvent", "{}", "EVENT_KEY_REQUIRED")]
-    [InlineData("WaitEvent", "{\"eventKey\":\"ready\",\"correlationVariable\":\"orderId\"}", "EVENT_CORRELATION_UNSUPPORTED")]
+    [InlineData("WaitEvent", "{\"eventKey\":\"ready\",\"correlationVariable\":\"orderId\"}", "EVENT_CONNECTION_REQUIRED")]
     [InlineData("Timer", "{\"timerType\":\"ExternalSignal\",\"signalKey\":\"ready\"}", "TIMER_SIGNAL_UNSUPPORTED")]
     [InlineData("Timer", "{\"duration\":\"-00:10:00\"}", "TIMER_DURATION_INVALID")]
     [InlineData("Timer", "{\"timerType\":\"DueDate\",\"dueAt\":\"2026-09-19T15:00\"}", "TIMER_DATE_INVALID")]
@@ -28,7 +28,7 @@ public sealed class WorkflowActivityConfigurationValidatorTests
     [InlineData("CallActivity", "{\"definitionKey\":\"child\",\"waitForCompletion\":\"true\"}", "CALL_ACTIVITY_WAIT_INVALID")]
     [InlineData("ScriptTask", "{\"setVariables\":\"invalid\"}", "VARIABLE_ASSIGNMENTS_INVALID")]
     [InlineData("ScriptTask", "{\"setVariables\":[42]}", "VARIABLE_ASSIGNMENTS_INVALID")]
-    [InlineData("NotificationTask", "{\"templateKey\":\"notice\",\"failurePolicy\":\"Retry\"}", "NOTIFICATION_RETRY_UNSUPPORTED")]
+    [InlineData("NotificationTask", "{\"templateKey\":\"notice\",\"failurePolicy\":\"Retry\"}", "NOTIFICATION_CONFIG_INVALID")]
     [InlineData("ServiceTask", "{}", "SERVICE_ACTION_REQUIRED")]
     [InlineData("WaitEvent", "[]", "ACTIVITY_CONFIG_OBJECT")]
     [InlineData("WaitEvent", "{", "ACTIVITY_CONFIG_JSON")]

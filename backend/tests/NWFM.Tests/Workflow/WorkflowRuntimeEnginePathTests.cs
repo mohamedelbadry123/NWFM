@@ -466,7 +466,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
     // Engine factory: real repos + real services + mocked external services
     // ═══════════════════════════════════════════════════════════════════════
 
-    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db)
+    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db, global::Workflow.Application.Integrations.IWorkflowIntegrationRuntime? integrations = null)
     {
         // Real DB-backed repositories
         var bindingRepo     = new WorkflowBindingRepository(db);
@@ -515,7 +515,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
             _notifPublisher.Object,
             tokenRepo,
             _outcomeDispatcher.Object,
-            _requestProjector.Object);
+            _requestProjector.Object, integrations);
     }
 
     private sealed class StubTenant(Guid orgId) : ICurrentTenant

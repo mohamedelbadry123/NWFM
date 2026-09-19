@@ -64,7 +64,7 @@ To regenerate the Angular client after an API change, start the backend, then ru
 
 ## Boundaries and extension points
 
-Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_ENHANCEMENT_PLAN.md) and [activity audit](WORKFLOW_ACTIVITY_AUDIT.md), including verified paths and integration features still under development.
+Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_ENHANCEMENT_PLAN.md) and [activity audit](WORKFLOW_ACTIVITY_AUDIT.md), with verified paths and operating boundaries. Configure API calls, email and authenticated callbacks using the [integration operator guide](WORKFLOW_INTEGRATIONS.md).
 
 - The only feature module is Workflow. The backend host supplies a minimal tenant and participant context.
 - `ICurrentTenant` and `IWorkflowActorContext` are the future authentication integration points. The `UserId` fields retained in Workflow are stable actor identifiers, not references to an Identity database.
@@ -73,7 +73,7 @@ Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_E
 - SQL schemas are `Workflow` and `Tenancy`. No privacy/compliance, Identity, platform administration, or original business data is included.
 - Workflow XML retains its original `https://privora.io/workflow/v1` schema namespace for compatibility with the extracted compiler and designer. This is a format identifier; it makes no network request.
 - The standalone outcome handler acknowledges results already stored in workflow history. Future integrations can implement capability, action, and outcome contracts without importing another product's modules.
-- In-app notifications work locally. SMTP is optional; without SMTP configuration, email deliveries remain queued, matching the retained engine's behavior.
+- In-app notifications work locally. Email uses a configured SMTP connection and durable delivery jobs. API calls and authenticated callbacks are configured through Integrations and the designer. Publication rejects missing integration prerequisites.
 
 ## Containers
 

@@ -23,7 +23,8 @@ internal sealed class WorkflowIntegrationInboxRepository : IWorkflowIntegrationI
         int take, CancellationToken cancellationToken = default)
     {
         return await _db.WorkflowIntegrationInbox
-            .Where(m => m.Status == WorkflowInboxStatus.Pending)
+            .Where(m => m.Status == WorkflowInboxStatus.Pending
+                || m.Status == WorkflowInboxStatus.Processing && m.UpdatedAt < DateTime.UtcNow.AddMinutes(-5))
             .OrderBy(m => m.CreatedAt)
             .Take(take)
             .ToListAsync(cancellationToken);

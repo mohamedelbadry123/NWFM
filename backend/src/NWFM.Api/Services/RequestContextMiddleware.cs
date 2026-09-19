@@ -14,6 +14,9 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
         {
             await Reject(http, "Tenant.Mismatch", "The requested tenant is not the active tenant."); return;
         }
+        // Callback identity comes from its connection's API key or signature,
+        // not from the selected interactive participant.
+        if (http.Request.Path.StartsWithSegments("/api/workflow/integrations/webhooks")) { await next(http); return; }
         var participants = db.Participants.AsNoTracking().Where(p => p.IsActive);
         if (http.Request.Headers.TryGetValue("X-Workflow-Participant-Id", out var actor))
         {

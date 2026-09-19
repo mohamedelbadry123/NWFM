@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 export const routes: Routes = [
+ {path:'admin/workflow/integrations',loadComponent:()=>import('./features/workflow/integrations/workflow-connections.component').then(m=>m.WorkflowConnectionsComponent)},
  {path:'',pathMatch:'full',redirectTo:'org/workflow'},
  {path:'admin/workflow',pathMatch:'full',redirectTo:'admin/workflow/hub'},
  {path:'workflow/start',loadComponent:()=>import('./features/workflow/start/workflow-start.component').then(m=>m.WorkflowStartComponent)},

@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 import { CanvasNode, NodeType, WorkflowDesignerComponent } from './workflow-designer.component';
 import { WritableSignal } from '@angular/core';
@@ -125,6 +125,22 @@ describe('WorkflowDesignerComponent scale', () => {
       buildConfigurationJson(type: NodeType, value: Record<string, unknown>): string;
     };
   }
+
+  it('loads a cloned draft when route parameters change on the existing designer', () => {
+    const params = new Subject<{ get(key: string): string }>();
+    (TestBed.inject(ActivatedRoute) as unknown as {paramMap: unknown}).paramMap = params;
+    const versions = TestBed.inject(WorkflowVersionsService);
+    const load = spyOn(versions, 'getById').and.callFake((_definition, version) => of({id:version,status:version === 'published' ? 'Published' : 'Draft',activities:[],transitions:[],variables:[]}));
+    component.ngOnInit();
+    params.next({get:key => key === 'definitionId' ? 'definition' : 'published'});
+    const editor = component as unknown as {version:()=>{status:string};isReadonly:()=>boolean};
+    expect(editor.isReadonly()).toBeTrue();
+    params.next({get:key => key === 'definitionId' ? 'definition' : 'cloned'});
+    expect(editor.version().status).toBe('Draft');
+    expect(editor.isReadonly()).toBeFalse();
+    expect(load).toHaveBeenCalledWith('definition','cloned');
+    fixture.destroy();
+  });
 
   function configure(type: NodeType, configuration: Record<string, unknown>) {
     const editor = access();

@@ -1,66 +1,44 @@
-# Workflow improvement: first implementation milestone
+# Workflow improvement verification
 
-Branch: `workflow-improvement`
+Branch: `workflow-improvement` · 2026-09-19
 
-Date: 2026-09-19
+The implementation retains the existing engine and all four palette categories. HTTP and email use persisted jobs; callbacks use authenticated receipts and per-activity waits. SQL transactions serialize advancement. See [setup and operations](WORKFLOW_INTEGRATIONS.md).
 
-Scope: initial source audit, targeted runtime corrections, and shared configuration validation. The full [enhancement plan](WORKFLOW_ENGINE_ENHANCEMENT_PLAN.md) remains in progress.
+## Activity evidence
 
-## Changes in this PR
+All 13 activities executed in the SQL acceptance fixture. This is representative evidence, not certification of every possible topology or external provider.
 
-- Failed service tasks stop the instance at the failed node, including retryable failures. The existing explicit retry operation now re-executes that task rather than skipping its outgoing edge. Automatic background retries are not yet implemented.
-- Service providers receive node configuration and activity-instance identity. The operation idempotency key remains stable across failed attempts and changes after a completed traversal. This does not by itself guarantee external exactly-once delivery.
-- Wait for Event recognizes the designer's `eventKey` and the legacy `signalKey`. Missing/mismatched keys and missing active waits cannot consume the wait. The canonical key takes precedence when both are present.
-- External-signal timers cannot be picked up by the clock worker or invoked through time-based resumption.
-- Due dates are converted to actual UTC instants on both frontend and backend, including explicit offsets. Editing a stored date preserves seconds and milliseconds.
-- Set Variables executes the designer's object representation while preserving support for legacy arrays and `assignments` objects.
-- Editing guided settings retains additional configuration fields. Notification channels/recipients are no longer discarded; obsolete timer fields and replaced legacy aliases are removed deliberately.
-- Validate, publication preview, and Publish share configuration checks. Unregistered service actions, malformed settings, unsupported variable-based event correlation, external-signal timers, and unimplemented notification Retry policies are blocked for new publications.
-- Resuming a failed instance clears its stale failure summary; the failed activity retains its failure history.
+| Category | Activity | Behavior and evidence |
+| --- | --- | --- |
+| Flow | Start | Pinned version, defaults, correlation and duplicate-start protection; SQL approval smoke. |
+| Flow | End | Waits for active branch tokens; dispatches root outcomes only; SQL completion once. |
+| Flow | Decision | Typed comparisons, AND/OR, parentheses, priority and fallback; unit cases and SQL approval decision. |
+| Flow | Inclusive Gateway | Activates matching routes, fallback otherwise; two branches inside a nested SQL fork. |
+| Flow | Parallel Fork | Unique identity per fork execution and ownership of asynchronous branches; callbacks plus timer in recovery test. |
+| Flow | Join | Groups by fork execution, consumes once, restores parent token; nested acceptance and concurrent/restart checks. Multiple joins require explicit selection. |
+| Tasks | User Task | Group assignment/fallback, claims, delegation, outcomes, required typed fields/options, mappings, instructions, SLA and installed action hooks. SQL form validation, mapping, SLA, completion hook and concurrent claim checks. |
+| Automation | Service Task | Guided HTTP, protected authentication references, request/response mappings, persisted retry/replay and failure routes. Real local HTTP verifies Bearer, typed JSON, header mapping and stable operation ID. |
+| Automation | Call Activity | Published child/version, input/output mapping, waiting or independent child, recursion guard. SQL immediate completion/output and waiting-child cancellation. |
+| Automation | Set Variables | Typed value editor, legacy compatibility, declared/existing variable whitelist, no executable code. Tests preserve numeric-looking strings, quotes and newlines. |
+| Automation | Notification | SMTP authentication, real To/Cc/Bcc/participant recipients, templates, durable attempts, channel logs and failure policies. Local mail capture verifies intended recipient and rendered amount. |
+| Events | Timer | Duration/timezone-aware date, token continuation, persistence/suspension; SQL restart and offset-date unit cases. |
+| Events | Wait for Event | API key/HMAC, source/event/correlation, buffering, deduplication, mappings, timeout, ambiguity/replay. Early callback and 24 concurrent deliveries producing exactly two receipts verified in SQL. |
 
-## Activity evidence and remaining gaps
+## Browser checks
 
-“Covered” below refers to named automated paths only. It is not a production-readiness certification. Engine tests use EF's in-memory provider and cannot establish SQL Server concurrency or crash guarantees.
-
-| Category | Activity | Evidence / current state | Still required |
-| --- | --- | --- | --- |
-| Flow | Start | Existing runtime paths start instances and run synchronous nodes. | Browser audit of all creation paths, duplicate/concurrent starts with SQL Server. |
-| Flow | End | Existing and new sequential paths complete; repeated event delivery cannot create a second End in the tested path. | Multiple-end and active-branch completion semantics. |
-| Flow | Decision | Transition evaluator tests cover conditions; approval runtime paths exist. | Full designer/runtime matrix for priorities and fallback conditions. |
-| Flow | Inclusive Gateway | Runtime implementation and enum tests exist. | Runtime evidence for all/one/no matching routes, nested joins, asynchronous branches. |
-| Flow | Parallel Fork | Existing runtime test covers two successful service branches. | Durable ownership for asynchronous branches, failure/retry and restart cases. |
-| Flow | Join | Existing fork/join path passes. | Nested/repeated joins and concurrent completion without selecting the wrong token. |
-| Tasks | User Task | Existing claim, completion, redirect, and approval path tests remain green. | Every inspector field, action hooks, SLA, forms, and mappings verified in the browser. |
-| Automation | Service Task | New tests prove stop/retry behavior, stable operation key, and configuration delivery to a mocked provider. Missing providers are rejected at publication. | Real HTTP provider, guided request/response/authentication form, connection store, durable jobs/retries, parallel retry ownership. |
-| Automation | Call Activity | Existing implementation inspected; configuration now requires an actual non-empty definition key and Boolean wait flag. | Parent/child mapping, immediate/asynchronous completion, independent child completion, cancellation and recursion tests. |
-| Automation | Set Variables | New runtime tests cover designer objects and legacy formats; frontend tests cover legacy editing. | Full type semantics, whitelist diagnostics and expression UX. |
-| Automation | Notification | Frontend regression test preserves channel/recipient configuration. Unsupported Retry is blocked for new publications. | Real email recipients/templates/authentication, durable sending, per-channel outcomes; current diagnostic mail path is not production-ready. |
-| Events | Timer | Existing duration test plus new offset-date tests. External signals are excluded from due processing and rejected on publication. | SQL-backed restart/suspension/concurrency tests, full timezone UI review. |
-| Events | Wait for Event | New tests cover canonical/legacy keys, mismatch/missing key, missing active wait, and repeat delivery after completion. | Authenticated external ingress, correlation/payload mapping, early-event buffering, per-activity subscriptions, timeout races, operation-aware inbox recovery and replay. |
-
-## Compatibility and intentional changes
-
-No database schema or public HTTP endpoint changes are introduced. Existing published definitions are not rewritten or automatically revalidated. New publication now rejects configurations that previously appeared valid but could not perform their advertised behavior. A previously published external-signal timer will remain waiting instead of incorrectly firing on a clock; it needs an operator-reviewed replacement using the future event-delivery implementation.
-
-Provider configuration fields added to the internal execution contract are optional constructor arguments, so existing source callers remain compatible. Explicit retry in this milestone supports failed Service Task activities. Unsupported retries return an error before changing the failed instance back to Running. Complex parallel recovery remains an open item.
-
-The application still uses a trusted-development participant model without login. This PR neither exposes a callback endpoint nor sends live integration tests to external services.
+All categories/palette items, published read-only controls, clone-to-draft navigation, API save/reload, sample response mapping, callback example/correlation, email controls and English/Arabic labels were inspected. No console errors occurred in the verified flow. Regression tests cover clone navigation, configuration preservation and typed values. Correlation fields accept variables produced by earlier API outputs.
 
 ## Verification
 
-- Baseline: 217 backend tests passed; production frontend build passed.
-- Runtime regression coverage: service failures/retries, event matching and non-consumption, external-signal exclusion, variable assignment formats, UTC due dates.
-- Publication coverage: malformed/unsupported settings and agreement between Validate, preview, and Publish even with a stale validation badge.
-- Frontend coverage: notification field preservation, legacy event/variable formats, timer-mode changes, and date round trips.
-- Final verification: 259 backend tests passed, 45 frontend tests passed in headless Chrome, and the production frontend build passed. This adds 42 backend and 10 frontend regression cases over the original suite.
-- Full SQL Server integration, fault injection, load testing, and browser end-to-end audit are not completed in this milestone.
+- Backend: 300 tests, no failures/skips; Release build.
+- Frontend: 57 headless Chrome tests; production build.
+- `scripts/smoke-test.mjs`: original approval flow, tenant/participant checks, duplicate start, concurrent claim, ownership and projection.
+- `scripts/workflow-integration-test.mjs`: SQL, all activities, task form/hook, real HTTP retry, early authenticated callback, SMTP capture, nested joins, timer and child output.
+- `scripts/workflow-recovery-test.mjs prepare`, actual API restart, then `verify`: suspended callbacks/timer persist, on-time events beat elapsed deadlines, one join/End, waiting-child cancellation. Observed local 24-request callback batch: 30 ms; this is not a throughput guarantee.
+- Migration applied to disposable `NWFM_WorkflowImprovementTest`; the normal development database was not migrated by these tests.
 
-## Remaining implementation sequence
+## Explicit boundaries
 
-1. Persist activity/branch execution ownership and explicit waiting/retry outcomes; distinguish start versus signal inbox recovery.
-2. Add protected connections and HTTP action provider, durable jobs, retry policies, and request/response forms.
-3. Add authenticated callback ingress, durable event subscriptions, correlation, payload mapping, and timeout handling.
-4. Replace diagnostic notification delivery with configured recipients, templates, authenticated mail and durable delivery attempts.
-5. Complete the remaining activity/browser audit and real-world scenarios against SQL Server.
+Required attachments, arbitrary JSON Schema forms, non-group assignment rules, disabled claim semantics and nonzero task queue priority are rejected before publication. Form key is a reference label, not an external form loader. Generic HTTP/SMTP and OAuth client credentials are provided; provider-specific authorization flows, attachments and email tracking are later extensions.
 
-Keep the PR in draft while these broader capabilities are outstanding; this milestone starts the enhancement rather than marking the full plan complete.
+External delivery is at-least-once after uncertain network/crash outcomes. API providers must honor idempotency keys; SMTP can duplicate after uncertain acceptance. The application retains its trusted-participant model and needs a controlled hosting boundary until separate login/access-control work is completed. No production provider credentials, public deployment, capacity certification or production-data migration was performed.

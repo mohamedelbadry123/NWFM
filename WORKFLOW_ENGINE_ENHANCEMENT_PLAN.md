@@ -4,7 +4,7 @@ Date: 2026-09-19
 
 Branch: `workflow-improvement`
 
-Status: Implementation started. The first draft PR delivers runtime/configuration corrections and an initial capability audit; integration connectors and durable event delivery remain open. See [implementation audit](WORKFLOW_ACTIVITY_AUDIT.md) for evidence and remaining work.
+Status: Implementation and representative acceptance verification completed. See [final activity audit](WORKFLOW_ACTIVITY_AUDIT.md) for tested paths and explicit boundaries, and [setup/operations](WORKFLOW_INTEGRATIONS.md) for configuration and recovery.
 
 ## Objective and scope
 
@@ -169,4 +169,4 @@ Deliver the capability audit, defect fixes, configuration contracts/migrations, 
 
 Default decisions for implementation: keep the existing engine and four categories; reuse compatible inbox/outbox/incident infrastructure; use generic HTTP and SMTP first; use mock services and mail capture for verification; preserve old published versions; keep application authentication separate. Concrete service providers, email server, credential-storage backend, business volume targets, and the first pilot workflow can be selected before their integration-specific implementation. They do not block the activity audit or core correctness work.
 
-The first implementation milestone is Phase 1 plus the critical runtime/configuration defects in Phase 2. Initial fixes and regression checks are recorded in the implementation audit. They do not establish that the current application is ready for production integrations.
+The six phases delivered the activity audit, runtime corrections, protected HTTP/SMTP connections, durable jobs/events, guided panels, migrations, regression tests, SQL acceptance fixtures and operator guide. The final implementation uses the v1 callback route and a minimal event envelope; source is derived from the connection and receipt time is server-owned. Mapping-path checks provide required-field validation; general JSON Schema/filter expressions and provider-specific connectors remain extensions. Task attachments, non-group assignment, queue-priority changes and alternative claim semantics are explicitly rejected rather than silently ignored. Capacity certification and rollout against real provider credentials remain environment-specific deployment work.

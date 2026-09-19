@@ -127,7 +127,7 @@ public sealed class WorkItemsController : WorkflowControllerBase
             new CompleteWorkItemCommand(
                 workItemId, GetUserId(), GetOrgId(),
                 body.ActionTaken, body.Comment,
-                body.RedirectAssignmentGroupId, body.RedirectDepartmentId),
+                body.RedirectAssignmentGroupId, body.RedirectDepartmentId, body.FormValues),
             cancellationToken);
         if (result.IsFailure) return BadRequest(new { result.Error.Code, result.Error.Message });
         return Ok(result.Value);
@@ -168,6 +168,7 @@ public sealed record CompleteWorkItemRequest(
     string ActionTaken,
     string? Comment = null,
     Guid? RedirectAssignmentGroupId = null,
-    Guid? RedirectDepartmentId = null);
+    Guid? RedirectDepartmentId = null,
+    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null);
 public sealed record ReassignWorkItemRequest(Guid NewAssignmentGroupId);
 public sealed record DelegateWorkItemRequest(Guid DelegateToUserId, string? Comment = null);

@@ -1,0 +1,43 @@
+<section class="integration-panel" [attr.dir]="locale.locale() === 'ar' ? 'rtl' : 'ltr'">
+  <div class="integration-toolbar"><h2>{{ t('Integration connections', 'اتصالات التكامل') }}</h2>
+    <button type="button" (click)="edit()">{{ t('New connection','اتصال جديد') }}</button>
+    <button type="button" (click)="refresh()">{{ t('Refresh','تحديث') }}</button></div>
+  <p class="integration-help">{{ t('Save service addresses and authentication once, then select the connection in workflow activities. Existing credentials are never returned to this screen.','احفظ عناوين الخدمات والمصادقة ثم اختر الاتصال في أنشطة سير العمل. لا تُعرض بيانات الاعتماد المحفوظة في هذه الشاشة.') }}</p>
+  @if (error()) { <p role="alert" class="integration-error">{{ error() }}</p> }
+  @for (connection of connections(); track connection.id) {
+    <article class="integration-connection"><div><strong>{{ connection.name }}</strong><p>{{ connection.kind }} · {{ connection.authentication }} · {{ connection.address }}</p>
+      @if (connection.kind === 'Webhook') { <code>{{ api.webhookUrl(connection.id) }}</code> }</div>
+      <button type="button" (click)="edit(connection)">{{ t('Edit','تعديل') }}</button>
+      <button type="button" (click)="remove(connection)">{{ t('Delete unused','حذف غير المستخدم') }}</button></article>
+  } @empty { <p>{{ t('No connections yet. Create one to configure an API, email server or callback.','لا توجد اتصالات بعد. أنشئ اتصالاً لإعداد واجهة أو بريد أو حدث وارد.') }}</p> }
+  @if (editing()) {
+    <fieldset class="integration-grid" [disabled]="busy()"><legend>{{ id ? t('Edit connection','تعديل الاتصال') : t('New connection','اتصال جديد') }}</legend>
+      <label>{{ t('Name','الاسم') }}<input [(ngModel)]="form.name" [ngModelOptions]="standalone" maxlength="200" /></label>
+      <label>{{ t('Type','النوع') }}<select [(ngModel)]="form.kind" (ngModelChange)="kindChanged()" [ngModelOptions]="standalone" [disabled]="!!id"><option>Http</option><option>Smtp</option><option>Webhook</option></select></label>
+      @if (form.kind !== 'Webhook') { <label class="full">{{ form.kind === 'Http' ? t('Base URL','الرابط الأساسي') : t('SMTP host','خادم SMTP') }}<input [(ngModel)]="form.address" [ngModelOptions]="standalone" [placeholder]="form.kind === 'Http' ? 'https://api.example.com/' : 'smtp.example.com'" /></label> }
+      <label>{{ t('Authentication','المصادقة') }}<select [(ngModel)]="form.authentication" [ngModelOptions]="standalone" (ngModelChange)="replaceCredentials = true">@for (auth of authOptions(); track auth) { <option>{{ auth }}</option> }</select></label>
+      @if (form.kind === 'Smtp') { <label>{{ t('Port','المنفذ') }}<input type="number" [(ngModel)]="form.port" [ngModelOptions]="standalone" min="1" max="65535" /></label><label class="check"><input type="checkbox" [(ngModel)]="form.useTls" [ngModelOptions]="standalone" />{{ t('Use TLS','استخدام TLS') }}</label> }
+      @if (form.kind === 'Http') { <label class="check full"><input type="checkbox" [(ngModel)]="form.allowPrivateNetwork" [ngModelOptions]="standalone" />{{ t('Allow private/test network (requires server setting)','السماح بالشبكة الداخلية/التجريبية (يتطلب إعداد الخادم)') }}</label> }
+      @if (id) { <label class="check full"><input type="checkbox" [(ngModel)]="replaceCredentials" [ngModelOptions]="standalone" />{{ t('Replace saved credentials','استبدال بيانات الاعتماد المحفوظة') }}</label> }
+      @if (replaceCredentials) { @for (field of credentialFields(); track field) { <label>{{ label(field) }}<input [type]="isSecret(field) ? 'password' : 'text'" [(ngModel)]="credentials[field]" [ngModelOptions]="standalone" autocomplete="off" /></label> } }
+      <div class="integration-toolbar full"><button type="button" (click)="save()">{{ t('Save connection','حفظ الاتصال') }}</button><button type="button" (click)="editing.set(false)">{{ t('Cancel','إلغاء') }}</button></div>
+    </fieldset>
+  }
+  @if (!embedded) {
+    <h2>{{ t('Integration executions','تنفيذ التكاملات') }}</h2>
+    <p class="integration-help">{{ t('Completed email means accepted by the mail server. Replay can repeat an external side effect if the provider cannot deduplicate requests.','اكتمال البريد يعني قبوله من خادم البريد. قد تؤدي إعادة التنفيذ إلى تكرار الأثر الخارجي إذا كانت الخدمة لا تمنع الطلبات المكررة.') }}</p>
+    <div class="integration-table"><table><thead><tr><th>{{ t('Workflow','سير العمل') }}</th><th>{{ t('Type','النوع') }}</th><th>{{ t('Status','الحالة') }}</th><th>{{ t('Attempts','المحاولات') }}</th><th>{{ t('Details','التفاصيل') }}</th></tr></thead><tbody>
+      @for (operation of operations(); track operation.id) { <tr><td><a [routerLink]="['/admin/workflow/instances', operation.workflowInstanceId]">{{ operation.workflowInstanceId.slice(0,8) }}</a></td><td>{{ operation.kind }}</td><td>{{ operation.status }}</td><td>{{ operation.attempts }}</td><td>{{ operation.error || operation.statusCode }} @if (operation.status === 'Failed') { <button type="button" (click)="replay(operation)">{{ t('Replay','إعادة التنفيذ') }}</button> }</td></tr> }
+    </tbody></table></div>
+    <h2>{{ t('Event waits','انتظار الأحداث') }}</h2>
+    <div class="integration-table"><table><thead><tr><th>{{ t('Workflow','سير العمل') }}</th><th>{{ t('Event / correlation','الحدث / الارتباط') }}</th><th>{{ t('Status','الحالة') }}</th><th>{{ t('Deadline','الموعد النهائي') }}</th></tr></thead><tbody>
+      @for (wait of waits(); track wait.id) { <tr><td><a [routerLink]="['/admin/workflow/instances', wait.workflowInstanceId]">{{ wait.workflowInstanceId.slice(0,8) }}</a><small>{{ wait.activityInstanceId }}</small></td><td>{{ wait.eventKey }}<br />{{ wait.correlationId }}</td><td>{{ wait.status }}</td><td>{{ wait.expiresAt | date:'medium' }}</td></tr> }
+    </tbody></table></div>
+    <h2>{{ t('Received events','الأحداث الواردة') }}</h2>
+    <div class="integration-table"><table><thead><tr><th>{{ t('Event ID','معرف الحدث') }}</th><th>{{ t('Event / correlation','الحدث / الارتباط') }}</th><th>{{ t('Status','الحالة') }}</th><th>{{ t('Details / recovery','التفاصيل / الاسترداد') }}</th></tr></thead><tbody>
+      @for (event of events(); track event.id) { <tr><td>{{ event.eventId }}</td><td>{{ event.eventKey }}<br />{{ event.correlationId }}</td><td>{{ event.status }}</td><td>{{ event.error }}
+        @if (event.status === 'Ambiguous' || event.status === 'Rejected') { <input [(ngModel)]="replayTargets[event.id]" [ngModelOptions]="standalone" [placeholder]="t('Target activity ID (optional)','معرف النشاط المستهدف (اختياري)')" [attr.aria-label]="t('Target activity ID','معرف النشاط المستهدف')" /><button type="button" (click)="replayEvent(event)">{{ t('Replay event','إعادة معالجة الحدث') }}</button> }
+      </td></tr> }
+    </tbody></table></div>
+  }
+</section>
