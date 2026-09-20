@@ -12,6 +12,10 @@ export const PERMISSIONS = {
   manageLookups: 'ManageLookups',
   manageUsers: 'ManageUsers',
   manageRolePermissions: 'CanManageRolePermissions',
+  viewForms: 'ViewForms',
+  manageForms: 'ManageForms',
+  submitForms: 'SubmitForms',
+  viewSubmissions: 'ViewSubmissions',
 } as const;
 
 @Directive({ selector: '[hasPermission]', standalone: true })

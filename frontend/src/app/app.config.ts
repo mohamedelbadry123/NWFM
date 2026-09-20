@@ -10,6 +10,7 @@ import { routes } from './app.routes';
 import { provideApiConfiguration } from './shared/models/api-configuration';
 import { provideLocaleInitializer } from './core/i18n/locale.initializer';
 import { AppContextService } from './core/context/app-context.service';
+import { AppConfigService } from './core/config/app-config.service';
 import { contextInterceptor } from './core/context/context.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
@@ -30,6 +31,8 @@ export const appConfig: ApplicationConfig = {
     provideTranslateService({ fallbackLang: 'en' }),
     provideTranslateHttpLoader({ prefix: '/assets/i18n/', suffix: '.json' }),
     provideLocaleInitializer(),
+    // Runtime config (the Maps key) has to be in hand before the first map is drawn.
+    provideAppInitializer(() => inject(AppConfigService).load()),
     provideAppInitializer(() => inject(AppContextService).load()),
   ]
 };

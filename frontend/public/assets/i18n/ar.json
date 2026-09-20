@@ -31,7 +31,8 @@
     "language": "اللغة",
     "english": "English",
     "arabic": "العربية",
-    "toggleTheme": "تبديل المظهر"
+    "toggleTheme": "تبديل المظهر",
+    "required": "مطلوب"
   },
   "error": {
     "ProcessingPurpose.NotFound": "غرض المعالجة غير موجود.",
@@ -62,7 +63,21 @@
     "Workflow.Binding.NotFound": "لم يتم العثور على ربط سير العمل. أكمل إنشاء الربط أولاً ثم أعد تشغيل المحاكاة.",
     "Workflow.Binding.OrganizationMismatch": "يمكن ربط سير العمل بشاشة في نفس المؤسسة المالكة فقط.",
     "Workflow.Binding.IncompleteMappings": "لا يمكن تفعيل الربط: مهمة مستخدم أو أكثر لا تشير إلى مجموعة تكليف في هذه المؤسسة.",
-    "Contact.NotFound": "طلب التواصل غير موجود."
+    "Contact.NotFound": "طلب التواصل غير موجود.",
+    "FormEngine.Form.NotFound": "تعذر العثور على النموذج.",
+    "FormEngine.Form.DuplicateCode": "يوجد نموذج بهذا الرمز بالفعل.",
+    "FormEngine.Form.NotEditable": "لم يعد من الممكن تعديل هذا النموذج.",
+    "FormEngine.Form.NotPublished": "لا يوجد إصدار منشور يقبل الإرساليات لهذا النموذج.",
+    "FormEngine.Form.ConcurrencyConflict": "قام شخص آخر بتعديل هذا النموذج. أعد التحميل وحاول مجددًا.",
+    "FormEngine.Schema.Empty": "أضف حقلًا واحدًا على الأقل قبل النشر.",
+    "FormEngine.Schema.InvalidDataName": "يجب أن يبدأ اسم الحقل بحرف أو شرطة سفلية وأن يتكوّن من حروف وأرقام وشرطات سفلية فقط.",
+    "FormEngine.Schema.DuplicateDataName": "يوجد حقلان بنفس الاسم. لكل حقل اسمه الخاص.",
+    "FormEngine.Schema.ReservedDataName": "هذا الاسم محجوز لبيانات الإرسالية. غيّر اسم الحقل.",
+    "FormEngine.FieldCatalog.TypeConflict": "اسم الحقل مستخدم بالفعل بنوع مختلف.",
+    "FormEngine.File.TooLarge": "حجم الملف أكبر من الحد المسموح.",
+    "FormEngine.File.ExtensionNotAllowed": "نوع الملف غير مقبول لهذا الحقل.",
+    "FormEngine.File.NotDeletable": "الملف يتبع نموذجًا مُرسلًا ولا يمكن حذفه.",
+    "FormEngine.File.Forbidden": "ليس لديك صلاحية الوصول إلى هذا الملف."
   },
   "workflow": {
     "common": {
@@ -1992,7 +2007,11 @@
     "workflowCatalog": "دليل سير العمل",
     "lookups": "البيانات المرجعية",
     "users": "حسابات المستخدمين",
-    "rolePermissions": "صلاحيات الأدوار"
+    "rolePermissions": "صلاحيات الأدوار",
+    "forms": "النماذج",
+    "formsList": "إدارة النماذج",
+    "fillForm": "تعبئة نموذج",
+    "fieldCatalog": "فهرس الحقول"
   },
   "lookups": {
     "title": "البيانات المرجعية",
@@ -2073,6 +2092,455 @@
       "columns": {
         "permission": "الصلاحية"
       }
+    }
+  },
+  "formBuilder": {
+    "title": "منشئ النماذج",
+    "subtitle": "صمّم نموذجاً، واضبط الحقول والقواعد والخيارات المتسلسلة، ثم انسخ JSON الناتج.",
+    "fields": "الحقول",
+    "layout": "التخطيط",
+    "fieldsCount": "الحقول",
+    "formNameEn": "اسم النموذج (EN)",
+    "formNameAr": "اسم النموذج (AR)",
+    "settings": "إعدادات النموذج",
+    "actions": {
+      "edit": "تعديل",
+      "duplicate": "تكرار",
+      "delete": "حذف",
+      "cancel": "إلغاء",
+      "save": "حفظ"
+    },
+    "loadSample": "تحميل نموذج تجريبي",
+    "newForm": "نموذج جديد",
+    "loadSampleSuccess": "تم تحميل النموذج التجريبي — يمكنك تعديل جميع الحقول.",
+    "loadSampleError": "فشل تحميل ملف JSON للنموذج التجريبي.",
+    "newFormSuccess": "تم بدء نموذج فارغ جديد.",
+    "save": "حفظ",
+    "publish": "نشر",
+    "saveSuccess": "تم حفظ النموذج.",
+    "saveError": "تعذر حفظ النموذج.",
+    "publishSuccess": "تم نشر النموذج.",
+    "publishError": "تعذر نشر النموذج.",
+    "loadError": "تعذر تحميل النموذج.",
+    "loading": "جاري تحميل النموذج…",
+    "dataNameNewFieldHint": "حقل جديد — سيتم إنشاء عمود عند النشر.",
+    "dataNameTypeMismatch": "اسم البيانات هذا موجود مسبقًا بنوع حقل مختلف.",
+    "dataNameInvalid": "يجب أن يبدأ اسم البيانات بحرف أو شرطة سفلية وأن يحتوي على حروف وأرقام وشرطات سفلية فقط.",
+    "paletteHint": "انقر أو اسحب حقلاً إلى مساحة التصميم.",
+    "dropHere": "اسحب الحقول إلى هنا",
+    "dropIntoSection": "اسحب الحقول داخل هذا القسم",
+    "groups": {
+      "basic": "أساسي",
+      "choice": "اختيار",
+      "design": "تصميم",
+      "media": "الوسائط",
+      "location": "الموقع"
+    },
+    "types": {
+      "text": "نص",
+      "memo": "مذكرة / تعليقات",
+      "numeric": "رقم",
+      "yes_no": "نعم / لا",
+      "date": "تاريخ",
+      "time": "وقت",
+      "calendar_with_hours": "التقويم مع الساعات",
+      "date_time": "التاريخ والوقت",
+      "single_choice": "اختيار واحد",
+      "multiple_choice": "اختيار متعدد",
+      "section": "قسم",
+      "signature": "التوقيع",
+      "photo": "صورة",
+      "video": "فيديو",
+      "audio": "صوت",
+      "file": "ملف",
+      "barcode": "باركود",
+      "geolocation": "الموقع الجغرافي"
+    },
+    "badges": {
+      "required": "إجباري",
+      "hidden": "مخفي",
+      "disabled": "للقراءة فقط",
+      "hasVisibility": "قواعد الظهور",
+      "hasRequirement": "قواعد الإلزام",
+      "hasDefault": "قيمة افتراضية",
+      "hasDateRule": "قاعدة تاريخ",
+      "cascading": "متتالي",
+      "choices": "{{count}} خيارات"
+    },
+    "editor": {
+      "title": "خصائص الحقل",
+      "labelEn": "التسمية (EN)",
+      "labelAr": "التسمية (AR)",
+      "dataName": "اسم البيانات",
+      "descriptionEn": "الوصف (EN)",
+      "descriptionAr": "الوصف (AR)",
+      "defaultValue": "القيمة الافتراضية",
+      "noDefault": "بدون قيمة افتراضية",
+      "defaultOutOfRange": "هذه القيمة الافتراضية لا تحقق قاعدة التاريخ الخاصة بالحقل.",
+      "defaultModes": {
+        "none": "بدون قيمة افتراضية",
+        "now": "تاريخ ووقت تعبئة النموذج",
+        "nowDate": "تاريخ تعبئة النموذج",
+        "fixed": "قيمة أحددها"
+      },
+      "latitude": "خط العرض",
+      "longitude": "خط الطول",
+      "dateRule": "قاعدة التاريخ",
+      "dateRuleHint": "يتم التحقق منها مقابل ساعة النظام عند كل تعبئة للنموذج، فلا تصبح القاعدة قديمة.",
+      "dateRules": {
+        "none": "بدون قيود",
+        "after": "بعد اليوم",
+        "onOrAfter": "اليوم أو بعده",
+        "before": "قبل اليوم",
+        "onOrBefore": "اليوم أو قبله"
+      },
+      "dateTimeRules": {
+        "none": "بدون قيود",
+        "after": "بعد الوقت الحالي",
+        "onOrAfter": "الوقت الحالي أو بعده",
+        "before": "قبل الوقت الحالي",
+        "onOrBefore": "الوقت الحالي أو قبله"
+      },
+      "minDate": "أقدم تاريخ",
+      "maxDate": "أحدث تاريخ",
+      "dateBoundsHint": "حدود ثابتة اختيارية تُطبَّق إضافةً إلى القاعدة أعلاه. اتركها فارغة لعدم استخدامها.",
+      "dateBoundsInvalid": "يجب ألا يكون أقدم تاريخ بعد أحدث تاريخ.",
+      "required": "حقل إجباري؟",
+      "hidden": "مخفي؟",
+      "readonly": "حقل للقراءة فقط؟",
+      "minLength": "أقل طول",
+      "maxLength": "أقصى طول",
+      "validationPattern": "نمط التحقق",
+      "format": "الصيغة",
+      "minValue": "القيمة الدنيا",
+      "maxValue": "القيمة القصوى",
+      "allowOther": "السماح بـ \"أخرى\"",
+      "parentField": "الحقل الأصل (تسلسلي)",
+      "parentFieldHint": "قم بتصفية هذه القائمة بناءً على القيمة المختارة في حقل اختيار آخر.",
+      "noParent": "بدون أصل (مستقل)",
+      "choices": "الخيارات",
+      "addChoice": "إضافة خيار",
+      "optionValue": "القيمة",
+      "optionLabelEn": "التسمية (EN)",
+      "optionLabelAr": "التسمية (AR)",
+      "dependsOn": "يعتمد على",
+      "display": "العرض",
+      "maxFiles": "الحد الأقصى للملفات",
+      "maxFileSize": "الحد الأقصى لحجم الملف (ميجابايت)",
+      "mediaHint": "حدود تُطبَّق عند التقاط المستجيب للملفات أو إرفاقها.",
+      "allowedExtensions": "الامتدادات المسموح بها",
+      "allowedExtensionsPlaceholder": "اكتب الامتداد ثم اضغط Enter",
+      "allowedExtensionsHint": "اتركه فارغاً لقبول أي ملف من هذا النوع.",
+      "resetExtensions": "استعادة الافتراضي",
+      "clearExtensions": "السماح بالكل",
+      "barcodeFormats": "صيغ الباركود المقبولة",
+      "barcodeFormatsPlaceholder": "اختر الصيغ",
+      "barcodeFormatsHint": "الصيغ التي يقبلها الماسح في تطبيق الجوال. اتركه فارغاً لقبول أي صيغة يستطيع قراءتها.",
+      "resetBarcodeFormats": "استعادة الافتراضي",
+      "mapZoom": "مستوى تقريب الخريطة",
+      "mapZoomHint": "1 = العالم كله، 5 = السعودية، 15 = مستوى الشارع. اضبط قيمة افتراضية مثل \"24.7136,46.6753\" لتحديد الدبوس مسبقاً."
+    },
+    "pattern": {
+      "title": "نمط التحقق",
+      "pattern": "النمط",
+      "description": "الوصف",
+      "tryHint": "أدخل أي نص أدناه لتجربة التحقق.",
+      "tryPlaceholder": "جرّبه",
+      "examples": {
+        "title": "أمثلة",
+        "alphanumeric": "أحرف وأرقام فقط",
+        "exactly5Letters": "خمسة أحرف بالضبط",
+        "exactly3Chars": "ثلاثة أحرف بالضبط",
+        "digitsOnly": "أرقام فقط",
+        "usPhone": "رقم هاتف أمريكي",
+        "price": "سعر",
+        "year": "سنة 1900-2099",
+        "uppercase": "أحرف كبيرة فقط",
+        "ip": "عنوان IP",
+        "singleLine": "سطر واحد فقط"
+      }
+    },
+    "rules": {
+      "visibilityRules": "قواعد الظهور",
+      "requirementRules": "قواعد الإلزام",
+      "visibilityTitle": "قواعد الظهور",
+      "requirementTitle": "قواعد الإلزام",
+      "visibilityHint": "فيما يلي الشروط التي تحدد إظهار العنصر أو إخفاءه.",
+      "requirementHint": "فيما يلي الشروط التي تحدد ما إذا كان الحقل إجبارياً أم لا.",
+      "match": "طابق",
+      "ofConditions": "من الشروط التالية",
+      "selectField": "اختر حقلاً",
+      "operator": "العامل",
+      "value": "القيمة",
+      "addCondition": "إضافة شرط",
+      "preserveData": "احتفظ ببيانات هذا الحقل حتى عندما يكون مخفياً.",
+      "preserveDataHint": "تفعيل هذا يحافظ على القيمة حتى عند إخفاء الحقل بشرط."
+    },
+    "match": {
+      "all": "الكل",
+      "any": "أي"
+    },
+    "operators": {
+      "equal": "يساوي",
+      "not_equal": "لا يساوي",
+      "contains": "يحتوي على",
+      "starts_with": "يبدأ بـ",
+      "greater_than": "أكبر من",
+      "less_than": "أصغر من",
+      "is_empty": "فارغ",
+      "is_not_empty": "غير فارغ"
+    },
+    "json": {
+      "title": "JSON النموذج الناتج",
+      "copy": "نسخ",
+      "copied": "تم النسخ"
+    },
+    "preview": {
+      "open": "معاينة",
+      "title": "معاينة النموذج",
+      "hint": "هذا هو النموذج الفعلي المُولَّد من ملف JSON — قم بتعبئته لاختبار القواعد والخيارات المتتالية والتحقق من الصحة.",
+      "empty": "أضف حقلاً واحداً على الأقل لمعاينة النموذج.",
+      "liveModel": "مخرجات بيانات النموذج (JSON مباشر)",
+      "valid": "صالح",
+      "invalid": "غير صالح",
+      "submit": "إرسال",
+      "reset": "إعادة تعيين",
+      "submitSuccess": "النموذج صالح — هذه هي البيانات المُرسلة.",
+      "submitInvalid": "يرجى تصحيح الحقول المميزة قبل الإرسال.",
+      "yes": "نعم",
+      "no": "لا",
+      "other": "أخرى",
+      "otherPlaceholder": "اكتب إجابتك",
+      "selectPlaceholder": "اختر...",
+      "invalidCount": "{{count}} حقل يحتاج إلى مراجعة",
+      "answered": "{{count}} تمت الإجابة"
+    },
+    "actionsHeading": "الإجراءات",
+    "backToForms": "العودة إلى النماذج",
+    "sandboxTitle": "مساحة تجربة منشئ النماذج",
+    "sandboxSubtitle": "جرّب أنواع الحقول. لا يتم حفظ أي شيء هنا."
+  },
+  "formly": {
+    "moreSelected": "+{{count}} أخرى",
+    "totalSelected": "{{count}} محدد",
+    "signature": {
+      "clear": "مسح",
+      "hint": "ارسم توقيعك في المربع أعلاه.",
+      "uploading": "جارٍ رفع التوقيع…",
+      "uploadFailed": "تعذر رفع التوقيع. {{reason}}"
+    },
+    "attachment": {
+      "add": "إضافة ملف",
+      "empty": "لم يتم إرفاق أي ملفات بعد.",
+      "remove": "إزالة",
+      "tooMany": "يمكنك إرفاق {{count}} ملف كحد أقصى.",
+      "tooLarge": "{{name}} يتجاوز الحد المسموح {{size}} ميجابايت.",
+      "limits": "حتى {{count}} ملف، {{size}} ميجابايت لكل ملف",
+      "badExtension": "{{name}} غير مسموح به. الامتدادات المقبولة: {{extensions}}.",
+      "limitsWithExtensions": "حتى {{count}} ملف، {{size}} ميجابايت لكل ملف — {{extensions}}",
+      "uploading": "جارٍ الرفع…",
+      "uploadFailed": "تعذر رفع {{name}}. {{reason}}"
+    },
+    "barcode": {
+      "placeholder": "امسح الرمز أو أدخله",
+      "formats": "الصيغ المقبولة: {{formats}}",
+      "webHint": "المسح متاح في تطبيق الجوال؛ أدخل الرمز هنا."
+    },
+    "calendarWithHours": {
+      "from": "من",
+      "to": "إلى",
+      "days": {
+        "sat": "السبت",
+        "sun": "الأحد",
+        "mon": "الاثنين",
+        "tue": "الثلاثاء",
+        "wed": "الأربعاء",
+        "thu": "الخميس",
+        "fri": "الجمعة"
+      }
+    },
+    "dateTime": {
+      "date": "التاريخ",
+      "time": "الوقت"
+    },
+    "timePicker": {
+      "hour": "الساعة",
+      "minute": "الدقيقة",
+      "clear": "مسح",
+      "placeholder": "--:--"
+    }
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "minLength": "يجب ألا يقل عن {{min}} أحرف",
+    "maxLength": "يجب ألا يزيد عن {{max}} أحرف",
+    "min": "يجب أن تكون القيمة أكبر من أو تساوي {{min}}",
+    "max": "يجب أن تكون القيمة أصغر من أو تساوي {{max}}",
+    "pattern": "القيمة لا تطابق التنسيق المطلوب",
+    "integer": "يجب أن يكون رقماً صحيحاً",
+    "calendarWithHoursRange": "حدد وقت البداية والنهاية لكل يوم مختار",
+    "dateAfterToday": "يجب أن يكون تاريخًا بعد اليوم",
+    "dateOnOrAfterToday": "يجب أن يكون اليوم أو تاريخًا لاحقًا",
+    "dateBeforeToday": "يجب أن يكون تاريخًا قبل اليوم",
+    "dateOnOrBeforeToday": "يجب أن يكون اليوم أو تاريخًا سابقًا",
+    "dateTimeAfterNow": "يجب أن يكون بعد الوقت الحالي",
+    "dateTimeOnOrAfterNow": "يجب أن يكون الوقت الحالي أو بعده",
+    "dateTimeBeforeNow": "يجب أن يكون قبل الوقت الحالي",
+    "dateTimeOnOrBeforeNow": "يجب أن يكون الوقت الحالي أو قبله",
+    "dateMin": "يجب ألا يكون قبل {{date}}",
+    "dateMax": "يجب ألا يكون بعد {{date}}"
+  },
+  "geoMap": {
+    "latitude": "خط العرض",
+    "longitude": "خط الطول",
+    "noPoint": "لم يتم تحديد موقع — انقر على الخريطة لوضع دبوس.",
+    "noPointManual": "لم يتم تحديد موقع — أدخل الإحداثيات أعلاه.",
+    "manualHint": "الخريطة غير متاحة، لذا أدخل الإحداثيات يدويًا. يلزم إدخال القيمتين قبل تسجيل الموقع.",
+    "myLocation": "موقعي الحالي",
+    "clear": "مسح",
+    "notConfigured": "لم يتم إعداد خرائط Google. أضف googleMapsApiKey إلى app-config.json.",
+    "loadFailed": "تعذر تحميل الخريطة. تحقق من مفتاح API ومن الاتصال.",
+    "geolocationUnavailable": "هذا المتصفح لا يدعم تحديد الموقع.",
+    "geolocationDenied": "تم رفض إذن الوصول إلى الموقع.",
+    "viewMap": "خريطة",
+    "viewSatellite": "قمر صناعي",
+    "recenter": "إعادة ضبط العرض",
+    "copy": "نسخ الإحداثيات",
+    "pickHint": "انقر على الخريطة لوضع دبوس",
+    "address": "العنوان",
+    "addressPlaceholder": "العنوان (اختياري)",
+    "addressLoading": "جارٍ جلب العنوان…",
+    "addressLookupFailed": "تعذر جلب العنوان. تم حفظ الموقع على أي حال — يمكنك كتابة العنوان يدويًا.",
+    "noAddress": "لا يوجد عنوان مسجل",
+    "refreshAddress": "إعادة جلب العنوان",
+    "search": "البحث عن عنوان",
+    "searchPlaceholder": "ابحث عن عنوان أو مكان"
+  },
+  "media": {
+    "preview": "معاينة",
+    "download": "تنزيل",
+    "previous": "السابق",
+    "next": "التالي",
+    "counter": "{{current}} / {{total}}",
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير",
+    "rotate": "تدوير",
+    "resetView": "إعادة ضبط العرض",
+    "loadFailed": "تعذّر تحميل هذا الملف.",
+    "noPreview": "لا يمكن معاينة هذا النوع من الملفات. قم بتنزيله لفتحه."
+  },
+  "fieldCatalog": {
+    "title": "فهرس الحقول",
+    "subtitle": "كل أسماء الحقول المستخدمة، ونوع العمود المخزّن لكل اسم.",
+    "hint": "يحتفظ الاسم بنوعه دائمًا: إعادة استخدامه في نموذج آخر تعيد استخدام العمود نفسه، وهذا ما يجعل الإجابات قابلة للمقارنة بين النماذج.",
+    "dataName": "اسم الحقل",
+    "fieldType": "النوع",
+    "labelEn": "التسمية (إنجليزي)",
+    "labelAr": "التسمية (عربي)",
+    "empty": "لا توجد أسماء حقول بعد. نشر نموذج يسجّل الأسماء التي يستخدمها."
+  },
+  "forms": {
+    "title": "النماذج",
+    "subtitle": "تصميم ونشر وإصدار النماذج التي تتم تعبئتها.",
+    "newForm": "نموذج جديد",
+    "editForm": "تعديل النموذج",
+    "code": "الرمز",
+    "codeInvalid": "استخدم الحروف والأرقام و\"-\" و\"_\" و\".\" فقط، على أن يبدأ بحرف أو رقم.",
+    "codeImmutable": "لا يمكن تغيير الرمز: الإصدارات المنشورة معروفة به.",
+    "name": "الاسم",
+    "nameEn": "الاسم (إنجليزي)",
+    "nameAr": "الاسم (عربي)",
+    "category": "التصنيف",
+    "allCategories": "كل التصنيفات",
+    "department": "الإدارة",
+    "noDepartment": "بدون إدارة",
+    "status": "الحالة",
+    "version": "الإصدار",
+    "empty": "لا توجد نماذج.",
+    "notFound": "تعذر العثور على النموذج.",
+    "backToForms": "العودة إلى النماذج",
+    "createSuccess": "تم إنشاء النموذج.",
+    "updateSuccess": "تم تحديث النموذج.",
+    "publishSuccess": "تم نشر النموذج.",
+    "deprecateSuccess": "تم إيقاف النموذج.",
+    "archiveSuccess": "تمت أرشفة النموذج.",
+    "categories": {
+      "GENERAL": "عام",
+      "INSPECTION": "فحص",
+      "SURVEY": "مسح",
+      "REQUEST": "طلب",
+      "CHECKLIST": "قائمة تحقق",
+      "OTHER": "أخرى"
+    },
+    "statuses": {
+      "draft": "مسودة",
+      "published": "منشور",
+      "deprecated": "موقوف",
+      "archived": "مؤرشف",
+      "unknown": "غير معروف"
+    },
+    "statusFilter": {
+      "active": "النماذج الفعّالة",
+      "all": "كل الحالات"
+    },
+    "actions": {
+      "edit": "تعديل البيانات",
+      "design": "تصميم الحقول",
+      "preview": "معاينة",
+      "fill": "تعبئة",
+      "versions": "سجل الإصدارات",
+      "clone": "نسخ",
+      "submissions": "الإرساليات",
+      "publish": "نشر",
+      "deprecate": "إيقاف",
+      "archive": "أرشفة"
+    },
+    "confirm": {
+      "publish": "نشر \"{{name}}\"؟ سيتم تجميد التصميم الحالي كإصدار جديد.",
+      "deprecate": "إيقاف \"{{name}}\"؟ لن يقبل إرساليات جديدة.",
+      "archive": "أرشفة \"{{name}}\"؟ سيُخفى من القائمة الفعّالة."
+    },
+    "clone": {
+      "title": "نسخ النموذج",
+      "hint": "ينسخ التصميم إلى مسودة جديدة. لا يتم نسخ سجل الإصدارات.",
+      "copySuffix": "(نسخة)",
+      "success": "تم نسخ النموذج."
+    },
+    "versions": {
+      "title": "سجل الإصدارات",
+      "no": "الإصدار",
+      "publishedBy": "نُشر بواسطة",
+      "publishedAt": "تاريخ النشر",
+      "empty": "لا توجد إصدارات بعد. انشر النموذج لإنشاء إصدار."
+    },
+    "preview": {
+      "invalidSchema": "تعذّر قراءة التصميم المحفوظ."
+    },
+    "fill": {
+      "title": "تعبئة نموذج",
+      "subtitle": "أجب عن النموذج ثم أرسله.",
+      "submit": "إرسال",
+      "success": "تم تسجيل الإرسالية.",
+      "error": "تعذر إرسال النموذج.",
+      "invalid": "بعض الإجابات تحتاج إلى مراجعة",
+      "invalidDetail": "هناك {{count}} حقل ناقص أو غير صحيح.",
+      "closed": "هذا النموذج لم يعد يقبل إرساليات.",
+      "empty": "لا توجد حقول لتعبئتها في هذا النموذج."
+    },
+    "published": {
+      "title": "تعبئة نموذج",
+      "subtitle": "النماذج المتاحة للتعبئة الآن.",
+      "empty": "لا توجد نماذج متاحة للتعبئة بعد."
+    },
+    "submissions": {
+      "title": "الإرساليات",
+      "subtitle": "ما تمت تعبئته في هذا النموذج.",
+      "submittedAt": "تاريخ الإرسال",
+      "submittedBy": "أرسلها",
+      "context": "يتبع",
+      "view": "عرض الإرسالية",
+      "renderedWithVersion": "معروضة بالإصدار الذي تمت الإجابة عليه.",
+      "empty": "لم يتم إرسال أي شيء بعد."
     }
   }
 }

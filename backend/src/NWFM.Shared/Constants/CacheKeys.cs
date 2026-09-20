@@ -27,4 +27,9 @@ public static class CacheKeys
         public const string Branches = $"{Prefix}:Lookups:Branches";
         public const string OperationAreas = $"{Prefix}:Lookups:OperationAreas";
     }
+
+    public static class FormEngine
+    {
+        public const string FieldCatalog = $"{Prefix}:FormEngine:FieldCatalog";
+    }
 }

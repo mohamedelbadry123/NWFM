@@ -43,6 +43,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/lookups/lookups.component').then(m => m.LookupsComponent),
       },
       {
+        path: 'forms',
+        loadChildren: () => import('./features/form-engine/form-engine.routes').then(m => m.FORM_ENGINE_ROUTES),
+      },
+      {
         path: 'admin/users',
         canActivate: [permissionGuard(PERMISSIONS.manageUsers)],
         data: { titleKey: 'users.title', subtitleKey: 'users.subtitle' },

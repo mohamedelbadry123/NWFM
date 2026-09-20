@@ -1,0 +1,148 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="mb-4 flex justify-end">
+  <ng-container *hasPermission="PERMISSIONS.manageForms">
+    <p-button [label]="'forms.newForm' | translate" icon="pi pi-plus" (onClick)="openNew()" />
+  </ng-container>
+</div>
+
+<div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+  <p-table
+    [value]="forms()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [rows]="10"
+    [paginator]="true"
+    [totalRecords]="totalRecords()"
+    [loading]="loading()"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [rowHover]="true"
+    styleClass="p-datatable-sm p-datatable-striped"
+  >
+    <ng-template pTemplate="caption">
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <p-select
+          [options]="categoryOptions"
+          [(ngModel)]="category"
+          optionValue="value"
+          [showClear]="false"
+          (onChange)="applyFilters()"
+          styleClass="w-48"
+          appendTo="body"
+        >
+          <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+          <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+        </p-select>
+
+        <p-select
+          [options]="statusOptions"
+          [(ngModel)]="status"
+          optionValue="value"
+          (onChange)="applyFilters()"
+          styleClass="w-48"
+          appendTo="body"
+        >
+          <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+          <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+        </p-select>
+
+        <input
+          pInputText
+          type="search"
+          [(ngModel)]="search"
+          (keyup.enter)="applyFilters()"
+          [placeholder]="'common.search' | translate"
+          class="w-64"
+        />
+        <p-button icon="pi pi-search" [text]="true" (onClick)="applyFilters()" [ariaLabel]="'common.search' | translate" />
+      </div>
+    </ng-template>
+
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'forms.code' | translate }}</th>
+        <th>{{ 'forms.name' | translate }}</th>
+        <th>{{ 'forms.category' | translate }}</th>
+        <th>{{ 'forms.status' | translate }}</th>
+        <th>{{ 'forms.version' | translate }}</th>
+        <th class="w-64">{{ 'common.actions' | translate }}</th>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-form>
+      <tr>
+        <td class="font-mono text-sm">{{ form.code }}</td>
+        <td>{{ nameOf()(form) }}</td>
+        <td>{{ 'forms.categories.' + form.category | translate }}</td>
+        <td>
+          <p-tag [value]="statusLabelKey(form.status) | translate" [severity]="statusSeverity(form.status)" />
+        </td>
+        <td>{{ form.currentVersionNo ?? '—' }}</td>
+        <td>
+          <div class="flex items-center gap-1">
+            <ng-container *hasPermission="PERMISSIONS.manageForms">
+              <p-button
+                icon="pi pi-pencil"
+                [text]="true"
+                [rounded]="true"
+                [pTooltip]="'forms.actions.edit' | translate"
+                (onClick)="openEdit(form)"
+              />
+              <p-button
+                icon="pi pi-sitemap"
+                [text]="true"
+                [rounded]="true"
+                [pTooltip]="'forms.actions.design' | translate"
+                (onClick)="design(form)"
+              />
+            </ng-container>
+
+            <p-button
+              icon="pi pi-eye"
+              [text]="true"
+              [rounded]="true"
+              [pTooltip]="'forms.actions.preview' | translate"
+              (onClick)="preview(form)"
+            />
+
+            <ng-container *hasPermission="PERMISSIONS.submitForms">
+              <p-button
+                icon="pi pi-pen-to-square"
+                [text]="true"
+                [rounded]="true"
+                [disabled]="!canFillForm(form)"
+                [pTooltip]="'forms.actions.fill' | translate"
+                (onClick)="fill(form)"
+              />
+            </ng-container>
+
+            <p-button
+              icon="pi pi-ellipsis-v"
+              [text]="true"
+              [rounded]="true"
+              [loading]="busyId() === form.id"
+              [ariaLabel]="'common.actions' | translate"
+              (onClick)="rowMenu.toggle($event)"
+            />
+            <p-menu #rowMenu [model]="menuFor(form)" [popup]="true" appendTo="body" />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="6" class="p-6 text-center opacity-70">{{ 'forms.empty' | translate }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<app-form-details-dialog [(visible)]="detailsVisible" [form]="selected()" (saved)="load()" />
+<app-form-clone-dialog [(visible)]="cloneVisible" [form]="selected()" (cloned)="load()" />
+<app-form-versions-dialog [(visible)]="versionsVisible" [form]="selected()" />
+
+@if (previewVisible()) {
+  <app-form-preview-dialog [(visible)]="previewVisible" [definition]="previewDefinition()" />
+}

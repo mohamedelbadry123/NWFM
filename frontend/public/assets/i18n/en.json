@@ -31,7 +31,8 @@
     "language": "Language",
     "english": "English",
     "arabic": "العربية",
-    "toggleTheme": "Toggle theme"
+    "toggleTheme": "Toggle theme",
+    "required": "Required"
   },
   "error": {
     "ProcessingPurpose.NotFound": "Processing purpose not found.",
@@ -62,7 +63,21 @@
     "Workflow.Binding.NotFound": "Workflow binding was not found. Finish creating the binding first, then run Simulate again.",
     "Workflow.Binding.OrganizationMismatch": "A binding can only attach a workflow to a screen in the same organization that owns the workflow.",
     "Workflow.Binding.IncompleteMappings": "Cannot activate binding: one or more User Tasks do not resolve to an assignment group in this organization.",
-    "Contact.NotFound": "The contact inquiry was not found."
+    "Contact.NotFound": "The contact inquiry was not found.",
+    "FormEngine.Form.NotFound": "The form could not be found.",
+    "FormEngine.Form.DuplicateCode": "A form with this code already exists.",
+    "FormEngine.Form.NotEditable": "This form can no longer be edited.",
+    "FormEngine.Form.NotPublished": "This form has no published version that accepts submissions.",
+    "FormEngine.Form.ConcurrencyConflict": "Someone else changed this form. Reload it and try again.",
+    "FormEngine.Schema.Empty": "Add at least one field before publishing.",
+    "FormEngine.Schema.InvalidDataName": "A field data name must start with a letter or underscore and contain only letters, digits and underscores.",
+    "FormEngine.Schema.DuplicateDataName": "Two fields share a data name. Every field needs its own.",
+    "FormEngine.Schema.ReservedDataName": "That data name is reserved for submission metadata. Rename the field.",
+    "FormEngine.FieldCatalog.TypeConflict": "That field name is already in use with a different type.",
+    "FormEngine.File.TooLarge": "The file is larger than the upload limit.",
+    "FormEngine.File.ExtensionNotAllowed": "That file type is not accepted for this field.",
+    "FormEngine.File.NotDeletable": "The file belongs to a submitted form and cannot be removed.",
+    "FormEngine.File.Forbidden": "You do not have access to this file."
   },
   "workflow": {
     "common": {
@@ -1992,7 +2007,11 @@
     "workflowCatalog": "Workflow catalog",
     "lookups": "Lookups",
     "users": "User accounts",
-    "rolePermissions": "Role permissions"
+    "rolePermissions": "Role permissions",
+    "forms": "Forms",
+    "formsList": "Manage forms",
+    "fillForm": "Fill a form",
+    "fieldCatalog": "Field catalog"
   },
   "lookups": {
     "title": "Lookups",
@@ -2073,6 +2092,455 @@
       "columns": {
         "permission": "Permission"
       }
+    }
+  },
+  "formBuilder": {
+    "title": "Form Builder",
+    "subtitle": "Design a form, configure fields, rules and cascading choices, then copy the generated JSON.",
+    "fields": "Fields",
+    "layout": "Layout",
+    "fieldsCount": "Fields",
+    "formNameEn": "Form Name (EN)",
+    "formNameAr": "Form Name (AR)",
+    "settings": "Form Settings",
+    "actions": {
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "loadSample": "Load Sample",
+    "newForm": "New Form",
+    "loadSampleSuccess": "Sample form loaded — you can edit all fields.",
+    "loadSampleError": "Failed to load sample form JSON.",
+    "newFormSuccess": "Started a new empty form.",
+    "save": "Save",
+    "publish": "Publish",
+    "saveSuccess": "Form saved.",
+    "saveError": "The form could not be saved.",
+    "publishSuccess": "Form published.",
+    "publishError": "The form could not be published.",
+    "loadError": "The form could not be loaded.",
+    "loading": "Loading form…",
+    "dataNameNewFieldHint": "New field — a column will be created on publish.",
+    "dataNameTypeMismatch": "This data name already exists as a different field type.",
+    "dataNameInvalid": "A data name must start with a letter or underscore and contain only letters, digits and underscores.",
+    "paletteHint": "Click or drag a field onto the canvas.",
+    "dropHere": "Drag fields here",
+    "dropIntoSection": "Drag fields into this section",
+    "groups": {
+      "basic": "Basic",
+      "choice": "Choice",
+      "design": "Design",
+      "media": "Media",
+      "location": "Location"
+    },
+    "types": {
+      "text": "Text",
+      "memo": "Memo / Comments",
+      "numeric": "Numeric",
+      "yes_no": "Yes / No",
+      "date": "Date",
+      "time": "Time",
+      "calendar_with_hours": "Calendar with Hours",
+      "date_time": "Date & Time",
+      "single_choice": "Single Choice",
+      "multiple_choice": "Multiple Choice",
+      "section": "Section",
+      "signature": "Signature",
+      "photo": "Photo",
+      "video": "Video",
+      "audio": "Audio",
+      "file": "File",
+      "barcode": "Barcode",
+      "geolocation": "Geolocation"
+    },
+    "badges": {
+      "required": "Required",
+      "hidden": "Hidden",
+      "disabled": "Read-only",
+      "hasVisibility": "Visibility rules",
+      "hasRequirement": "Req. rules",
+      "hasDefault": "Default",
+      "hasDateRule": "Date rule",
+      "cascading": "Cascading",
+      "choices": "{{count}} choices"
+    },
+    "editor": {
+      "title": "Field Properties",
+      "labelEn": "Label (EN)",
+      "labelAr": "Label (AR)",
+      "dataName": "Data Name",
+      "descriptionEn": "Description (EN)",
+      "descriptionAr": "Description (AR)",
+      "defaultValue": "Default Value",
+      "noDefault": "No default",
+      "defaultOutOfRange": "This default does not satisfy the field's own date rule.",
+      "defaultModes": {
+        "none": "No default",
+        "now": "The date and time the form is filled",
+        "nowDate": "The date the form is filled",
+        "fixed": "A value I choose"
+      },
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "dateRule": "Date Rule",
+      "dateRuleHint": "Checked against the system clock each time the form is filled, so the rule never goes stale.",
+      "dateRules": {
+        "none": "No restriction",
+        "after": "After today",
+        "onOrAfter": "Today or after",
+        "before": "Before today",
+        "onOrBefore": "Today or before"
+      },
+      "dateTimeRules": {
+        "none": "No restriction",
+        "after": "Later than now",
+        "onOrAfter": "Now or later",
+        "before": "Earlier than now",
+        "onOrBefore": "Now or earlier"
+      },
+      "minDate": "Earliest Date",
+      "maxDate": "Latest Date",
+      "dateBoundsHint": "Optional fixed limits, applied on top of the rule above. Leave empty for none.",
+      "dateBoundsInvalid": "The earliest date must not be after the latest date.",
+      "required": "Required field?",
+      "hidden": "Hidden?",
+      "readonly": "Read-only field?",
+      "minLength": "Min Length",
+      "maxLength": "Max Length",
+      "validationPattern": "Validation Pattern",
+      "format": "Format",
+      "minValue": "Minimum Value",
+      "maxValue": "Maximum Value",
+      "allowOther": "Allow \"Other\"",
+      "parentField": "Parent Field (cascading)",
+      "parentFieldHint": "Filter this list based on the value chosen in another choice field.",
+      "noParent": "No parent (independent)",
+      "choices": "Choices",
+      "addChoice": "Add Choice",
+      "optionValue": "Value",
+      "optionLabelEn": "Label (EN)",
+      "optionLabelAr": "Label (AR)",
+      "dependsOn": "Depends on",
+      "display": "Display",
+      "maxFiles": "Max Files",
+      "maxFileSize": "Max File Size (MB)",
+      "mediaHint": "Limits applied when the respondent captures or attaches files.",
+      "allowedExtensions": "Allowed Extensions",
+      "allowedExtensionsPlaceholder": "Type an extension and press Enter",
+      "allowedExtensionsHint": "Leave empty to accept any file of this media type.",
+      "resetExtensions": "Reset to defaults",
+      "clearExtensions": "Allow all",
+      "barcodeFormats": "Accepted Barcode Formats",
+      "barcodeFormatsPlaceholder": "Select formats",
+      "barcodeFormatsHint": "Which symbologies the mobile scanner should accept. Leave empty to accept anything it can read.",
+      "resetBarcodeFormats": "Reset to defaults",
+      "mapZoom": "Initial Map Zoom",
+      "mapZoomHint": "1 = whole world, 5 = Saudi Arabia, 15 = street level. Set a Default Value like \"24.7136,46.6753\" to pre-place the pin."
+    },
+    "pattern": {
+      "title": "Validation Pattern",
+      "pattern": "Pattern",
+      "description": "Description",
+      "tryHint": "Enter any text below to try out the validation.",
+      "tryPlaceholder": "Try it out",
+      "examples": {
+        "title": "Examples",
+        "alphanumeric": "Alphanumeric Only",
+        "exactly5Letters": "Exactly 5 Letters",
+        "exactly3Chars": "Exactly 3 Characters",
+        "digitsOnly": "Digits Only",
+        "usPhone": "US Phone Number",
+        "price": "Price",
+        "year": "Year 1900-2099",
+        "uppercase": "Uppercase Only",
+        "ip": "IP Address",
+        "singleLine": "Single Line Only"
+      }
+    },
+    "rules": {
+      "visibilityRules": "Visibility Rules",
+      "requirementRules": "Requirement Rules",
+      "visibilityTitle": "Visibility Rules",
+      "requirementTitle": "Requirement Rules",
+      "visibilityHint": "Below are the conditions that determine whether to show or hide the element.",
+      "requirementHint": "Below are the conditions that determine whether the field is required or not.",
+      "match": "Match",
+      "ofConditions": "of the following conditions",
+      "selectField": "Select a field",
+      "operator": "Operator",
+      "value": "Value",
+      "addCondition": "Add Condition",
+      "preserveData": "Preserve data in this field even when it's invisible.",
+      "preserveDataHint": "Enabling this preserves the value even when the field is conditionally hidden."
+    },
+    "match": {
+      "all": "All",
+      "any": "Any"
+    },
+    "operators": {
+      "equal": "Equal to",
+      "not_equal": "Not equal to",
+      "contains": "Contains",
+      "starts_with": "Starts with",
+      "greater_than": "Greater than",
+      "less_than": "Less than",
+      "is_empty": "Is empty",
+      "is_not_empty": "Is not empty"
+    },
+    "json": {
+      "title": "Generated Form JSON",
+      "copy": "Copy",
+      "copied": "Copied"
+    },
+    "preview": {
+      "open": "Preview",
+      "title": "Form Preview",
+      "hint": "This is the real form rendered from the generated JSON — fill it in to test rules, cascading choices and validation.",
+      "empty": "Add at least one field to preview the form.",
+      "liveModel": "Form Model Output (Live JSON)",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "submit": "Submit",
+      "reset": "Reset",
+      "submitSuccess": "Form is valid — this is the submitted payload.",
+      "submitInvalid": "Please fix the highlighted fields before submitting.",
+      "yes": "Yes",
+      "no": "No",
+      "other": "Other",
+      "otherPlaceholder": "Type your answer",
+      "selectPlaceholder": "Select...",
+      "invalidCount": "{{count}} field(s) need attention",
+      "answered": "{{count}} answered"
+    },
+    "actionsHeading": "Actions",
+    "backToForms": "Back to forms",
+    "sandboxTitle": "Form builder sandbox",
+    "sandboxSubtitle": "Try the field palette out. Nothing here is saved."
+  },
+  "formly": {
+    "moreSelected": "+{{count}} more",
+    "totalSelected": "{{count}} selected",
+    "signature": {
+      "clear": "Clear",
+      "hint": "Draw your signature in the box above.",
+      "uploading": "Uploading signature…",
+      "uploadFailed": "The signature could not be uploaded. {{reason}}"
+    },
+    "attachment": {
+      "add": "Add file",
+      "empty": "No files attached yet.",
+      "remove": "Remove",
+      "tooMany": "You can attach at most {{count}} file(s).",
+      "tooLarge": "{{name}} exceeds the {{size}} MB limit.",
+      "limits": "Up to {{count}} file(s), {{size}} MB each",
+      "badExtension": "{{name}} is not allowed. Accepted extensions: {{extensions}}.",
+      "limitsWithExtensions": "Up to {{count}} file(s), {{size}} MB each — {{extensions}}",
+      "uploading": "Uploading…",
+      "uploadFailed": "{{name}} could not be uploaded. {{reason}}"
+    },
+    "barcode": {
+      "placeholder": "Scan or enter the code",
+      "formats": "Accepts: {{formats}}",
+      "webHint": "Scanning is available in the mobile app; type the code here."
+    },
+    "calendarWithHours": {
+      "from": "From",
+      "to": "To",
+      "days": {
+        "sat": "Saturday",
+        "sun": "Sunday",
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday"
+      }
+    },
+    "dateTime": {
+      "date": "Date",
+      "time": "Time"
+    },
+    "timePicker": {
+      "hour": "Hour",
+      "minute": "Minute",
+      "clear": "Clear",
+      "placeholder": "--:--"
+    }
+  },
+  "validation": {
+    "required": "This field is required",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be at most {{max}} characters",
+    "min": "Must be greater than or equal to {{min}}",
+    "max": "Must be less than or equal to {{max}}",
+    "pattern": "The value does not match the expected format",
+    "integer": "Must be a whole number",
+    "calendarWithHoursRange": "Set both a start and an end time for every selected day",
+    "dateAfterToday": "Must be a date after today",
+    "dateOnOrAfterToday": "Must be today or a later date",
+    "dateBeforeToday": "Must be a date before today",
+    "dateOnOrBeforeToday": "Must be today or an earlier date",
+    "dateTimeAfterNow": "Must be later than the current time",
+    "dateTimeOnOrAfterNow": "Must be the current time or later",
+    "dateTimeBeforeNow": "Must be earlier than the current time",
+    "dateTimeOnOrBeforeNow": "Must be the current time or earlier",
+    "dateMin": "Must not be before {{date}}",
+    "dateMax": "Must not be after {{date}}"
+  },
+  "geoMap": {
+    "latitude": "Lat",
+    "longitude": "Lng",
+    "noPoint": "No location selected — click the map to drop a pin.",
+    "noPointManual": "No location selected — type the coordinates above.",
+    "manualHint": "The map is unavailable, so enter the coordinates by hand. Both are needed before the location is recorded.",
+    "myLocation": "My location",
+    "clear": "Clear",
+    "notConfigured": "Google Maps is not configured. Add googleMapsApiKey to app-config.json.",
+    "loadFailed": "The map could not be loaded. Check the API key and your connection.",
+    "geolocationUnavailable": "This browser does not support geolocation.",
+    "geolocationDenied": "Location permission was denied.",
+    "viewMap": "Map",
+    "viewSatellite": "Satellite",
+    "recenter": "Reset view",
+    "copy": "Copy coordinates",
+    "pickHint": "Click the map to drop a pin",
+    "address": "Address",
+    "addressPlaceholder": "Address (optional)",
+    "addressLoading": "Looking up the address…",
+    "addressLookupFailed": "The address could not be looked up. The location is still saved — you can type the address yourself.",
+    "noAddress": "No address recorded",
+    "refreshAddress": "Look up the address again",
+    "search": "Search for an address",
+    "searchPlaceholder": "Search for an address or place"
+  },
+  "media": {
+    "preview": "Preview",
+    "download": "Download",
+    "previous": "Previous",
+    "next": "Next",
+    "counter": "{{current}} / {{total}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "rotate": "Rotate",
+    "resetView": "Reset view",
+    "loadFailed": "This file could not be loaded.",
+    "noPreview": "This file type cannot be previewed. Download it to open."
+  },
+  "fieldCatalog": {
+    "title": "Field catalog",
+    "subtitle": "Every field name in use, and the type its stored column holds.",
+    "hint": "A name keeps one type for good: reusing it in another form reuses the same column, which is what makes answers comparable across forms.",
+    "dataName": "Data name",
+    "fieldType": "Type",
+    "labelEn": "Label (EN)",
+    "labelAr": "Label (AR)",
+    "empty": "No field names yet. Publishing a form registers the names it uses."
+  },
+  "forms": {
+    "title": "Forms",
+    "subtitle": "Design, publish and version the forms people fill in.",
+    "newForm": "New form",
+    "editForm": "Edit form",
+    "code": "Code",
+    "codeInvalid": "Use letters, digits, \"-\", \"_\" and \".\" only, starting with a letter or digit.",
+    "codeImmutable": "The code cannot be changed: published versions are known by it.",
+    "name": "Name",
+    "nameEn": "Name (English)",
+    "nameAr": "Name (Arabic)",
+    "category": "Category",
+    "allCategories": "All categories",
+    "department": "Department",
+    "noDepartment": "No department",
+    "status": "Status",
+    "version": "Version",
+    "empty": "No forms found.",
+    "notFound": "The form could not be found.",
+    "backToForms": "Back to forms",
+    "createSuccess": "Form created.",
+    "updateSuccess": "Form updated.",
+    "publishSuccess": "Form published.",
+    "deprecateSuccess": "Form deprecated.",
+    "archiveSuccess": "Form archived.",
+    "categories": {
+      "GENERAL": "General",
+      "INSPECTION": "Inspection",
+      "SURVEY": "Survey",
+      "REQUEST": "Request",
+      "CHECKLIST": "Checklist",
+      "OTHER": "Other"
+    },
+    "statuses": {
+      "draft": "Draft",
+      "published": "Published",
+      "deprecated": "Deprecated",
+      "archived": "Archived",
+      "unknown": "Unknown"
+    },
+    "statusFilter": {
+      "active": "Active forms",
+      "all": "All statuses"
+    },
+    "actions": {
+      "edit": "Edit details",
+      "design": "Design fields",
+      "preview": "Preview",
+      "fill": "Fill in",
+      "versions": "Version history",
+      "clone": "Clone",
+      "submissions": "Submissions",
+      "publish": "Publish",
+      "deprecate": "Deprecate",
+      "archive": "Archive"
+    },
+    "confirm": {
+      "publish": "Publish \"{{name}}\"? This freezes the current design as a new version.",
+      "deprecate": "Deprecate \"{{name}}\"? It will stop accepting new submissions.",
+      "archive": "Archive \"{{name}}\"? It will be hidden from the working list."
+    },
+    "clone": {
+      "title": "Clone form",
+      "hint": "Copies the design into a new draft. Version history is not copied.",
+      "copySuffix": "(copy)",
+      "success": "Form cloned."
+    },
+    "versions": {
+      "title": "Version history",
+      "no": "Version",
+      "publishedBy": "Published by",
+      "publishedAt": "Published",
+      "empty": "No versions yet. Publish the form to create one."
+    },
+    "preview": {
+      "invalidSchema": "The saved design could not be read."
+    },
+    "fill": {
+      "title": "Fill in a form",
+      "subtitle": "Answer the form and submit it.",
+      "submit": "Submit",
+      "success": "Submission recorded.",
+      "error": "The form could not be submitted.",
+      "invalid": "Some answers need attention",
+      "invalidDetail": "{{count}} field(s) are missing or invalid.",
+      "closed": "This form is no longer accepting submissions.",
+      "empty": "This form has no fields to fill in."
+    },
+    "published": {
+      "title": "Fill a form",
+      "subtitle": "The forms you can fill in right now.",
+      "empty": "No forms are available to fill in yet."
+    },
+    "submissions": {
+      "title": "Submissions",
+      "subtitle": "What has been filled in for this form.",
+      "submittedAt": "Submitted",
+      "submittedBy": "Submitted by",
+      "context": "Belongs to",
+      "view": "View submission",
+      "renderedWithVersion": "Shown with the version it was answered on.",
+      "empty": "Nothing has been submitted yet."
     }
   }
 }

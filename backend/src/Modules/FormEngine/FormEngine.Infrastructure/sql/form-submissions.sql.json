@@ -1,0 +1,50 @@
+{
+  "_comment": "Native SQL for the single shared FE.Submissions table (every form lives in one table; FormDefinitionId separates them). Placeholders in {curly} are validated identifiers wrapped with [] by the store; @named parameters carry all values. Edit here without redeploying (the file is reloaded on change).",
+
+  "TableExists": "SELECT CASE WHEN OBJECT_ID(@tableName, N'U') IS NOT NULL THEN 1 ELSE 0 END;",
+
+  "_comment_CreateTable": "The schema guard lets the table be created before the first EF migration has run. Id defaults to NEWSEQUENTIALID so the clustered key stays in order; inserts read the value back with OUTPUT.",
+  "CreateTable": "IF SCHEMA_ID(N'FE') IS NULL EXEC(N'CREATE SCHEMA [FE]'); CREATE TABLE [FE].[Submissions] ([Id] UNIQUEIDENTIFIER NOT NULL CONSTRAINT [DF_FE_Submissions_Id] DEFAULT NEWSEQUENTIALID() CONSTRAINT [PK_FE_Submissions] PRIMARY KEY, [FormDefinitionId] UNIQUEIDENTIFIER NOT NULL, [VersionNo] INT NOT NULL, [Status] NVARCHAR(50) NULL, [ContextType] NVARCHAR(100) NULL, [ContextId] NVARCHAR(100) NULL, [SubmittedBy] NVARCHAR(256) NULL, [SubmittedByName] NVARCHAR(256) NULL, [SubmittedDate] DATETIMEOFFSET NULL, [ClientSubmissionId] UNIQUEIDENTIFIER NULL, [Created] DATETIMEOFFSET NOT NULL CONSTRAINT [DF_FE_Submissions_Created] DEFAULT SYSDATETIMEOFFSET());",
+
+  "ColumnExists": "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE [object_id] = OBJECT_ID(@tableName, N'U') AND [name] = @columnName) THEN 1 ELSE 0 END;",
+  "ColumnNames": "SELECT [name] FROM sys.columns WHERE [object_id] = OBJECT_ID(@tableName, N'U');",
+
+  "_comment_ColumnMaxLength": "Bytes, not characters — an NVARCHAR(100) column reports 200. NVARCHAR(MAX) reports -1. Used to tell a column that is narrower than the type its field now wants.",
+  "ColumnMaxLength": "SELECT [max_length] FROM sys.columns WHERE [object_id] = OBJECT_ID(@tableName, N'U') AND [name] = @columnName;",
+
+  "_comment_ColumnDecimalPrecision": "Precision and scale of a DECIMAL column; no row when the column is not DECIMAL.",
+  "ColumnDecimalPrecision": "SELECT [precision], [scale] FROM sys.columns WHERE [object_id] = OBJECT_ID(@tableName, N'U') AND [name] = @columnName AND [system_type_id] = TYPE_ID(N'decimal');",
+
+  "AddColumn": "ALTER TABLE [FE].[Submissions] ADD {column} {type} NULL;",
+
+  "_comment_AlterColumn": "Only ever issued to WIDEN an NVARCHAR or DECIMAL column — widening preserves every existing row, narrowing would fail or truncate.",
+  "AlterColumn": "ALTER TABLE [FE].[Submissions] ALTER COLUMN {column} {type} NULL;",
+
+  "IndexExists": "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.indexes WHERE [object_id] = OBJECT_ID(@tableName, N'U') AND [name] = @indexName) THEN 1 ELSE 0 END;",
+
+  "CreateFormIndex": "CREATE NONCLUSTERED INDEX [IX_FE_Submissions_Form_SubmittedDate] ON [FE].[Submissions] ([FormDefinitionId], [SubmittedDate] DESC) INCLUDE ([VersionNo], [ContextType], [ContextId]);",
+
+  "_comment_ContextIndex": "Filtered to the rows that belong to something — a workflow work item, say — so a stand-alone fill costs nothing here. A filtered index needs QUOTED_IDENTIFIER and ANSI_NULLS ON; SqlClient sets both, but they are set explicitly because this runs on the submit path.",
+  "CreateContextIndex": "SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; CREATE NONCLUSTERED INDEX [IX_FE_Submissions_Context] ON [FE].[Submissions] ([ContextType], [ContextId]) INCLUDE ([FormDefinitionId], [VersionNo]) WHERE [ContextType] IS NOT NULL;",
+
+  "_comment_ClientSubmissionIndex": "Filtered so the rows that carry no client key are exempt from the uniqueness rule rather than colliding on NULL. This is what makes a retried submit idempotent.",
+  "CreateClientSubmissionIndex": "SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; CREATE UNIQUE NONCLUSTERED INDEX [UX_FE_Submissions_ClientSubmissionId] ON [FE].[Submissions] ([FormDefinitionId], [ClientSubmissionId]) WHERE [ClientSubmissionId] IS NOT NULL;",
+
+  "_comment_AcquireSchemaLock": "Serialises publishes so two forms introducing the same data_name cannot both pass the catalog check and then race to add the column. Held until the surrounding transaction ends; a negative result means the wait timed out.",
+  "AcquireSchemaLock": "DECLARE @result INT; EXEC @result = sp_getapplock @Resource = N'FE.Submissions.Schema', @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 30000; SELECT @result;",
+
+  "Insert": "INSERT INTO [FE].[Submissions] ([FormDefinitionId], [VersionNo], [Status], [ContextType], [ContextId], [SubmittedBy], [SubmittedByName], [SubmittedDate], [ClientSubmissionId]{columns}) OUTPUT INSERTED.[Id] VALUES (@formDefinitionId, @versionNo, @status, @contextType, @contextId, @submittedBy, @submittedByName, @submittedDate, @clientSubmissionId{params});",
+
+  "_comment_UpdateAnswers": "Rewrites named answer columns on a row that already exists. Deliberately narrow — no base column is touched, and there is no way to reach it without naming a submission id. The ordinary way to change answers is a new fill, which writes its own row.",
+  "UpdateAnswers": "UPDATE [FE].[Submissions] SET {assignments} WHERE [Id] = @submissionId AND [FormDefinitionId] = @formDefinitionId;",
+
+  "GetById": "SELECT {select} FROM [FE].[Submissions] WHERE [Id] = @submissionId AND [FormDefinitionId] = @formDefinitionId;",
+
+  "GetLatestByContext": "SELECT TOP 1 {select} FROM [FE].[Submissions] WHERE [FormDefinitionId] = @formDefinitionId AND [ContextType] = @contextType AND [ContextId] = @contextId ORDER BY [SubmittedDate] DESC, [Created] DESC;",
+
+  "GetIdByClientId": "SELECT TOP 1 [Id] FROM [FE].[Submissions] WHERE [FormDefinitionId] = @formDefinitionId AND [ClientSubmissionId] = @clientSubmissionId;",
+
+  "ListByForm": "SELECT {select} FROM [FE].[Submissions] WHERE [FormDefinitionId] = @formDefinitionId AND (@contextType IS NULL OR [ContextType] = @contextType) AND (@contextId IS NULL OR [ContextId] = @contextId) ORDER BY [SubmittedDate] DESC, [Created] DESC OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;",
+
+  "CountByForm": "SELECT COUNT(1) FROM [FE].[Submissions] WHERE [FormDefinitionId] = @formDefinitionId AND (@contextType IS NULL OR [ContextType] = @contextType) AND (@contextId IS NULL OR [ContextId] = @contextId);"
+}

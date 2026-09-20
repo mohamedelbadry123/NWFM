@@ -2,11 +2,13 @@ using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using NWFM.Api.Hosting;
 using NWFM.Api.Services;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Behaviors;
 using NWFM.Shared.Integration.Workflow;
 using Auth.Infrastructure;
+using FormEngine.Infrastructure;
 using Workflow.Infrastructure;
 using Workflow.Infrastructure.Persistence;
 using AppContext = NWFM.Api.Services.ApplicationContext;
@@ -26,14 +28,20 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 builder.AddAuthInfrastructure(connectionString);
 builder.Services.AddWorkflowInfrastructure(connectionString, builder.Configuration);
+builder.AddFormEngineInfrastructure(connectionString);
+
+// Media uploads are larger than Kestrel's default body limit allows.
+builder.AddRequestBodyLimits();
 
 builder.Services.AddMediatR(c =>
 {
     c.RegisterServicesFromAssembly(typeof(Workflow.Application.AssemblyMarker).Assembly);
     c.RegisterServicesFromAssembly(typeof(Auth.Application.AssemblyMarker).Assembly);
+    c.RegisterServicesFromAssembly(typeof(FormEngine.Application.AssemblyMarker).Assembly);
 });
 builder.Services.AddValidatorsFromAssembly(typeof(Workflow.Application.AssemblyMarker).Assembly);
 builder.Services.AddValidatorsFromAssembly(typeof(Auth.Application.AssemblyMarker).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(FormEngine.Application.AssemblyMarker).Assembly);
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
@@ -47,6 +55,7 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 builder.Services.AddControllers(o => o.Filters.AddService<TenantScopeFilter>())
     .AddApplicationPart(typeof(Workflow.Api.Controllers.WorkItemsController).Assembly)
     .AddApplicationPart(typeof(Auth.Api.Controllers.AuthController).Assembly)
+    .AddApplicationPart(typeof(FormEngine.Api.Controllers.FormsController).Assembly)
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
 builder.Services.AddEndpointsApiExplorer();
@@ -112,6 +121,9 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", application = "NWFM"
 
 // Auth database: migrate, SQL objects, seed — controlled by DatabaseStartup flags.
 await app.InitialiseAuthDatabaseAsync();
+
+// FormEngine database: migrate, ensure the shared submissions table, seed the example forms.
+await app.InitialiseFormEngineDatabaseAsync();
 
 // Workflow database: always migrates (existing behavior).
 await using (var scope = app.Services.CreateAsyncScope())

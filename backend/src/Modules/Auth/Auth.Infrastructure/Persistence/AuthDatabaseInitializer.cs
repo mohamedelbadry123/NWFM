@@ -293,31 +293,37 @@ public sealed class AuthDatabaseInitializer
                 NwfmPolicies.ManageDefinitions, NwfmPolicies.ManageBindings, NwfmPolicies.ManageCalendars,
                 NwfmPolicies.ManageSlaPolicies, NwfmPolicies.ViewInstances, NwfmPolicies.ManageIncidents,
                 NwfmPolicies.ManageDeadLetters, NwfmPolicies.ManageParticipants, NwfmPolicies.ManageGroups,
-                NwfmPolicies.ViewWorkload, NwfmPolicies.ManageLookups
+                NwfmPolicies.ViewWorkload, NwfmPolicies.ManageLookups,
+                NwfmPolicies.ViewForms, NwfmPolicies.ManageForms, NwfmPolicies.SubmitForms,
+                NwfmPolicies.ViewSubmissions
             ],
 
             [Roles.Supervisor] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.StartWorkflows, NwfmPolicies.ClaimTasks,
                 NwfmPolicies.ViewInstances, NwfmPolicies.ManageIncidents,
-                NwfmPolicies.ViewWorkload
+                NwfmPolicies.ViewWorkload,
+                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms, NwfmPolicies.ViewSubmissions
             ],
 
             [Roles.Participant] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.ClaimTasks,
-                NwfmPolicies.ViewInstances
+                NwfmPolicies.ViewInstances,
+                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms
             ],
 
             [Roles.FieldTeam] =
             [
-                NwfmPolicies.ViewWorkflows, NwfmPolicies.ClaimTasks
+                NwfmPolicies.ViewWorkflows, NwfmPolicies.ClaimTasks,
+                NwfmPolicies.SubmitForms
             ],
 
             [Roles.Monitor] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.ViewInstances,
-                NwfmPolicies.ViewWorkload
+                NwfmPolicies.ViewWorkload,
+                NwfmPolicies.ViewForms, NwfmPolicies.ViewSubmissions
             ]
         };
     }
@@ -340,6 +346,10 @@ public sealed class AuthDatabaseInitializer
         (NwfmPolicies.ManageDeadLetters, "Workflow", "Manage dead letters", "إدارة الرسائل المتعثرة"),
         (NwfmPolicies.ManageParticipants, "Workflow", "Manage participants", "إدارة المشاركين"),
         (NwfmPolicies.ManageGroups, "Workflow", "Manage assignment groups", "إدارة مجموعات الإسناد"),
-        (NwfmPolicies.ViewWorkload, "Workflow", "View workload", "عرض عبء العمل")
+        (NwfmPolicies.ViewWorkload, "Workflow", "View workload", "عرض عبء العمل"),
+        (NwfmPolicies.ViewForms, "Forms", "View forms", "عرض النماذج"),
+        (NwfmPolicies.ManageForms, "Forms", "Manage forms", "إدارة النماذج"),
+        (NwfmPolicies.SubmitForms, "Forms", "Fill and submit forms", "تعبئة وإرسال النماذج"),
+        (NwfmPolicies.ViewSubmissions, "Forms", "View form submissions", "عرض إرساليات النماذج")
     ];
 }

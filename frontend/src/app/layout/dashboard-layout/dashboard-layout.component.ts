@@ -96,6 +96,28 @@ export class DashboardLayoutComponent {
       ],
     },
     {
+      labelKey: 'nav.forms',
+      icon: 'pi pi-file-edit',
+      children: [
+        {
+          labelKey: 'nav.formsList',
+          route: '/forms',
+          exact: true,
+          permissions: [PERMISSIONS.viewForms, ADMINISTRATOR_ROLE],
+        },
+        {
+          labelKey: 'nav.fillForm',
+          route: '/forms/published',
+          permissions: [PERMISSIONS.submitForms, PERMISSIONS.viewForms, ADMINISTRATOR_ROLE],
+        },
+        {
+          labelKey: 'nav.fieldCatalog',
+          route: '/forms/field-catalog',
+          permissions: [PERMISSIONS.viewForms, ADMINISTRATOR_ROLE],
+        },
+      ],
+    },
+    {
       labelKey: 'nav.lookups',
       icon: 'pi pi-list',
       route: '/lookups',

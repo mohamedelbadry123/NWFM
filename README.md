@@ -43,6 +43,41 @@ Startup applies the new migrations and initializes one tenant, two reviewers, a 
 
 The header selects the acting participant. New participants can be created directly under **Participants**; the header list updates automatically. The tenant selector has one available tenant in this version. The configured default participant cannot be deactivated until another default is configured.
 
+## Forms
+
+The **FormEngine** module (SQL schema `FE`) holds the forms people fill in: a drag-and-drop builder, a
+versioned publish lifecycle, and the submissions themselves.
+
+1. Open **Forms → Manage forms**, create a form, then **Design fields** to lay it out. Saving keeps a
+   working draft; nothing is registered until you publish.
+2. **Publish** freezes the design as a version. It also registers each field's data name in the field
+   catalog and adds that name's column to the shared `FE.Submissions` table.
+3. **Fill a form** lists everything with a published version. Media fields upload as soon as a file is
+   picked, so a submission carries references rather than bytes.
+4. **Submissions** shows what has been filled in, rendered through the version each row answered.
+
+A data name is a SQL column, so it must be a legal identifier and it keeps one type for good: reusing
+a name in another form reuses that column, and publishing it under a different type is refused. The
+**Field catalog** page lists every registered name and its type.
+
+Editing a published form reopens it as a draft; it keeps accepting submissions against its published
+version until it is deprecated or archived, so work already pinned to a version is never broken.
+
+A workflow user task will later pick a form and a version — submissions already carry a
+`ContextType`/`ContextId` pair for exactly that.
+
+After changing the FormEngine entities, generate the migration by hand (this project does not
+auto-generate them), from `backend`:
+
+```powershell
+dotnet ef migrations add <Name> --project src/Modules/FormEngine/FormEngine.Infrastructure --startup-project src/NWFM.Api --output-dir Persistence/Migrations
+```
+
+Uploaded media is written under `FileStorage:Root` (`backend/src/NWFM.Api/Media` by default), which is
+excluded from source control. The geolocation field uses Google Maps when
+`frontend/public/config/app-config.json` carries a `googleMapsApiKey`, and falls back to manual
+latitude/longitude entry when it does not.
+
 ## Verify
 
 ```powershell

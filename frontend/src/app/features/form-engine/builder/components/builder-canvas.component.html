@@ -1,0 +1,121 @@
+<ng-container *translateContext="let t">
+  <div class="flex flex-col h-full">
+    <div class="px-3 py-3 border-b border-[var(--app-border)] flex items-center justify-between">
+      <h2 class="text-xs font-bold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+        {{ t('formBuilder.layout') }} ({{ t('formBuilder.fieldsCount') }}: {{ store.elements().length }})
+      </h2>
+    </div>
+
+    <div
+      cdkDropList
+      cdkScrollable
+      [id]="rootId"
+      [cdkDropListData]="store.elements()"
+      [cdkDropListConnectedTo]="rootConnectedTo()"
+      (cdkDropListDropped)="onDrop($event)"
+      class="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px]"
+    >
+      @for (element of store.elements(); track element.key) {
+        @if (element.type === sectionType) {
+          <!-- Section -->
+          <div cdkDrag [cdkDragData]="element" class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)]">
+            <div *cdkDragPlaceholder class="rounded-xl border-2 border-dashed border-[var(--p-primary-color)] bg-[var(--p-primary-color)]/10 h-14"></div>
+            <div class="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--app-border)]">
+              <i class="pi pi-bars text-[var(--p-text-muted-color)] cursor-grab active:cursor-grabbing" cdkDragHandle></i>
+              <i class="pi pi-folder text-[var(--p-primary-color)]"></i>
+              <span class="text-sm font-semibold flex-1 truncate">{{ displayLabel(element) }}</span>
+              <span class="flex items-center gap-1 flex-wrap">
+                @for (badge of sectionBadgesFor(element); track badge.key) {
+                  <span [class]="badge.classes">
+                    {{ t('formBuilder.badges.' + badge.key, badge.params) }}
+                  </span>
+                }
+              </span>
+              <p-button icon="pi pi-pencil" [text]="true" size="small" (onClick)="onEdit(element.key)" [ariaLabel]="t('formBuilder.actions.edit')" />
+              <p-button icon="pi pi-trash" [text]="true" size="small" severity="danger" (onClick)="onRemove(element.key)" [ariaLabel]="t('formBuilder.actions.delete')" />
+            </div>
+
+            <div
+              cdkDropList
+              [id]="element.key"
+              [cdkDropListData]="element.elements"
+              [cdkDropListConnectedTo]="connectedForSection(element.key)"
+              (cdkDropListDropped)="onDrop($event)"
+              class="p-3 space-y-2 min-h-[70px]"
+            >
+              @for (child of element.elements; track child.key) {
+                <div
+                  cdkDrag
+                  [cdkDragData]="child"
+                  class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] hover:border-[var(--p-primary-color)] transition group"
+                >
+                  <div *cdkDragPlaceholder class="w-full rounded-lg border-2 border-dashed border-[var(--p-primary-color)] bg-[var(--p-primary-color)]/10 h-10"></div>
+                  <i class="pi pi-bars text-[var(--p-text-muted-color)] cursor-grab active:cursor-grabbing" cdkDragHandle></i>
+                  <i [class]="iconFor(child.type) + ' text-[var(--p-primary-color)]'"></i>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate">{{ displayLabel(child) }}</div>
+                    <div class="text-[11px] text-[var(--p-text-muted-color)] truncate">
+                      {{ t(labelKeyFor(child.type)) }} &middot; {{ child.data_name }}
+                    </div>
+                  </div>
+                  <span class="flex items-center gap-1 flex-wrap">
+                    @for (badge of badgesFor(child); track badge.key) {
+                      <span [class]="badge.classes">
+                        {{ t('formBuilder.badges.' + badge.key, badge.params) }}
+                      </span>
+                    }
+                  </span>
+                  <div class="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition">
+                    <p-button icon="pi pi-pencil" [text]="true" size="small" (onClick)="onEdit(child.key)" [ariaLabel]="t('formBuilder.actions.edit')" />
+                    <p-button icon="pi pi-copy" [text]="true" size="small" (onClick)="onDuplicate(child.key)" [ariaLabel]="t('formBuilder.actions.duplicate')" />
+                    <p-button icon="pi pi-trash" [text]="true" size="small" severity="danger" (onClick)="onRemove(child.key)" [ariaLabel]="t('formBuilder.actions.delete')" />
+                  </div>
+                </div>
+              }
+              @if (element.elements.length === 0) {
+                <div class="text-center text-xs text-[var(--p-text-muted-color)] py-4 border border-dashed border-[var(--app-border)] rounded-lg">
+                  {{ t('formBuilder.dropIntoSection') }}
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div
+            cdkDrag
+            [cdkDragData]="element"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] hover:border-[var(--p-primary-color)] transition group"
+          >
+            <div *cdkDragPlaceholder class="w-full rounded-lg border-2 border-dashed border-[var(--p-primary-color)] bg-[var(--p-primary-color)]/10 h-10"></div>
+            <i class="pi pi-bars text-[var(--p-text-muted-color)] cursor-grab active:cursor-grabbing" cdkDragHandle></i>
+            <i [class]="iconFor(element.type) + ' text-[var(--p-primary-color)]'"></i>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">{{ displayLabel(element) }}</div>
+              <div class="text-[11px] text-[var(--p-text-muted-color)] truncate">
+                {{ t(labelKeyFor(element.type)) }} &middot; {{ element.data_name }}
+              </div>
+            </div>
+            <span class="flex items-center gap-1 flex-wrap">
+              @for (badge of badgesFor(element); track badge.key) {
+                <span [class]="badge.classes">
+                  {{ t('formBuilder.badges.' + badge.key, badge.params) }}
+                </span>
+              }
+            </span>
+            <div class="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition">
+              <p-button icon="pi pi-pencil" [text]="true" size="small" (onClick)="onEdit(element.key)" [ariaLabel]="t('formBuilder.actions.edit')" />
+              <p-button icon="pi pi-copy" [text]="true" size="small" (onClick)="onDuplicate(element.key)" [ariaLabel]="t('formBuilder.actions.duplicate')" />
+              <p-button icon="pi pi-trash" [text]="true" size="small" severity="danger" (onClick)="onRemove(element.key)" [ariaLabel]="t('formBuilder.actions.delete')" />
+            </div>
+          </div>
+        }
+      }
+
+      @if (store.elements().length === 0) {
+        <div class="flex flex-col items-center justify-center gap-2 py-16 text-[var(--p-text-muted-color)] border-2 border-dashed border-[var(--app-border)] rounded-xl">
+          <i class="pi pi-arrow-down text-2xl"></i>
+          <span class="text-sm font-medium">{{ t('formBuilder.dropHere') }}</span>
+        </div>
+      }
+    </div>
+  </div>
+</ng-container>
