@@ -83,7 +83,7 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     {
         if (!TryGetOrganizationId(out var orgId)) return Forbid();
 
-        var command = new RegisterParticipantCommand(orgId, request.DisplayName, request.Email, request.DisplayNameAr, request.EmployeeNumber);
+        var command = new RegisterParticipantCommand(orgId, request.DisplayName, request.Email, request.DisplayNameAr, request.EmployeeNumber, request.UserId);
         var result = await _sender.Send(command, cancellationToken);
 
         if (result.IsFailure && result.Error.Code == "Workflow.Participant.AlreadyRegistered")
@@ -119,4 +119,4 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     }
 }
 
-public sealed record RegisterParticipantRequest(string DisplayName, string Email, string? DisplayNameAr = null, string? EmployeeNumber = null);
+public sealed record RegisterParticipantRequest(string DisplayName, string Email, string? DisplayNameAr = null, string? EmployeeNumber = null, Guid? UserId = null);

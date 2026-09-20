@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { map, Observable } from 'rxjs';
 import { ApiResult, PaginatedResult } from '../api/api-result';
 
-export type LookupType = 'Department' | 'Cluster' | 'Cbu' | 'Branch' | 'OperationArea';
+export type LookupType = 'Department' | 'Cluster' | 'Cbu' | 'Branch' | 'OperationArea' | 'FieldActivityType';
 
 export interface LookupItem {
   id: string;
@@ -16,6 +16,7 @@ export interface LookupItem {
 
 const PATHS: Record<LookupType, string> = {
   Department: 'departments',
+  FieldActivityType: 'field-activity-types',
   Cluster: 'clusters',
   Cbu: 'cbus',
   Branch: 'branches',

@@ -42,6 +42,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>Start a new workflow instance for a business entity.</summary>
     [HttpPost("instances")]
+    [Authorize(Policy = NwfmPolicies.StartWorkflows)]
     [ProducesResponseType(typeof(WorkflowInstanceDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> StartInstance(
@@ -178,6 +179,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>Suspend a running workflow instance (OrgAdmin).</summary>
     [HttpPost("instances/{instanceId:guid}/suspend")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Suspend(Guid instanceId, CancellationToken cancellationToken)
     {
@@ -189,6 +191,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>Resume a suspended workflow instance (OrgAdmin).</summary>
     [HttpPost("instances/{instanceId:guid}/resume")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Resume(Guid instanceId, CancellationToken cancellationToken)
     {
@@ -200,6 +203,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>Cancel a running or suspended instance.</summary>
     [HttpPost("instances/{instanceId:guid}/cancel")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Cancel(Guid instanceId, CancellationToken cancellationToken)
     {
@@ -255,6 +259,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>SuperAdmin: suspend an instance.</summary>
     [HttpPost("admin/instances/{instanceId:guid}/suspend")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> AdminSuspend(Guid instanceId, CancellationToken cancellationToken)
     {
@@ -267,6 +272,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>SuperAdmin: resume a suspended instance.</summary>
     [HttpPost("admin/instances/{instanceId:guid}/resume")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> AdminResume(Guid instanceId, CancellationToken cancellationToken)
     {
@@ -278,6 +284,7 @@ public sealed class WorkflowRuntimeController : WorkflowControllerBase
 
     /// <summary>SuperAdmin: retry a failed activity.</summary>
     [HttpPost("admin/instances/{instanceId:guid}/retry")]
+    [Authorize(Policy = NwfmPolicies.ManageIncidents)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> AdminRetry(Guid instanceId, CancellationToken cancellationToken)
     {

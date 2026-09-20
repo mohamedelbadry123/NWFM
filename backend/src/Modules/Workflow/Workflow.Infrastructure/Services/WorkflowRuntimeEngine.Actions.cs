@@ -56,6 +56,7 @@ internal sealed partial class WorkflowRuntimeEngine
                     WorkflowIncidentSeverity.High, "Task action failed", now, execution.Id, definition.NodeKey, result.ErrorCode, result.ErrorMessage, ct);
             if (hook.FailurePolicy is ActionFailurePolicy.Continue or ActionFailurePolicy.CreateIncident) continue;
             execution.Fail(result.ErrorMessage ?? "Task action failed", now); instance.AdvanceTo(definition.NodeKey, now); instance.Fail(result.ErrorMessage ?? "Task action failed", now);
+            if (_activityEvents is not null) await _activityEvents.QueueAsync(instance, definition, execution, "OnFailure", "failure", ct);
             if (trigger != ActionExecutionTrigger.OnFailure) await ExecuteHooksAsync(instance, definition, execution, ActionExecutionTrigger.OnFailure, outcome, now, ct);
             return Result.Failure(new Error("Workflow.Hook.Failed", result.ErrorMessage ?? "Task action failed"));
         }

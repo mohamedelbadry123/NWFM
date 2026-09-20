@@ -20,7 +20,7 @@ public static class WorkflowActivityConfigurationValidator
             if (!Enum.TryParse<ActivityType>(activity.ActivityTypeName, true, out var type)) continue;
             foreach (var action in activity.Actions)
             {
-                if (type != ActivityType.UserTask) Error("ACTION_TRIGGER_UNSUPPORTED", "Task action hooks are supported on User Tasks. Use Service Task for other actions.");
+                if (type is not (ActivityType.UserTask or ActivityType.MainActivity)) Error("ACTION_TRIGGER_UNSUPPORTED", "Task action hooks are supported on human activities. Use activity events for integrations.");
                 if (action.ActionKey == "http.request" || string.IsNullOrWhiteSpace(action.ActionKey) || registry is not null && registry.Resolve(action.ActionKey) is null)
                     Error("TASK_ACTION_UNAVAILABLE", "Select an installed task action. HTTP calls belong in a separate Service Task.");
                 if (!Enum.TryParse<ActionExecutionTrigger>(action.ExecutionTriggerName, out _)) Error("ACTION_TRIGGER_INVALID", "Select a valid task action trigger.");
@@ -64,6 +64,7 @@ public static class WorkflowActivityConfigurationValidator
                 switch (type)
                 {
                     case ActivityType.UserTask:
+                    case ActivityType.MainActivity:
                         if (root.TryGetProperty("nodePriority", out var priority) && priority.ValueKind == JsonValueKind.Number && (!priority.TryGetDecimal(out var priorityValue) || priorityValue != 0))
                             Error("TASK_PRIORITY_UNSUPPORTED", "Task queue priority is not supported. Set it to zero; routing priority is configured on transitions.");
                         foreach (var flag in new[] { "requiresClaim", "allowSelfClaim" })

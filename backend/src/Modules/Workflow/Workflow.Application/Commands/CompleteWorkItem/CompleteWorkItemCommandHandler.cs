@@ -73,6 +73,17 @@ public sealed class CompleteWorkItemCommandHandler
         if (item.ClaimedByUserId != request.UserId)
             return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotClaimedByUser);
 
+        var workspaceInstance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
+        var workspaceVersion = workspaceInstance is null ? null : await _versions.GetByIdWithProjectionAsync(workspaceInstance.PinnedWorkflowVersionId, cancellationToken);
+        if (workspaceVersion?.WorkspaceJson is not null)
+        {
+            if (!await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken))
+                return Result.Failure<WorkItemDto>(new Error("Workflow.Assignment.Membership", "The user no longer belongs to the assigned group."));
+            var execution = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+            if (execution?.ActivityType == ActivityType.MainActivity && execution.Phase != "AwaitingApproval")
+                return Result.Failure<WorkItemDto>(new Error("Workflow.Main.ChildPending", "Complete the child workflow before approving its parent."));
+        }
+
         var (outcomeError, outcome) = await LoadOutcomeAsync(item, request.ActionTaken, request.Comment, cancellationToken);
         if (outcomeError is not null)
             return Result.Failure<WorkItemDto>(outcomeError);

@@ -30,10 +30,9 @@ public sealed class RequestContextMiddleware(RequestDelegate next)
                 .Where(p => p.IsActive && p.UserId == userGuid)
                 .FirstOrDefaultAsync(http.RequestAborted);
 
-            if (participant is not null)
-            {
-                context.SelectActor(participant.UserId, participant.Id);
-            }
+            // The authenticated identity may create definitions and instances before
+            // the group-owning module supplies an assignment projection for it.
+            context.SelectActor(userGuid, participant?.Id ?? Guid.Empty);
         }
 
         await next(http);

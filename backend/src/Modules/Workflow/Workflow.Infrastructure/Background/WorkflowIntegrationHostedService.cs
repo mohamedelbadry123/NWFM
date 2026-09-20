@@ -26,7 +26,8 @@ internal sealed class WorkflowIntegrationHostedService(IServiceScopeFactory scop
                 var now = DateTime.UtcNow;
                 var jobs = await db.IntegrationJobs.AsNoTracking().Where(j => (j.Status == "Delivered"
                     || j.Status == "Pending" && j.NextAttemptAt <= now || j.Status == "Running" && j.LeaseUntil <= now)
-                    && db.WorkflowInstances.Any(i => i.Id == j.WorkflowInstanceId && i.Status != WorkflowInstanceStatus.Suspended && i.Status != WorkflowInstanceStatus.Failed))
+                    && db.WorkflowInstances.Any(i => i.Id == j.WorkflowInstanceId && i.Status != WorkflowInstanceStatus.Suspended
+                        && (i.Status != WorkflowInstanceStatus.Failed || j.IsActivityEvent && !j.Required)))
                     .OrderBy(j => j.NextAttemptAt).Select(j => j.Id).Take(25).ToListAsync(stoppingToken);
                 await Parallel.ForEachAsync(jobs, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = stoppingToken }, async (id, ct) =>
                 {
@@ -41,6 +42,8 @@ internal sealed class WorkflowIntegrationHostedService(IServiceScopeFactory scop
                 await eventScope.ServiceProvider.GetRequiredService<WorkflowIntegrationProcessor>().ProcessEventsAsync(stoppingToken);
                 using var childScope = scopes.CreateScope();
                 await childScope.ServiceProvider.GetRequiredService<WorkflowIntegrationProcessor>().ProcessChildrenAsync(stoppingToken);
+                using var workspaceScope = scopes.CreateScope();
+                await workspaceScope.ServiceProvider.GetRequiredService<WorkflowWorkspaceProcessor>().ProcessAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }

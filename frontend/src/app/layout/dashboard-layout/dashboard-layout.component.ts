@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -57,7 +58,7 @@ export class DashboardLayoutComponent {
     { initialValue: this.router.url },
   );
 
-  protected readonly navItems: readonly NavItem[] = [
+  private readonly fullNavItems: readonly NavItem[] = [
     {
       labelKey: 'nav.operations',
       icon: 'pi pi-th-large',
@@ -114,6 +115,16 @@ export class DashboardLayoutComponent {
       permissions: [PERMISSIONS.manageRolePermissions, ADMINISTRATOR_ROLE],
     },
   ];
+
+  protected get navItems(): readonly NavItem[] {
+    if (!environment.workflowWorkspace) return this.fullNavItems;
+    return [
+      {labelKey:'workspace.workflows',icon:'pi pi-sitemap',route:'/admin/workflow/definitions',permissions:[PERMISSIONS.manageDefinitions]},
+      {labelKey:'workspace.newInstance',icon:'pi pi-plus',route:'/workflow/start',permissions:[PERMISSIONS.startWorkflows]},
+      {labelKey:'workspace.instances',icon:'pi pi-list',route:'/admin/workflow/instances',permissions:[PERMISSIONS.viewInstances]},
+      ...this.fullNavItems.filter(item => ['/lookups','/admin/users','/admin/roles'].includes(item.route || ''))
+    ];
+  }
 
   protected readonly userMenu = computed<MenuItem[]>(() => {
     this.locale.locale();

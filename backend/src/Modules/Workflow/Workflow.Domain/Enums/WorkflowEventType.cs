@@ -33,4 +33,9 @@ public enum WorkflowEventType
     CandidateAssigned   = 28,
     WorkItemReassigned  = 29,
     WorkItemDelegated   = 30,
+    CommentAdded       = 31,
+    DemoAction         = 32,
+    IntegrationCompleted = 33,
+    IntegrationFailed = 34,
+    SlaBreached = 35,
 }

@@ -48,7 +48,7 @@ export class LookupsComponent {
     { type: 'Cluster', labelKey: 'lookups.tabs.clusters' },
     { type: 'Cbu', labelKey: 'lookups.tabs.cbus', parentType: 'Cluster', parentLabelKey: 'lookups.cluster' },
     { type: 'Branch', labelKey: 'lookups.tabs.branches', parentType: 'Cbu', parentLabelKey: 'lookups.cbu' },
-    { type: 'OperationArea', labelKey: 'lookups.tabs.operationAreas', parentType: 'Cbu', parentLabelKey: 'lookups.cbu' },
+    { type: 'FieldActivityType', labelKey: 'workspace.fieldActivityTypes', parentType: 'Department', parentLabelKey: 'workspace.department' },
   ];
 
   protected readonly activeTab = signal(0);

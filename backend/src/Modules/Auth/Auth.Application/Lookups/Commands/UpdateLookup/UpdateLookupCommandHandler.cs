@@ -16,9 +16,12 @@ public sealed class UpdateLookupCommandHandler(IAuthDbContext context)
         try
         {
             var type = request.LookupType.Trim();
+            if (!await LookupParentValidator.IsValidAsync(context, type, request.ParentCode, ct))
+                return Result<LookupItemDto>.Failure(new Error("Auth.LookupParentInvalid", "Select an active parent lookup."));
             Result<LookupItemDto> updated = type switch
             {
                 "Department" => await UpdateDepartment(request, ct),
+                "FieldActivityType" => await UpdateFieldActivityType(request, ct),
                 "Cluster" => await UpdateCluster(request, ct),
                 "Cbu" => await UpdateCbu(request, ct),
                 "Branch" => await UpdateBranch(request, ct),
@@ -84,4 +87,14 @@ public sealed class UpdateLookupCommandHandler(IAuthDbContext context)
 
     private static LookupItemDto Map(Guid id, string code, string nameEn, string nameAr, bool isActive, string? parent) =>
         new() { Id = id, Code = code, NameEn = nameEn, NameAr = nameAr, IsActive = isActive, ParentCode = parent };
+
+    private async Task<Result<LookupItemDto>> UpdateFieldActivityType(UpdateLookupCommand request, CancellationToken ct)
+    {
+        var entity = await context.FieldActivityTypes.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
+        if (await context.FieldActivityTypes.AnyAsync(x => x.Id != entity.Id && x.Code == entity.Code && x.DepartmentCode == request.ParentCode, ct))
+            return Result<LookupItemDto>.Failure(AuthErrors.LookupDuplicate);
+        entity.Update(request.NameEn, request.NameAr, request.ParentCode!);
+        return Map(entity.Id, entity.Code, entity.NameEn, entity.NameAr, entity.IsActive, entity.DepartmentCode);
+    }
 }

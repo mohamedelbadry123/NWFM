@@ -515,7 +515,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
             _notifPublisher.Object,
             tokenRepo,
             _outcomeDispatcher.Object,
-            _requestProjector.Object, integrations);
+            _requestProjector.Object, integrations, integrations is null ? null : new WorkflowActivityEvents(db, integrations));
     }
 
     private sealed class StubTenant(Guid orgId) : ICurrentTenant

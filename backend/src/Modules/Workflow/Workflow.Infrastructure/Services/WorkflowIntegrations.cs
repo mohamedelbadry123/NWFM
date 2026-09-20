@@ -135,6 +135,13 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
             if (job is null || job.Status != "Failed") return Result.Failure(new Error("Workflow.Job.NotReplayable", "Only failed operations can be replayed."));
             var instance = await db.WorkflowInstances.FindAsync([job.WorkflowInstanceId], ct);
             var activity = await db.ActivityInstances.FindAsync([job.ActivityInstanceId], ct);
+            if (job.IsActivityEvent)
+            {
+                if (instance is null || activity is null || !await WorkflowTreeGuard.CanRunAsync(db, instance.Id, ct, !job.Required)
+                    || job.Required && activity.Status != ActivityInstanceStatus.Active)
+                    return Result.Failure(new Error("Workflow.Job.NotReplayable", "This event no longer belongs to an active execution."));
+                job.Replay(); await db.SaveChangesAsync(ct); return Result.Success();
+            }
             if (instance is null || activity is null || instance.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed or WorkflowInstanceStatus.Suspended
                 || activity.Status != ActivityInstanceStatus.Failed)
                 return Result.Failure(new Error("Workflow.Job.NotReplayable", "The workflow or activity can no longer replay this operation."));

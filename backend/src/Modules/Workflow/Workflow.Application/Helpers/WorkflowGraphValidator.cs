@@ -79,7 +79,7 @@ public static class WorkflowGraphValidator
         }
 
         var userTasks = doc.Activities.Where(a =>
-            string.Equals(a.ActivityTypeName, ActivityType.UserTask.ToString(), StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.ActivityTypeName, ActivityType.UserTask.ToString(), StringComparison.OrdinalIgnoreCase) || a.ActivityTypeName == "MainActivity");
         foreach (var ut in userTasks)
         {
             var hasGroup = ut.AssignmentRules.Any(r =>

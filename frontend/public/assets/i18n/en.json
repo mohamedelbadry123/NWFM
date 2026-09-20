@@ -889,7 +889,9 @@
       "ctx_add_task": "Add User Task",
       "ctx_add_decision": "Add Decision",
       "ctx_add_end": "Add End",
-      "ctx_select_all": "Select all"
+      "ctx_select_all": "Select all",
+      "node_main_activity": "Main activity",
+      "node_desc_main_activity": "Child workflow followed by final approval"
     },
     "help": {
       "title": "Workflow Knowledge Base",
@@ -2004,14 +2006,14 @@
     "nameAr": "Name (AR)",
     "status": "Status",
     "cluster": "Cluster",
-    "cbu": "CBU",
+    "cbu": "Region",
     "activate": "Activate",
     "deactivate": "Deactivate",
     "tabs": {
       "departments": "Departments",
       "clusters": "Clusters",
-      "cbus": "CBUs",
-      "branches": "Branches",
+      "cbus": "Regions",
+      "branches": "Cities",
       "operationAreas": "Operation areas"
     }
   },
@@ -2074,5 +2076,12 @@
         "permission": "Permission"
       }
     }
+  },
+  "workspace": {
+    "workflows": "Workflows",
+    "newInstance": "New Instance",
+    "instances": "Instances",
+    "fieldActivityTypes": "Field Activity Types",
+    "department": "Department"
   }
 }

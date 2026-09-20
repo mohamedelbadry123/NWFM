@@ -10,6 +10,8 @@ internal static class WorkflowExecutionLock
     public static async Task<T> RunAsync<T>(WorkflowDbContext db, string key, Func<Task<T>> action, CancellationToken ct)
     {
         if (!db.Database.IsSqlServer()) return await action();
+        if (key.StartsWith("instance:", StringComparison.Ordinal) && Guid.TryParse(key[9..], out var instanceId))
+            key = "instance:" + await WorkflowTreeGuard.RootAsync(db, instanceId, ct);
         var ownsTransaction = db.Database.CurrentTransaction is null;
         await using var transaction = ownsTransaction ? await db.Database.BeginTransactionAsync(ct) : null;
         var resource = "nwfm:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)));

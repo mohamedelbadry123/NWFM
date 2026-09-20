@@ -21,6 +21,13 @@ public sealed class WorkflowIntegrationJob : Entity, ITenantAware
     public string? Error { get; private set; }
     public int? StatusCode { get; private set; }
     public string? ResultJson { get; private set; }
+    public bool IsActivityEvent { get; private set; }
+    public bool Required { get; private set; }
+    public string? EventTrigger { get; private set; }
+    public string? EventName { get; private set; }
+    public string? DeliveryResultJson { get; private set; }
+    public void ConfigureEvent(bool required, string trigger, string name)
+    { IsActivityEvent = true; Required = required; EventTrigger = trigger; EventName = name; }
     public byte[] RowVersion { get; private set; } = [];
     private WorkflowIntegrationJob() { }
     public static WorkflowIntegrationJob Create(Guid org, Guid instance, Guid activity, Guid connection,
@@ -32,7 +39,7 @@ public sealed class WorkflowIntegrationJob : Entity, ITenantAware
     };
     public void Claim(Guid owner, DateTime until) { Status = "Running"; Attempts++; LeaseOwner = owner; LeaseUntil = until; }
     public void RecordDelivery(string result, int? statusCode)
-    { Status = "Delivered"; ResultJson = result; StatusCode = statusCode; LeaseOwner = null; LeaseUntil = null; SetUpdated(DateTime.UtcNow); }
+    { Status = "Delivered"; ResultJson = result; DeliveryResultJson = result; StatusCode = statusCode; LeaseOwner = null; LeaseUntil = null; SetUpdated(DateTime.UtcNow); }
     public void Complete(string result, int? statusCode)
     { Status = "Completed"; ResultJson = result; StatusCode = statusCode; Error = null; LeaseOwner = null; LeaseUntil = null; SetUpdated(DateTime.UtcNow); }
     public void Fail(string error, int? statusCode, DateTime? retryAt)

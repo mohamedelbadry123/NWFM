@@ -34,6 +34,7 @@ internal sealed partial class WorkflowRuntimeEngine
         var instance = await _instanceRepo.GetByIdAsync(ai.WorkflowInstanceId, cancellationToken);
         if (instance is null || instance.Status != WorkflowInstanceStatus.Running)
             return Result.Failure(WorkflowErrors.Instance.NotRunning);
+        if (!await WorkflowTreeGuard.CanRunAsync(_db, instance.Id, cancellationToken)) return Result.Failure(WorkflowErrors.Instance.NotRunning);
         if (ai.Status != ActivityInstanceStatus.Active) return Result.Failure(new Error("Workflow.Activity.NotActive", "Activity is no longer active."));
         var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
         var activity = version?.Activities.FirstOrDefault(a => a.NodeKey == ai.ActivityNodeKey);

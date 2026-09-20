@@ -23,6 +23,9 @@ public static class DatabaseInitializer
         var now = DateTime.UtcNow;
         if (!await db.Set<Tenant>().AnyAsync(t => t.Id == options.TenantId))
             db.Add(new Tenant { Id = options.TenantId, Name = options.TenantName });
+        await db.SaveChangesAsync();
+        if (!services.GetRequiredService<IConfiguration>().GetValue<bool>("WorkflowDemo:Enabled"))
+        { await tx.CommitAsync(); return; }
         var actors = new[] { Guid.Parse("20000000-0000-0000-0000-000000000001"), Guid.Parse("20000000-0000-0000-0000-000000000002") };
         for (var i = 0; i < actors.Length; i++)
             if (!await db.Participants.AnyAsync(p => p.UserId == actors[i]))

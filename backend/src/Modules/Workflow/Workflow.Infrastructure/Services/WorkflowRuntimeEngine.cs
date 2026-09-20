@@ -47,6 +47,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
     private readonly IWorkflowOutcomeDispatcher _outcomeDispatcher;
     private readonly IWorkflowRequestProjector _requestProjector;
     private readonly IWorkflowIntegrationRuntime? _integrations;
+    private readonly WorkflowActivityEvents? _activityEvents;
 
     public WorkflowRuntimeEngine(
         WorkflowDbContext db,
@@ -75,7 +76,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         IWorkflowExecutionTokenRepository tokenRepo,
         IWorkflowOutcomeDispatcher outcomeDispatcher,
         IWorkflowRequestProjector requestProjector,
-        IWorkflowIntegrationRuntime? integrations = null)
+        IWorkflowIntegrationRuntime? integrations = null, WorkflowActivityEvents? activityEvents = null)
     {
         _db                     = db;
         _bindingRepo            = bindingRepo;
@@ -104,6 +105,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         _outcomeDispatcher      = outcomeDispatcher;
         _requestProjector       = requestProjector;
         _integrations           = integrations;
+        _activityEvents = activityEvents;
     }
 
     public Task<Result<WorkflowInstance>> StartAsync(Guid organizationId, Guid workflowBindingId, string businessEntityId,
@@ -143,7 +145,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 pinnedWorkflowVersionId.Value, cancellationToken);
             if (pinned is null)
                 return Result.Failure<WorkflowInstance>(WorkflowErrors.Version.NotFound);
-            if (pinned.Status != WorkflowVersionStatus.Published)
+            if (pinned.Status != WorkflowVersionStatus.Published && !(parentActivityInstanceId.HasValue && pinned.Status == WorkflowVersionStatus.Retired))
                 return Result.Failure<WorkflowInstance>(WorkflowErrors.Version.NotPublished);
             version = pinned;
         }
@@ -163,6 +165,19 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             businessEntityId, startActivity.NodeKey, now, correlationId, startedByUserId,
             parentInstanceId, parentActivityNodeKey);
         instance.AttachParentActivity(parentActivityInstanceId);
+        if (parentInstanceId is Guid parentId)
+        {
+            var parentContext = await _instanceRepo.GetByIdAsync(parentId, cancellationToken);
+            if (parentContext is null || !await WorkflowTreeGuard.CanRunAsync(_db, parentId, cancellationToken))
+                return Result.Failure<WorkflowInstance>(WorkflowErrors.Instance.NotRunning);
+            instance.SetExecutionContext(parentContext.GeographyJson, parentContext.IsDemo);
+        }
+        else if (version.WorkspaceJson is not null)
+        {
+            var scope = JsonSerializer.Deserialize<WorkflowWorkspaceDefinition>(version.WorkspaceJson, IntegrationJson.Options)!;
+            if (scope.Kind != "Main") return Result.Failure<WorkflowInstance>(new Error("Workflow.Child.Start", "Child workflows must be started by their parent."));
+            instance.SetExecutionContext(JsonSerializer.Serialize(new WorkflowGeography(scope.ClusterCode!, scope.RegionCode!, scope.CityCode!), IntegrationJson.Options), binding.IsDemo);
+        }
 
         await _instanceRepo.AddAsync(instance, cancellationToken);
         foreach (var variable in version.Variables.Where(v => v.DefaultValue is not null))
@@ -224,6 +239,9 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             && !(completedWorkItemId == Guid.Empty && instance.Status == WorkflowInstanceStatus.Failed))
             return Result.Failure(WorkflowErrors.Instance.NotRunning);
 
+        if (completedWorkItemId != Guid.Empty && !await WorkflowTreeGuard.CanRunAsync(_db, instance.Id, cancellationToken))
+            return Result.Failure(WorkflowErrors.Instance.NotRunning);
+
         var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
         if (version is null)
             return Result.Failure(WorkflowErrors.Version.NotFound);
@@ -278,7 +296,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
         if (completedWorkItem is not null && currentAI?.Status == ActivityInstanceStatus.Completed)
             return Result.Success();
-        if (completedWorkItem is not null)
+        if (completedWorkItem is not null && currentAI?.Phase != "WaitingForOutcomeEvents")
         {
             try
             {
@@ -290,7 +308,11 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                 foreach (var (key, value) in mapped) await UpsertVariableAsync(instance, key, JsonSerializer.Serialize(value), VariableDataType.Json, now, cancellationToken);
             }
             catch (Exception ex) when (ex is JsonException or InvalidOperationException)
-            { currentAI?.Fail(ex.Message, now); instance.Fail(ex.Message, now); await _db.SaveChangesAsync(cancellationToken); return Result.Failure(new Error("Workflow.Form.Mapping", ex.Message)); }
+            {
+                currentAI?.Fail(ex.Message, now); instance.Fail(ex.Message, now);
+                if (_activityEvents is not null && currentAI is not null) await _activityEvents.QueueAsync(instance, currentActivity, currentAI, "OnFailure", "failure", cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken); return Result.Failure(new Error("Workflow.Form.Mapping", ex.Message));
+            }
         }
 
         // An explicit retry re-enters the failed activity. It must never complete the
@@ -341,6 +363,19 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
 
         if (currentAI is not null)
         {
+            if (_activityEvents is not null && completedWorkItem is not null)
+            {
+                currentAI.SetPendingOutcome(completedWorkItem.ActionTaken);
+                var actionTrigger = completedWorkItem.ActionTaken?.ToUpperInvariant() switch { "APPROVE" => "OnApprove", "REJECT" => "OnReject", _ => null };
+                foreach (var eventTrigger in actionTrigger is null ? new[] { "OnComplete" } : new[] { actionTrigger, "OnComplete" })
+                {
+                    var queued = await _activityEvents.QueueAsync(instance, currentActivity, currentAI, eventTrigger, completedWorkItem.Id.ToString("N"), cancellationToken);
+                    if (queued.IsFailure) return Result.Failure(queued.Error);
+                    if (!queued.Value) { currentAI.SetPhase("WaitingForOutcomeEvents"); await _db.SaveChangesAsync(cancellationToken); return Result.Success(); }
+                }
+                if (await _db.IntegrationJobs.AnyAsync(j => j.ActivityInstanceId == currentAI.Id && j.IsActivityEvent && j.Required && j.Status != "Completed", cancellationToken))
+                { currentAI.SetPhase("WaitingForOutcomeEvents"); await _db.SaveChangesAsync(cancellationToken); return Result.Success(); }
+            }
             foreach (var trigger in new[] { ActionExecutionTrigger.OnOutcome, ActionExecutionTrigger.OnComplete })
             {
                 var hooks = await ExecuteHooksAsync(instance, currentActivity, currentAI, trigger, completedWorkItem?.ActionTaken, now, cancellationToken);
@@ -358,6 +393,19 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var outgoing = version.Transitions
             .Where(t => t.FromActivityDefinitionId == currentActivity.Id)
             .ToList();
+        var business = IntegrationJson.Read<Workflow.Application.Workspace.BusinessActivityConfiguration>(currentActivity.ConfigurationJson);
+        if (completedWorkItem?.ActionTaken?.Equals("reject", StringComparison.OrdinalIgnoreCase) == true && !string.IsNullOrWhiteSpace(business.RejectTargetNodeKey))
+        {
+            var target = version.Activities.FirstOrDefault(a => a.NodeKey == business.RejectTargetNodeKey);
+            if (target is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+            var rework = WorkflowTransition.Create(version.Id, currentActivity.Id, target.Id, currentNodeKey + ":rework", 0, now);
+            await RecordTransitionTakenAsync(instance, currentNodeKey, target.NodeKey, rework, now, cancellationToken);
+            instance.AdvanceTo(target.NodeKey, now);
+            var reworkResult = await AdvanceFromNodeAsync(instance, version, target.NodeKey, now, cancellationToken, activeToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            await ProjectRequestAsync(instance, await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken), now, cancellationToken);
+            return reworkResult;
+        }
         var variables = await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var selectedKey = _transitionEvaluator.Evaluate(outgoing, variables);
         var selected = selectedKey is null
@@ -412,6 +460,9 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var instance = await _instanceRepo.GetByIdAsync(timer.WorkflowInstanceId, cancellationToken);
         if (instance is null)
             return Result.Failure(WorkflowErrors.Instance.NotFound);
+
+        if (!await WorkflowTreeGuard.CanRunAsync(_db, instance.Id, cancellationToken))
+            return Result.Failure(WorkflowErrors.Instance.NotRunning);
 
         if (instance.Status == WorkflowInstanceStatus.Suspended)
             return Result.Failure(WorkflowErrors.Instance.NotRunning);
@@ -515,16 +566,18 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             return Result.Failure(WorkflowErrors.Version.NotFound);
 
         var callActivity = version.Activities.FirstOrDefault(a =>
-            a.NodeKey == callActivityNodeKey && a.ActivityType == ActivityType.CallActivity);
+            a.NodeKey == callActivityNodeKey && a.ActivityType is ActivityType.CallActivity or ActivityType.MainActivity);
         if (callActivity is null)
             return Result.Failure(WorkflowErrors.Instance.UnhandledActivityType);
 
         var activityInstances = await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var callAi = activityInstances.LastOrDefault(a =>
             a.ActivityNodeKey == callActivityNodeKey
-            && a.ActivityType == ActivityType.CallActivity
+            && a.ActivityType is ActivityType.CallActivity or ActivityType.MainActivity
             && a.Status == ActivityInstanceStatus.Active);
         if (callAi is null) return Result.Success(); // already resumed, including synchronous children
+        if (callActivity.ActivityType == ActivityType.MainActivity && callAi.Phase is not ("WaitingForChild" or "ChildFailed")) return Result.Success();
+        if (!await WorkflowTreeGuard.CanRunAsync(_db, instance.Id, cancellationToken)) return Result.Success();
         var child = await _db.WorkflowInstances.Where(c => c.ParentInstanceId == instance.Id
             && c.ParentActivityNodeKey == callActivityNodeKey
             && (c.ParentActivityInstanceId == callAi.Id || c.ParentActivityInstanceId == null))
@@ -537,7 +590,28 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         {
             var childValues = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(child.Id, cancellationToken));
             try { outputs = IntegrationValueMapper.Map(JsonSerializer.Serialize(childValues), config.OutputMappings); }
-            catch (InvalidOperationException ex) { return await CompleteExternalActivityAsync(callAi.Id, outputs, "error", ex.Message, now, cancellationToken); }
+            catch (InvalidOperationException ex)
+            {
+                if (callActivity.ActivityType != ActivityType.MainActivity)
+                    return await CompleteExternalActivityAsync(callAi.Id, outputs, "error", ex.Message, now, cancellationToken);
+                callAi.SetPhase("ChildFailed");
+                if (_activityEvents is not null)
+                    await _activityEvents.QueueAsync(instance, callActivity, callAi, "OnFailure", child.Id.ToString("N"), cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken);
+                return Result.Failure(new Error("Workflow.Child.OutputMapping", ex.Message));
+            }
+        }
+        if (callActivity.ActivityType == ActivityType.MainActivity)
+        {
+            if (child.Status != WorkflowInstanceStatus.Completed)
+            {
+                if (_activityEvents is not null) await _activityEvents.QueueAsync(instance, callActivity, callAi, "OnFailure", child.Id.ToString("N"), cancellationToken);
+                callAi.SetPhase("ChildFailed");
+                await _db.SaveChangesAsync(cancellationToken);
+                return Result.Success();
+            }
+            foreach (var (key, value) in outputs) await UpsertVariableAsync(instance, key, JsonSerializer.Serialize(value), VariableDataType.Json, now, cancellationToken);
+            return await CreateApprovalTaskAsync(instance, callActivity, callAi, now, cancellationToken);
         }
         return await CompleteExternalActivityAsync(callAi.Id, outputs,
             child.Status == WorkflowInstanceStatus.Completed ? "success" : "error",
@@ -583,55 +657,18 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                     var activityInst = retryExecution ?? await CreateActivityInstanceAsync(
                         instance, currentActivity, now, cancellationToken);
                     activityInst.AttachToken(currentToken?.Id);
+                    activityInst.SetDeadline(await ResolveUserTaskDueAtAsync(instance.OrganizationId, currentActivity.ConfigurationJson, now, cancellationToken));
+                    if (_activityEvents is not null)
+                    {
+                        var entry = await _activityEvents.QueueAsync(instance, currentActivity, activityInst, "OnEnter", "entry", cancellationToken);
+                        if (entry.IsFailure) return Result.Failure(entry.Error);
+                        if (!entry.Value) { activityInst.SetPhase("WaitingForEnterEvents"); instance.AdvanceTo(currentNodeKey, now); return Result.Success(); }
+                    }
 
                     var hooks = await ExecuteHooksAsync(instance, currentActivity, activityInst, ActionExecutionTrigger.OnEnter, null, now, cancellationToken);
                     if (hooks.IsFailure) return hooks;
 
-                    var assignmentValues = (await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
-                        .ToDictionary(v => v.VariableName, v => v.ValueJson, StringComparer.OrdinalIgnoreCase);
-                    var rules = currentActivity.AssignmentRules.Where(r => r.IsActive)
-                        .OrderBy(r => r.IsFallback).ThenBy(r => r.Priority).ToList();
-                    var rule = rules.FirstOrDefault(r => string.IsNullOrWhiteSpace(r.Expression)
-                        || Workflow.Application.Helpers.WorkflowCondition.Evaluate(r.Expression, assignmentValues));
-                    Guid? groupId = rule?.ReferenceId;
-                    var assignmentKey = rule?.AssignmentKey;
-
-                    var groupResult = await _assignmentResolver.ResolveGroupAsync(
-                        instance.OrganizationId, instance.WorkflowBindingId,
-                        assignmentKey, groupId, cancellationToken);
-                    if (groupResult.IsFailure)
-                    {
-                        var fallback = IntegrationJson.Read<Workflow.Application.Helpers.WorkflowTaskConfiguration>(currentActivity.ConfigurationJson).FallbackAssignmentKey;
-                        if (!string.IsNullOrWhiteSpace(fallback)) groupResult = await _assignmentResolver.ResolveGroupAsync(
-                            instance.OrganizationId, instance.WorkflowBindingId, fallback, null, cancellationToken);
-                    }
-                    if (groupResult.IsFailure) return Result.Failure(groupResult.Error);
-
-                    var dueAt = await ResolveUserTaskDueAtAsync(
-                        instance.OrganizationId, currentActivity.ConfigurationJson, now, cancellationToken);
-
-                    var workItem = WorkItem.Create(
-                        instance.OrganizationId, instance.Id, activityInst.Id,
-                        groupResult.Value, now, dueAt);
-                    await _workItemRepo.AddAsync(workItem, cancellationToken);
-
-                    var candidates = await _candidateFactory.CreateCandidatesAsync(
-                        instance.OrganizationId, workItem.Id, groupResult.Value, now, cancellationToken);
-                    await _candidateRepo.AddRangeAsync(candidates, cancellationToken);
-
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.ActivityStarted, now, currentNodeKey,
-                        cancellationToken: cancellationToken);
-
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.CandidateAssigned, now, currentNodeKey,
-                        payloadJson: $"{{\"workItemId\":\"{workItem.Id}\",\"candidateCount\":{candidates.Count}}}",
-                        cancellationToken: cancellationToken);
-
-                    instance.AdvanceTo(currentNodeKey, now);
-                    return Result.Success();
+                    return await CreateApprovalTaskAsync(instance, currentActivity, activityInst, now, cancellationToken);
                 }
 
                 case ActivityType.ExclusiveGateway:
@@ -802,6 +839,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
                     return inclusiveResult;
                 }
 
+                case ActivityType.MainActivity:
                 case ActivityType.CallActivity:
                 {
                     var callResult = await ExecuteCallActivityAsync(
@@ -911,6 +949,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         if (!execResult.Success)
         {
             activityInst.Fail(execResult.ErrorMessage ?? "Service task failed", now);
+            if (_activityEvents is not null) await _activityEvents.QueueAsync(instance, activity, activityInst, "OnFailure", "failure", cancellationToken);
 
             await _events.AppendAsync(
                 instance.OrganizationId, instance.Id,
@@ -1034,6 +1073,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             {
                 activityInst.Fail(ex.Message, now);
                 instance.Fail(ex.Message, now);
+                if (_activityEvents is not null) await _activityEvents.QueueAsync(instance, activity, activityInst, "OnFailure", "failure", cancellationToken);
                 return Result.Failure(new Error("Workflow.Notification.Failed", ex.Message));
             }
 
@@ -1204,9 +1244,12 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         ActivityDefinition currentActivity,
         DateTime now,
         CancellationToken cancellationToken,
-        WorkflowExecutionToken? activeToken = null)
+        WorkflowExecutionToken? activeToken = null, ActivityInstance? existingCall = null)
     {
         var config = ParseCallActivityConfig(currentActivity.ConfigurationJson);
+        var childPins = JsonSerializer.Deserialize<Dictionary<string, Guid>>(version.PinnedChildVersionsJson ?? "{}")!;
+        if (childPins.TryGetValue(currentActivity.NodeKey, out var pinnedChild)) config.VersionId = pinnedChild;
+        if (currentActivity.ActivityType == ActivityType.MainActivity) config.WaitForCompletion = true;
         if (string.IsNullOrWhiteSpace(config.DefinitionKey))
             return Result.Failure(WorkflowErrors.Instance.CallActivityDefinitionMissing);
 
@@ -1218,7 +1261,8 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var childVersion = config.VersionId.HasValue
             ? await _versionRepo.GetByIdWithProjectionAsync(config.VersionId.Value, cancellationToken)
             : await _versionRepo.GetLatestPublishedWithProjectionAsync(definition.Id, cancellationToken);
-        if (childVersion is null || childVersion.WorkflowDefinitionId != definition.Id || childVersion.Status != WorkflowVersionStatus.Published)
+        var hasPinnedChild = version.PinnedChildVersionsJson is not null && JsonSerializer.Deserialize<Dictionary<string, Guid>>(version.PinnedChildVersionsJson)!.ContainsKey(currentActivity.NodeKey);
+        if (childVersion is null || childVersion.WorkflowDefinitionId != definition.Id || childVersion.Status != WorkflowVersionStatus.Published && !(hasPinnedChild && childVersion.Status == WorkflowVersionStatus.Retired))
             return Result.Failure(WorkflowErrors.Instance.CallActivityNoPublishedVersion);
 
         var ancestor = instance;
@@ -1235,14 +1279,31 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         try { childInputs = IntegrationValueMapper.Map(JsonSerializer.Serialize(BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))), config.InputMappings); }
         catch (InvalidOperationException ex) { return Result.Failure(new Error("Workflow.Call.InputMapping", ex.Message)); }
 
-        var createdCall = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+        var createdCall = existingCall ?? await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
         createdCall.AttachToken(activeToken?.Id);
+        if (currentActivity.ActivityType == ActivityType.MainActivity)
+        {
+            createdCall.SetPhase("WaitingForChild");
+            createdCall.SetDeadline(await ResolveUserTaskDueAtAsync(instance.OrganizationId, currentActivity.ConfigurationJson, createdCall.StartedAt, cancellationToken));
+            if (_activityEvents is not null)
+            {
+                var entry = await _activityEvents.QueueAsync(instance, currentActivity, createdCall, "OnEnter", "entry", cancellationToken);
+                if (entry.IsFailure) return Result.Failure(entry.Error);
+                if (!entry.Value) { createdCall.SetPhase("WaitingForEnterEvents"); instance.AdvanceTo(currentActivity.NodeKey, now); return Result.Success(); }
+            }
+        }
 
         await _events.AppendAsync(
             instance.OrganizationId, instance.Id,
             WorkflowEventType.ActivityStarted, now, currentActivity.NodeKey,
             payloadJson: currentActivity.ConfigurationJson,
             cancellationToken: cancellationToken);
+
+        if (currentActivity.ActivityType == ActivityType.MainActivity)
+        {
+            var hooks = await ExecuteHooksAsync(instance, currentActivity, createdCall, ActionExecutionTrigger.OnEnter, null, now, cancellationToken);
+            if (hooks.IsFailure) return hooks;
+        }
 
         var childIdempotency =
             $"call:{instance.Id}:{createdCall.Id}";
@@ -1266,7 +1327,7 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var activityInstances = await _activityRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
         var callAi = activityInstances.LastOrDefault(a =>
             a.ActivityNodeKey == currentActivity.NodeKey
-            && a.ActivityType == ActivityType.CallActivity
+            && a.ActivityType is ActivityType.CallActivity or ActivityType.MainActivity
             && a.Status == ActivityInstanceStatus.Active);
 
         if (config.WaitForCompletion)
@@ -2000,4 +2061,59 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         WorkflowNotificationChannel Channels,
         NotificationFailurePolicy FailurePolicy,
         IReadOnlyList<Guid> RecipientUserIds);
+    private async Task<Result> CreateApprovalTaskAsync(WorkflowInstance instance, ActivityDefinition currentActivity,
+        ActivityInstance activityInst, DateTime now, CancellationToken cancellationToken)
+    {
+        if (await _db.WorkItems.AnyAsync(w => w.ActivityInstanceId == activityInst.Id, cancellationToken)) return Result.Success();
+        var assignmentValues = (await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken))
+            .ToDictionary(v => v.VariableName, v => v.ValueJson, StringComparer.OrdinalIgnoreCase);
+        var rules = currentActivity.AssignmentRules.Where(r => r.IsActive)
+            .OrderBy(r => r.IsFallback).ThenBy(r => r.Priority).ToList();
+        var rule = rules.FirstOrDefault(r => string.IsNullOrWhiteSpace(r.Expression)
+            || Workflow.Application.Helpers.WorkflowCondition.Evaluate(r.Expression, assignmentValues));
+        Guid? groupId = rule?.ReferenceId;
+        var assignmentKey = rule?.AssignmentKey;
+
+        var groupResult = await _assignmentResolver.ResolveGroupAsync(
+            instance.OrganizationId, instance.WorkflowBindingId,
+            assignmentKey, groupId, cancellationToken);
+        if (groupResult.IsFailure)
+        {
+            var fallback = IntegrationJson.Read<Workflow.Application.Helpers.WorkflowTaskConfiguration>(currentActivity.ConfigurationJson).FallbackAssignmentKey;
+            if (!string.IsNullOrWhiteSpace(fallback)) groupResult = await _assignmentResolver.ResolveGroupAsync(
+                instance.OrganizationId, instance.WorkflowBindingId, fallback, null, cancellationToken);
+        }
+        if (groupResult.IsFailure) return Result.Failure(groupResult.Error);
+
+        var dueAt = await ResolveUserTaskDueAtAsync(
+            instance.OrganizationId, currentActivity.ConfigurationJson, activityInst.StartedAt, cancellationToken);
+        activityInst.SetDeadline(dueAt);
+
+        var workItem = WorkItem.Create(
+            instance.OrganizationId, instance.Id, activityInst.Id,
+            groupResult.Value, now, dueAt);
+        await _workItemRepo.AddAsync(workItem, cancellationToken);
+
+        var candidates = await _candidateFactory.CreateCandidatesAsync(
+            instance.OrganizationId, workItem.Id, groupResult.Value, now, cancellationToken);
+        await _candidateRepo.AddRangeAsync(candidates, cancellationToken);
+
+        await _events.AppendAsync(
+            instance.OrganizationId, instance.Id,
+            WorkflowEventType.ActivityStarted, now, currentActivity.NodeKey,
+            cancellationToken: cancellationToken);
+
+        await _events.AppendAsync(
+            instance.OrganizationId, instance.Id,
+            WorkflowEventType.CandidateAssigned, now, currentActivity.NodeKey,
+            payloadJson: $"{{\"workItemId\":\"{workItem.Id}\",\"candidateCount\":{candidates.Count}}}",
+            cancellationToken: cancellationToken);
+
+
+        activityInst.SetPhase("AwaitingApproval");
+        instance.AdvanceTo(currentActivity.NodeKey, now);
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+
 }

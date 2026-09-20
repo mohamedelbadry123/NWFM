@@ -17,6 +17,21 @@ namespace Auth.Api.Controllers;
 [Route("api/v1/lookups")]
 public sealed class LookupsController(ISender sender) : ControllerBase
 {
+    [HttpGet("field-activity-types")]
+    public Task<IActionResult> GetFieldActivityTypes([FromQuery] LookupListQuery query, CancellationToken ct) => Get("FieldActivityType", query, ct);
+
+    [HttpPost("field-activity-types")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> CreateFieldActivityType(CreateLookupRequest request, CancellationToken ct) => Create("FieldActivityType", request, ct);
+
+    [HttpPut("field-activity-types/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> UpdateFieldActivityType(Guid id, UpdateLookupRequest request, CancellationToken ct) => Update("FieldActivityType", id, request, ct);
+
+    [HttpPut("field-activity-types/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> SetFieldActivityTypeStatus(Guid id, SetLookupStatusRequest request, CancellationToken ct) => SetStatus("FieldActivityType", id, request, ct);
+
     [HttpGet("departments")]
     public Task<IActionResult> GetDepartments([FromQuery] LookupListQuery query, CancellationToken ct) =>
         Get("Department", query, ct);

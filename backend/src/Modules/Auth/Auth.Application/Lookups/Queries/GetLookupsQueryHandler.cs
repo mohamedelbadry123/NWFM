@@ -17,6 +17,10 @@ public sealed class GetLookupsQueryHandler(IAuthDbContext context)
             {
                 Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive
             }),
+            "FieldActivityType" => context.FieldActivityTypes.AsNoTracking().Select(x => new LookupItemDto
+            {
+                Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive, ParentCode = x.DepartmentCode
+            }),
             "Cluster" => context.Clusters.AsNoTracking().Select(x => new LookupItemDto
             {
                 Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive

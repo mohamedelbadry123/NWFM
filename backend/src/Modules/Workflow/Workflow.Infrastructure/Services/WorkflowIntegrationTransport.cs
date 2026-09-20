@@ -20,6 +20,12 @@ internal sealed class WorkflowIntegrationTransport
         timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(config.TimeoutSeconds, 1, 120)));
         try
         {
+            if (config.Protocol == "Sms")
+            {
+                variables = new(variables);
+                variables["smsTo"] = JsonSerializer.SerializeToElement(IntegrationValueMapper.Render(config.SmsTo, variables));
+                variables["smsMessage"] = JsonSerializer.SerializeToElement(IntegrationValueMapper.Render(config.SmsMessage, variables));
+            }
             var baseUri = new Uri(connection.Address, UriKind.Absolute);
             var uri = new Uri(baseUri, IntegrationValueMapper.Render(config.Path, variables));
             if (uri.Scheme != baseUri.Scheme || uri.Host != baseUri.Host || uri.Port != baseUri.Port || !string.IsNullOrEmpty(uri.UserInfo))
@@ -40,10 +46,15 @@ internal sealed class WorkflowIntegrationTransport
             if (!string.IsNullOrWhiteSpace(config.IdempotencyHeader)) request.Headers.Add(config.IdempotencyHeader, operationKey);
             if (config.Body is not null)
             {
-                var body = config.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                var body = config.Protocol == "Soap" ? SoapMessage.Render(config.Body, variables) : config.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
                     ? IntegrationValueMapper.RenderJson(config.Body, variables) : IntegrationValueMapper.Render(config.Body, variables);
                 if (Encoding.UTF8.GetByteCount(body) > MaxResponseBytes) return new(false, null, "", "Request body exceeds 256 KB.");
-                request.Content = new StringContent(body, Encoding.UTF8, config.ContentType);
+                request.Content = new StringContent(body, Encoding.UTF8, config.Protocol == "Soap" ? config.SoapVersion == "1.2" ? "application/soap+xml" : "text/xml" : config.ContentType);
+                if (config.Protocol == "Soap")
+                {
+                    if (config.SoapVersion == "1.2") request.Content.Headers.ContentType!.Parameters.Add(new NameValueHeaderValue("action", "\"" + config.SoapAction.Replace("\"", "") + "\""));
+                    else request.Headers.Add("SOAPAction", "\"" + config.SoapAction.Replace("\"", "") + "\"");
+                }
             }
             string Credential(string key) => credentials.GetValueOrDefault(key) ?? throw new InvalidOperationException($"Connection credential '{key}' is missing.");
             switch (connection.Authentication)
@@ -80,12 +91,15 @@ internal sealed class WorkflowIntegrationTransport
                 .ToDictionary(h => h.Key.ToLowerInvariant(), h => Redact(string.Join(",", h.Value)));
             var status = (int)response.StatusCode;
             var success = config.SuccessStatusCodes.Length > 0 ? config.SuccessStatusCodes.Contains(status) : response.IsSuccessStatusCode;
-            return new(success, status, responseBody, success ? null : $"HTTP request returned status {status}.", status is 408 or 429 || status >= 500, Headers: responseHeaders);
+            // Request diagnostics deliberately omit headers, body values and query values.
+            var summary = JsonSerializer.Serialize(new { method = request.Method.Method, host = uri.Host, protocol = config.Protocol, contentType = request.Content?.Headers.ContentType?.MediaType, requestBytes = request.Content?.Headers.ContentLength, operationId = operationKey });
+            if (config.Protocol == "Soap" && SoapMessage.HasFault(responseBody)) return new(false, status, responseBody, "SOAP service returned a Fault.", false, Headers: responseHeaders, RequestSummary: summary);
+            return new(success, status, responseBody, success ? null : $"HTTP request returned status {status}.", status is 408 or 429 || status >= 500, Headers: responseHeaders, RequestSummary: summary);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return new(false, null, "", "HTTP request timed out.", true, true); }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) when (ex is HttpRequestException or IOException or SocketException) { return new(false, null, "", "The service could not be reached or its response exceeded the permitted size.", true); }
-        catch (Exception ex) when (ex is FormatException or InvalidOperationException or JsonException or ArgumentException or KeyNotFoundException)
+        catch (Exception ex) when (ex is FormatException or InvalidOperationException or JsonException or ArgumentException or KeyNotFoundException or System.Xml.XmlException)
         { return new(false, null, "", "Request configuration or response format is invalid. Check the connection and mappings."); }
     }
 

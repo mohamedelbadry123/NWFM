@@ -246,6 +246,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("DueAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid?>("ExecutionTokenId")
                         .HasColumnType("uniqueidentifier");
 
@@ -263,6 +266,15 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PendingOutcome")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phase")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SlaBreachedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("datetime2");
@@ -826,6 +838,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDemo")
                         .HasColumnType("bit");
 
                     b.Property<string>("Mode")
@@ -1474,10 +1489,16 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("GeographyJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsDemo")
+                        .HasColumnType("bit");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
@@ -1726,13 +1747,25 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DeliveryResultJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Error")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("EventName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EventTrigger")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("InputJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActivityEvent")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -1755,6 +1788,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("bit");
 
                     b.Property<string>("ResultJson")
                         .HasColumnType("nvarchar(max)");
@@ -1962,6 +1998,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDemo")
                         .HasColumnType("bit");
 
                     b.Property<Guid>("OrganizationId")
@@ -2357,6 +2396,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<string>("DesignerJson")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PinnedChildVersionsJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2");
 
@@ -2396,6 +2438,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("WorkflowDefinitionId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("WorkspaceJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("XmlContent")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -2412,6 +2457,46 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("workflow_versions", "Workflow");
+                });
+
+            modelBuilder.Entity("Workflow.Domain.Entities.WorkflowWorkspaceAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("EffectiveActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("WorkItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("workspace_actions", "Workflow");
                 });
 
             modelBuilder.Entity("Workflow.Domain.Entities.ActivityActionDefinition", b =>

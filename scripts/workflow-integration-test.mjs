@@ -5,12 +5,14 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createServer as createTcpServer } from 'node:net';
 import { writeFile, mkdir } from 'node:fs/promises';
+import { loginForWorkflowTest, ensureTestParticipant } from './workflow-test-auth.mjs';
 const base = process.env.NWFM_API_URL || 'http://localhost:5081';
+const token = await loginForWorkflowTest(base);
 const prefix = 'VERIFY_' + randomUUID().slice(0,8);
 const secret = randomUUID() + randomUUID();
 const esc = value => String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 async function api(path, method='GET', body, expected=200, headers={}) {
-  const response=await fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...headers},body:body===undefined?undefined:JSON.stringify(body)});
   const text=await response.text(); let data;try{data=JSON.parse(text)}catch{data=text}
   assert.equal(response.status,expected,`${method} ${path}: ${text}`); return data;
 }
@@ -25,6 +27,7 @@ const xml=(nodes,edges,variables='')=>`<Workflow xmlns="https://privora.io/workf
 const variable=(key,type,defaultValue)=>`<Variable key="${key}" name="${key}" dataType="${type}" ${defaultValue!==undefined?`defaultValue="${esc(defaultValue)}"`:''}/>`;
 const context=await api('app-context'); const org=context.tenant.id;
 const groups=await api('workflow/assignment-groups');const group=(groups.items||groups).find(g=>g.code==='REVIEWERS');assert.ok(group);
+await ensureTestParticipant(api,token,group);
 async function createWorkflow(name,content) {
   const definition=await api('workflow/definitions','POST',{organizationId:org,definitionKey:prefix+'_'+name,name:prefix+' '+name},201);
   const route=`workflow/definitions/${definition.id}/versions`;

@@ -1,6 +1,8 @@
 # Workflow improvement verification
 
-Branch: `workflow-improvement` · 2026-09-19
+Branch: `workflow-improvement` · 2026-09-20
+
+The Auth merge and nested workspace extend this original activity audit. See [WORKFLOW_WORKSPACE.md](WORKFLOW_WORKSPACE.md) for the current 319 backend / 60 frontend test results, 66 authenticated API checks, migration evidence and browser walkthrough. The Main Activity is the fourteenth palette activity and is covered by the workspace runtime, SQL acceptance and restart suites.
 
 The implementation retains the existing engine and all four palette categories. HTTP and email use persisted jobs; callbacks use authenticated receipts and per-activity waits. SQL transactions serialize advancement. See [setup and operations](WORKFLOW_INTEGRATIONS.md).
 
@@ -17,6 +19,7 @@ All 13 activities executed in the SQL acceptance fixture. This is representative
 | Flow | Parallel Fork | Unique identity per fork execution and ownership of asynchronous branches; callbacks plus timer in recovery test. |
 | Flow | Join | Groups by fork execution, consumes once, restores parent token; nested acceptance and concurrent/restart checks. Multiple joins require explicit selection. |
 | Tasks | User Task | Group assignment/fallback, claims, delegation, outcomes, required typed fields/options, mappings, instructions, SLA and installed action hooks. SQL form validation, mapping, SLA, completion hook and concurrent claim checks. |
+| Tasks | Main Activity | Pinned nested child → final approval → required events → route. Geography inheritance, child gating, rework, inclusive main SLA, group checks and persisted restart identity are verified. |
 | Automation | Service Task | Guided HTTP, protected authentication references, request/response mappings, persisted retry/replay and failure routes. Real local HTTP verifies Bearer, typed JSON, header mapping and stable operation ID. |
 | Automation | Call Activity | Published child/version, input/output mapping, waiting or independent child, recursion guard. SQL immediate completion/output and waiting-child cancellation. |
 | Automation | Set Variables | Typed value editor, legacy compatibility, declared/existing variable whitelist, no executable code. Tests preserve numeric-looking strings, quotes and newlines. |
@@ -41,4 +44,4 @@ All categories/palette items, published read-only controls, clone-to-draft navig
 
 Required attachments, arbitrary JSON Schema forms, non-group assignment rules, disabled claim semantics and nonzero task queue priority are rejected before publication. Form key is a reference label, not an external form loader. Generic HTTP/SMTP and OAuth client credentials are provided; provider-specific authorization flows, attachments and email tracking are later extensions.
 
-External delivery is at-least-once after uncertain network/crash outcomes. API providers must honor idempotency keys; SMTP can duplicate after uncertain acceptance. The application retains its trusted-participant model and needs a controlled hosting boundary until separate login/access-control work is completed. No production provider credentials, public deployment, capacity certification or production-data migration was performed.
+External delivery is at-least-once after uncertain network/crash outcomes. API providers must honor idempotency keys; SMTP can duplicate after uncertain acceptance. Auth now supplies login/permissions and signed-in actor context, with administrator-only demo selection restricted to marked demo instances. No production provider credentials, public deployment, capacity certification or production-data migration was performed.

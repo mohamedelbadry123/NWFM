@@ -10,11 +10,11 @@ Deploy backend/frontend together and apply the `WorkflowIntegrations` migration 
 
 Connections are tenant-scoped; secrets are protected with ASP.NET Core Data Protection and omitted from XML and read responses. Preserve the protected key ring with database backups. Multiple hosts need a shared persistent protected key store and application discriminator. Ephemeral container keys cannot decrypt saved connections after replacement. Job configuration/input is snapshotted; current connection addresses and credentials are resolved per attempt, so rotation affects queued/replayed jobs.
 
-The app retains participant attribution without login. Keep administrative pages behind a trusted hosting boundary until the separate authentication project is implemented. Webhook authentication does not secure administrative endpoints.
+Auth login and permission policies now protect administrative endpoints. Workflow actor context comes from the signed-in identity; arbitrary participant headers cannot impersonate another user. Webhooks retain their separate source authentication. See [the workspace guide](WORKFLOW_WORKSPACE.md) for nested activities and activity-level required/background events.
 
 ## Configure an API call
 
-Open **Integrations**, create an HTTP connection with an HTTPS base URL, and choose None, Basic, Bearer, API key (header/query), or OAuth client credentials. OAuth token URLs must be HTTPS and obey the destination policy; client credentials are sent as form fields. Blank credential edits preserve existing values; replacement requires the complete required set. Referenced connections cannot be deleted.
+Open an activity's integration editor and use **Manage connections** to create an HTTP connection with an HTTPS base URL. Choose None, Basic, Bearer, API key (header/query), or OAuth client credentials. The standalone Integrations page is hidden in workspace mode. OAuth token URLs must be HTTPS and obey the destination policy; client credentials are sent as form fields. Blank credential edits preserve existing values; replacement requires the complete required set. Referenced connections cannot be deleted.
 
 In Service Task, select **Call API** and configure method, endpoint, query, headers, content type/body, success codes, timeout, retries and response mappings. URLs must stay on the connection origin; redirects/proxies are disabled. DNS is validated and sockets connect to those validated addresses. A leading `/` resolves from the host root; relative paths follow the base URL path.
 
@@ -69,9 +69,9 @@ Call Activity selects latest or fixed published child version, parent-input/chil
 
 ## Monitor and recover
 
-Integrations lists the latest 200 operations, receipts and waits. History/incidents show context. Job states are Pending, Running, Delivered, Completed, Failed and Cancelled. Delivered means only workflow advancement remains. Leases last three minutes; workers poll every two seconds with four parallel deliveries per host. Timers use the existing configured interval.
+The instance workspace displays events, integration operations and retry controls. The retained administration API lists operations, receipts and waits. Job states are Pending, Running, Delivered, Completed, Failed and Cancelled. Delivered means only workflow advancement remains. Leases last three minutes; workers poll every two seconds with four parallel deliveries per host. Timers use the existing configured interval.
 
-Replay a failed operation after fixing its provider/connection. Only its failed activity reopens, with the same operation ID. Completed/cancelled/suspended workflows and already-handled failures cannot be replayed. Callback replay only consumes an unconsumed event against one active matching wait.
+Replay a failed operation after fixing its provider/connection, retaining its operation ID. Legacy integration-activity replay reopens only its failed activity and rejects completed/cancelled/suspended workflows. Required activity events retry while their execution remains active; background activity events can retry after workflow completion without reopening it. Suspended/cancelled ancestors block delivery and progression. Callback replay only consumes an unconsumed event against one active matching wait.
 
 Limits: HTTP body/response and webhook body 256 KiB; HTTP timeout 1–120 seconds; at most 10 attempts; delay 1–3600 seconds multiplied by attempt; event wait 1 second–1 year; unmatched early callback retention seven days. Hooks allow three retries, five-second delay, 30-second total timeout. Database retention, production volume targets and ingress rate limits are deployment responsibilities. Business input/results may contain sensitive data: protect the database and define retention. Credential encryption/echo redaction is not general personal-data redaction.
 

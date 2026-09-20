@@ -188,6 +188,49 @@ namespace Auth.Infrastructure.Persistence.Migrations
                     b.ToTable("LKP_DEPARTMENT", "Auth");
                 });
 
+            modelBuilder.Entity("Auth.Domain.Entities.Lookups.FieldActivityType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DepartmentCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepartmentCode", "Code")
+                        .IsUnique();
+
+                    b.ToTable("LKP_FIELD_ACTIVITY_TYPE", "Auth");
+                });
+
             modelBuilder.Entity("Auth.Domain.Entities.Lookups.OperationArea", b =>
                 {
                     b.Property<Guid>("Id")
@@ -687,6 +730,16 @@ namespace Auth.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("UserTokens", "Auth");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.Lookups.FieldActivityType", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.Lookups.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentCode")
+                        .HasPrincipalKey("Code")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.RolePermission", b =>

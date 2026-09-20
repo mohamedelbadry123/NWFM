@@ -9,7 +9,7 @@ using Workflow.Domain.Enums;
 using Workflow.Infrastructure.Persistence;
 
 internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, WorkflowIntegrations integrations,
-    WorkflowIntegrationTransport transport, IWorkflowRuntimeEngine engine)
+    WorkflowIntegrationTransport transport, IWorkflowRuntimeEngine engine, WorkflowActivityEvents? activityEvents = null)
 {
     public async Task ProcessJobAsync(Guid id, CancellationToken ct)
     {
@@ -19,9 +19,9 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
             var job = await db.IntegrationJobs.FindAsync([id], ct);
             if (job is null) return false;
             var instance = await db.WorkflowInstances.FindAsync([job.WorkflowInstanceId], ct);
-            if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed)
+            if (instance?.Status == WorkflowInstanceStatus.Cancelled || instance?.Status == WorkflowInstanceStatus.Completed && !(job.IsActivityEvent && !job.Required))
             { job.Cancel(); return false; }
-            if (instance?.Status != WorkflowInstanceStatus.Running) return false;
+            if (instance is null || !await WorkflowTreeGuard.CanRunAsync(db, instance.Id, ct, job.IsActivityEvent && !job.Required)) return false;
             if (job.Status == "Delivered") return true;
             var now = DateTime.UtcNow;
             if (!(job.Status == "Pending" && job.NextAttemptAt <= now || job.Status == "Running" && job.LeaseUntil <= now)) return false;
@@ -58,8 +58,8 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
             await db.Entry(operation).ReloadAsync(ct);
             var instance = await db.WorkflowInstances.FindAsync([operation.WorkflowInstanceId], ct);
             if (instance is not null) await db.Entry(instance).ReloadAsync(ct);
-            if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed) { operation.Cancel(); return false; }
-            if (instance?.Status != WorkflowInstanceStatus.Running || operation.Status != "Delivered") return false;
+            if (instance?.Status == WorkflowInstanceStatus.Cancelled || instance?.Status == WorkflowInstanceStatus.Completed && !(operation.IsActivityEvent && !operation.Required)) { operation.Cancel(); return false; }
+            if (instance is null || !await WorkflowTreeGuard.CanRunAsync(db, instance.Id, ct, operation.IsActivityEvent && !operation.Required) || operation.Status != "Delivered") return false;
             var result = JsonSerializer.Deserialize<IntegrationResult>(operation.ResultJson!, IntegrationJson.Options)!;
             var http = IntegrationJson.Read<HttpActivityConfiguration>(operation.ConfigurationJson);
             var email = IntegrationJson.Read<EmailActivityConfiguration>(operation.ConfigurationJson);
@@ -75,11 +75,43 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
                     catch (JsonException) { body = result.Body; }
                     var envelope = JsonSerializer.Serialize(new { status = result.StatusCode, headers = result.Headers, body });
                     outputs = IntegrationValueMapper.Map(envelope, http.OutputMappings);
+                    if (http.Protocol == "Soap") foreach (var (key, value) in SoapMessage.Map(result.Body, http)) outputs[key] = value;
                 }
-                catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+                catch (Exception ex) when (ex is JsonException or InvalidOperationException or System.Xml.XmlException or System.Xml.XPath.XPathException)
                 { error = ex.Message; outcome = http.ErrorOutcome; result = result with { Success = false, Error = error }; }
             }
             if (operation.Kind == "Email" && !result.Success && email.FailurePolicy == "Continue") { error = null; outcome = "success"; }
+            if (operation.IsActivityEvent)
+            {
+                if (result.Success)
+                {
+                    if (operation.Required)
+                    {
+                        foreach (var (key, value) in outputs)
+                        {
+                            var variable = await db.WorkflowVariables.FirstOrDefaultAsync(v => v.WorkflowInstanceId == instance.Id && v.VariableName == key, ct);
+                            if (variable is null) db.WorkflowVariables.Add(WorkflowVariable.Create(instance.OrganizationId, instance.Id, key, VariableDataType.Json, JsonSerializer.Serialize(value), DateTime.UtcNow));
+                            else variable.SetValue(JsonSerializer.Serialize(value), DateTime.UtcNow);
+                        }
+                    }
+                    operation.Complete(JsonSerializer.Serialize(outputs), result.StatusCode);
+                }
+                else
+                {
+                    operation.Fail(result.Error ?? "Integration failed.", result.StatusCode, null);
+                    if (activityEvents is not null && operation.EventTrigger != "OnFailure")
+                    {
+                        var execution = await db.ActivityInstances.FindAsync([operation.ActivityInstanceId], ct);
+                        var definition = await db.ActivityDefinitions.FirstAsync(a => a.WorkflowVersionId == instance.PinnedWorkflowVersionId && a.NodeKey == execution!.ActivityNodeKey, ct);
+                        await activityEvents.QueueAsync(instance, definition, execution!, "OnFailure", operation.Id.ToString("N"), ct);
+                    }
+                }
+                db.WorkflowEvents.Add(WorkflowEvent.Append(instance.OrganizationId, instance.Id,
+                    result.Success ? WorkflowEventType.IntegrationCompleted : WorkflowEventType.IntegrationFailed, DateTime.UtcNow,
+                    payloadJson: JsonSerializer.Serialize(new { operationId = operation.Id, operation.EventName, operation.Required, operation.Attempts, result.Error })));
+                await db.SaveChangesAsync(ct);
+                return true;
+            }
             var completion = await engine.CompleteExternalActivityAsync(operation.ActivityInstanceId, outputs, outcome, error, DateTime.UtcNow, ct);
             if (completion.IsFailure) return false;
             if (result.Success) operation.Complete(JsonSerializer.Serialize(outputs), result.StatusCode);
@@ -168,11 +200,12 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
     {
         var children = await db.WorkflowInstances.AsNoTracking().Where(c => c.ParentInstanceId != null && c.ParentActivityNodeKey != null
             && (c.Status == WorkflowInstanceStatus.Completed || c.Status == WorkflowInstanceStatus.Failed || c.Status == WorkflowInstanceStatus.Cancelled)
-            && db.ActivityInstances.Any(a => a.Id == c.ParentActivityInstanceId && a.Status == ActivityInstanceStatus.Active)
-            && db.WorkflowInstances.Any(p => p.Id == c.ParentInstanceId && p.Status == WorkflowInstanceStatus.Running)).Take(50).ToListAsync(ct);
+            && db.ActivityInstances.Any(a => a.Id == c.ParentActivityInstanceId && a.Status == ActivityInstanceStatus.Active
+                && (a.ActivityType == ActivityType.CallActivity || a.Phase == "WaitingForChild" || a.Phase == "ChildFailed" && c.Status == WorkflowInstanceStatus.Completed))
+            && db.WorkflowInstances.Any(p => p.Id == c.ParentInstanceId && p.Status == WorkflowInstanceStatus.Running)).OrderBy(c => c.StartedAt).Take(50).ToListAsync(ct);
         foreach (var child in children)
             await engine.ResumeFromCallActivityAsync(child.ParentInstanceId!.Value, child.ParentActivityNodeKey!, DateTime.UtcNow, ct);
-        var cancelledChildren = await db.WorkflowInstances.Where(c => c.ParentInstanceId != null && c.ParentActivityNodeKey != null
+        var cancelledChildren = await db.WorkflowInstances.Where(c => c.ParentInstanceId != null
             && (c.Status == WorkflowInstanceStatus.Running || c.Status == WorkflowInstanceStatus.Suspended)
             && db.WorkflowInstances.Any(p => p.Id == c.ParentInstanceId && p.Status == WorkflowInstanceStatus.Cancelled)).Take(50).ToListAsync(ct);
         foreach (var child in cancelledChildren)

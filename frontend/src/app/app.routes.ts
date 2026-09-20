@@ -1,3 +1,4 @@
+import { workflowHomeGuard, workflowWorkspaceGuard } from './core/guards/workflow-workspace.guard';
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard, permissionGuard } from './core/guards/auth.guard';
 import { PERMISSIONS } from './core/auth/permissions';
@@ -11,20 +12,21 @@ export const routes: Routes = [
     path: '',
     component: DashboardLayoutComponent,
     canActivate: [authGuard],
+    canActivateChild: [workflowWorkspaceGuard],
     children: [
       { path: 'admin/workflow/integrations', canActivate: [permissionGuard(PERMISSIONS.manageDefinitions)], loadComponent: () => import('./features/workflow/integrations/workflow-connections.component').then(m => m.WorkflowConnectionsComponent) },
-      { path: '', pathMatch: 'full', redirectTo: 'org/workflow' },
+      { path: '', pathMatch: 'full', canActivate: [workflowHomeGuard], loadComponent: () => import('./features/workflow/workspace/workflow-workspace.component').then(m => m.WorkflowWorkspaceComponent) },
       { path: 'admin/workflow', pathMatch: 'full', redirectTo: 'admin/workflow/hub' },
-      { path: 'workflow/start', loadComponent: () => import('./features/workflow/start/workflow-start.component').then(m => m.WorkflowStartComponent) },
+      { path: 'workflow/start', data: {workspaceView: 'start'}, canActivate: [permissionGuard(PERMISSIONS.startWorkflows)], loadComponent: () => import('./features/workflow/workspace/workflow-workspace.component').then(m => m.WorkflowWorkspaceComponent) },
       { path: 'admin/workflow/hub', loadComponent: () => import('./features/admin/workflow-hub/admin-workflow-hub-page.component').then(m => m.AdminWorkflowHubPageComponent) },
       { path: 'admin/workflow/bindings', loadComponent: () => import('./features/admin/workflow-bindings/workflow-bindings-list.component').then(m => m.WorkflowBindingsListComponent) },
       { path: 'admin/workflow/bindings/new', loadComponent: () => import('./features/admin/workflow-bindings/workflow-binding-wizard.component').then(m => m.WorkflowBindingWizardComponent) },
       { path: 'admin/workflow/bindings/:bindingId', loadComponent: () => import('./features/admin/workflow-bindings/workflow-binding-detail.component').then(m => m.WorkflowBindingDetailComponent) },
-      { path: 'admin/workflow/definitions', loadComponent: () => import('./features/workflow/definitions/workflow-definitions.component').then(m => m.WorkflowDefinitionsComponent) },
+      { path: 'admin/workflow/definitions', data: {workspaceView: 'workflows'}, canActivate: [permissionGuard(PERMISSIONS.manageDefinitions)], loadComponent: () => import('./features/workflow/workspace/workflow-workspace.component').then(m => m.WorkflowWorkspaceComponent) },
       { path: 'admin/workflow/definitions/:definitionId/versions', loadComponent: () => import('./features/workflow/versions/workflow-versions.component').then(m => m.WorkflowVersionsComponent) },
       { path: 'admin/workflow/definitions/:definitionId/versions/:versionId/designer', loadComponent: () => import('./features/workflow/designer/workflow-designer.component').then(m => m.WorkflowDesignerComponent) },
-      { path: 'admin/workflow/instances', loadComponent: () => import('./features/admin/workflow-instances/workflow-instances.component').then(m => m.WorkflowInstancesComponent) },
-      { path: 'admin/workflow/instances/:id', loadComponent: () => import('./features/admin/workflow-instance-detail/workflow-instance-detail.component').then(m => m.WorkflowInstanceDetailComponent) },
+      { path: 'admin/workflow/instances', data: {workspaceView: 'instances'}, canActivate: [permissionGuard(PERMISSIONS.viewInstances)], loadComponent: () => import('./features/workflow/workspace/workflow-workspace.component').then(m => m.WorkflowWorkspaceComponent) },
+      { path: 'admin/workflow/instances/:id', canActivate: [permissionGuard(PERMISSIONS.viewInstances)], loadComponent: () => import('./features/workflow/workspace/workflow-instance-workspace.component').then(m => m.WorkflowInstanceWorkspaceComponent) },
       { path: 'admin/workflow/calendars', loadComponent: () => import('./features/admin/workflow-calendars/workflow-calendars.component').then(m => m.WorkflowCalendarsComponent) },
       { path: 'admin/workflow/sla-policies', loadComponent: () => import('./features/admin/workflow-sla-policies/workflow-sla-policies.component').then(m => m.WorkflowSlaPoliciesComponent) },
       { path: 'admin/workflow/incidents', loadComponent: () => import('./features/admin/workflow-incidents/workflow-incidents.component').then(m => m.WorkflowIncidentsComponent) },
@@ -55,7 +57,7 @@ export const routes: Routes = [
         data: { titleKey: 'admin.rolePermissions.title', subtitleKey: 'admin.rolePermissions.subtitle' },
         loadComponent: () => import('./features/admin/role-permissions/role-permissions.component').then(m => m.RolePermissionsComponent),
       },
-      { path: '**', redirectTo: 'org/workflow' },
+      { path: '**', redirectTo: 'admin/workflow/definitions' },
     ],
   },
 ];

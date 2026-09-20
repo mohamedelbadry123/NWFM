@@ -2,7 +2,7 @@
 
 An independent workflow application extracted from the reference project's Workflow module. It contains an ASP.NET Core backend and an Angular frontend, using a fresh SQL Server database.
 
-Version one opens directly into one default tenant. Participants identify who performs a workflow action; they have no accounts or passwords. Authentication and access control are intentionally absent and will be implemented separately. Run this version locally or in a trusted development environment.
+The application uses Auth login and permissions with one server-configured default tenant. The workflow workspace provides Workflows, New Instance, Instances and Lookups, while retaining the complete designer and runtime. See the [workspace guide](WORKFLOW_WORKSPACE.md) for architecture, migrations, local demo setup and a walkthrough.
 
 ## Start locally
 
@@ -31,17 +31,15 @@ Open http://localhost:4200. The API listens on http://localhost:5080 and its API
 
 The default connection uses Windows authentication to SQL Server on `localhost`, database `NWFM`. The startup identity needs permission to create that database. Override `ConnectionStrings__DefaultConnection` for another SQL Server; use a new NWFM database, never the reference database. No reference credentials or data are copied.
 
-Startup applies the new migrations and initializes one tenant, two reviewers, a Reviewers group, and a Simple approval workflow. Initialization is transactional and repeatable. To manage migrations separately, set `Application__InitializeDatabase=false` after initialization.
+Startup applies workflow migrations and initializes the default tenant. Auth migrations/seeding use the `DatabaseStartup` settings. Workflow examples are created only when `WorkflowDemo:Enabled=true`; the [demo setup](WORKFLOW_WORKSPACE.md#local-demo-setup) also enables local transports. Leave demo and Auth data seeding disabled for business deployments.
 
 ## First workflow
 
-1. Open **Start workflow**, select the standalone binding, and start a request.
-2. Open **Tasks** and claim the review task.
-3. Open **Action**, enter `Approve`, and submit completion.
-4. Check **Requests** or **Execution monitor** for progress and history.
-5. Use **Designer & definitions** to create definitions and new versions. Configure groups before assigning user tasks; publish a version and create an active binding to make it available on the start screen.
-
-The header selects the acting participant. New participants can be created directly under **Participants**; the header list updates automatically. The tenant selector has one available tenant in this version. The configured default participant cannot be deactivated until another default is configured.
+1. Sign in, open **Lookups**, and check geography, departments and Field Activity Types.
+2. In **Workflows**, create and publish child workflows, then a main workflow containing Main Activities. Each main activity runs its child before final approval.
+3. In **New Instance**, select a published main workflow and start it. Tenant and binding are resolved automatically.
+4. In **Instances**, open the execution tree and use permitted Approve, Reject or Add Comment actions. Rejection follows the configured rework route.
+5. On explicitly marked demo instances, administrators can select a demo user. Ordinary requests always use the signed-in identity and real group membership.
 
 ## Verify
 
@@ -58,7 +56,7 @@ With the API running, from the project root:
 node scripts/smoke-test.mjs
 ```
 
-The smoke test creates a completed sample request and a deactivated test participant. It verifies API availability, tenant/participant validation, participant registration, default participant protection, duplicate execution protection, concurrent claims, ownership, completion, and the reduced API surface.
+Run the smoke test against a disposable, Auth-seeded database with workflow demos enabled. It verifies authenticated API availability, tenant isolation, real-user assignment, duplicate starts, concurrent claims, ownership and completion. The [workspace guide](WORKFLOW_WORKSPACE.md#verification-evidence) includes additional integration and process-restart checks.
 
 To regenerate the Angular client after an API change, start the backend, then run `npm run generate:api` in `frontend`.
 
@@ -66,17 +64,17 @@ To regenerate the Angular client after an API change, start the backend, then ru
 
 Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_ENHANCEMENT_PLAN.md) and [activity audit](WORKFLOW_ACTIVITY_AUDIT.md), with verified paths and operating boundaries. Configure API calls, email and authenticated callbacks using the [integration operator guide](WORKFLOW_INTEGRATIONS.md).
 
-- The only feature module is Workflow. The backend host supplies a minimal tenant and participant context.
-- `ICurrentTenant` and `IWorkflowActorContext` are the future authentication integration points. The `UserId` fields retained in Workflow are stable actor identifiers, not references to an Identity database.
-- The frontend sends `X-Workflow-Participant-Id`; this is attribution, not proof of identity. Tenant selection comes from backend configuration. Tenant headers, route values, or body values cannot override it.
+- Auth supplies identities, permissions and organizational reference data. Workflow uses reference-data and group-directory interfaces.
+- `ICurrentTenant` resolves the configured tenant. Auth's JWT supplies the actor; participant headers cannot select another identity. Tenant headers, route values or body values cannot override the tenant.
+- Normal Workflow participant `UserId` values match their Auth user IDs. Demo participants are separately marked and usable only through authorized demo-instance actions.
 - Former workflow administration endpoints operate inside the configured tenant. Database filters include workflow versions and compiled child records; writes to another tenant are rejected.
-- SQL schemas are `Workflow` and `Tenancy`. No privacy/compliance, Identity, platform administration, or original business data is included.
+- SQL schemas include `Auth`, `Workflow` and `Tenancy`; reference-project business data is not copied.
 - Workflow XML retains its original `https://privora.io/workflow/v1` schema namespace for compatibility with the extracted compiler and designer. This is a format identifier; it makes no network request.
 - The standalone outcome handler acknowledges results already stored in workflow history. Future integrations can implement capability, action, and outcome contracts without importing another product's modules.
-- In-app notifications work locally. Email uses a configured SMTP connection and durable delivery jobs. API calls and authenticated callbacks are configured through Integrations and the designer. Publication rejects missing integration prerequisites.
+- REST, SOAP, SMS and email are configured inside activity settings. Required delivery blocks advancement; background delivery remains visible after completion. Wait for Event handles authenticated incoming callbacks separately.
 
 ## Containers
 
 Copy `.env.example` to `.env`, set a local SQL Server password, and run `docker compose up --build`. The frontend is available at http://localhost:4200. The database volume is separate from any reference project volume. This is a local development configuration, not a production deployment.
 
-The local .NET/Angular setup was verified with SQL Server, 217 backend tests, 35 frontend tests, a production frontend build, HTTP smoke checks, and browser workflow completion. The container configuration was validated; the containers have not been run.
+The workspace was verified with SQL Server, 319 backend tests, 60 frontend tests, production builds, authenticated API checks, real process restarts and browser checks. See the workspace guide for evidence and remaining build warnings. The containers have not been run for this workspace change.

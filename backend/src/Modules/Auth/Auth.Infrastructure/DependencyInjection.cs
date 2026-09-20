@@ -31,6 +31,7 @@ public static class DependencyInjection
         builder.Services.AddDbContext<AuthDbContext>(options =>
             options.UseSqlServer(connectionString));
         builder.Services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AuthDbContext>());
+        builder.Services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowReferenceData, WorkflowReferenceData>();
 
         builder.Services
             .AddIdentity<ApplicationUser, ApplicationRole>()

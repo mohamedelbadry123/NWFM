@@ -12,6 +12,8 @@ public sealed class WorkflowParticipant : Entity, ITenantAware
     public string? DisplayNameAr { get; private set; }
     public string Email { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
+    public bool IsDemo { get; private set; }
+    public void MarkDemo() => IsDemo = true;
     public byte[] RowVersion { get; private set; } = [];
 
     private WorkflowParticipant() { }

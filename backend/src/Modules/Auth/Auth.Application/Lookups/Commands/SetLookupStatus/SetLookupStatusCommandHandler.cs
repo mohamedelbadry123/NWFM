@@ -16,6 +16,7 @@ public sealed class SetLookupStatusCommandHandler(IAuthDbContext context)
         Result<LookupItemDto> updated = type switch
         {
             "Department" => await SetDepartment(request, ct),
+            "FieldActivityType" => await SetFieldActivityType(request, ct),
             "Cluster" => await SetCluster(request, ct),
             "Cbu" => await SetCbu(request, ct),
             "Branch" => await SetBranch(request, ct),
@@ -44,6 +45,14 @@ public sealed class SetLookupStatusCommandHandler(IAuthDbContext context)
         if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
         entity.SetActive(request.IsActive);
         return new LookupItemDto { Id = entity.Id, Code = entity.Code, NameEn = entity.NameEn, NameAr = entity.NameAr, IsActive = entity.IsActive };
+    }
+
+    private async Task<Result<LookupItemDto>> SetFieldActivityType(SetLookupStatusCommand request, CancellationToken ct)
+    {
+        var entity = await context.FieldActivityTypes.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
+        entity.SetActive(request.IsActive);
+        return new LookupItemDto { Id = entity.Id, Code = entity.Code, NameEn = entity.NameEn, NameAr = entity.NameAr, IsActive = entity.IsActive, ParentCode = entity.DepartmentCode };
     }
 
     private async Task<Result<LookupItemDto>> SetCbu(SetLookupStatusCommand request, CancellationToken ct)

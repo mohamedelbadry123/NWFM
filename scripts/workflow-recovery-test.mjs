@@ -2,10 +2,12 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { loginForWorkflowTest } from './workflow-test-auth.mjs';
 const base=process.env.NWFM_API_URL || 'http://localhost:5081';
+const token=await loginForWorkflowTest(base);
 const stateFile=new URL('../.work/workflow-recovery-state.json',import.meta.url);
 async function api(path,method='GET',body,status=200,headers={}) {
-  const response=await fetch(`${base}/api/${path}`,{method,headers:{'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(`${base}/api/${path}`,{method,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...headers},body:body===undefined?undefined:JSON.stringify(body)});
   const text=await response.text();assert.equal(response.status,status,`${method} ${path}: ${text}`);return text?JSON.parse(text):null;
 }
 async function until(read,predicate) {

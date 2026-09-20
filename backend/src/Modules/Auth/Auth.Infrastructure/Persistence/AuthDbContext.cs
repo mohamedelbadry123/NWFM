@@ -22,6 +22,7 @@ public class AuthDbContext : IdentityDbContext<ApplicationUser, ApplicationRole,
     public DbSet<OrgScope> OrgScopes => Set<OrgScope>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Department> Departments => Set<Department>();
+    public DbSet<FieldActivityType> FieldActivityTypes => Set<FieldActivityType>();
     public DbSet<Cluster> Clusters => Set<Cluster>();
     public DbSet<Cbu> Cbus => Set<Cbu>();
     public DbSet<Branch> Branches => Set<Branch>();

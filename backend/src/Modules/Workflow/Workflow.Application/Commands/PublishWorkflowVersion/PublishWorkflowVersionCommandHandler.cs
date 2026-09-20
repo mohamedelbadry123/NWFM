@@ -21,13 +21,14 @@ public sealed class PublishWorkflowVersionCommandHandler
     private readonly IWorkflowXmlCompiler _compiler;
     private readonly IWorkflowActionRegistry? _actionRegistry;
     private readonly IWorkflowIntegrations? _integrations;
+    private readonly Workflow.Application.Workspace.IWorkflowWorkspacePublisher? _workspace;
 
     public PublishWorkflowVersionCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitionRepo,
         IWorkflowVersionRepository versionRepo,
         IWorkflowXmlCompiler compiler,
-        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null)
+        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null, Workflow.Application.Workspace.IWorkflowWorkspacePublisher? workspace = null)
     {
         _gate = gate;
         _definitionRepo = definitionRepo;
@@ -35,6 +36,7 @@ public sealed class PublishWorkflowVersionCommandHandler
         _compiler = compiler;
         _actionRegistry = actionRegistry;
         _integrations = integrations;
+        _workspace = workspace;
     }
 
     public async Task<Result<WorkflowVersionDto>> Handle(
@@ -76,6 +78,7 @@ public sealed class PublishWorkflowVersionCommandHandler
             if (_integrations is not null) errors.AddRange(await _integrations.ValidateConnectionsAsync(compileResult.Value!, cancellationToken));
         }
 
+        if (_workspace is not null) errors.AddRange(await _workspace.ValidateAsync(version, cancellationToken));
         var isValid = errors.Count == 0;
         var resultDto = new WorkflowValidationResultDto(isValid, errors, warnings);
         version.SetValidationResult(isValid, JsonSerializer.Serialize(resultDto), DateTime.UtcNow);
@@ -89,6 +92,7 @@ public sealed class PublishWorkflowVersionCommandHandler
                 first));
         }
 
+        if (_workspace is not null) { var prepared = await _workspace.PreparePublicationAsync(version, cancellationToken); if (prepared.IsFailure) return Result.Failure<WorkflowVersionDto>(prepared.Error); }
         var now = DateTime.UtcNow;
         version.Publish(request.PublishedByUserId, now);
         await _versionRepo.SaveChangesAsync(cancellationToken);

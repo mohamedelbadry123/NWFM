@@ -28,6 +28,7 @@ public static class DependencyInjection
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", "Workflow")));
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
+        services.AddScoped<Workflow.Application.Workspace.IWorkflowWorkspacePublisher, WorkflowWorkspacePublisher>();
         services.AddTransient(typeof(MediatR.IPipelineBehavior<,>), typeof(WorkflowRuntimeCommandLock<,>));
         services.AddScoped<IWorkflowParticipantRepository, WorkflowParticipantRepository>();
         services.AddScoped<IWorkflowAssignmentGroupRepository, WorkflowAssignmentGroupRepository>();
@@ -77,6 +78,10 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowIntegrationRuntime>(sp => sp.GetRequiredService<WorkflowIntegrations>());
         services.AddScoped<WorkflowIntegrationTransport>();
         services.AddScoped<WorkflowIntegrationProcessor>();
+        services.AddScoped<WorkflowActivityEvents>();
+        services.AddScoped<WorkflowWorkspaceProcessor>();
+        services.AddScoped<Workflow.Application.Workspace.IWorkflowWorkspace, WorkflowWorkspace>();
+        services.AddScoped<Workflow.Application.Workspace.IWorkflowGroupDirectory, WorkflowGroupDirectory>();
         services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowActionProvider, HttpWorkflowActionProvider>();
         services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowActionProvider, WorkflowVariableActionProvider>();
         services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowTriggerService, WorkflowTriggerService>();

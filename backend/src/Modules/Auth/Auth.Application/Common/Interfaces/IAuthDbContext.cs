@@ -11,6 +11,7 @@ public interface IAuthDbContext
     DbSet<OrgScope> OrgScopes { get; }
     DbSet<Team> Teams { get; }
     DbSet<Department> Departments { get; }
+    DbSet<FieldActivityType> FieldActivityTypes { get; }
     DbSet<Cluster> Clusters { get; }
     DbSet<Cbu> Cbus { get; }
     DbSet<Branch> Branches { get; }

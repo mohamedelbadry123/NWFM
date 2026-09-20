@@ -44,7 +44,7 @@ var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>(
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
 
-builder.Services.AddControllers(o => o.Filters.AddService<TenantScopeFilter>())
+builder.Services.AddControllers(o => { o.Filters.AddService<TenantScopeFilter>(); o.Filters.Add<FailureResultFilter>(); })
     .AddApplicationPart(typeof(Workflow.Api.Controllers.WorkItemsController).Assembly)
     .AddApplicationPart(typeof(Auth.Api.Controllers.AuthController).Assembly)
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -117,6 +117,7 @@ await app.InitialiseAuthDatabaseAsync();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
+    await WorkflowWorkspaceDemo.InitializeAsync(scope.ServiceProvider, app.Configuration);
 }
 
 app.Run();

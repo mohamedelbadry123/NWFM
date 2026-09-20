@@ -49,6 +49,7 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
         var now = DateTime.UtcNow;
 
         version.UpdateXml(request.XmlContent, canonicalHash, now);
+        version.SetWorkspace(doc.WorkspaceJson);
         if (request.DesignerJson is not null)
             version.UpdateDesignerJson(request.DesignerJson, now);
 

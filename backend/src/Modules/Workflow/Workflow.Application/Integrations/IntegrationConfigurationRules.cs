@@ -19,6 +19,18 @@ public static class IntegrationConfigurationRules
             if (kind == "Http")
             {
                 var c = IntegrationJson.Read<HttpActivityConfiguration>(json);
+                Check(c.Protocol is "Rest" or "Soap" or "Sms", "Select REST, SOAP or SMS.");
+                if (c.Protocol == "Soap")
+                {
+                    Check(c.SoapVersion is "1.1" or "1.2", "Select SOAP 1.1 or SOAP 1.2.");
+                    Check(c.Method == "POST", "SOAP requests use POST.");
+                    Check(!c.SoapAction.Contains('\r') && !c.SoapAction.Contains('\n'), "SOAP action must not contain line breaks.");
+                    var xml = SoapMessage.Parse(c.Body ?? "");
+                    Check(xml.Root?.Name.LocalName == "Envelope" && xml.Root.Name.NamespaceName == (c.SoapVersion == "1.2" ? "http://www.w3.org/2003/05/soap-envelope" : "http://schemas.xmlsoap.org/soap/envelope/"), "Provide a SOAP envelope matching the selected version.");
+                    Mappings(c.XmlOutputMappings);
+                    foreach (var path in c.XmlOutputMappings.Values) System.Xml.XPath.XPathExpression.Compile(path);
+                }
+                if (c.Protocol == "Sms") Check(!string.IsNullOrWhiteSpace(c.SmsTo) && !string.IsNullOrWhiteSpace(c.SmsMessage), "SMS requires a recipient and message.");
                 Check(c.ConnectionId != Guid.Empty, "Select an HTTP connection.");
                 Check(new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS" }.Contains(c.Method), "Select a supported HTTP method.");
                 Check(!string.IsNullOrWhiteSpace(c.Path), "Enter an endpoint path.");
@@ -29,7 +41,7 @@ public static class IntegrationConfigurationRules
                 Check(c.Headers is null || c.Headers.All(h => !string.IsNullOrWhiteSpace(h.Key) && h.Value is not null && !h.Key.Contains('\r') && !h.Key.Contains('\n') && !h.Value.Contains('\r') && !h.Value.Contains('\n')), "Headers must not contain line breaks.");
                 Check(!string.IsNullOrWhiteSpace(c.ErrorOutcome) && !string.IsNullOrWhiteSpace(c.TimeoutOutcome), "Error and timeout outcomes are required.");
                 Check(c.MaxAttempts <= 1 || c.Method is "GET" or "HEAD" or "OPTIONS" || !string.IsNullOrWhiteSpace(c.IdempotencyHeader), "Retrying a request that changes data requires an idempotency header.");
-                if (c.ContentType == "application/json" && !string.IsNullOrWhiteSpace(c.Body)) { using var document = JsonDocument.Parse(c.Body); }
+                if (c.Protocol != "Soap" && c.ContentType == "application/json" && !string.IsNullOrWhiteSpace(c.Body)) { using var document = JsonDocument.Parse(c.Body); }
             }
             else if (kind == "Webhook")
             {
@@ -55,7 +67,7 @@ public static class IntegrationConfigurationRules
                 else Check(c.FailurePolicy != "Retry", "Retry requires the Email channel; in-app notifications are stored immediately.");
             }
         }
-        catch (Exception ex) when (ex is JsonException or NotSupportedException) { errors.Add("Integration configuration contains an invalid value or JSON request body."); }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or System.Xml.XmlException or System.Xml.XPath.XPathException) { errors.Add("Integration configuration contains an invalid value, request body or XML mapping."); }
         return errors;
     }
 }

@@ -20,13 +20,14 @@ public sealed class GetWorkflowPublishPreviewQueryHandler
     private readonly IWorkflowXmlCompiler _compiler;
     private readonly IWorkflowActionRegistry? _actionRegistry;
     private readonly IWorkflowIntegrations? _integrations;
+    private readonly Workflow.Application.Workspace.IWorkflowWorkspacePublisher? _workspace;
 
     public GetWorkflowPublishPreviewQueryHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitions,
         IWorkflowVersionRepository versions,
         IWorkflowXmlCompiler compiler,
-        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null)
+        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null, Workflow.Application.Workspace.IWorkflowWorkspacePublisher? workspace = null)
     {
         _gate = gate;
         _definitions = definitions;
@@ -34,6 +35,7 @@ public sealed class GetWorkflowPublishPreviewQueryHandler
         _compiler = compiler;
         _actionRegistry = actionRegistry;
         _integrations = integrations;
+        _workspace = workspace;
     }
 
     public async Task<Result<WorkflowPublishPreviewDto>> Handle(
@@ -100,6 +102,7 @@ public sealed class GetWorkflowPublishPreviewQueryHandler
                 var validationWarnings = new List<WorkflowValidationIssueDto>();
                 WorkflowGraphValidator.Validate(doc, validationErrors, validationWarnings, _actionRegistry);
                 if (_integrations is not null) validationErrors.AddRange(await _integrations.ValidateConnectionsAsync(doc, cancellationToken));
+                if (_workspace is not null) validationErrors.AddRange(await _workspace.ValidateAsync(version, cancellationToken));
                 blocking.AddRange(validationErrors.Select(e => e.Message));
                 warnings.AddRange(validationWarnings.Select(w => w.Message));
             }

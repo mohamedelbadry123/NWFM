@@ -889,7 +889,9 @@
       "ctx_add_task": "إضافة مهمة مستخدم",
       "ctx_add_decision": "إضافة قرار",
       "ctx_add_end": "إضافة نهاية",
-      "ctx_select_all": "تحديد الكل"
+      "ctx_select_all": "تحديد الكل",
+      "node_main_activity": "نشاط رئيسي",
+      "node_desc_main_activity": "سير عمل فرعي ثم اعتماد رئيسي"
     },
     "help": {
       "title": "قاعدة معرفة سير العمل",
@@ -2004,14 +2006,14 @@
     "nameAr": "الاسم (عربي)",
     "status": "الحالة",
     "cluster": "التجمع",
-    "cbu": "وحدة الأعمال",
+    "cbu": "المنطقة",
     "activate": "تفعيل",
     "deactivate": "إيقاف",
     "tabs": {
       "departments": "الأقسام",
       "clusters": "التجمعات",
-      "cbus": "وحدات الأعمال",
-      "branches": "الفروع",
+      "cbus": "المناطق",
+      "branches": "المدن",
       "operationAreas": "مناطق التشغيل"
     }
   },
@@ -2074,5 +2076,12 @@
         "permission": "الصلاحية"
       }
     }
+  },
+  "workspace": {
+    "workflows": "مسارات العمل",
+    "newInstance": "نسخة جديدة",
+    "instances": "النسخ",
+    "fieldActivityTypes": "أنواع النشاط الميداني",
+    "department": "القسم"
   }
 }

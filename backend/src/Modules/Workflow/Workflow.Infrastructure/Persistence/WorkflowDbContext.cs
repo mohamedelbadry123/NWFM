@@ -11,6 +11,7 @@ public sealed class WorkflowDbContext : BaseDbContext
         : base(options, currentTenant) { }
 
     public DbSet<WorkflowParticipant> Participants => Set<WorkflowParticipant>();
+    public DbSet<WorkflowWorkspaceAction> WorkspaceActions => Set<WorkflowWorkspaceAction>();
     public DbSet<WorkflowAssignmentGroup> AssignmentGroups => Set<WorkflowAssignmentGroup>();
     public DbSet<WorkflowGroupMember> GroupMembers => Set<WorkflowGroupMember>();
     public DbSet<WorkflowDepartment> Departments => Set<WorkflowDepartment>();

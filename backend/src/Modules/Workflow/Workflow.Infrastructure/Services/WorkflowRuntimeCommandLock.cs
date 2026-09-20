@@ -25,6 +25,12 @@ internal sealed class WorkflowRuntimeCommandLock<TRequest, TResponse>(WorkflowDb
         { CancelWorkflowInstanceCommand c => c.InstanceId, SuspendWorkflowInstanceCommand c => c.InstanceId,
           ResumeWorkflowInstanceCommand c => c.InstanceId, RetryFailedActivityCommand c => c.InstanceId, _ => null };
         if (workItemId.HasValue) instanceId = await db.WorkItems.AsNoTracking().Where(w => w.Id == workItemId).Select(w => (Guid?)w.WorkflowInstanceId).FirstOrDefaultAsync(ct);
-        return instanceId.HasValue ? await WorkflowExecutionLock.RunAsync(db, "instance:" + instanceId, () => next(), ct) : await next();
+        if (!instanceId.HasValue) return await next();
+        return await WorkflowExecutionLock.RunAsync(db, "instance:" + instanceId, async () =>
+        {
+            if (workItemId.HasValue && !await WorkflowTreeGuard.CanRunAsync(db, instanceId.Value, ct))
+                throw new UnauthorizedAccessException("This workflow or one of its parents is suspended or no longer running.");
+            return await next();
+        }, ct);
     }
 }

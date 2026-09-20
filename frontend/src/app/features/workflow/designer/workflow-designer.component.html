@@ -24,6 +24,11 @@
 
   @if (!isLoading() && !loadError() && version()) {
 
+    @if (workspace(); as settings) {
+      <details class="shrink-0 border-b p-3"><summary class="cursor-pointer font-medium">{{ locale.locale() === 'ar' ? 'إعدادات سير العمل والموقع' : 'Workflow settings and geography' }}</summary>
+        <app-workflow-geography [settings]="settings" [readonly]="isReadonly()" (settingsChange)="updateWorkspace($event)" />
+      </details>
+    }
     <!-- ── Top bar ── -->
     <div class="designer-topbar flex items-center justify-between px-3 py-2 shrink-0 gap-3">
 
@@ -1257,7 +1262,7 @@
           </div>
 
           <!-- Tab bar (UserTask only) — 2-row 4-column grid, no horizontal scroll -->
-          @if (selectedNode()!.type === 'UserTask') {
+          @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
             <div class="sticky top-0 z-10 border-b shrink-0 designer-panel-header">
               <!-- Row 1: General · Assignment · Outcomes · Actions -->
               <div class="grid grid-cols-4 border-b border-dark-700/60">
@@ -1293,8 +1298,11 @@
           <div class="flex-1 overflow-y-auto">
 
             <!-- ─── General tab (all types) / non-UserTask single panel ─── -->
-            @if (selectedNode()!.type !== 'UserTask' || inspectorTab() === 'general') {
+            @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || inspectorTab() === 'general') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
+                @if (workspace() && (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
+                  <app-workflow-business-activity [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
                 <!-- Name EN -->
                 <div>
                   <label class="block text-xs font-medium text-dark-300 mb-1">
@@ -1313,7 +1321,7 @@
                 </div>
 
                 <!-- UserTask: description, instructions, priority -->
-                @if (selectedNode()!.type === 'UserTask') {
+                @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_description' | translate }}
@@ -1536,7 +1544,7 @@
             }
 
             <!-- ─── Assignment tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'assignment') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'assignment') {
               <div class="p-4 space-y-4">
                 <p class="text-xs leading-relaxed rounded-xl px-3 py-2.5"
                   style="background: color-mix(in srgb, var(--ds-primary, #6d28d9) 12%, transparent); color: var(--ds-text-2)">
@@ -1585,7 +1593,7 @@
             }
 
             <!-- ─── Outcomes tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'outcomes') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'outcomes') {
               <div class="p-4 space-y-3">
                 <p class="text-xs leading-relaxed rounded-lg px-3 py-2" style="background: var(--ds-primary-soft); color: var(--ds-text-2)">
                   {{ 'workflow.designer.props_outcomes_help' | translate }}
@@ -1693,7 +1701,7 @@
             }
 
             <!-- ─── Actions tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'actions') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'actions') {
               <div class="p-4 space-y-3">
                 @if (selectedNode()!.actions.length === 0) {
                   <p class="text-xs text-dark-500 text-center py-4">
@@ -1874,7 +1882,7 @@
             }
 
             <!-- ─── SLA tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'sla') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'sla') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 <!-- SLA Policy dropdown -->
                 <div>
@@ -1921,7 +1929,7 @@
             }
 
             <!-- ─── Data tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'data') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'data') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 <div>
                   <label class="block text-xs font-medium text-dark-300 mb-1">
@@ -1949,7 +1957,7 @@
             }
 
             <!-- ─── Form tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'form') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'form') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 <div>
                   <label class="block text-xs font-medium text-dark-300 mb-1">
@@ -2060,7 +2068,7 @@
             }
 
             <!-- ─── Advanced tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'advanced') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'advanced') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 <div>
                   <label class="block text-xs font-medium text-dark-300 mb-1">
