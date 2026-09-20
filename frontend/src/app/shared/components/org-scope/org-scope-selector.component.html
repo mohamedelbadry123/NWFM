@@ -1,0 +1,128 @@
+<div class="flex flex-col gap-3">
+  <div class="grid grid-cols-1 gap-3"
+       [class.sm:grid-cols-2]="true"
+       [class.md:grid-cols-2]="layout() === 'grid'"
+       [class.md:grid-cols-4]="layout() === 'row'">
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium">{{ 'org.cluster' | translate }}</label>
+      <p-select
+        [options]="clusters()"
+        [ngModel]="clusterCode()"
+        (ngModelChange)="onClusterChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'org.selectCluster' | translate"
+        [showClear]="true"
+        [filter]="true"
+        filterBy="label"
+        [loading]="loadingClusters()"
+        [disabled]="disabled()"
+        appendTo="body"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium">{{ 'org.cbu' | translate }}</label>
+      <p-select
+        [options]="cbus()"
+        [ngModel]="cbuCode()"
+        (ngModelChange)="onCbuChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'org.selectCbu' | translate"
+        [showClear]="true"
+        [filter]="true"
+        filterBy="label"
+        [loading]="loadingCbus()"
+        [disabled]="disabled() || !clusterCode()"
+        appendTo="body"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label class="text-sm font-medium">{{ 'org.branch' | translate }}</label>
+      <p-select
+        [options]="branches()"
+        [ngModel]="branchCode()"
+        (ngModelChange)="onBranchChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'org.selectBranch' | translate"
+        [showClear]="true"
+        [filter]="true"
+        filterBy="label"
+        [loading]="loadingBranches()"
+        [disabled]="disabled() || !cbuCode()"
+        appendTo="body"
+        styleClass="w-full"
+      />
+    </div>
+
+    @if (showOperationArea()) {
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'org.operationArea' | translate }}</label>
+        <p-select
+          [options]="operationAreas()"
+          [ngModel]="operationAreaCode()"
+          (ngModelChange)="onOperationAreaChange($event)"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'org.selectOperationArea' | translate"
+          [showClear]="true"
+          [filter]="true"
+          filterBy="label"
+          [loading]="loadingOperationAreas()"
+          [disabled]="disabled() || !cbuCode()"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
+    }
+  </div>
+
+  @if (mode() === 'multi') {
+    <div class="flex flex-col gap-1 md:max-w-[calc(50%-0.375rem)]">
+      <label class="text-sm font-medium">{{ 'org.department' | translate }}</label>
+      <p-select
+        [options]="departments()"
+        [ngModel]="departmentId()"
+        (ngModelChange)="departmentId.set($event)"
+        optionLabel="label"
+        optionValue="value"
+        [placeholder]="'org.allDepartments' | translate"
+        [showClear]="true"
+        [filter]="true"
+        filterBy="label"
+        [loading]="loadingDepartments()"
+        [disabled]="disabled()"
+        appendTo="body"
+        styleClass="w-full"
+      />
+    </div>
+
+    <div class="flex items-center gap-2">
+      <p-button
+        [label]="'org.addScope' | translate"
+        icon="pi pi-plus"
+        size="small"
+        [disabled]="!canAdd()"
+        (onClick)="addScope()"
+      />
+      <span class="text-xs text-surface-500">{{ 'org.addScopeHint' | translate }}</span>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+      @for (scope of scopes(); track scopeKey(scope)) {
+        <p-chip
+          [label]="scopeLabel(scope)"
+          [removable]="!disabled()"
+          (onRemove)="removeScope(scope)"
+        />
+      } @empty {
+        <span class="text-sm text-surface-500">{{ 'org.noScopes' | translate }}</span>
+      }
+    </div>
+  }
+</div>

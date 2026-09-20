@@ -1,0 +1,107 @@
+<div class="layout" [class.sidebar-collapsed]="!sidebarOpen()">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-mark">NWFM</span>
+      @if (sidebarOpen()) {
+        <span class="brand-text">{{ 'common.appName' | translate }}</span>
+      }
+    </div>
+
+    <nav class="sidebar-nav">
+      @for (item of navItems; track item.route ?? item.labelKey) {
+        @if (canSee(item.permissions)) {
+          @if (item.children) {
+            <button type="button" class="nav-item nav-group-toggle" (click)="toggleGroup(item)"
+              [class.active]="isGroupActive(item)" [attr.title]="item.labelKey | translate">
+              <i [class]="item.icon"></i>
+              @if (sidebarOpen()) {
+                <span>{{ item.labelKey | translate }}</span>
+                <i class="pi pi-angle-down nav-chevron" [class.expanded]="isGroupExpanded(item)"></i>
+              }
+            </button>
+            @if (sidebarOpen() && isGroupExpanded(item)) {
+              <div class="nav-subgroup">
+                @for (child of item.children; track child.route) {
+                  @if (canSee(child.permissions)) {
+                    <a class="nav-item nav-subitem" [routerLink]="child.route" routerLinkActive="active"
+                      [routerLinkActiveOptions]="{ exact: !!child.exact }">
+                      <span>{{ child.labelKey | translate }}</span>
+                    </a>
+                  }
+                }
+              </div>
+            }
+          } @else {
+            <a class="nav-item" [routerLink]="item.route" routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: false }" [attr.title]="item.labelKey | translate">
+              <i [class]="item.icon"></i>
+              @if (sidebarOpen()) {
+                <span>{{ item.labelKey | translate }}</span>
+              }
+            </a>
+          }
+        }
+      }
+    </nav>
+
+    <div class="sidebar-footer" style="margin-top: auto; padding: 0.5rem; display: flex; flex-direction: column;">
+      <a class="nav-item" (click)="logout()" style="cursor: pointer;" [attr.title]="'common.logout' | translate">
+        <i class="pi pi-sign-out"></i>
+        @if (sidebarOpen()) {
+          <span>{{ 'common.logout' | translate }}</span>
+        }
+      </a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-start">
+        <button type="button" class="icon-btn" (click)="toggleSidebar()" aria-label="menu">
+          <i class="pi pi-bars"></i>
+        </button>
+        <div class="page-heading">
+          <h1 class="page-title">
+            {{ pageHeader.header().titleText || (pageHeader.header().titleKey ? (pageHeader.header().titleKey! | translate) : ('common.appName' | translate)) }}
+          </h1>
+          @if (pageHeader.header().subtitleText || pageHeader.header().subtitleKey) {
+            <p class="page-subtitle">
+              {{ pageHeader.header().subtitleText || (pageHeader.header().subtitleKey! | translate) }}
+            </p>
+          }
+        </div>
+      </div>
+
+      <div class="topbar-end">
+        <button type="button" class="icon-btn" (click)="toggleLanguage()" [attr.aria-label]="'common.language' | translate">
+          <i class="pi pi-globe"></i>
+          <span class="lang-code">{{ locale.locale() === 'ar' ? 'EN' : 'ع' }}</span>
+        </button>
+
+        <button type="button" class="icon-btn" (click)="toggleTheme()" [attr.aria-label]="'common.toggleTheme' | translate">
+          <i class="pi" [class.pi-moon]="theme.mode() === 'light'" [class.pi-sun]="theme.mode() === 'dark'"></i>
+        </button>
+
+        <button type="button" class="user-chip" (click)="menu.toggle($event)">
+          <span class="avatar">{{ initials() }}</span>
+          <span class="user-name">{{ store.userName() }}</span>
+          <i class="pi pi-angle-down"></i>
+        </button>
+        <p-menu #menu [model]="userMenu()" [popup]="true" appendTo="body" />
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<div class="toasts" aria-live="polite">
+  @for (t of toast.toasts(); track t.id) {
+    <div role="status" class="toast" [class.error]="t.type === 'error'">
+      {{ t.message }}
+      <button type="button" (click)="toast.dismiss(t.id)" [attr.aria-label]="'common.close' | translate">×</button>
+    </div>
+  }
+</div>

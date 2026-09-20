@@ -6,10 +6,9 @@ using NWFM.Shared.Abstractions;
 
 public abstract class WorkflowControllerBase : ControllerBase
 {
-    protected (Guid OrganizationId, Guid ActorId, Guid DefaultActorId) Context =>
+    protected (Guid OrganizationId, Guid ActorId) Context =>
         (HttpContext.RequestServices.GetRequiredService<ICurrentTenant>().OrganizationId,
-         HttpContext.RequestServices.GetRequiredService<IWorkflowActorContext>().ActorId,
-         HttpContext.RequestServices.GetRequiredService<IWorkflowActorContext>().DefaultActorId);
+         HttpContext.RequestServices.GetRequiredService<IWorkflowActorContext>().ActorId);
 
     protected bool TryResolveTenant(out Guid id)
     {

@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.Commands.DeactivateParticipant;
@@ -14,6 +16,7 @@ using NWFM.Shared.Results;
 [ApiController]
 [Route("api/workflow/participants")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageParticipants)]
 public sealed class WorkflowParticipantsController : WorkflowControllerBase
 {
     private readonly ISender _sender;
@@ -103,10 +106,6 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
     {
         if (!TryGetOrganizationId(out var orgId)) return Forbid();
-
-        var participant = await _sender.Send(new GetParticipantByIdQuery(id, orgId), cancellationToken);
-        if (participant.IsSuccess && participant.Value.UserId == Context.DefaultActorId)
-            return Conflict(new { Code = "Participant.DefaultActor", Message = "The default participant cannot be deactivated. Configure another default participant first." });
 
         var result = await _sender.Send(new DeactivateParticipantCommand(id, orgId), cancellationToken);
 

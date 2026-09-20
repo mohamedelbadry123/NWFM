@@ -65,3 +65,4 @@ $RECYCLE.BIN/
 
 # Local workflow acceptance results and restart-test state
 .work/workflow-*.json
+/refernceApp

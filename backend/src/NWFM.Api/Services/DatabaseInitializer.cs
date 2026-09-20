@@ -23,7 +23,7 @@ public static class DatabaseInitializer
         var now = DateTime.UtcNow;
         if (!await db.Set<Tenant>().AnyAsync(t => t.Id == options.TenantId))
             db.Add(new Tenant { Id = options.TenantId, Name = options.TenantName });
-        var actors = new[] { options.DefaultActorId, Guid.Parse("20000000-0000-0000-0000-000000000002") };
+        var actors = new[] { Guid.Parse("20000000-0000-0000-0000-000000000001"), Guid.Parse("20000000-0000-0000-0000-000000000002") };
         for (var i = 0; i < actors.Length; i++)
             if (!await db.Participants.AnyAsync(p => p.UserId == actors[i]))
                 db.Participants.Add(WorkflowParticipant.Create(options.TenantId, actors[i], $"Reviewer {i + 1}", $"reviewer{i + 1}@example.test", now, $"مراجع {i + 1}"));
@@ -36,14 +36,14 @@ public static class DatabaseInitializer
         }
         foreach (var p in await db.Participants.Where(p => actors.Contains(p.UserId)).ToListAsync())
             if (!await db.GroupMembers.AnyAsync(m => m.AssignmentGroupId == group.Id && m.ParticipantId == p.Id))
-                db.GroupMembers.Add(WorkflowGroupMember.Create(group.Id, p.Id, true, p.UserId == options.DefaultActorId, now));
+                db.GroupMembers.Add(WorkflowGroupMember.Create(group.Id, p.Id, true, p.UserId == actors[0], now));
         await db.SaveChangesAsync();
         if (!await db.WorkflowDefinitions.AnyAsync(d => d.DefinitionKey == "SIMPLE_APPROVAL")) {
             var definition = WorkflowDefinition.Create(options.TenantId, "SIMPLE_APPROVAL", "Simple approval", now, "موافقة بسيطة");
             db.WorkflowDefinitions.Add(definition);
             await db.SaveChangesAsync();
             var sender = services.GetRequiredService<ISender>();
-            var draft = await sender.Send(new CreateWorkflowDraftCommand(definition.Id, options.DefaultActorId));
+            var draft = await sender.Send(new CreateWorkflowDraftCommand(definition.Id, actors[0]));
             if (draft.IsFailure) throw new InvalidOperationException(draft.Error.Message);
             var xml = $$"""
             <Workflow xmlns="https://privora.io/workflow/v1">
@@ -62,7 +62,7 @@ public static class DatabaseInitializer
             if (saved.IsFailure) throw new InvalidOperationException(saved.Error.Message);
             var validation = await sender.Send(new ValidateWorkflowVersionCommand(draft.Value.Id));
             if (validation.IsFailure) throw new InvalidOperationException(validation.Error.Message);
-            var published = await sender.Send(new PublishWorkflowVersionCommand(draft.Value.Id, options.DefaultActorId));
+            var published = await sender.Send(new PublishWorkflowVersionCommand(draft.Value.Id, actors[0]));
             if (published.IsFailure) throw new InvalidOperationException(published.Error.Message);
             var binding = WorkflowBinding.Create(definition.Id, options.TenantId, "Standalone", "WorkflowRequest", "RequestSubmitted", now, mode: WorkflowBindingMode.Active, screenKey: "workflow.start");
             binding.Activate(now);

@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -15,6 +17,7 @@ using Workflow.Domain.Enums;
 [ApiController]
 [Route("api/workflow/sla-policies")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageSlaPolicies)]
 public sealed class SlaPoliciesController : WorkflowControllerBase
 {
     private readonly ISender _sender;

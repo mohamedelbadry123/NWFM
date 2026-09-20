@@ -2,9 +2,12 @@ namespace Workflow.Api.Controllers;
 
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using NWFM.Shared.Constants;
 using Workflow.Application.Integrations;
 
 [ApiController]
+[Authorize(Policy = NwfmPolicies.ManageDefinitions)]
 [Route("api/workflow/integrations")]
 public sealed class WorkflowIntegrationsController(IWorkflowIntegrations integrations) : WorkflowControllerBase
 {
@@ -28,6 +31,7 @@ public sealed class WorkflowIntegrationsController(IWorkflowIntegrations integra
     public async Task<IActionResult> Replay(Guid id, CancellationToken ct)
     { var result = await integrations.ReplayOperationAsync(id, ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
     [HttpPost("webhooks/{connectionId:guid}")]
+    [AllowAnonymous] // Connection credentials are validated by ReceiveEventAsync.
     [RequestSizeLimit(262144)]
     public async Task<IActionResult> Receive(Guid connectionId, CancellationToken ct)
     {

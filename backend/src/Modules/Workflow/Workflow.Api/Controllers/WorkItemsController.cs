@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -23,6 +25,7 @@ using Workflow.Application.Queries.ListOverdueWorkItems;
 [ApiController]
 [Route("api/workflow/work-items")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ClaimTasks)]
 public sealed class WorkItemsController : WorkflowControllerBase
 {
     private readonly ISender _sender;
