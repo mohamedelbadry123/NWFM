@@ -6,7 +6,7 @@ namespace Tasks.Domain.Entities;
 /// <summary>
 /// One team's hold on a task. A task keeps every assignment it has had — reassigning it supersedes
 /// the live one rather than overwriting it — so the timeline can say who had the work, and when.
-/// Table: <c>TK.TaskAssignments</c>.
+/// Table: <c>Task.TaskAssignments</c>.
 /// </summary>
 public sealed class TaskAssignment : Entity
 {

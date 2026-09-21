@@ -29,6 +29,7 @@ export function createElement(type: ElementType): FormElement {
     label_en: '',
     label_ar: '',
     data_name: '',
+    c2m_parameter_name: null,
     description_en: '',
     description_ar: '',
     default_value: null,
@@ -62,8 +63,8 @@ export function createElement(type: ElementType): FormElement {
 
   if (isChoiceType(type)) {
     base.choices = [
-      { value: 'option_1', label_en: 'Option 1', label_ar: 'الخيار 1', dependency_value: null },
-      { value: 'option_2', label_en: 'Option 2', label_ar: 'الخيار 2', dependency_value: null },
+      { value: 'option_1', label_en: 'Option 1', label_ar: 'الخيار 1', dependency_value: null, c2m_fa_status: null, c2m_reason: null },
+      { value: 'option_2', label_en: 'Option 2', label_ar: 'الخيار 2', dependency_value: null, c2m_fa_status: null, c2m_reason: null },
     ];
   }
 

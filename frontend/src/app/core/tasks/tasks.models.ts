@@ -37,6 +37,12 @@ export interface TaskListItem {
   returnReason: string | null;
   returnedDate: string | null;
   returnCount: number;
+  /** The C2M field activity the task settles, if any. */
+  faId: string | null;
+  /** WFM's ticket for that activity — C2M's MOBId. */
+  wfmTicketId: number | null;
+  /** Where closing it in C2M stands (`C2M_CLOSURE_STATUSES`); null when the task closes nothing in C2M. */
+  c2mStatus: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,6 +73,10 @@ export interface TaskDetail {
   expiredBy: string | null;
   expiredDate: string | null;
   createdBy: string | null;
+  c2mAttempts: number;
+  c2mLastAttemptAt: string | null;
+  /** The task's type closes C2M field activities — with an FA id, approving it will. */
+  typeClosesC2mActivity: boolean;
   formCode: string | null;
   formNameEn: string | null;
   formNameAr: string | null;
@@ -92,6 +102,20 @@ export interface TaskFill {
   submittedDate: string | null;
   /** As the form's table stores them — the renderer's `fromStoredAnswers` reads this shape. */
   answers: Record<string, unknown>;
+  /** The same answers labelled and rendered by the server, in the form's order. Blank answers are left out. */
+  display: TaskAnswerView[];
+}
+
+/** One answer ready to read: the question's labels and the answer in each language. */
+export interface TaskAnswerView {
+  dataName: string;
+  fieldType: string;
+  labelEn: string | null;
+  labelAr: string | null;
+  displayEn: string;
+  displayAr: string;
+  /** Set for a geolocation answer, so it can be shown on a map. */
+  point: { latitude: number; longitude: number; address: string | null } | null;
 }
 
 export interface TaskFile {
@@ -156,6 +180,8 @@ export interface TaskDetailsPayload extends TaskLocationPayload {
   notes: string | null;
   priority: string;
   externalReference: string | null;
+  faId: string | null;
+  wfmTicketId: number | null;
   dueDate: string | null;
   completionDueDate: string | null;
 }
@@ -200,6 +226,8 @@ export interface TaskType {
   departmentCode: string | null;
   fillSlaHours: number | null;
   completionSlaHours: number | null;
+  /** Approving one of its tasks that carries an FA id closes that field activity in C2M. */
+  closesC2mActivity: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -214,6 +242,7 @@ export interface TaskTypePayload {
   departmentCode: string | null;
   fillSlaHours: number | null;
   completionSlaHours: number | null;
+  closesC2mActivity: boolean;
 }
 
 export interface CreateTaskTypePayload extends TaskTypePayload {
@@ -226,4 +255,61 @@ export interface FormOption {
   nameEn: string;
   nameAr: string;
   currentVersionNo: number;
+}
+
+/** Where closing a task's C2M field activity stands — the server's `C2mClosureStatuses`. */
+export const C2M_CLOSURE_STATUSES = {
+  Pending: 'PENDING',
+  Closed: 'CLOSED',
+  Skipped: 'SKIPPED',
+  Rejected: 'REJECTED',
+  Failed: 'FAILED',
+} as const;
+
+/** One attempt to close a task's field activity in C2M. */
+export interface C2mDispatchLog {
+  id: string;
+  attemptNumber: number;
+  faId: string;
+  /** `C` (completed) or `X` (cancelled) — what C2M was asked to record. */
+  opStatus: string;
+  /** `PENDING`, `SUCCEEDED`, `FAILED` or `SKIPPED`. */
+  status: string;
+  responseCode: string | null;
+  errorMessage: string | null;
+  requestJson: string;
+  responseJson: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface C2mRetryResult {
+  c2mStatus: string | null;
+  outcome: string;
+  message: string | null;
+  responseCode: string | null;
+}
+
+export const C2M_ACTION_MAPPINGS_PATH = '/api/v1/c2m-action-mappings';
+
+/** What one Action Taken answer tells C2M when a task closes its field activity. */
+export interface C2mActionMapping {
+  id: string;
+  actionCode: string;
+  faStatus: string;
+  cancelReason: string | null;
+  closureReason: string | null;
+  nameEn: string;
+  nameAr: string;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+export interface C2mActionMappingPayload {
+  faStatus: string;
+  cancelReason: string | null;
+  closureReason: string | null;
+  nameEn: string;
+  nameAr: string;
+  isActive: boolean;
 }

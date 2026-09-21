@@ -7,7 +7,7 @@ namespace FormEngine.Domain.Entities;
 /// <summary>
 /// An immutable copy of a form's schema, frozen at publish time. One row per target client per
 /// publish. Submissions are written and validated against the version they name, never the
-/// working draft. Table: <c>FE.FormVersions</c>.
+/// working draft. Table: <c>FormEngine.FormVersions</c>.
 /// </summary>
 public sealed class FormVersion : Entity, IImmutableEntity
 {

@@ -7,7 +7,7 @@ namespace Tasks.Domain.Entities;
 /// <summary>
 /// One piece of field work: a place, a territory, a deadline, and the form a crew fills there.
 /// Modelled on the reference app's survey. Named <c>FieldTask</c> rather than <c>Task</c> so it never
-/// competes with <see cref="System.Threading.Tasks.Task"/>. Table: <c>TK.Tasks</c>.
+/// competes with <see cref="System.Threading.Tasks.Task"/>. Table: <c>Task.Tasks</c>.
 ///
 /// The form is pinned by <see cref="FormDefinitionId"/> and <see cref="FormVersionNo"/> when the task
 /// is raised; its fills live in that form's own submission table, filed under this task's id.
@@ -22,6 +22,7 @@ public sealed class FieldTask : Entity
     public const int OrgCodeMaxLength = 50;
     public const int ActorMaxLength = 256;
     public const int ReturnReasonMaxLength = 1000;
+    public const int FaIdMaxLength = 50;
 
     private readonly List<TaskAssignment> _assignments = [];
     private readonly List<TaskStatusHistory> _history = [];
@@ -90,6 +91,24 @@ public sealed class FieldTask : Entity
     public string? ExpiredBy { get; private set; }
     public DateTime? ExpiredDate { get; private set; }
 
+    /// <summary>
+    /// The C2M field activity this task settles, when the work is C2M's. Approving the task closes that
+    /// activity in C2M when the task's type says its form is the closing form.
+    /// </summary>
+    public string? FaId { get; private set; }
+
+    /// <summary>WFM's ticket for the activity — C2M's <c>MOBId</c>.</summary>
+    public long? WfmTicketId { get; private set; }
+
+    /// <summary>Where closing the field activity in C2M stands (<see cref="C2mClosureStatuses"/>); null when it closes nothing.</summary>
+    public string? C2mStatus { get; private set; }
+
+    /// <summary>How many times the closure has been tried.</summary>
+    public int C2mAttempts { get; private set; }
+
+    /// <summary>When the closure was last tried. Also the background sender's claim on the task.</summary>
+    public DateTime? C2mLastAttemptAt { get; private set; }
+
     /// <summary>False once the task has expired.</summary>
     public bool IsActive { get; private set; }
 
@@ -147,6 +166,7 @@ public sealed class FieldTask : Entity
 
         task.ApplyDetails(draft.Title, draft.Notes, draft.Priority, draft.ExternalReference, draft.DueDate, draft.CompletionDueDate);
         task.ApplyLocation(draft.Location);
+        task.ApplyFieldActivity(draft.FaId, draft.WfmTicketId);
 
         task._history.Add(new TaskStatusHistory(task.Id, null, TaskStatuses.Created, task.CreatedBy, null, utcNow));
         return task;
@@ -167,6 +187,53 @@ public sealed class FieldTask : Entity
         ApplyDetails(title, notes, priority, externalReference, dueDate, completionDueDate);
         Touch(updatedBy, utcNow);
     }
+
+    /// <summary>
+    /// Names the C2M field activity the task settles. Not once it is approved: the closure already
+    /// sent, or queued, refers to the activity it had then.
+    /// </summary>
+    public void SetFieldActivity(string? faId, long? wfmTicketId, string? updatedBy, DateTime utcNow)
+    {
+        EnsureNotClosed("given a field activity");
+        ApplyFieldActivity(faId, wfmTicketId);
+        Touch(updatedBy, utcNow);
+    }
+
+    /// <summary>
+    /// Records one attempt at closing the field activity in C2M, and where that leaves the closure.
+    /// Kept apart from <see cref="Touch"/>: a background retry is not an edit anyone made.
+    /// </summary>
+    public void RecordC2mAttempt(string closureStatus, DateTime utcNow)
+    {
+        if (!C2mClosureStatuses.All.Contains(closureStatus))
+        {
+            throw new DomainException($"Unknown C2M closure status '{closureStatus}'.");
+        }
+
+        C2mStatus = closureStatus;
+        C2mAttempts++;
+        C2mLastAttemptAt = utcNow;
+    }
+
+    /// <summary>
+    /// Queues the closure for the background sender — an approval that did not wait for C2M, or a
+    /// person asking for a refused closure to be sent again.
+    /// </summary>
+    public void QueueC2mClosure()
+    {
+        if (string.IsNullOrWhiteSpace(FaId))
+        {
+            throw new DomainException("A task with no field activity has nothing to close in C2M.");
+        }
+
+        C2mStatus = C2mClosureStatuses.Pending;
+    }
+
+    /// <summary>
+    /// Claims the task for one background attempt. Saved before the call, so with the row version a
+    /// second sender working the same queue loses the race instead of sending the closure twice.
+    /// </summary>
+    public void ClaimC2mAttempt(DateTime utcNow) => C2mLastAttemptAt = utcNow;
 
     /// <summary>
     /// Moves the task. Only before it is filled: a fill records what was found at a place, and moving
@@ -374,6 +441,17 @@ public sealed class FieldTask : Entity
         CompletionDueDate = completionDueDate;
     }
 
+    private void ApplyFieldActivity(string? faId, long? wfmTicketId)
+    {
+        if (wfmTicketId is <= 0)
+        {
+            throw new DomainException("A WFM ticket id must be a positive number.");
+        }
+
+        FaId = Clip(faId, FaIdMaxLength);
+        WfmTicketId = wfmTicketId;
+    }
+
     private void ApplyLocation(TaskLocation location)
     {
         if (location.Latitude is < -90 or > 90 || location.Longitude is < -180 or > 180
@@ -468,6 +546,8 @@ public sealed record FieldTaskDraft
     public string? Notes { get; init; }
     public string Priority { get; init; } = TaskPriorities.Normal;
     public string? ExternalReference { get; init; }
+    public string? FaId { get; init; }
+    public long? WfmTicketId { get; init; }
     public string? AdditionalDataJson { get; init; }
     public required TaskLocation Location { get; init; }
     public DateTime? DueDate { get; init; }

@@ -17,11 +17,129 @@ namespace Tasks.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("TK")
+                .HasDefaultSchema("Task")
                 .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Tasks.Domain.Entities.C2mActionMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActionCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ClosureReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FaStatus")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("nvarchar(1)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActionCode")
+                        .IsUnique();
+
+                    b.ToTable("C2mActionMappings", "Task");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.C2mDispatchLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("FaId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("OpStatus")
+                        .IsRequired()
+                        .HasMaxLength(1)
+                        .HasColumnType("nvarchar(1)");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResponseCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ResponseJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FaId");
+
+                    b.HasIndex("TaskId", "AttemptNumber")
+                        .IsUnique();
+
+                    b.ToTable("C2mDispatchLogs", "Task");
+                });
 
             modelBuilder.Entity("Tasks.Domain.Entities.FieldTask", b =>
                 {
@@ -48,6 +166,16 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.Property<string>("BranchCode")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("C2mAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("C2mLastAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("C2mStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("CbuCode")
                         .HasMaxLength(50)
@@ -90,6 +218,10 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.Property<string>("ExternalReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FaId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("FillSlaHours")
                         .HasColumnType("int");
@@ -188,6 +320,9 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<long?>("WfmTicketId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
@@ -195,6 +330,9 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.HasIndex("DepartmentCode");
 
                     b.HasIndex("DueDate");
+
+                    b.HasIndex("FaId")
+                        .HasFilter("[FaId] IS NOT NULL");
 
                     b.HasIndex("FormDefinitionId");
 
@@ -209,9 +347,12 @@ namespace Tasks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BranchCode", "Status");
 
+                    b.HasIndex("C2mStatus", "C2mLastAttemptAt")
+                        .HasFilter("[C2mStatus] IS NOT NULL");
+
                     b.HasIndex("CbuCode", "Status");
 
-                    b.ToTable("Tasks", "TK");
+                    b.ToTable("Tasks", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.TaskAssignment", b =>
@@ -262,7 +403,7 @@ namespace Tasks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TeamId", "Status");
 
-                    b.ToTable("TaskAssignments", "TK");
+                    b.ToTable("TaskAssignments", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.TaskStatusHistory", b =>
@@ -303,13 +444,18 @@ namespace Tasks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FieldTaskId", "ChangedDate");
 
-                    b.ToTable("TaskStatusHistory", "TK");
+                    b.ToTable("TaskStatusHistory", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.TaskType", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ClosesC2mActivity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -379,7 +525,7 @@ namespace Tasks.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("IsActive");
 
-                    b.ToTable("TaskTypes", "TK");
+                    b.ToTable("TaskTypes", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.FieldTask", b =>

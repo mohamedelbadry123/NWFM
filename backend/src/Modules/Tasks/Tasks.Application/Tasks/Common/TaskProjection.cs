@@ -88,6 +88,9 @@ internal static class TaskProjection
             ReturnReason = task.ReturnReason,
             ReturnedDate = task.ReturnedDate,
             ReturnCount = task.ReturnCount,
+            FaId = task.FaId,
+            WfmTicketId = task.WfmTicketId,
+            C2mStatus = task.C2mStatus,
             CreatedAt = task.CreatedAt,
             UpdatedAt = task.UpdatedAt,
         };

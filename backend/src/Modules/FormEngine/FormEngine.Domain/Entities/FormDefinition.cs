@@ -9,7 +9,7 @@ namespace FormEngine.Domain.Entities;
 /// (<see cref="SchemaJson"/>, the working draft) and owns its immutable published
 /// <see cref="FormVersion"/>s. A consumer — e.g. a workflow user task — pins one version by
 /// <c>(FormDefinitionId, VersionNo)</c>, so republishing never changes a form under work in flight.
-/// Table: <c>FE.FormDefinitions</c>.
+/// Table: <c>FormEngine.FormDefinitions</c>.
 /// </summary>
 public sealed class FormDefinition : Entity
 {

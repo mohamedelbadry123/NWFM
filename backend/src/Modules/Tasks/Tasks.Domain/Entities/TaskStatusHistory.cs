@@ -5,7 +5,7 @@ namespace Tasks.Domain.Entities;
 /// <summary>
 /// One line of a task's timeline. Append-only. A change that is not a status change — a refill, a
 /// relocation, a form re-pin — is logged with the same status on both sides, so the timeline shows
-/// everything that happened, not only the transitions. Table: <c>TK.TaskStatusHistory</c>.
+/// everything that happened, not only the transitions. Table: <c>Task.TaskStatusHistory</c>.
 /// </summary>
 public sealed class TaskStatusHistory : Entity, IImmutableEntity
 {

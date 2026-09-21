@@ -109,6 +109,29 @@ export function taskReturnReasonSeverity(reasonCode?: string | null): TaskTagSev
   }
 }
 
+/**
+ * Colour of the C2M closure tag: green once C2M took it, blue while queued, red when it was refused
+ * or never answered — both need a person — and grey when nothing was sent.
+ */
+export function c2mStatusSeverity(status?: string | null): TaskTagSeverity {
+  switch (status) {
+    case 'CLOSED':
+      return 'success';
+    case 'PENDING':
+      return 'info';
+    case 'REJECTED':
+    case 'FAILED':
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+/** Whether a person may send a refused or failed C2M closure again. */
+export function canRetryC2m(task: { status?: string | null; c2mStatus?: string | null }): boolean {
+  return task.status === TaskStatus.Approved && (task.c2mStatus === 'REJECTED' || task.c2mStatus === 'FAILED');
+}
+
 /** The lifecycle actions the API will accept for a task in this status. */
 export type TaskAction = 'assign' | 'fill' | 'complete' | 'return' | 'expire' | 'edit';
 

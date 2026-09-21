@@ -45,18 +45,19 @@ The header selects the acting participant. New participants can be created direc
 
 ## Forms
 
-The **FormEngine** module (SQL schema `FE`) holds the forms people fill in: a drag-and-drop builder, a
-versioned publish lifecycle, and the submissions themselves.
+The **FormEngine** module (SQL schema `FormEngine`) holds the forms people fill in: a drag-and-drop builder, a
+versioned publish lifecycle, and the submissions themselves. [docs/form-engine.md](docs/form-engine.md)
+explains forms, fields and submission handling in depth.
 
 1. Open **Forms → Manage forms**, create a form, then **Design fields** to lay it out. Saving keeps a
    working draft; nothing is registered until you publish.
 2. **Publish** freezes the design as a version. It also records each field's data name and type in
-   `FE.FormFields`, and creates or widens the form's own submissions table.
+   `FormEngine.FormFields`, and creates or widens the form's own submissions table.
 3. **Fill a form** lists everything with a published version. Media fields upload as soon as a file is
    picked, so a submission carries references rather than bytes.
 4. **Submissions** shows what has been filled in, rendered through the version each row answered.
 
-Each form stores its submissions in its own table, `FE.SUB_<CODE>`. The name is chosen at first
+Each form stores its submissions in its own table, `FormEngine.SUB_<CODE>`. The name is chosen at first
 publish from the form code and never changes after that. A table holds only its own form's columns, so
 no single table has to carry every field the application has ever seen. SQL Server's 1,024 columns per
 table and 8,060 bytes per row now apply to one form, not to all of them. Publishing is locked per form,
@@ -86,7 +87,7 @@ latitude/longitude entry when it does not.
 
 ## Field tasks and teams
 
-The **Tasks** module (SQL schema `TK`) holds field work: each task is a place to visit and a form to
+The **Tasks** module (SQL schema `Task`) holds field work: each task is a place to visit and a form to
 fill there.
 
 1. **Admin → Field teams** creates a crew together with the login its members sign in with, and gives
@@ -105,12 +106,24 @@ Every list and every action is limited to the caller's territory. A task outside
 found. A team login sees only the tasks currently assigned to its team. Administrators and monitors are
 unrestricted.
 
-With `DatabaseStartup:SeedData` on, startup seeds two task types (bound to the two seeded forms) and
-four sample tasks around Riyadh. To generate a Tasks migration, from `backend`:
+A task that carries a C2M field activity id, and whose type is marked as the closing type, closes that
+activity in C2M when it is approved. The outcome (completed or cancelled, and the reason) comes from
+the fill's `wfm_action_taken` answer; fields with a C2M parameter name travel with it. The integration
+is off until `C2m:Enabled` is set, and every attempt is logged on the task's **C2M** tab. See
+[docs/form-engine.md](docs/form-engine.md#13-closing-c2m-field-activities).
+
+With `DatabaseStartup:SeedData` on, startup seeds two task types (bound to the two seeded forms), four
+sample tasks around Riyadh, and the reference app's C2M action mappings. To generate a Tasks migration,
+from `backend`:
 
 ```powershell
 dotnet ef migrations add <Name> --project src/Modules/Tasks/Tasks.Infrastructure --startup-project src/NWFM.Api --output-dir Persistence/Migrations
 ```
+
+The two modules used to live in the `FE` and `TK` schemas. On startup each module first moves its
+migration history table into the new schema, then a migration moves its tables, including every
+per-form `SUB_` table. Apply these by starting the API rather than with `dotnet ef database update`,
+which does not run that first step.
 
 ## Verify
 

@@ -276,6 +276,14 @@
               @if (isOverdue(task)) {
                 <p-tag [value]="t('tasks.tags.overdue')" severity="danger" />
               }
+              @if (task.c2mStatus) {
+                <p-tag
+                  [value]="'C2M · ' + t('tasks.c2m.status.' + task.c2mStatus)"
+                  [severity]="c2mSeverity(task.c2mStatus)"
+                  [pTooltip]="task.faId || ''"
+                  tooltipPosition="top"
+                />
+              }
               @if (task.returnCount) {
                 <span class="text-xs text-surface-500" [pTooltip]="t('tasks.fields.returnCount')" tooltipPosition="top"
                   >×{{ task.returnCount }}</span
@@ -347,4 +355,5 @@
   <app-task-return-dialog [(visible)]="returnVisible" [task]="selectedTask()" (completed)="loadTasks()" />
   <app-task-fill-dialog [(visible)]="fillVisible" [taskId]="selectedTask()?.id ?? null" (filled)="loadTasks()" />
   <app-task-detail-dialog [(visible)]="detailVisible" [taskId]="selectedTask()?.id ?? null" />
+  <app-task-preview-dialog [(visible)]="previewVisible" [taskId]="selectedTask()?.id ?? null" />
 </ng-container>

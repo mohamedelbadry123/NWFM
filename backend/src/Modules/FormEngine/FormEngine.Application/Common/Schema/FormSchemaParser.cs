@@ -8,10 +8,20 @@ namespace FormEngine.Application.Common.Schema;
 /// One selectable option of a choice field. <c>Value</c> is what a submission stores; the labels are
 /// what a human is shown. Cascading (<c>dependency_value</c>) only drives input, so it is not kept.
 /// </summary>
+/// <param name="C2mFaStatus">
+/// On the <c>wfm_action_taken</c> field only: the C2M field-activity status this answer closes the
+/// activity with — <c>C</c> (completed) or <c>X</c> (cancelled). Null when the option names none.
+/// </param>
+/// <param name="C2mReason">
+/// The reason sent with <see cref="C2mFaStatus"/>: the cancel reason for <c>X</c> (the option's value
+/// when blank), the closure reason for <c>C</c>.
+/// </param>
 public sealed record FormSchemaChoice(
     string Value,
     string? LabelEn,
-    string? LabelAr);
+    string? LabelAr,
+    string? C2mFaStatus = null,
+    string? C2mReason = null);
 
 /// <summary>
 /// A <c>date</c> / <c>date_time</c> field's constraint on its answer: a rule relative to the system
@@ -88,6 +98,10 @@ public sealed record FormFieldRules(
 /// Everything else the field requires of its answer. Never null once parsed — a field declaring
 /// nothing reports <see cref="FormFieldRules.None"/>.
 /// </param>
+/// <param name="C2mParameterName">
+/// The C2M <c>ParameterName</c> this field's answer is sent under when a task closes its field
+/// activity in C2M. Null when the field is not sent.
+/// </param>
 public sealed record FormSchemaField(
     string DataName,
     string FieldType,
@@ -97,7 +111,8 @@ public sealed record FormSchemaField(
     IReadOnlyList<string> AllowedExtensions,
     bool AllowOther,
     FormDateConstraint? DateConstraint = null,
-    FormFieldRules? Rules = null)
+    FormFieldRules? Rules = null,
+    string? C2mParameterName = null)
 {
     public FormSchemaField(string dataName, string fieldType, string? labelEn, string? labelAr)
         : this(dataName, fieldType, labelEn, labelAr, [], [], false)
@@ -145,6 +160,9 @@ public static class FormSchemaParser
     private const string LabelArProperty = "label_ar";
     private const string ChoicesProperty = "choices";
     private const string ValueProperty = "value";
+    private const string C2mParameterNameProperty = "c2m_parameter_name";
+    private const string C2mFaStatusProperty = "c2m_fa_status";
+    private const string C2mReasonProperty = "c2m_reason";
     private const string AllowedExtensionsProperty = "allowed_extensions";
     private const string AllowOtherProperty = "allow_other";
     private const string DateRuleProperty = "date_rule";
@@ -285,7 +303,8 @@ public static class FormSchemaParser
                 ReadAllowedExtensions(element),
                 GetBoolean(element, AllowOtherProperty),
                 ReadDateConstraint(element),
-                ReadRules(element, enclosing)));
+                ReadRules(element, enclosing),
+                Trimmed(GetString(element, C2mParameterNameProperty))));
         }
     }
 
@@ -320,6 +339,9 @@ public static class FormSchemaParser
                 : Conditions ?? [];
     }
 
+    /// <summary>A trimmed value, or null for a blank one.</summary>
+    private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     /// <summary>
     /// Reads a choice field's options. Non-choice fields simply carry no <c>choices</c> array, so the
     /// result is empty and nothing downstream has to branch on the field type here.
@@ -349,7 +371,9 @@ public static class FormSchemaParser
             result.Add(new FormSchemaChoice(
                 value.Trim(),
                 GetString(choice, LabelEnProperty),
-                GetString(choice, LabelArProperty)));
+                GetString(choice, LabelArProperty),
+                Trimmed(GetString(choice, C2mFaStatusProperty))?.ToUpperInvariant(),
+                Trimmed(GetString(choice, C2mReasonProperty))));
         }
 
         return result;

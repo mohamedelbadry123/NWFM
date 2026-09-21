@@ -110,6 +110,11 @@ export class DashboardLayoutComponent {
           route: '/tasks/types',
           permissions: [PERMISSIONS.manageTaskTypes, ADMINISTRATOR_ROLE],
         },
+        {
+          labelKey: 'nav.c2mActions',
+          route: '/tasks/c2m-actions',
+          permissions: [PERMISSIONS.manageTaskTypes, ADMINISTRATOR_ROLE],
+        },
       ],
     },
     {

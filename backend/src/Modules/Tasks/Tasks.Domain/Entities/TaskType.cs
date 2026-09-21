@@ -6,7 +6,7 @@ namespace Tasks.Domain.Entities;
 /// <summary>
 /// A kind of field work, and the form its tasks are filled with. Different types collect different
 /// inputs; a task pins its type's form, at the version current when the task was raised, so changing
-/// the type's form later never changes a task already in the field. Table: <c>TK.TaskTypes</c>.
+/// the type's form later never changes a task already in the field. Table: <c>Task.TaskTypes</c>.
 /// </summary>
 public sealed class TaskType : Entity
 {
@@ -40,6 +40,12 @@ public sealed class TaskType : Entity
 
     /// <summary>Hours after the fill deadline for review to finish; seeds the completion due date.</summary>
     public int? CompletionSlaHours { get; private set; }
+
+    /// <summary>
+    /// Whether this type's form is the closing form for C2M field activities: approving one of its
+    /// tasks that carries an FA id closes that activity in C2M.
+    /// </summary>
+    public bool ClosesC2mActivity { get; private set; }
 
     public bool IsActive { get; private set; }
     public string? CreatedBy { get; private set; }
@@ -90,6 +96,12 @@ public sealed class TaskType : Entity
         DateTime utcNow)
     {
         Apply(nameEn, nameAr, descriptionEn, descriptionAr, formDefinitionId, departmentCode, fillSlaHours, completionSlaHours);
+        Touch(updatedBy, utcNow);
+    }
+
+    public void SetClosesC2mActivity(bool closes, string? updatedBy, DateTime utcNow)
+    {
+        ClosesC2mActivity = closes;
         Touch(updatedBy, utcNow);
     }
 

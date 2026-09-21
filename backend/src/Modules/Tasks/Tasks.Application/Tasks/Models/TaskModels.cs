@@ -1,3 +1,5 @@
+using NWFM.Shared.Integration.Forms;
+
 namespace Tasks.Application.Tasks.Models;
 
 /// <summary>One row of the task worklist.</summary>
@@ -46,6 +48,15 @@ public sealed class TaskListItemDto
     public DateTime? ReturnedDate { get; init; }
     public int ReturnCount { get; init; }
 
+    /// <summary>The C2M field activity the task settles, if any.</summary>
+    public string? FaId { get; init; }
+
+    /// <summary>WFM's ticket for the activity — C2M's MOBId.</summary>
+    public long? WfmTicketId { get; init; }
+
+    /// <summary>Where closing it in C2M stands; null when the task closes nothing in C2M.</summary>
+    public string? C2mStatus { get; init; }
+
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
 }
@@ -66,6 +77,11 @@ public sealed class TaskDetailDto
     public string? ExpiredBy { get; init; }
     public DateTime? ExpiredDate { get; init; }
     public string? CreatedBy { get; init; }
+    public int C2mAttempts { get; init; }
+    public DateTime? C2mLastAttemptAt { get; init; }
+
+    /// <summary>Whether the task's type closes C2M field activities — with an FA id, approving it will.</summary>
+    public bool TypeClosesC2mActivity { get; init; }
 
     public string? FormCode { get; init; }
     public string? FormNameEn { get; init; }
@@ -100,13 +116,18 @@ public sealed record TaskHistoryDto(
     string? Note);
 
 /// <summary>One fill of the task's form, with its answers as the form's table stores them.</summary>
+/// <summary>
+/// One fill. <see cref="Answers"/> is the stored row, which the web renderer reads back into the
+/// form; <see cref="Display"/> is the same answers labelled and rendered, in the form's order.
+/// </summary>
 public sealed record TaskFillDto(
     Guid SubmissionId,
     int VersionNo,
     string? SubmittedBy,
     string? SubmittedByName,
     DateTimeOffset? SubmittedDate,
-    IReadOnlyDictionary<string, object?> Answers);
+    IReadOnlyDictionary<string, object?> Answers,
+    IReadOnlyList<FormAnswerView> Display);
 
 public sealed record TaskFileDto(
     Guid FileId,

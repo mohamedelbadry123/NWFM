@@ -35,6 +35,7 @@ import {
   TASK_RETURN_REASONS,
   TASK_SOURCES,
   TASK_STATUSES,
+  c2mStatusSeverity,
   canMigrateVersion,
   canReassign,
   canRunTaskAction,
@@ -51,6 +52,8 @@ import { TaskActionDialogComponent, TaskNoteAction } from './modals/task-action-
 import { TaskReturnDialogComponent } from './modals/task-return-dialog.component';
 import { TaskFillDialogComponent } from './modals/task-fill-dialog.component';
 import { TaskDetailDialogComponent } from './modals/task-detail-dialog.component';
+import { TaskPreviewDialogComponent } from './modals/task-preview-dialog.component';
+import { TaskExportService } from '../task-export.service';
 import { buildTaskListQuery } from './task-list-query';
 
 interface FilterOption {
@@ -91,6 +94,7 @@ interface FilterOption {
     TaskReturnDialogComponent,
     TaskFillDialogComponent,
     TaskDetailDialogComponent,
+    TaskPreviewDialogComponent,
   ],
   providers: [MessageService],
   templateUrl: './task-list.component.html',
@@ -103,6 +107,7 @@ export class TaskListComponent implements OnInit {
   private readonly locale = inject(LocaleService);
   private readonly authStore = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly exporter = inject(TaskExportService);
   protected readonly orgNames = inject(OrgNamesService);
 
   protected readonly PERMISSIONS = PERMISSIONS;
@@ -115,6 +120,7 @@ export class TaskListComponent implements OnInit {
   protected readonly returnReasonSeverity = taskReturnReasonSeverity;
   protected readonly wasSubmittedAgain = wasSubmittedAgain;
   protected readonly isOverdue = isOverdue;
+  protected readonly c2mSeverity = c2mStatusSeverity;
 
   // Server-side filters.
   protected search = '';
@@ -167,6 +173,7 @@ export class TaskListComponent implements OnInit {
   protected readonly returnVisible = signal(false);
   protected readonly fillVisible = signal(false);
   protected readonly detailVisible = signal(false);
+  protected readonly previewVisible = signal(false);
   protected readonly orgFilterVisible = signal(false);
   protected readonly selectedTask = signal<TaskListItem | null>(null);
   protected readonly currentAction = signal<TaskNoteAction>('complete');
@@ -293,6 +300,19 @@ export class TaskListComponent implements OnInit {
     this.detailVisible.set(true);
   }
 
+  protected openPreview(task: TaskListItem): void {
+    this.selectedTask.set(task);
+    this.previewVisible.set(true);
+  }
+
+  /** The menu closes on click, so there is no row to spin; a toast reports a failure. */
+  protected exportPdf(task: TaskListItem): void {
+    this.exporter
+      .exportPdf(task)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => this.fail(null, 'tasks.messages.exportFailed') });
+  }
+
   protected openEdit(task: TaskListItem): void {
     this.selectedTask.set(task);
     this.editVisible.set(true);
@@ -354,6 +374,17 @@ export class TaskListComponent implements OnInit {
         label: this.translate.instant('tasks.actions.viewDetail'),
         icon: 'pi pi-eye',
         command: () => this.openDetail(task),
+      },
+      {
+        label: this.translate.instant('tasks.actions.previewForm'),
+        icon: 'pi pi-file',
+        disabled: task.submissionCount === 0,
+        command: () => this.openPreview(task),
+      },
+      {
+        label: this.translate.instant('tasks.actions.exportPdf'),
+        icon: 'pi pi-file-pdf',
+        command: () => this.exportPdf(task),
       },
       {
         label: this.translate.instant('tasks.actions.edit'),

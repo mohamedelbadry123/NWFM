@@ -90,6 +90,9 @@ export class TaskCreateDialogComponent {
     taskNumber: this.fb.control<string>('', Validators.maxLength(60)),
     title: this.fb.control<string>('', Validators.maxLength(250)),
     externalReference: this.fb.control<string>('', Validators.maxLength(100)),
+    faId: this.fb.control<string>('', Validators.maxLength(50)),
+    // Text rather than a number input: a ticket id is an identifier, and a spinner or grouping would mangle it.
+    wfmTicketId: this.fb.control<string>('', Validators.pattern(/^d{1,15}$/)),
     priority: this.fb.control<string>(TaskPriority.Normal, Validators.required),
     departmentCode: this.fb.control<string | null>(null),
     notes: this.fb.control<string>('', Validators.maxLength(1000)),
@@ -152,6 +155,8 @@ export class TaskCreateDialogComponent {
         taskNumber: value.taskNumber?.trim() || null,
         title: value.title?.trim() || null,
         externalReference: value.externalReference?.trim() || null,
+        faId: value.faId?.trim() || null,
+        wfmTicketId: value.wfmTicketId?.trim() ? Number(value.wfmTicketId.trim()) : null,
         priority: value.priority ?? TaskPriority.Normal,
         notes: value.notes?.trim() || null,
         latitude: point.lat,

@@ -12,6 +12,7 @@ import { MessageModule } from 'primeng/message';
 import { MessageService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
 
 import { TranslateContextDirective } from '../../../core/i18n/translate-context.directive';
 import { LocaleService } from '../../../core/i18n/locale.service';
@@ -44,6 +45,7 @@ interface SelectOption {
     MessageModule,
     SelectModule,
     TextareaModule,
+    ToggleSwitchModule,
   ],
   template: `
     <ng-container *translateContext="let t">
@@ -132,6 +134,14 @@ interface SelectOption {
             <label for="type-desc-ar" class="text-sm font-medium">{{ t('taskTypes.descriptionAr') }}</label>
             <textarea pTextarea id="type-desc-ar" formControlName="descriptionAr" rows="2" class="w-full" dir="rtl"></textarea>
           </div>
+
+          <div class="flex items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 sm:col-span-2">
+            <p-toggleswitch inputId="type-closes-c2m" formControlName="closesC2mActivity" />
+            <div class="flex flex-col gap-1">
+              <label for="type-closes-c2m" class="text-sm font-medium">{{ t('taskTypes.closesC2mActivity') }}</label>
+              <small class="text-surface-500">{{ t('taskTypes.closesC2mActivityHint') }}</small>
+            </div>
+          </div>
         </form>
 
         <ng-template pTemplate="footer">
@@ -188,6 +198,7 @@ export class TaskTypeDialogComponent {
     departmentCode: this.fb.control<string | null>(null),
     fillSlaHours: this.fb.control<number | null>(null),
     completionSlaHours: this.fb.control<number | null>(null),
+    closesC2mActivity: this.fb.control(false),
   });
 
   constructor() {
@@ -207,6 +218,7 @@ export class TaskTypeDialogComponent {
       departmentCode: type?.departmentCode ?? null,
       fillSlaHours: type?.fillSlaHours ?? null,
       completionSlaHours: type?.completionSlaHours ?? null,
+      closesC2mActivity: type?.closesC2mActivity ?? false,
     });
 
     this.loadingForms.set(true);
@@ -239,6 +251,7 @@ export class TaskTypeDialogComponent {
       departmentCode: value.departmentCode,
       fillSlaHours: value.fillSlaHours,
       completionSlaHours: value.completionSlaHours,
+      closesC2mActivity: !!value.closesC2mActivity,
     };
 
     const current = this.taskType();

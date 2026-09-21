@@ -16,6 +16,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="QuestPDF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shipped inside the assembly: most hosts have no font with Arabic glyphs, and QuestPDF would
+         print empty boxes. The OFL texts travel with the fonts they license. -->
+    <EmbeddedResource Include="Reports\Fonts\*.ttf" LogicalName="Tasks.Reports.Fonts.%(Filename)%(Extension)" />
+    <None Include="Reports\Fonts\*.txt" />
   </ItemGroup>
 
   <ItemGroup>

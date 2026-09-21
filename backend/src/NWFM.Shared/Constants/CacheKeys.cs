@@ -32,4 +32,9 @@ public static class CacheKeys
     {
         public const string FieldCatalog = $"{Prefix}:FormEngine:FieldCatalog";
     }
+
+    public static class Tasks
+    {
+        public const string C2mActionMappings = $"{Prefix}:Tasks:C2mActionMappings";
+    }
 }

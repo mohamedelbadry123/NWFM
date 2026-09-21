@@ -126,7 +126,8 @@ public sealed class GetTasksQueryHandler(
             query = query.Where(t =>
                 t.TaskNumber.Contains(term)
                 || (t.Title != null && t.Title.Contains(term))
-                || (t.ExternalReference != null && t.ExternalReference.Contains(term)));
+                || (t.ExternalReference != null && t.ExternalReference.Contains(term))
+                || (t.FaId != null && t.FaId.Contains(term)));
         }
 
         if (request.Statuses is { Length: > 0 } statuses)

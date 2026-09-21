@@ -62,6 +62,20 @@
         </div>
 
         <div class="flex flex-col gap-2">
+          <label for="task-fa-id" class="text-sm font-medium">{{ t('tasks.fields.faId') }}</label>
+          <input pInputText id="task-fa-id" formControlName="faId" class="w-full font-mono" dir="ltr" />
+          <small class="text-surface-500">{{ t('tasks.c2m.faIdHint') }}</small>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-ticket" class="text-sm font-medium">{{ t('tasks.fields.wfmTicketId') }}</label>
+          <input pInputText id="task-ticket" formControlName="wfmTicketId" class="w-full font-mono" dir="ltr" inputmode="numeric" />
+          @if (form.controls.wfmTicketId.invalid && form.controls.wfmTicketId.touched) {
+            <small class="text-red-500">{{ t('tasks.validation.ticketInvalid') }}</small>
+          }
+        </div>
+
+        <div class="flex flex-col gap-2">
           <label for="task-priority" class="text-sm font-medium">{{ t('tasks.fields.priority') }}</label>
           <p-select
             inputId="task-priority"

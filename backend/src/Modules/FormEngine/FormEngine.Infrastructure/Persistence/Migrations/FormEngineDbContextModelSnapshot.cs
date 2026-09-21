@@ -17,7 +17,7 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("FE")
+                .HasDefaultSchema("FormEngine")
                 .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
@@ -110,7 +110,7 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "Category");
 
-                    b.ToTable("FormDefinitions", "FE");
+                    b.ToTable("FormDefinitions", "FormEngine");
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.FormField", b =>
@@ -161,7 +161,7 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                     b.HasIndex("FormDefinitionId", "DataName")
                         .IsUnique();
 
-                    b.ToTable("FormFields", "FE");
+                    b.ToTable("FormFields", "FormEngine");
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.FormVersion", b =>
@@ -206,7 +206,7 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                     b.HasIndex("FormDefinitionId", "VersionNo", "TargetClient")
                         .IsUnique();
 
-                    b.ToTable("FormVersions", "FE");
+                    b.ToTable("FormVersions", "FormEngine");
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.SubmissionFile", b =>
@@ -287,7 +287,7 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "CreatedAt");
 
-                    b.ToTable("SubmissionFiles", "FE");
+                    b.ToTable("SubmissionFiles", "FormEngine");
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.FormField", b =>

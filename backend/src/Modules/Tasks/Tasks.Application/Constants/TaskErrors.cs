@@ -26,6 +26,11 @@ public static class TaskErrors
         public const string FormNotPublished = "Tasks.Form.NotPublished";
         public const string TeamNotFound = "Tasks.Team.NotFound";
         public const string TeamNotEligible = "Tasks.Team.NotEligible";
+        public const string C2mRejected = "Tasks.C2m.Rejected";
+        public const string C2mUnavailable = "Tasks.C2m.Unavailable";
+        public const string C2mNotRetryable = "Tasks.C2m.NotRetryable";
+        public const string C2mMappingNotFound = "Tasks.C2mMapping.NotFound";
+        public const string C2mMappingDuplicateCode = "Tasks.C2mMapping.DuplicateCode";
 
         /// <summary>The form engine's own codes that also mean "the state is wrong, not the request".</summary>
         public const string FormEngineNotPublished = "FormEngine.Form.NotPublished";
@@ -42,6 +47,15 @@ public static class TaskErrors
         Codes.FormNotPublished,
         Codes.FormEngineNotPublished,
         Codes.TeamNotEligible,
+        Codes.C2mRejected,
+        Codes.C2mNotRetryable,
+        Codes.C2mMappingDuplicateCode,
+    };
+
+    /// <summary>An upstream system did not answer — HTTP 503, worth trying again shortly.</summary>
+    public static readonly IReadOnlySet<string> Unavailable = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Codes.C2mUnavailable,
     };
 
     /// <summary>Failures the caller is not allowed to act on — HTTP 403.</summary>
@@ -89,6 +103,30 @@ public static class TaskErrors
         public static readonly Error NotPublished = new(
             Codes.FormNotPublished,
             "The task type's form has no published version that accepts fills. Publish it first.");
+    }
+
+    public static class C2m
+    {
+        /// <summary>C2M answered and refused. Re-sending the same answers will not change that.</summary>
+        public static Error Rejected(string faId, string? message, string? responseCode) =>
+            new(
+                Codes.C2mRejected,
+                $"C2M refused to close field activity {faId}: {message} (code {responseCode ?? "-"}). The task has not been approved.");
+
+        /// <summary>C2M did not answer. Whether it processed the closure is unknown; the attempt is logged.</summary>
+        public static Error Unavailable(string faId, string? message) =>
+            new(
+                Codes.C2mUnavailable,
+                $"C2M did not confirm the closure of field activity {faId}: {message} The task has not been approved; try again shortly.");
+
+        public static readonly Error NotRetryable = new(
+            Codes.C2mNotRetryable,
+            "Only an approved task whose C2M closure was refused or failed can be sent again.");
+
+        public static readonly Error MappingNotFound = new(Codes.C2mMappingNotFound, "C2M action mapping not found.");
+
+        public static Error MappingDuplicateCode(string code) =>
+            new(Codes.C2mMappingDuplicateCode, $"A mapping for action code '{code}' already exists.");
     }
 
     public static class Team

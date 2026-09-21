@@ -1,4 +1,6 @@
 import {
+  c2mStatusSeverity,
+  canRetryC2m,
   TASK_STATUSES,
   TaskStatus,
   canMigrateVersion,
@@ -106,6 +108,25 @@ describe('task-status', () => {
       expect(isOverdue({ status: TaskStatus.Expired, dueDate: past }, now)).toBeFalse();
       expect(isOverdue({ status: TaskStatus.Assigned, dueDate: '2026-09-22T12:00:00Z' }, now)).toBeFalse();
       expect(isOverdue({ status: TaskStatus.Assigned, dueDate: null }, now)).toBeFalse();
+    });
+  });
+
+  describe('C2M closure', () => {
+    it('offers a retry only on an approved task whose closure was refused or failed', () => {
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'REJECTED' })).toBeTrue();
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'FAILED' })).toBeTrue();
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'CLOSED' })).toBeFalse();
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'PENDING' })).toBeFalse();
+      // Refused while a reviewer was approving: the task is still filled, and approving again retries.
+      expect(canRetryC2m({ status: TaskStatus.Submitted, c2mStatus: 'REJECTED' })).toBeFalse();
+    });
+
+    it('colours a closure that needs a person red', () => {
+      expect(c2mStatusSeverity('CLOSED')).toBe('success');
+      expect(c2mStatusSeverity('PENDING')).toBe('info');
+      expect(c2mStatusSeverity('REJECTED')).toBe('danger');
+      expect(c2mStatusSeverity('FAILED')).toBe('danger');
+      expect(c2mStatusSeverity('SKIPPED')).toBe('secondary');
     });
   });
 

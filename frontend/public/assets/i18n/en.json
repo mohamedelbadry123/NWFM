@@ -35,7 +35,9 @@
     "toggleTheme": "Toggle theme",
     "required": "Required",
     "reset": "Reset",
-    "apply": "Apply"
+    "apply": "Apply",
+    "download": "Download",
+    "warning": "Warning"
   },
   "error": {
     "ProcessingPurpose.NotFound": "Processing purpose not found.",
@@ -96,7 +98,10 @@
     "Auth.TeamDuplicateName": "A team with this name already exists.",
     "Auth.UserAlreadyExists": "That sign-in name is already taken.",
     "Tasks.Team.NotFound": "The team could not be found.",
-    "Auth.TeamLoginNotFound": "This team has no login yet."
+    "Auth.TeamLoginNotFound": "This team has no login yet.",
+    "Tasks.C2m.NotRetryable": "Only an approved task whose C2M closure was refused or failed can be sent again.",
+    "Tasks.C2mMapping.NotFound": "The C2M action mapping could not be found.",
+    "Tasks.C2mMapping.DuplicateCode": "A mapping for this action code already exists."
   },
   "workflow": {
     "common": {
@@ -2034,7 +2039,8 @@
     "fieldTasks": "Field tasks",
     "fieldTaskList": "Tasks",
     "taskTypes": "Task types",
-    "teams": "Field teams"
+    "teams": "Field teams",
+    "c2mActions": "C2M action mappings"
   },
   "lookups": {
     "title": "Lookups",
@@ -2263,7 +2269,15 @@
       "barcodeFormatsHint": "Which symbologies the mobile scanner should accept. Leave empty to accept anything it can read.",
       "resetBarcodeFormats": "Reset to defaults",
       "mapZoom": "Initial Map Zoom",
-      "mapZoomHint": "1 = whole world, 5 = Saudi Arabia, 15 = street level. Set a Default Value like \"24.7136,46.6753\" to pre-place the pin."
+      "mapZoomHint": "1 = whole world, 5 = Saudi Arabia, 15 = street level. Set a Default Value like \"24.7136,46.6753\" to pre-place the pin.",
+      "c2mParameterName": "C2M parameter name",
+      "c2mParameterNameHint": "Optional. When set, this field's answer is sent on the C2M closing request under this ParameterName (for example CM_BUNIT). Leave empty to keep it in NWFM only.",
+      "c2mFaStatus": "C2M status",
+      "c2mFaStatusHint": "What C2M is told when this Action Taken option is chosen. Leave empty to use the C2M action mapping table.",
+      "c2mFaStatusCompleted": "Completed (C)",
+      "c2mFaStatusCancelled": "Cancelled (X)",
+      "c2mReason": "C2M reason",
+      "c2mReasonHint": "Optional. The cancel reason when cancelled (defaults to the option value); the closure reason when completed."
     },
     "pattern": {
       "title": "Validation Pattern",
@@ -2643,7 +2657,10 @@
       "assigned": "Assigned",
       "completed": "Completed",
       "expired": "Expired",
-      "returnReason": "Return reason"
+      "returnReason": "Return reason",
+      "form": "Form",
+      "faId": "FA id",
+      "wfmTicketId": "WFM ticket"
     },
     "filters": {
       "searchPlaceholder": "Number, title or reference",
@@ -2667,7 +2684,9 @@
       "migrateVersion": "Move to newer form version",
       "complete": "Approve",
       "return": "Return",
-      "expire": "Expire"
+      "expire": "Expire",
+      "previewForm": "Preview form",
+      "exportPdf": "Export PDF"
     },
     "action": {
       "complete": {
@@ -2735,10 +2754,23 @@
       "fillBy": "Filled by {{by}} on {{date}}",
       "filledBy": "Filled by",
       "version": "Form version",
-      "viewFill": "View this fill",
+      "viewFill": "Preview",
       "noAssignments": "Not assigned yet.",
       "noFiles": "No photos or files.",
-      "hours": "h"
+      "hours": "h",
+      "latestFill": "Latest fill",
+      "noTimeline": "No status changes yet.",
+      "noEarlierFills": "Only one fill so far — it is shown above.",
+      "recordsHint": "Earlier fills are kept as they were sent, including ones a reviewer returned.",
+      "answerCount": "{{count}} answer(s)",
+      "noAnswers": "No answers recorded.",
+      "viewOnMap": "View on map",
+      "groups": {
+        "task": "Task",
+        "assignment": "Assignment",
+        "organisation": "Organisation",
+        "schedule": "Schedule"
+      }
     },
     "migrateVersion": {
       "tooltip": "Move to form version {{version}}",
@@ -2755,14 +2787,56 @@
       "assignFailed": "The task could not be assigned.",
       "filled": "Fill submitted.",
       "fillFailed": "The fill could not be submitted.",
-      "returned": "Task returned."
+      "returned": "Task returned.",
+      "exportFailed": "The PDF report could not be generated."
     },
     "validation": {
       "typeRequired": "Choose a task type.",
       "coordinatesRequired": "Pick the task's location on the map.",
       "teamRequired": "Choose a team.",
       "reasonRequired": "Choose a return reason.",
-      "returnNoteRequired": "Say what needs doing."
+      "returnNoteRequired": "Say what needs doing.",
+      "ticketInvalid": "A WFM ticket is a number of up to 15 digits."
+    },
+    "preview": {
+      "title": "Filled form",
+      "subtitle": "The form exactly as it was filled, in the version the task is pinned to. Nothing here can be changed.",
+      "loadFailed": "The filled form could not be loaded.",
+      "filledBy": "Filled by {{by}} on {{date}}.",
+      "noFill": "This task has not been filled yet — the form is shown empty."
+    },
+    "c2m": {
+      "faIdHint": "The C2M field activity this task settles. Approving the task closes it in C2M when its task type is a closing type.",
+      "closesOnApproval": "Closes in C2M on approval",
+      "closure": "C2M closure",
+      "notYet": "Not attempted",
+      "attempts": "{{count}} attempt(s)",
+      "retry": "Send to C2M again",
+      "noAttempts": "Nothing has been sent to C2M for this task.",
+      "sent": "Sent",
+      "opStatus": "Outcome sent",
+      "responseCode": "C2M code",
+      "message": "Message",
+      "payload": "Request and response",
+      "request": "Request",
+      "response": "Response",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "retryClosed": "C2M accepted the closure.",
+      "retryNotClosed": "C2M did not accept the closure. {{message}}",
+      "status": {
+        "PENDING": "Queued",
+        "CLOSED": "Closed",
+        "SKIPPED": "Not sent",
+        "REJECTED": "Refused",
+        "FAILED": "Failed"
+      },
+      "dispatch": {
+        "PENDING": "Sending",
+        "SUCCEEDED": "Accepted",
+        "FAILED": "Failed",
+        "SKIPPED": "Skipped"
+      }
     }
   },
   "taskTypes": {
@@ -2794,7 +2868,9 @@
     "confirmDeactivate": "Deactivate {{name}}? No new tasks can use it; tasks already raised carry on.",
     "codeInvalid": "Use letters, digits, \"-\" and \"_\" only.",
     "created": "Task type created.",
-    "updated": "Task type updated."
+    "updated": "Task type updated.",
+    "closesC2mActivity": "Closes the C2M field activity",
+    "closesC2mActivityHint": "This type's form is the closing form: approving one of its tasks that carries an FA id closes that activity in C2M, with the outcome its Action Taken answer maps to."
   },
   "teams": {
     "title": "Field teams",
@@ -2822,5 +2898,24 @@
     "updated": "Team updated.",
     "confirmActivate": "Activate {{name}}? Its crew can sign in and be handed work again.",
     "confirmDeactivate": "Deactivate {{name}}? Its crew can no longer sign in or be handed work."
+  },
+  "c2mMappings": {
+    "title": "C2M action mappings",
+    "subtitle": "What each Action Taken code closes a C2M field activity with.",
+    "new": "New mapping",
+    "edit": "Edit mapping",
+    "hint": "Used when the Action Taken option on the closing form does not name a C2M status itself. A code with no mapping closes as cancelled, carrying itself as the reason.",
+    "searchPlaceholder": "Code or name",
+    "actionCode": "Action code",
+    "faStatus": "C2M status",
+    "cancelReason": "Cancel reason",
+    "cancelReasonHint": "Sent to C2M with a cancellation. Leave empty to send the action code itself.",
+    "closureReason": "Closure reason",
+    "reason": "Reason",
+    "empty": "No mappings yet.",
+    "created": "Mapping created.",
+    "updated": "Mapping updated.",
+    "confirmActivate": "Activate the mapping for {{code}}?",
+    "confirmDeactivate": "Deactivate the mapping for {{code}}? Its code falls back to the built-in rule."
   }
 }

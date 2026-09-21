@@ -45,6 +45,14 @@
           }
         </div>
 
+        @if (!isSection()) {
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.c2mParameterName' | translate) }}</label>
+            <input pInputText class="w-full font-mono" formControlName="c2m_parameter_name" dir="ltr" />
+            <small class="block mt-1 text-[var(--p-text-muted-color)]">{{ ('formBuilder.editor.c2mParameterNameHint' | translate) }}</small>
+          </div>
+        }
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.descriptionEn' | translate) }}</label>
@@ -236,9 +244,33 @@
                       }
                       <p-button class="col-span-1" icon="pi pi-times" [text]="true" size="small" severity="danger" (onClick)="removeChoice($index)" />
                     </div>
+                    @if (isActionTakenField()) {
+                      <div class="grid grid-cols-12 gap-2 items-start ps-1">
+                        <div class="col-span-5">
+                          <p-select
+                            [options]="c2mFaStatusOptions()"
+                            optionLabel="label"
+                            optionValue="value"
+                            formControlName="c2m_fa_status"
+                            [showClear]="true"
+                            [placeholder]="('formBuilder.editor.c2mFaStatus' | translate)"
+                            appendTo="body"
+                            styleClass="w-full"
+                          />
+                        </div>
+                        <div class="col-span-6">
+                          <input pInputText class="w-full" formControlName="c2m_reason" [placeholder]="('formBuilder.editor.c2mReason' | translate)" />
+                        </div>
+                      </div>
+                    }
                   </div>
                 }
               </div>
+              @if (isActionTakenField()) {
+                <p class="text-[11px] text-[var(--p-text-muted-color)] mt-2">
+                  {{ ('formBuilder.editor.c2mFaStatusHint' | translate) }} {{ ('formBuilder.editor.c2mReasonHint' | translate) }}
+                </p>
+              }
             </div>
           </div>
         }

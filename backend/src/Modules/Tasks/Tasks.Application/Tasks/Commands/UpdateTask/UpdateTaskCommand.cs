@@ -26,6 +26,11 @@ public sealed record UpdateTaskCommand : IRequest<Result>, ITaskLocationInput
     public string Priority { get; init; } = TaskPriorities.Normal;
     public string? ExternalReference { get; init; }
 
+    /// <summary>The C2M field activity this task settles. Fixed once the task is approved.</summary>
+    public string? FaId { get; init; }
+
+    public long? WfmTicketId { get; init; }
+
     public double Latitude { get; init; }
     public double Longitude { get; init; }
     public string? Address { get; init; }
@@ -46,6 +51,8 @@ public sealed class UpdateTaskCommandValidator : AbstractValidator<UpdateTaskCom
         RuleFor(x => x.Title).MaximumLength(FieldTask.TitleMaxLength);
         RuleFor(x => x.Notes).MaximumLength(FieldTask.NotesMaxLength);
         RuleFor(x => x.ExternalReference).MaximumLength(FieldTask.ExternalReferenceMaxLength);
+        RuleFor(x => x.FaId).MaximumLength(FieldTask.FaIdMaxLength);
+        RuleFor(x => x.WfmTicketId).GreaterThan(0).When(x => x.WfmTicketId is not null);
         RuleFor(x => x.Priority).Must(TaskPriorities.IsDefined).WithMessage("Unknown task priority.");
         Include(new TaskLocationValidator());
     }
@@ -88,6 +95,12 @@ public sealed class UpdateTaskCommandHandler(
                 request.CompletionDueDate,
                 actor,
                 now);
+
+            var faId = string.IsNullOrWhiteSpace(request.FaId) ? null : request.FaId.Trim();
+            if (faId != task.FaId || request.WfmTicketId != task.WfmTicketId)
+            {
+                task.SetFieldActivity(faId, request.WfmTicketId, actor, now);
+            }
 
             // Only a real move is refused on a filled task; re-sending the same place is not a move.
             if (moved)

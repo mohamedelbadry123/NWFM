@@ -8,7 +8,7 @@ namespace FormEngine.Domain.Entities;
 /// One media file uploaded against a form field. Created the moment the user picks the file —
 /// before the form is submitted — so the browser never carries bytes into the submit payload; the
 /// submission row only stores a reference array of file id + <see cref="RelativePath"/>.
-/// The row <see cref="Entity.Id"/> is the public file handle. Table: <c>FE.SubmissionFiles</c>.
+/// The row <see cref="Entity.Id"/> is the public file handle. Table: <c>FormEngine.SubmissionFiles</c>.
 /// </summary>
 public sealed class SubmissionFile : Entity
 {

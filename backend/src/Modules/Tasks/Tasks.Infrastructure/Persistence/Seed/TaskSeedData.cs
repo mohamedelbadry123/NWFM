@@ -51,6 +51,35 @@ internal static class TaskSeedData
         new("TSK-DEMO-0004", "DEMO_ALL_INPUTS", "Inspection walkthrough — Al Mourouj", TaskPriorities.Low, 24.7586, 46.6547, "Al Mourouj, Riyadh", "R-23"),
     ];
 
+    /// <summary>
+    /// WFM's Action Taken codes and what each tells C2M, as the reference app seeds them: only OCUL01
+    /// completes the activity; every other code cancels it and travels back as the cancel reason.
+    /// Inserted when missing and never overwritten, so an edit made on the admin screen survives.
+    /// </summary>
+    private static readonly (string Code, string FaStatus, string? CancelReason, string NameEn, string NameAr)[] C2mActionMappings =
+    [
+        (C2mOperationStatuses.CompletedActionCode, C2mOperationStatuses.Completed, null, "Work completed", "تم إنجاز العمل"),
+        ("MMFCNR1", C2mOperationStatuses.Cancelled, "MMFCNR1", "Lack of contracts", "عدم وجود عقود"),
+        ("MMFCNR2", C2mOperationStatuses.Cancelled, "MMFCNR2", "Difficulty implementing due to obstacles", "صعوبة التنفيذ بسبب عوائق"),
+        ("MMFCNR3", C2mOperationStatuses.Cancelled, "MMFCNR3", "Requires a new connection request", "يتطلب طلب توصيل جديد"),
+        ("MMFCNR4", C2mOperationStatuses.Cancelled, "MMFCNR4", "Cannot obtain drilling permits", "تعذّر الحصول على تصاريح الحفر"),
+    ];
+
+    private static async Task SeedC2mActionMappingsAsync(TasksDbContext context, ILogger logger, DateTime utcNow, CancellationToken ct)
+    {
+        var existing = await context.C2mActionMappings.Select(m => m.ActionCode).ToListAsync(ct);
+        var known = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var seed in C2mActionMappings.Where(m => !known.Contains(m.Code)))
+        {
+            context.C2mActionMappings.Add(C2mActionMapping.Create(
+                seed.Code, seed.FaStatus, seed.CancelReason, null, seed.NameEn, seed.NameAr, true, SeedActor, utcNow));
+            logger.LogInformation("Seeded C2M action mapping {Code}.", seed.Code);
+        }
+
+        await context.SaveChangesAsync(ct);
+    }
+
     public static async Task SeedAsync(IServiceScopeFactory scopeFactory, ILogger logger, CancellationToken ct)
     {
         using var scope = scopeFactory.CreateScope();
@@ -58,6 +87,8 @@ internal static class TaskSeedData
         var forms = scope.ServiceProvider.GetRequiredService<IFormGateway>();
 
         var utcNow = DateTime.UtcNow;
+        await SeedC2mActionMappingsAsync(context, logger, utcNow, ct);
+
         var types = new Dictionary<string, TaskType>(StringComparer.Ordinal);
 
         foreach (var seed in Types)

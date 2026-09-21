@@ -48,7 +48,77 @@ public interface IFormGateway
         string contextType,
         string contextId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The answerable fields of one published version, in the form's order, with what an integration
+    /// needs of them: each field's C2M parameter name, and each choice's C2M close outcome. Empty when
+    /// the version is unknown.
+    /// </summary>
+    Task<IReadOnlyList<FormFieldInfo>> GetFieldsAsync(Guid formId, int versionNo, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A fill's answers as a person reads them, in the order the answered version lays its fields
+    /// out. Each carries the question's labels and the answer rendered in both languages, so a
+    /// choice reads as its option's label and a media answer as its file names. Blank answers are
+    /// left out. Empty when the version is unknown.
+    /// </summary>
+    Task<IReadOnlyList<FormAnswerView>> DescribeAnswersAsync(
+        Guid formId,
+        int versionNo,
+        IReadOnlyDictionary<string, object?> answers,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The bytes of one file a context's fills claimed — for embedding in a report. Null when the
+    /// file is not the context's, has been removed, is larger than <paramref name="maxBytes"/>, or
+    /// its bytes are gone from storage.
+    /// </summary>
+    Task<byte[]?> ReadContextFileAsync(
+        Guid fileId,
+        string contextType,
+        string contextId,
+        long maxBytes,
+        CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// One answer ready to show. <see cref="DisplayEn"/>/<see cref="DisplayAr"/> are the answer in each
+/// language; <see cref="Point"/> is set for a geolocation answer, so a client can put it on a map.
+/// </summary>
+public sealed record FormAnswerView(
+    string DataName,
+    string FieldType,
+    string? LabelEn,
+    string? LabelAr,
+    string DisplayEn,
+    string DisplayAr,
+    FormAnswerPoint? Point);
+
+public sealed record FormAnswerPoint(double Latitude, double Longitude, string? Address);
+
+/// <summary>
+/// One answerable field of a published version. <see cref="C2mParameterName"/> is the name its answer
+/// travels under when a field activity is closed in C2M; null when it is not sent.
+/// </summary>
+public sealed record FormFieldInfo(
+    string DataName,
+    string FieldType,
+    string? LabelEn,
+    string? LabelAr,
+    string? C2mParameterName,
+    IReadOnlyList<FormChoiceInfo> Choices);
+
+/// <summary>
+/// One option of a choice field. <see cref="C2mFaStatus"/> (<c>C</c> or <c>X</c>) and
+/// <see cref="C2mReason"/> are set on the options of the Action Taken field that decide how a field
+/// activity closes in C2M.
+/// </summary>
+public sealed record FormChoiceInfo(
+    string Value,
+    string? LabelEn,
+    string? LabelAr,
+    string? C2mFaStatus,
+    string? C2mReason);
 
 /// <summary>A form that can be filled, at its current published version.</summary>
 public sealed record PublishedFormInfo(

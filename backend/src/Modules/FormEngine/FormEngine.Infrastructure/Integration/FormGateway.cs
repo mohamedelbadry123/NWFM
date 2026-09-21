@@ -1,11 +1,13 @@
 using FormEngine.Application.Common;
 using FormEngine.Application.Common.Interfaces;
+using FormEngine.Application.Common.Schema;
 using FormEngine.Application.Submissions.Common;
 using FormEngine.Domain.Constants;
 using FormEngine.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Results;
+using NWFM.Shared.Storage;
 
 namespace FormEngine.Infrastructure.Integration;
 
@@ -20,12 +22,19 @@ namespace FormEngine.Infrastructure.Integration;
 internal sealed class FormGateway(
     IFormEngineDbContext context,
     IFormSubmissionStore submissionStore,
-    IFormSubmissionService submissions) : IFormGateway
+    IFormSubmissionService submissions,
+    IFileStorage fileStorage) : IFormGateway
 {
     /// <summary>A context's fills are few — one per fill of one task — so they are read in one page.</summary>
     private const int ContextPageSize = 200;
 
     private const int MaxListTake = 500;
+
+    /// <summary>
+    /// Parsed schemas by form and version. A task's fills usually share one version, so describing
+    /// them all parses it once. Scoped with the gateway, so a republish is seen by the next request.
+    /// </summary>
+    private readonly Dictionary<(Guid FormId, int VersionNo), FormSchema?> _schemas = [];
 
     public async Task<PublishedFormInfo?> FindPublishedAsync(Guid formId, CancellationToken cancellationToken)
     {
@@ -164,6 +173,77 @@ internal sealed class FormGateway(
                 f.Status,
                 f.CreatedAt))
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<FormFieldInfo>> GetFieldsAsync(Guid formId, int versionNo, CancellationToken cancellationToken)
+    {
+        var schema = await SchemaAsync(formId, versionNo, cancellationToken);
+
+        return schema is null
+            ? []
+            : schema.Fields
+                .Select(f => new FormFieldInfo(
+                    f.DataName,
+                    f.FieldType,
+                    f.LabelEn,
+                    f.LabelAr,
+                    f.C2mParameterName,
+                    f.Choices.Select(c => new FormChoiceInfo(c.Value, c.LabelEn, c.LabelAr, c.C2mFaStatus, c.C2mReason)).ToList()))
+                .ToList();
+    }
+
+    public async Task<IReadOnlyList<FormAnswerView>> DescribeAnswersAsync(
+        Guid formId,
+        int versionNo,
+        IReadOnlyDictionary<string, object?> answers,
+        CancellationToken cancellationToken)
+    {
+        var schema = await SchemaAsync(formId, versionNo, cancellationToken);
+        return schema is null ? [] : FormAnswerDescriber.Describe(schema, answers);
+    }
+
+    private async Task<FormSchema?> SchemaAsync(Guid formId, int versionNo, CancellationToken cancellationToken)
+    {
+        if (!_schemas.TryGetValue((formId, versionNo), out var schema))
+        {
+            var json = await GetVersionSchemaAsync(formId, versionNo, cancellationToken);
+            schema = json is null ? null : FormSchemaParser.Parse(json);
+            _schemas[(formId, versionNo)] = schema;
+        }
+
+        return schema;
+    }
+
+    public async Task<byte[]?> ReadContextFileAsync(
+        Guid fileId,
+        string contextType,
+        string contextId,
+        long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        var file = await context.SubmissionFiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                f => f.Id == fileId && f.ContextType == contextType && f.ContextId == contextId && f.IsActive,
+                cancellationToken);
+
+        if (file is null || file.SizeBytes > maxBytes)
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = await fileStorage.OpenReadAsync(file.RelativePath, cancellationToken);
+            using var buffer = new MemoryStream((int)Math.Max(file.SizeBytes, 0));
+            await stream.CopyToAsync(buffer, cancellationToken);
+            return buffer.ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The row outlived its bytes; the caller reports the file as unavailable.
+            return null;
+        }
+    }
 
     private static PublishedFormInfo ToInfo(FormDefinition form) =>
         new(

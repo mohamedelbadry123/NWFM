@@ -121,6 +121,55 @@ internal sealed class OrgScopeProvider(
         return coverage;
     }
 
+    public async Task<IReadOnlyDictionary<string, OrgUnitName>> GetUnitNamesAsync(
+        string level,
+        IReadOnlyCollection<string> codes,
+        CancellationToken cancellationToken)
+    {
+        var wanted = codes
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (wanted.Count == 0)
+        {
+            return new Dictionary<string, OrgUnitName>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // SQL Server compares these codes case-insensitively, so the IN list matches however the
+        // work stamped them.
+        IQueryable<OrgUnitName>? names = level switch
+        {
+            OrgUnitLevels.Department => db.Departments.AsNoTracking()
+                .Where(x => wanted.Contains(x.Code)).Select(x => new OrgUnitName(x.Code, x.NameEn, x.NameAr)),
+            OrgLevels.Cluster => db.Clusters.AsNoTracking()
+                .Where(x => wanted.Contains(x.Code)).Select(x => new OrgUnitName(x.Code, x.NameEn, x.NameAr)),
+            OrgLevels.Cbu => db.Cbus.AsNoTracking()
+                .Where(x => wanted.Contains(x.Code)).Select(x => new OrgUnitName(x.Code, x.NameEn, x.NameAr)),
+            OrgLevels.Branch => db.Branches.AsNoTracking()
+                .Where(x => wanted.Contains(x.Code)).Select(x => new OrgUnitName(x.Code, x.NameEn, x.NameAr)),
+            OrgLevels.OperationArea => db.OperationAreas.AsNoTracking()
+                .Where(x => wanted.Contains(x.Code)).Select(x => new OrgUnitName(x.Code, x.NameEn, x.NameAr)),
+            _ => null,
+        };
+
+        if (names is null)
+        {
+            return new Dictionary<string, OrgUnitName>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var found = await names.ToListAsync(cancellationToken);
+
+        var byCode = new Dictionary<string, OrgUnitName>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in found)
+        {
+            byCode.TryAdd(name.Code, name);
+        }
+
+        return byCode;
+    }
+
     private async Task<OrgScopeSet> ScopeOfAsync(string ownerType, string ownerId, CancellationToken cancellationToken)
     {
         var rows = await db.OrgScopes

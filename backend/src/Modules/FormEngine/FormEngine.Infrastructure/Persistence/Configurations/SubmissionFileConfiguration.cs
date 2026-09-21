@@ -38,7 +38,7 @@ public sealed class SubmissionFileConfiguration : IEntityTypeConfiguration<Submi
             .HasForeignKey(x => x.FormDefinitionId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // No foreign key to the submission: FE.Submissions is outside the EF model.
+        // No foreign key to the submission: A form's submissions table is outside the EF model.
         builder.HasIndex(x => x.SubmissionId);
         builder.HasIndex(x => new { x.Status, x.CreatedAt });
         builder.HasIndex(x => x.FormDefinitionId);

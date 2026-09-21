@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Options;
+using NWFM.Shared.Persistence;
+using Tasks.Domain.Constants;
 using Tasks.Infrastructure.Persistence.Seed;
 
 namespace Tasks.Infrastructure.Persistence;
@@ -28,6 +30,15 @@ public sealed class TasksDatabaseInitializer(
             if (_startupOptions.ApplyMigrations)
             {
                 logger.LogInformation("Applying Tasks EF Core migrations (DatabaseStartup:ApplyMigrations=true).");
+                // History first: the module moved from the TK schema to Task, and EF has to find
+                // the migrations already applied before it can run the one that moves the tables.
+                await MigrationHistorySchemaMove.RunAsync(
+                    context,
+                    TasksSchema.PreviousName,
+                    TasksSchema.Name,
+                    TasksSchema.MigrationsHistoryTable,
+                    context.Database.ExecuteSqlRawAsync,
+                    ct);
                 await context.Database.MigrateAsync(ct);
             }
             else

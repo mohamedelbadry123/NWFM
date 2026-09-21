@@ -113,6 +113,8 @@ function asChoices(value: unknown): Choice[] {
       label_en: asString(raw['label_en']),
       label_ar: asString(raw['label_ar']),
       dependency_value: asNullableString(raw['dependency_value'])?.trim() ?? null,
+      c2m_fa_status: asNullableString(raw['c2m_fa_status'])?.trim().toUpperCase() || null,
+      c2m_reason: asNullableString(raw['c2m_reason'])?.trim() || null,
     };
   });
 }
@@ -196,6 +198,7 @@ export function deserializeSchemaElement(raw: Record<string, unknown>): FormElem
     return element;
   }
 
+  element.c2m_parameter_name = asNullableString(raw['c2m_parameter_name'])?.trim() || null;
   element.default_value = asNullableString(raw['default_value']);
   element.default_value_mode = asDefaultValueMode(raw['default_value_mode']);
   element.required = raw['required'] !== undefined ? !!raw['required'] : defaults.required;

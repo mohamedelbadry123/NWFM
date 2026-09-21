@@ -84,10 +84,11 @@ describe('form schema import', () => {
 
   it('ignores properties written by another product', () => {
     const schema = deserializeSchema({
-      elements: [{ type: 'text', data_name: 'note', c2m_parameter_name: 'CM_NOTE', unknown: { a: 1 } }],
+      elements: [{ type: 'text', data_name: 'note', legacy_widget_id: 'W-17', unknown: { a: 1 } }],
     });
 
     expect(schema.elements[0].data_name).toBe('note');
-    expect((schema.elements[0] as unknown as Record<string, unknown>)['c2m_parameter_name']).toBeUndefined();
+    expect((schema.elements[0] as unknown as Record<string, unknown>)['legacy_widget_id']).toBeUndefined();
+    expect((schema.elements[0] as unknown as Record<string, unknown>)['unknown']).toBeUndefined();
   });
 });

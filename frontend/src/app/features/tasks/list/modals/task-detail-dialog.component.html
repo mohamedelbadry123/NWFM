@@ -4,213 +4,577 @@
     (visibleChange)="visible.set($event)"
     [header]="t('tasks.detail.title')"
     [modal]="true"
-    [draggable]="true"
     [maximizable]="true"
-    [style]="{ width: '72rem' }"
-    [contentStyle]="{ overflow: 'auto' }"
+    [draggable]="true"
+    [resizable]="false"
+    [style]="{ width: '960px' }"
     [breakpoints]="{ '960px': '95vw' }"
   >
     @if (loading()) {
-      <div class="flex justify-center py-10">
-        <p-progressSpinner styleClass="w-10 h-10" strokeWidth="4" />
+      <div class="flex justify-center p-10">
+        <p-progressSpinner styleClass="h-12 w-12" [attr.aria-label]="t('common.loading')" />
       </div>
     } @else if (loadFailed()) {
-      <p-message severity="error" [text]="t('tasks.detail.loadFailed')" styleClass="w-full" />
+      <p class="p-6 text-center text-surface-500">{{ t('tasks.detail.loadFailed') }}</p>
     } @else if (detail(); as d) {
-      <!-- Identity banner -->
-      <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)] px-4 py-3">
-        <span class="text-lg font-semibold">{{ d.task.taskNumber }}</span>
-        <p-tag [value]="t('tasks.status.' + d.task.status)" [severity]="statusSeverity(d.task.status)" />
-        <p-tag [value]="t('tasks.priority.' + d.task.priority)" [severity]="prioritySeverity(d.task.priority)" />
-        @if (isOverdue(d.task)) {
-          <p-tag [value]="t('tasks.tags.overdue')" severity="danger" />
-        }
-        <span class="text-sm text-surface-500">{{ typeName() }}</span>
-        <span class="app-badge app-badge--code">{{ formName() }} v{{ d.task.formVersionNo }}</span>
-        @if (d.task.assignedTeamName) {
-          <span class="ms-auto text-sm"><i class="pi pi-users me-1"></i>{{ d.task.assignedTeamName }}</span>
-        }
-      </div>
-
-      @if (d.task.returnReasonCode) {
-        <!-- Why it came back is the first thing a returned task has to say. -->
-        <p-message severity="warn" styleClass="w-full mb-4">
-          <div class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-col gap-4">
+        <!-- Identity banner: the number and everything that qualifies its state, on its own surface
+             so it reads as the subject of the dialog rather than the first row of the facts. -->
+        <div class="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)] px-4 py-3">
+          <span class="font-mono text-lg font-semibold tracking-tight">{{ d.task.taskNumber }}</span>
+          <p-tag [value]="t('tasks.status.' + d.task.status)" [severity]="statusSeverity(d.task.status)" />
+          @if (d.task.returnReasonCode) {
             <p-tag
               [value]="t('tasks.returnReason.' + d.task.returnReasonCode)"
               [severity]="returnReasonSeverity(d.task.returnReasonCode)"
+              [pTooltip]="d.task.returnReason || ''"
+              tooltipPosition="top"
             />
-            <span>{{ d.task.returnReason }}</span>
-            <span class="text-xs text-surface-500">
-              {{ d.returnedBy }} · {{ d.task.returnedDate | date: 'yyyy-MM-dd HH:mm' }}
-            </span>
+          }
+          @if (wasSubmittedAgain(d.task)) {
+            <p-tag
+              [value]="t('tasks.tags.submittedAgain')"
+              severity="info"
+              [pTooltip]="
+                t('tasks.fields.returnedDate') + ': ' + (d.task.returnedDate | date: 'yyyy-MM-dd HH:mm') + ' · ' +
+                t('tasks.fields.submittedDate') + ': ' + (d.task.submittedDate | date: 'yyyy-MM-dd HH:mm')
+              "
+              tooltipPosition="top"
+            />
+          }
+          @if (isOverdue(d.task)) {
+            <p-tag [value]="t('tasks.tags.overdue')" severity="danger" />
+          }
+          <p-tag [value]="t('tasks.priority.' + d.task.priority)" [severity]="prioritySeverity(d.task.priority)" />
+          <p-tag [value]="t('tasks.source.' + d.task.source)" severity="secondary" />
+          @if (d.task.c2mStatus) {
+            <p-tag [value]="'C2M · ' + t('tasks.c2m.status.' + d.task.c2mStatus)" [severity]="c2mSeverity(d.task.c2mStatus)" />
+          }
+          <div class="ms-auto flex items-center gap-2">
+            <!-- Always offered, whatever the status: reading back what was filled is most often
+                 wanted once the task is closed and can no longer be filled. -->
+            <p-button
+              [label]="t('tasks.actions.previewForm')"
+              icon="pi pi-eye"
+              severity="secondary"
+              [outlined]="true"
+              size="small"
+              (onClick)="openPreview()"
+            />
+            <p-button
+              [label]="t('tasks.actions.exportPdf')"
+              icon="pi pi-file-pdf"
+              severity="secondary"
+              [outlined]="true"
+              size="small"
+              [loading]="exporting()"
+              (onClick)="exportPdf()"
+            />
           </div>
-        </p-message>
-      }
+        </div>
 
-      <!-- Facts -->
-      <div class="mb-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-        <div class="sm:col-span-2 lg:col-span-3">
-          <span class="text-surface-500">{{ t('tasks.fields.title') }}:</span> {{ d.task.title || '—' }}
-        </div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.externalReference') }}:</span> {{ d.task.externalReference || '—' }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.source') }}:</span> {{ t('tasks.source.' + d.task.source) }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.created') }}:</span> {{ d.task.createdAt | date: 'yyyy-MM-dd HH:mm' }} · {{ d.createdBy || '—' }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.fillDueDate') }}:</span> {{ d.task.dueDate ? (d.task.dueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.completionDueDate') }}:</span> {{ d.task.completionDueDate ? (d.task.completionDueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</div>
-        <div>
-          <span class="text-surface-500">{{ t('tasks.fields.sla') }}:</span>
-          {{ d.fillSlaHours ?? '—' }} / {{ d.completionSlaHours ?? '—' }} {{ t('tasks.detail.hours') }}
-        </div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.assigned') }}:</span> {{ d.task.assignedDate ? (d.task.assignedDate | date: 'yyyy-MM-dd HH:mm') : '—' }} · {{ d.assignedBy || '—' }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.submittedDate') }}:</span> {{ d.task.submittedDate ? (d.task.submittedDate | date: 'yyyy-MM-dd HH:mm') : '—' }} · {{ d.lastFilledBy || '—' }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.fills') }}:</span> {{ d.task.submissionCount }}</div>
-        @if (d.completedDate) {
-          <div><span class="text-surface-500">{{ t('tasks.fields.completed') }}:</span> {{ d.completedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ d.completedBy }}</div>
-        }
-        @if (d.expiredDate) {
-          <div><span class="text-surface-500">{{ t('tasks.fields.expired') }}:</span> {{ d.expiredDate | date: 'yyyy-MM-dd HH:mm' }} · {{ d.expiredBy }}</div>
-        }
-        <div><span class="text-surface-500">{{ t('org.cbu') }}:</span> {{ orgNames.label('Cbu', d.task.cbuCode) }}</div>
-        <div><span class="text-surface-500">{{ t('org.branch') }}:</span> {{ orgNames.label('Branch', d.task.branchCode) }}</div>
-        <div><span class="text-surface-500">{{ t('org.operationArea') }}:</span> {{ orgNames.label('OperationArea', d.task.operationAreaCode) }}</div>
-        <div><span class="text-surface-500">{{ t('tasks.fields.department') }}:</span> {{ orgNames.label('Department', d.task.departmentCode) }}</div>
-        <div class="sm:col-span-2">
-          <span class="text-surface-500">{{ t('tasks.fields.address') }}:</span> {{ d.task.address || '—' }}
-          <span class="font-mono text-xs text-surface-500">({{ d.task.latitude }}, {{ d.task.longitude }})</span>
-        </div>
+        <!-- The instruction to the crew. Above the facts rather than a row among them: it is a
+             sentence someone wrote, and the one thing here that says what the visit is for. -->
         @if (d.notes) {
-          <div class="sm:col-span-2 lg:col-span-3 whitespace-pre-line">
-            <span class="text-surface-500">{{ t('tasks.fields.notes') }}:</span> {{ d.notes }}
+          <div
+            class="flex items-start gap-2 rounded-xl border-s-[3px] p-3 text-sm"
+            style="background: var(--acc-brand-bg); border-color: var(--p-primary-color)"
+          >
+            <i class="pi pi-comment mt-0.5 text-[var(--p-primary-color)]"></i>
+            <div class="flex flex-col gap-1">
+              <span class="text-xs font-semibold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+                {{ t('tasks.fields.notes') }}
+              </span>
+              <span class="whitespace-pre-line font-medium">{{ d.notes }}</span>
+            </div>
           </div>
         }
-      </div>
 
-      <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($any($event))">
-        <p-tablist>
-          <p-tab value="answers"><i class="pi pi-file-edit me-1"></i>{{ t('tasks.detail.answers') }}</p-tab>
-          <p-tab value="records"><i class="pi pi-history me-1"></i>{{ t('tasks.detail.records') }} ({{ fills().length }})</p-tab>
-          <p-tab value="timeline"><i class="pi pi-clock me-1"></i>{{ t('tasks.detail.timeline') }}</p-tab>
-          <p-tab value="assignments"><i class="pi pi-users me-1"></i>{{ t('tasks.detail.assignments') }} ({{ d.assignments.length }})</p-tab>
-          <p-tab value="files"><i class="pi pi-images me-1"></i>{{ t('tasks.detail.files') }} ({{ files().length }})</p-tab>
-          <p-tab value="location"><i class="pi pi-map-marker me-1"></i>{{ t('tasks.detail.location') }}</p-tab>
-        </p-tablist>
+        <!-- Grouped by subject — what the task is, who holds it, which part of the org owns it, and
+             when it is due — so reading it does not mean scanning every cell. -->
+        <div class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <section class="rounded-xl border border-[var(--app-border)] p-3">
+            <h4 class="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+              <i class="pi pi-file-edit text-[var(--p-primary-color)]"></i>
+              {{ t('tasks.detail.groups.task') }}
+            </h4>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.taskType') }}</span>
+              <span class="text-end font-medium">{{ typeName() }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.form') }}</span>
+              <span class="text-end font-medium">
+                {{ formName() }}
+                <span class="app-badge app-badge--code ms-1">v{{ d.task.formVersionNo }}</span>
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.title') }}</span>
+              <span class="text-end font-medium">{{ d.task.title || '-' }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.externalReference') }}</span>
+              <span class="text-end font-medium">{{ d.task.externalReference || '-' }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.faId') }}</span>
+              <span class="text-end font-medium">
+                <span class="font-mono" dir="ltr">{{ d.task.faId || '-' }}</span>
+                @if (d.task.wfmTicketId) {
+                  <span class="text-[var(--p-text-muted-color)]"> · {{ t('tasks.fields.wfmTicketId') }} <span dir="ltr">{{ d.task.wfmTicketId }}</span></span>
+                }
+                @if (d.task.faId && d.typeClosesC2mActivity) {
+                  <span class="app-badge app-badge--brand ms-1">{{ t('tasks.c2m.closesOnApproval') }}</span>
+                }
+              </span>
+            </div>
+          </section>
 
-        <p-tabpanels>
-          <p-tabpanel value="answers">
-            @if (shownFill(); as fill) {
-              <p class="mb-3 text-xs text-surface-500">
-                {{ t('tasks.detail.fillBy', { by: fill.submittedByName || fill.submittedBy || '—', date: (fill.submittedDate | date: 'yyyy-MM-dd HH:mm') || '' }) }}
-              </p>
-              <!-- The form as it was filled: the pinned version, read-only. -->
-              <app-dynamic-form-renderer
-                [definition]="definition()"
-                [answers]="fill.answers"
-                [readOnly]="true"
-                [emptyMessage]="t('tasks.fill.empty')"
-              />
-            } @else {
-              <p-message severity="info" [text]="t('tasks.detail.notFilled')" styleClass="w-full" />
+          <section class="rounded-xl border border-[var(--app-border)] p-3">
+            <h4 class="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+              <i class="pi pi-users text-[var(--p-primary-color)]"></i>
+              {{ t('tasks.detail.groups.assignment') }}
+            </h4>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.team') }}</span>
+              <span class="text-end font-medium">{{ d.task.assignedTeamName || '-' }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.assigned') }}</span>
+              <span class="text-end font-medium">
+                {{ d.task.assignedDate ? (d.task.assignedDate | date: 'yyyy-MM-dd HH:mm') : '-' }}
+                @if (d.assignedBy) {
+                  <span class="text-[var(--p-text-muted-color)]">· {{ d.assignedBy }}</span>
+                }
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.sla') }}</span>
+              <span class="text-end font-medium">
+                {{ d.fillSlaHours ?? '-' }} / {{ d.completionSlaHours ?? '-' }} {{ t('tasks.detail.hours') }}
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 py-1.5">
+              @if (d.expiredDate) {
+                <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.expired') }}</span>
+                <span class="text-end font-medium">{{ d.expiredDate | date: 'yyyy-MM-dd HH:mm' }} · {{ d.expiredBy || '-' }}</span>
+              } @else {
+                <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.completed') }}</span>
+                <span class="text-end font-medium">
+                  {{ d.completedDate ? (d.completedDate | date: 'yyyy-MM-dd HH:mm') : '-' }}
+                  @if (d.completedBy) {
+                    <span class="text-[var(--p-text-muted-color)]">· {{ d.completedBy }}</span>
+                  }
+                </span>
+              }
+            </div>
+          </section>
+
+          <section class="rounded-xl border border-[var(--app-border)] p-3">
+            <h4 class="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+              <i class="pi pi-sitemap text-[var(--p-primary-color)]"></i>
+              {{ t('tasks.detail.groups.organisation') }}
+            </h4>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('org.cbu') }}</span>
+              <span class="text-end font-medium">{{ orgNames.label('Cbu', d.task.cbuCode) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.branch') }}</span>
+              <span class="text-end font-medium">{{ orgNames.label('Branch', d.task.branchCode) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('org.operationArea') }}</span>
+              <span class="text-end font-medium">{{ orgNames.label('OperationArea', d.task.operationAreaCode) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.department') }}</span>
+              <span class="text-end font-medium">{{ orgNames.label('Department', d.task.departmentCode) }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.address') }}</span>
+              <span class="text-end font-medium">
+                {{ d.task.address || '-' }}
+                <span class="block font-mono text-xs text-[var(--p-text-muted-color)]" dir="ltr">
+                  {{ d.task.latitude }}, {{ d.task.longitude }}
+                </span>
+              </span>
+            </div>
+          </section>
+
+          <section class="rounded-xl border border-[var(--app-border)] p-3">
+            <h4 class="mb-1.5 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+              <i class="pi pi-clock text-[var(--p-primary-color)]"></i>
+              {{ t('tasks.detail.groups.schedule') }}
+            </h4>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.created') }}</span>
+              <span class="text-end font-medium">
+                {{ d.task.createdAt | date: 'yyyy-MM-dd HH:mm' }}
+                @if (d.createdBy) {
+                  <span class="text-[var(--p-text-muted-color)]">· {{ d.createdBy }}</span>
+                }
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.fillDueDate') }}</span>
+              <span class="text-end font-medium">{{ d.task.dueDate ? (d.task.dueDate | date: 'yyyy-MM-dd HH:mm') : '-' }}</span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.completionDueDate') }}</span>
+              <span class="text-end font-medium">
+                {{ d.task.completionDueDate ? (d.task.completionDueDate | date: 'yyyy-MM-dd HH:mm') : '-' }}
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between gap-4 py-1.5">
+              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.fills') }}</span>
+              <span class="text-end font-medium">
+                {{ d.task.submissionCount }}
+                @if (d.lastFilledBy) {
+                  <span class="text-[var(--p-text-muted-color)]">({{ d.lastFilledBy }})</span>
+                }
+              </span>
+            </div>
+          </section>
+        </div>
+
+        @if (d.task.returnReason || d.task.returnReasonCode) {
+          <!-- The shared danger accent, not raw red utilities, which do not flip between themes. -->
+          <div
+            class="flex flex-col gap-2 rounded-xl border-s-[3px] p-3 text-sm"
+            style="background: var(--acc-danger-bg); border-color: var(--acc-danger-fg)"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              @if (d.task.returnReasonCode) {
+                <p-tag
+                  [value]="t('tasks.returnReason.' + d.task.returnReasonCode)"
+                  [severity]="returnReasonSeverity(d.task.returnReasonCode)"
+                />
+              }
+              @if (wasSubmittedAgain(d.task)) {
+                <p-tag [value]="t('tasks.tags.submittedAgain')" severity="info" />
+              }
+              @if (d.task.returnedDate) {
+                <span class="text-surface-500">
+                  {{ t('tasks.fields.returnedDate') }}: {{ d.task.returnedDate | date: 'yyyy-MM-dd HH:mm' }}
+                  @if (d.returnedBy) {
+                    · {{ d.returnedBy }}
+                  }
+                </span>
+              }
+              @if (d.task.returnCount) {
+                <span class="text-surface-500">{{ t('tasks.fields.returnCount') }}: {{ d.task.returnCount }}</span>
+              }
+            </div>
+            @if (d.task.returnReason) {
+              <div><span class="font-medium">{{ t('tasks.fields.returnReason') }}:</span> {{ d.task.returnReason }}</div>
             }
-          </p-tabpanel>
+          </div>
+        }
 
-          <p-tabpanel value="records">
-            <p-table [value]="fills()" styleClass="app-table p-datatable-sm p-datatable-striped" [rowHover]="true">
-              <ng-template pTemplate="header">
-                <tr>
-                  <th>{{ t('tasks.fields.submittedDate') }}</th>
-                  <th>{{ t('tasks.detail.filledBy') }}</th>
-                  <th>{{ t('tasks.detail.version') }}</th>
-                  <th class="w-24"></th>
-                </tr>
-              </ng-template>
-              <ng-template pTemplate="body" let-fill let-index="rowIndex">
-                <tr>
-                  <td>{{ fill.submittedDate | date: 'yyyy-MM-dd HH:mm' }}</td>
-                  <td>{{ fill.submittedByName || fill.submittedBy || '—' }}</td>
-                  <td>v{{ fill.versionNo }}</td>
-                  <td class="text-end">
-                    <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" [ariaLabel]="t('tasks.detail.viewFill')" (onClick)="showFill(fill)" />
-                  </td>
-                </tr>
-              </ng-template>
-              <ng-template pTemplate="emptymessage">
-                <tr><td colspan="4" class="p-4 text-center text-surface-500">{{ t('tasks.detail.notFilled') }}</td></tr>
-              </ng-template>
-            </p-table>
-          </p-tabpanel>
+        @if (latestFill(); as latest) {
+          <section class="flex flex-col gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold">{{ t('tasks.detail.latestFill') }}</h3>
+            </div>
+            <ng-container *ngTemplateOutlet="fillCard; context: { $implicit: latest }" />
+          </section>
+        }
 
-          <p-tabpanel value="timeline">
-            <p-timeline [value]="timeline()" styleClass="app-timeline-directional">
-              <ng-template pTemplate="content" let-entry>
-                <div class="mb-3">
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    @if (entry.fromStatus && entry.fromStatus !== entry.toStatus) {
-                      <p-tag [value]="t('tasks.status.' + entry.fromStatus)" [severity]="statusSeverity(entry.fromStatus)" />
-                      <i class="pi pi-arrow-right text-xs text-surface-500"></i>
-                    }
-                    <p-tag [value]="t('tasks.status.' + entry.toStatus)" [severity]="statusSeverity(entry.toStatus)" />
-                  </div>
-                  <div class="mt-1 text-xs text-surface-500">
-                    {{ entry.changedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ entry.changedBy || '—' }}
-                  </div>
-                  @if (entry.note) {
-                    <div class="mt-1 text-sm">{{ entry.note }}</div>
+        <p-tabs value="0">
+          <p-tablist>
+            <p-tab value="0">{{ t('tasks.detail.timeline') }}</p-tab>
+            <p-tab value="1">{{ t('tasks.detail.records') }}</p-tab>
+            <p-tab value="2">{{ t('tasks.detail.assignments') }}</p-tab>
+            <p-tab value="3">{{ t('tasks.detail.files') }}</p-tab>
+            <p-tab value="4">{{ t('tasks.detail.location') }}</p-tab>
+            @if (showC2m()) {
+              <p-tab value="5">C2M</p-tab>
+            }
+          </p-tablist>
+
+          <p-tabpanels>
+            <!-- Status trail -->
+            <p-tabpanel value="0">
+              @if (timeline().length === 0) {
+                <p class="p-4 text-center text-surface-500">{{ t('tasks.detail.noTimeline') }}</p>
+              } @else {
+                <p-timeline [value]="timeline()" align="left" styleClass="app-timeline-directional pt-2">
+                  <ng-template pTemplate="content" let-entry>
+                    <div class="pb-4">
+                      <div class="flex flex-wrap items-center gap-2">
+                        @if (entry.fromStatus && entry.fromStatus !== entry.toStatus) {
+                          <span class="text-surface-500">{{ t('tasks.status.' + entry.fromStatus) }}</span>
+                          <!-- The row reads right to left in Arabic, so the arrow has to point that way too. -->
+                          <i class="pi text-xs text-surface-400" [class.pi-arrow-right]="!isRtl()" [class.pi-arrow-left]="isRtl()"></i>
+                        }
+                        <p-tag [value]="t('tasks.status.' + entry.toStatus)" [severity]="statusSeverity(entry.toStatus)" />
+                      </div>
+                      <div class="mt-1 text-xs text-surface-500">
+                        {{ entry.changedDate | date: 'yyyy-MM-dd HH:mm' }}
+                        @if (entry.changedBy) {
+                          — {{ entry.changedBy }}
+                        }
+                      </div>
+                      @if (entry.note) {
+                        <div class="mt-1 text-sm">{{ entry.note }}</div>
+                      }
+                    </div>
+                  </ng-template>
+                </p-timeline>
+              }
+            </p-tabpanel>
+
+            <!-- Earlier fills — the latest answers sit above the tabs. -->
+            <p-tabpanel value="1">
+              @if (fills().length === 0) {
+                <p class="p-4 text-center text-surface-500">{{ t('tasks.detail.notFilled') }}</p>
+              } @else if (earlierFills().length === 0) {
+                <p class="p-4 text-center text-surface-500">{{ t('tasks.detail.noEarlierFills') }}</p>
+              } @else {
+                <div class="flex flex-col gap-3 pt-2">
+                  @for (fill of earlierFills(); track fill.submissionId) {
+                    <ng-container *ngTemplateOutlet="fillCard; context: { $implicit: fill }" />
                   }
                 </div>
-              </ng-template>
-            </p-timeline>
-          </p-tabpanel>
+                <p class="mt-3 text-xs text-surface-500">{{ t('tasks.detail.recordsHint') }}</p>
+              }
+            </p-tabpanel>
 
-          <p-tabpanel value="assignments">
-            <p-table [value]="d.assignments" styleClass="app-table p-datatable-sm p-datatable-striped" [rowHover]="true">
-              <ng-template pTemplate="header">
-                <tr>
-                  <th>{{ t('tasks.fields.team') }}</th>
-                  <th>{{ t('tasks.fields.status') }}</th>
-                  <th>{{ t('tasks.fields.assigned') }}</th>
-                  <th>{{ t('tasks.fields.fillDueDate') }}</th>
-                  <th>{{ t('tasks.fields.submittedDate') }}</th>
-                  <th>{{ t('tasks.fields.note') }}</th>
-                </tr>
-              </ng-template>
-              <ng-template pTemplate="body" let-a>
-                <tr [class.font-semibold]="a.isActive">
-                  <td>{{ a.teamName || a.teamId }}</td>
-                  <td>{{ t('tasks.assignmentStatus.' + a.status) }}</td>
-                  <td>{{ a.assignedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ a.assignedBy || '—' }}</td>
-                  <td>{{ a.dueDate ? (a.dueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</td>
-                  <td>{{ a.submittedDate ? (a.submittedDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</td>
-                  <td class="app-col-wrap">{{ a.note || '—' }}</td>
-                </tr>
-              </ng-template>
-              <ng-template pTemplate="emptymessage">
-                <tr><td colspan="6" class="p-4 text-center text-surface-500">{{ t('tasks.detail.noAssignments') }}</td></tr>
-              </ng-template>
-            </p-table>
-          </p-tabpanel>
+            <!-- Assignments -->
+            <p-tabpanel value="2">
+              @if (d.assignments.length === 0) {
+                <p class="p-4 text-center text-surface-500">{{ t('tasks.detail.noAssignments') }}</p>
+              } @else {
+                <div class="overflow-x-auto pt-2">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="border-b border-surface-200 text-start dark:border-surface-700">
+                        <th class="py-2 text-start">{{ t('tasks.fields.team') }}</th>
+                        <th class="py-2 text-start">{{ t('tasks.fields.status') }}</th>
+                        <th class="py-2 text-start">{{ t('tasks.fields.assigned') }}</th>
+                        <th class="py-2 text-start">{{ t('tasks.fields.fillDueDate') }}</th>
+                        <th class="py-2 text-start">{{ t('tasks.fields.submittedDate') }}</th>
+                        <th class="py-2 text-start">{{ t('tasks.fields.note') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (a of d.assignments; track a.id) {
+                        <tr class="border-b border-surface-100 dark:border-surface-800" [class.font-semibold]="a.isActive">
+                          <td class="py-2">{{ a.teamName || a.teamId }}</td>
+                          <td class="py-2">{{ t('tasks.assignmentStatus.' + a.status) }}</td>
+                          <td class="py-2">
+                            {{ a.assignedDate | date: 'yyyy-MM-dd' }}
+                            @if (a.assignedBy) {
+                              <span class="text-surface-500">· {{ a.assignedBy }}</span>
+                            }
+                          </td>
+                          <td class="py-2">{{ a.dueDate ? (a.dueDate | date: 'yyyy-MM-dd') : '-' }}</td>
+                          <td class="py-2">{{ a.submittedDate ? (a.submittedDate | date: 'yyyy-MM-dd HH:mm') : '-' }}</td>
+                          <td class="py-2 app-col-wrap">{{ a.note || '-' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </p-tabpanel>
 
-          <p-tabpanel value="files">
-            @if (mediaItems().length === 0) {
-              <p-message severity="info" [text]="t('tasks.detail.noFiles')" styleClass="w-full" />
-            } @else {
-              <div class="flex flex-wrap gap-3">
-                @for (item of mediaItems(); track item.fileId; let i = $index) {
-                  <app-media-thumbnail [item]="item" (open)="openMedia(i)" />
+            <!-- Files -->
+            <p-tabpanel value="3">
+              @if (fileCards().length === 0) {
+                <p class="p-4 text-center text-surface-500">{{ t('tasks.detail.noFiles') }}</p>
+              } @else {
+                <div class="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-3 lg:grid-cols-4">
+                  @for (card of fileCards(); track card.item.fileId; let i = $index) {
+                    <div class="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] p-2">
+                      <app-media-thumbnail size="md" [item]="card.item" (open)="openViewer(i)" />
+                      <div class="min-w-0">
+                        <div class="truncate text-sm font-medium" [title]="card.item.name">{{ card.item.name }}</div>
+                        <div class="truncate text-[11px] text-[var(--p-text-muted-color)]">
+                          {{ formatBytes(card.item.sizeBytes ?? 0) }} · {{ card.created | date: 'yyyy-MM-dd HH:mm' }}
+                        </div>
+                        <div class="truncate text-[11px] text-[var(--p-text-muted-color)]" [title]="card.dataName">
+                          {{ card.dataName }}
+                        </div>
+                      </div>
+                      <div class="flex justify-end">
+                        <p-button
+                          icon="pi pi-download"
+                          [text]="true"
+                          size="small"
+                          severity="secondary"
+                          [ariaLabel]="t('common.download')"
+                          [loading]="isDownloading(card.item)"
+                          [disabled]="isDownloading(card.item)"
+                          (onClick)="downloadFile(card.item)"
+                        />
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <app-media-viewer-dialog [(visible)]="viewerVisible" [items]="viewerItems()" [startIndex]="viewerIndex()" />
+              }
+            </p-tabpanel>
+
+            <!-- Lazy, so the map is built once the panel is visible: a hidden panel sizes the canvas to 0×0. -->
+            <p-tabpanel value="4" [lazy]="true">
+              <div class="pt-2">
+                @if (locationPoint(); as point) {
+                  <app-geo-map [value]="point" [readonly]="true" height="360px" />
                 }
               </div>
-              <app-media-viewer-dialog [(visible)]="viewerVisible" [items]="mediaItems()" [startIndex]="viewerIndex()" />
-            }
-          </p-tabpanel>
+            </p-tabpanel>
+            @if (showC2m()) {
+              <p-tabpanel value="5">
+                <div class="flex flex-col gap-3 pt-2">
+                  <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <span class="text-[var(--p-text-muted-color)]">{{ t('tasks.c2m.closure') }}:</span>
+                    @if (d.task.c2mStatus) {
+                      <p-tag [value]="t('tasks.c2m.status.' + d.task.c2mStatus)" [severity]="c2mSeverity(d.task.c2mStatus)" />
+                    } @else {
+                      <span>{{ t('tasks.c2m.notYet') }}</span>
+                    }
+                    <span class="text-[var(--p-text-muted-color)]">· {{ t('tasks.c2m.attempts', { count: d.c2mAttempts }) }}</span>
+                    @if (d.c2mLastAttemptAt) {
+                      <span class="text-[var(--p-text-muted-color)]">· {{ d.c2mLastAttemptAt | date: 'yyyy-MM-dd HH:mm' }}</span>
+                    }
+                    @if (canRetry()) {
+                      <p-button
+                        class="ms-auto"
+                        [label]="t('tasks.c2m.retry')"
+                        icon="pi pi-refresh"
+                        size="small"
+                        severity="warn"
+                        [outlined]="true"
+                        [loading]="retryingC2m()"
+                        (onClick)="retryC2m()"
+                      />
+                    }
+                  </div>
 
-          <!-- Lazy: a map drawn inside a hidden panel sizes itself to nothing. -->
-          <p-tabpanel value="location">
-            @if (activeTab() === 'location') {
-              <app-geo-map [value]="point()" [readonly]="true" height="360px" />
+                  @if (c2mLogs().length === 0) {
+                    <p class="p-4 text-center text-surface-500">{{ t('tasks.c2m.noAttempts') }}</p>
+                  } @else {
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                        <thead>
+                          <tr class="border-b border-surface-200 dark:border-surface-700">
+                            <th class="py-2 text-start">#</th>
+                            <th class="py-2 text-start">{{ t('tasks.c2m.sent') }}</th>
+                            <th class="py-2 text-start">{{ t('tasks.c2m.opStatus') }}</th>
+                            <th class="py-2 text-start">{{ t('tasks.fields.status') }}</th>
+                            <th class="py-2 text-start">{{ t('tasks.c2m.responseCode') }}</th>
+                            <th class="py-2 text-start">{{ t('tasks.c2m.message') }}</th>
+                            <th class="py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (log of c2mLogs(); track log.id) {
+                            <tr class="border-b border-surface-100 dark:border-surface-800">
+                              <td class="py-2">{{ log.attemptNumber }}</td>
+                              <td class="py-2 whitespace-nowrap">{{ log.createdAt | date: 'yyyy-MM-dd HH:mm:ss' }}</td>
+                              <td class="py-2">
+                                <span
+                                  class="app-badge app-badge--code"
+                                  [class.app-badge--success]="log.opStatus === 'C'"
+                                  [class.app-badge--warn]="log.opStatus === 'X'"
+                                >
+                                  {{ log.opStatus }} · {{ t(log.opStatus === 'C' ? 'tasks.c2m.completed' : 'tasks.c2m.cancelled') }}
+                                </span>
+                              </td>
+                              <td class="py-2">{{ t('tasks.c2m.dispatch.' + log.status) }}</td>
+                              <td class="py-2 font-mono">{{ log.responseCode || '-' }}</td>
+                              <td class="py-2 app-col-wrap">{{ log.errorMessage || '-' }}</td>
+                              <td class="py-2 text-end">
+                                <p-button
+                                  [icon]="openLogId() === log.id ? 'pi pi-chevron-up' : 'pi pi-code'"
+                                  [text]="true"
+                                  [rounded]="true"
+                                  size="small"
+                                  [ariaLabel]="t('tasks.c2m.payload')"
+                                  [pTooltip]="t('tasks.c2m.payload')"
+                                  (onClick)="toggleLog(log.id)"
+                                />
+                              </td>
+                            </tr>
+                            @if (openLogId() === log.id) {
+                              <tr>
+                                <td colspan="7" class="pb-3">
+                                  <div class="grid grid-cols-1 gap-2 md:grid-cols-2" dir="ltr">
+                                    <div>
+                                      <div class="mb-1 text-xs font-semibold text-[var(--p-text-muted-color)]">{{ t('tasks.c2m.request') }}</div>
+                                      <pre class="max-h-64 overflow-auto rounded bg-[var(--app-surface-alt)] p-2 text-[11px]">{{ prettyJson(log.requestJson) }}</pre>
+                                    </div>
+                                    <div>
+                                      <div class="mb-1 text-xs font-semibold text-[var(--p-text-muted-color)]">{{ t('tasks.c2m.response') }}</div>
+                                      <pre class="max-h-64 overflow-auto rounded bg-[var(--app-surface-alt)] p-2 text-[11px]">{{ prettyJson(log.responseJson) }}</pre>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            }
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              </p-tabpanel>
             }
-          </p-tabpanel>
-        </p-tabpanels>
-      </p-tabs>
+          </p-tabpanels>
+        </p-tabs>
+
+        <ng-template #fillCard let-fill>
+          <div class="rounded border border-surface-200 p-3 dark:border-surface-700">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs text-surface-500">
+                {{ fill.submittedDate | date: 'yyyy-MM-dd HH:mm' }}
+                · {{ fill.submittedByName || fill.submittedBy || '-' }}
+                · <span class="app-badge app-badge--code">v{{ fill.versionNo }}</span>
+                · {{ t('tasks.detail.answerCount', { count: fill.display?.length ?? 0 }) }}
+              </span>
+              <p-button
+                [label]="t('tasks.detail.viewFill')"
+                icon="pi pi-eye"
+                [text]="true"
+                size="small"
+                (onClick)="openPreview(fill.submissionId)"
+              />
+            </div>
+            <div class="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+              @for (entry of answerEntries(fill); track $index) {
+                <div class="flex items-center justify-between gap-3 border-b border-dashed border-surface-200 py-1 dark:border-surface-700">
+                  <span class="text-surface-500">{{ entry.label }}</span>
+                  <span class="flex items-center gap-1 text-end font-medium">
+                    {{ entry.value }}
+                    @if (entry.point) {
+                      <p-button
+                        icon="pi pi-map-marker"
+                        size="small"
+                        [text]="true"
+                        [rounded]="true"
+                        [pTooltip]="t('tasks.detail.viewOnMap')"
+                        [ariaLabel]="t('tasks.detail.viewOnMap')"
+                        (onClick)="openAnswerMap(entry)"
+                      />
+                    }
+                  </span>
+                </div>
+              } @empty {
+                <div class="text-surface-500">{{ t('tasks.detail.noAnswers') }}</div>
+              }
+            </div>
+          </div>
+        </ng-template>
+      </div>
     }
   </p-dialog>
+
+  <!-- Outside the details dialog, so a long form or a map is not clipped by its scroll container. -->
+  <app-task-preview-dialog [(visible)]="previewVisible" [taskId]="taskId()" [submissionId]="previewSubmissionId()" />
+
+  <app-task-answer-map-dialog [(visible)]="answerMapVisible" [point]="answerMapPoint()" [label]="answerMapLabel()" />
 </ng-container>

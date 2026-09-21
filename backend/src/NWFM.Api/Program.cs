@@ -53,8 +53,9 @@ builder.Services.AddScoped<IWorkflowOutcomeHandler, StandaloneOutcomeHandler>();
 builder.Services.AddScoped<TenantScopeFilter>();
 
 var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>() ?? [];
+// Content-Disposition is exposed so a cross-origin client can read a report's file name.
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials()));
+    p.WithOrigins(corsOrigins).AllowAnyMethod().AllowAnyHeader().AllowCredentials().WithExposedHeaders("Content-Disposition")));
 
 builder.Services.AddControllers(o => o.Filters.AddService<TenantScopeFilter>())
     .AddApplicationPart(typeof(Workflow.Api.Controllers.WorkItemsController).Assembly)

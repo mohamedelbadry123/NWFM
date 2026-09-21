@@ -41,6 +41,9 @@ public sealed record CreateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string? DepartmentCode { get; init; }
     public int? FillSlaHours { get; init; }
     public int? CompletionSlaHours { get; init; }
+
+    /// <summary>Whether approving one of its tasks that carries an FA id closes that activity in C2M.</summary>
+    public bool ClosesC2mActivity { get; init; }
 }
 
 /// <summary>
@@ -59,6 +62,9 @@ public sealed record UpdateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string? DepartmentCode { get; init; }
     public int? FillSlaHours { get; init; }
     public int? CompletionSlaHours { get; init; }
+
+    /// <summary>Whether approving one of its tasks that carries an FA id closes that activity in C2M.</summary>
+    public bool ClosesC2mActivity { get; init; }
 }
 
 /// <summary>Deactivating a type stops new tasks of it; tasks already raised carry on.</summary>
@@ -141,6 +147,7 @@ public sealed class CreateTaskTypeCommandHandler(
                 request.CompletionSlaHours,
                 TaskWrites.Actor(user),
                 timeProvider.GetUtcNow().UtcDateTime);
+            type.SetClosesC2mActivity(request.ClosesC2mActivity, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime);
         }
         catch (DomainException ex)
         {
@@ -190,6 +197,7 @@ public sealed class UpdateTaskTypeCommandHandler(
                 request.CompletionSlaHours,
                 TaskWrites.Actor(user),
                 timeProvider.GetUtcNow().UtcDateTime);
+            type.SetClosesC2mActivity(request.ClosesC2mActivity, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime);
 
             await db.SaveChangesAsync(ct);
         }

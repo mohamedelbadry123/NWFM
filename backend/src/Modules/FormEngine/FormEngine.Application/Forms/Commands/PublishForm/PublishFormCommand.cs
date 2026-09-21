@@ -8,7 +8,7 @@ namespace FormEngine.Application.Forms.Commands.PublishForm;
 
 /// <summary>
 /// Freezes the working schema into a new version: registers its data names in the field catalog and
-/// adds their columns to <c>FE.Submissions</c>. A data name already registered under another type is
+/// adds their columns to the form's submissions table. A data name already registered under another type is
 /// refused with a conflict, and nothing is changed.
 /// </summary>
 [Authorize(Policy = NwfmPolicies.ManageForms)]

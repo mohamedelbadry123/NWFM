@@ -324,6 +324,12 @@ export class FormBuilderStore {
       return base;
     }
 
+    // Only written when set, so a form with no C2M role exports exactly as before.
+    const c2mName = element.c2m_parameter_name?.trim() || null;
+    if (c2mName) {
+      base['c2m_parameter_name'] = c2mName;
+    }
+
     base['default_value'] = element.default_value;
     base['default_value_mode'] = element.default_value_mode;
     base['required'] = element.required;
@@ -351,12 +357,23 @@ export class FormBuilderStore {
       base['allow_other'] = element.allow_other;
       base['multiple'] = element.type === ELEMENT_TYPES.MultipleChoice;
       base['parent_field'] = element.parent_field;
-      base['choices'] = element.choices.map((choice) => ({
-        value: choice.value,
-        label_en: choice.label_en,
-        label_ar: choice.label_ar,
-        dependency_value: choice.dependency_value,
-      }));
+      base['choices'] = element.choices.map((choice) => {
+        const row: Record<string, unknown> = {
+          value: choice.value,
+          label_en: choice.label_en,
+          label_ar: choice.label_ar,
+          dependency_value: choice.dependency_value,
+        };
+        const status = choice.c2m_fa_status?.trim();
+        if (status) {
+          row['c2m_fa_status'] = status;
+        }
+        const reason = choice.c2m_reason?.trim();
+        if (reason) {
+          row['c2m_reason'] = reason;
+        }
+        return row;
+      });
     }
 
     if (isAttachmentType(element.type)) {

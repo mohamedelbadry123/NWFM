@@ -24,6 +24,13 @@ export const TASKS_ROUTES: Routes = [
         data: { titleKey: 'taskTypes.title', subtitleKey: 'taskTypes.subtitle' },
         loadComponent: () => import('./types/task-type-list.component').then((m) => m.TaskTypeListComponent),
       },
+      {
+        path: 'c2m-actions',
+        canActivate: [permissionGuard(PERMISSIONS.manageTaskTypes)],
+        data: { titleKey: 'c2mMappings.title', subtitleKey: 'c2mMappings.subtitle' },
+        loadComponent: () =>
+          import('./c2m/c2m-action-mapping-list.component').then((m) => m.C2mActionMappingListComponent),
+      },
     ],
   },
 ];

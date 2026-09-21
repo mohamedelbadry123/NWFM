@@ -33,6 +33,12 @@ public sealed record CreateTaskCommand : IRequest<Result<Guid>>, ITaskLocationIn
     public string Priority { get; init; } = TaskPriorities.Normal;
     public string? ExternalReference { get; init; }
 
+    /// <summary>The C2M field activity this task settles, when the work is C2M's.</summary>
+    public string? FaId { get; init; }
+
+    /// <summary>WFM's ticket for that activity.</summary>
+    public long? WfmTicketId { get; init; }
+
     public double Latitude { get; init; }
     public double Longitude { get; init; }
     public string? Address { get; init; }
@@ -56,6 +62,8 @@ public sealed class CreateTaskCommandValidator : AbstractValidator<CreateTaskCom
         RuleFor(x => x.Title).MaximumLength(FieldTask.TitleMaxLength);
         RuleFor(x => x.Notes).MaximumLength(FieldTask.NotesMaxLength);
         RuleFor(x => x.ExternalReference).MaximumLength(FieldTask.ExternalReferenceMaxLength);
+        RuleFor(x => x.FaId).MaximumLength(FieldTask.FaIdMaxLength);
+        RuleFor(x => x.WfmTicketId).GreaterThan(0).When(x => x.WfmTicketId is not null);
         RuleFor(x => x.Priority).Must(TaskPriorities.IsDefined).WithMessage("Unknown task priority.");
         Include(new TaskLocationValidator());
     }
@@ -117,6 +125,8 @@ public sealed class CreateTaskCommandHandler(
                     Notes = request.Notes,
                     Priority = request.Priority,
                     ExternalReference = request.ExternalReference,
+                    FaId = request.FaId,
+                    WfmTicketId = request.WfmTicketId,
                     Location = TaskLocationValidator.ToLocation(request, departmentCode),
                     DueDate = request.DueDate,
                     CompletionDueDate = request.CompletionDueDate,

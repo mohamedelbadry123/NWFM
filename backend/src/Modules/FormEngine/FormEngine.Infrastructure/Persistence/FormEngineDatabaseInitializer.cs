@@ -1,10 +1,12 @@
 using FormEngine.Application.Common.Interfaces;
+using FormEngine.Domain.Constants;
 using FormEngine.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Options;
+using NWFM.Shared.Persistence;
 
 namespace FormEngine.Infrastructure.Persistence;
 
@@ -35,6 +37,15 @@ public sealed class FormEngineDatabaseInitializer(
             if (_startupOptions.ApplyMigrations)
             {
                 logger.LogInformation("Applying FormEngine EF Core migrations (DatabaseStartup:ApplyMigrations=true).");
+                // History first: the module moved from the FE schema to FormEngine, and EF has to find
+                // the migrations already applied before it can run the one that moves the tables.
+                await MigrationHistorySchemaMove.RunAsync(
+                    context,
+                    FormEngineSchema.PreviousName,
+                    FormEngineSchema.Name,
+                    FormEngineSchema.MigrationsHistoryTable,
+                    context.Database.ExecuteSqlRawAsync,
+                    ct);
                 await context.Database.MigrateAsync(ct);
                 logger.LogInformation("FormEngine EF Core migrations completed.");
             }

@@ -64,11 +64,15 @@ public sealed class GetTaskFillsQueryHandler(TaskAccess access, IFormGateway for
             task.Id.ToString("D"),
             ct);
 
-        IReadOnlyList<TaskFillDto> fills = records
-            .Select(r => new TaskFillDto(r.SubmissionId, r.VersionNo, r.SubmittedBy, r.SubmittedByName, r.SubmittedDate, r.Answers))
-            .ToList();
+        var fills = new List<TaskFillDto>(records.Count);
+        foreach (var r in records)
+        {
+            // Each fill is described through the version it answered, not the task's current pin.
+            var display = await forms.DescribeAnswersAsync(task.FormDefinitionId, r.VersionNo, r.Answers, ct);
+            fills.Add(new TaskFillDto(r.SubmissionId, r.VersionNo, r.SubmittedBy, r.SubmittedByName, r.SubmittedDate, r.Answers, display));
+        }
 
-        return Result.Success(fills);
+        return Result.Success<IReadOnlyList<TaskFillDto>>(fills);
     }
 }
 

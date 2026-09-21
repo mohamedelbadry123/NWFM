@@ -309,3 +309,51 @@ html[dir="rtl"] h2 { line-height: 1.2 !important; }
     @apply text-ink-500 dark:text-ink-300;
   }
 }
+
+/* ---- Badge / tag system ------------------------------------------------
+ * One shape, six approved tones — the accent tokens in app-tokens.css. `--code` is the monospace
+ * variant for codes and version pins (`v3`). Ported from the reference styles; the task screens
+ * used the classes before they existed here, so their badges rendered as bare text.
+ */
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--acc-neutral-bg);
+  color: var(--acc-neutral-fg);
+}
+
+.app-badge--brand { background: var(--acc-brand-bg); color: var(--acc-brand-fg); }
+.app-badge--rule { background: var(--acc-rule-bg); color: var(--acc-rule-fg); }
+.app-badge--success { background: var(--acc-success-bg); color: var(--acc-success-fg); }
+.app-badge--warn { background: var(--acc-warn-bg); color: var(--acc-warn-fg); }
+.app-badge--danger { background: var(--acc-danger-bg); color: var(--acc-danger-fg); }
+.app-badge--neutral { background: var(--acc-neutral-bg); color: var(--acc-neutral-fg); }
+
+.app-badge--code {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * PrimeNG's timeline pins `direction: ltr`, so a status trail keeps its markers on the left even on
+ * an Arabic page, and it always renders the "opposite" column, parking the markers mid-width. Both
+ * are opt-in via this class — a timeline that does use an opposite template must not add it.
+ */
+.p-timeline.app-timeline-directional {
+  direction: inherit;
+}
+
+.p-timeline.app-timeline-directional .p-timeline-event-opposite {
+  display: none;
+}
+
+.p-timeline.app-timeline-directional .p-timeline-event-content {
+  text-align: start;
+}

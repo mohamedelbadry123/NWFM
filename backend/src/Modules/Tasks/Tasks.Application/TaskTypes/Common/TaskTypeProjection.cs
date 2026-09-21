@@ -40,6 +40,7 @@ internal static class TaskTypeProjection
                     DepartmentCode = type.DepartmentCode,
                     FillSlaHours = type.FillSlaHours,
                     CompletionSlaHours = type.CompletionSlaHours,
+                    ClosesC2mActivity = type.ClosesC2mActivity,
                     IsActive = type.IsActive,
                     CreatedAt = type.CreatedAt,
                     UpdatedAt = type.UpdatedAt,

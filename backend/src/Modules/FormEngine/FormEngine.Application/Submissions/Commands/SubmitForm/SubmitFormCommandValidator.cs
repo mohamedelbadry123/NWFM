@@ -24,6 +24,10 @@ public sealed class SubmitFormCommandValidator : AbstractValidator<SubmitFormCom
             .Must(x => string.IsNullOrWhiteSpace(x.ContextType) == string.IsNullOrWhiteSpace(x.ContextId))
             .WithMessage("A context needs both a type and an id, or neither.");
 
+        RuleFor(x => x.ContextType)
+            .Must(type => type is null || !FormContextTypes.OwnedByModules.Contains(type.Trim()))
+            .WithMessage(x => $"Fills for a {x.ContextType!.Trim()} are recorded through that module, not posted to the form directly.");
+
         RuleFor(x => x.Answers)
             .NotNull().WithMessage("Answers are required.")
             .Must(a => a is { Count: > 0 }).WithMessage("At least one answer is required.");

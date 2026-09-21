@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiResult, PaginatedResult } from '../api/api-result';
@@ -9,6 +9,8 @@ import {
   FillTaskPayload,
   ReturnTaskPayload,
   TASKS_PATH,
+  C2mDispatchLog,
+  C2mRetryResult,
   TaskDetail,
   TaskDetailsPayload,
   TaskFile,
@@ -69,6 +71,25 @@ export class TasksService {
 
   get(id: string): Observable<ApiResult<TaskDetail>> {
     return this.http.get<ApiResult<TaskDetail>>(`${TASKS_PATH}/${id}`);
+  }
+
+  /** The task as a PDF report in `language` (`en` or `ar`); the file name comes in Content-Disposition. */
+  exportPdf(id: string, language: string): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${TASKS_PATH}/${id}/export-pdf`, {
+      params: new HttpParams().set('language', language),
+      responseType: 'blob',
+      observe: 'response',
+    });
+  }
+
+  /** Every attempt to close the task's C2M field activity, newest first. */
+  c2mLogs(id: string): Observable<ApiResult<C2mDispatchLog[]>> {
+    return this.http.get<ApiResult<C2mDispatchLog[]>>(`${TASKS_PATH}/${id}/c2m/logs`);
+  }
+
+  /** Sends an approved task's refused or failed C2M closure again, now. */
+  retryC2m(id: string): Observable<ApiResult<C2mRetryResult>> {
+    return this.http.post<ApiResult<C2mRetryResult>>(`${TASKS_PATH}/${id}/c2m/retry`, {});
   }
 
   timeline(id: string): Observable<ApiResult<TaskHistoryEntry[]>> {

@@ -17,7 +17,7 @@ namespace FormEngine.Infrastructure.Submissions;
 /// <summary>
 /// Native-SQL form submission store. Each published form writes to its own table in the <c>FE</c>
 /// schema: fixed base columns plus one typed column per <c>data_name</c>. A column's SQL type comes
-/// from the form's own <c>FE.FormFields</c> registry, handed in on the <see cref="FormTable"/>.
+/// from the form's own <c>FormEngine.FormFields</c> registry, handed in on the <see cref="FormTable"/>.
 /// Table names are checked against the closed <c>SUB_[A-Z0-9_]+</c> alphabet and column names against
 /// the data-name rule before either reaches SQL; every value flows through a parameter.
 /// </summary>

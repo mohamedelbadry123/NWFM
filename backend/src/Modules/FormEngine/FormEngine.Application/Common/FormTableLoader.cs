@@ -6,7 +6,7 @@ namespace FormEngine.Application.Common;
 
 /// <summary>
 /// Resolves a form's submission table from its registry rows. Reads never ask SQL Server which
-/// columns exist: <c>FE.FormFields</c> is written in the same transaction that creates them, so it is
+/// columns exist: <c>FormEngine.FormFields</c> is written in the same transaction that creates them, so it is
 /// the list of columns by construction.
 /// </summary>
 public static class FormTableLoader

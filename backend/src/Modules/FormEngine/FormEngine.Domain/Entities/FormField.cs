@@ -7,7 +7,7 @@ namespace FormEngine.Domain.Entities;
 /// One column of a form's submission table: the <c>data_name</c> a published version introduced, and
 /// the builder type its column was created as. A name keeps that type for the life of its form —
 /// the column already holds values of it — but another form is free to use the same name as another
-/// type, since it writes to a table of its own. Table: <c>FE.FormFields</c>.
+/// type, since it writes to a table of its own. Table: <c>FormEngine.FormFields</c>.
 /// </summary>
 public sealed class FormField : Entity
 {

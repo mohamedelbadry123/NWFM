@@ -13,4 +13,16 @@ public static class FormContextTypes
     public const string Task = "Task";
 
     public const int MaxLength = 100;
+
+    /// <summary>
+    /// Contexts only their owning module may write, in-process through <c>IFormGateway</c> after its
+    /// own checks. The form engine's public submit endpoint refuses them: a fill posted there as
+    /// <c>Task</c> would show up as that task's fill without the task ever having been asked.
+    /// <see cref="WorkItem"/> is not listed yet — the workflow screens are meant to post through the
+    /// fill page — and joins this list once workflow records its fills through a module of its own.
+    /// </summary>
+    public static readonly IReadOnlySet<string> OwnedByModules = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        Task,
+    };
 }

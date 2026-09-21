@@ -7,7 +7,13 @@ namespace FormEngine.Domain.Constants;
 /// </summary>
 public static class FormEngineSchema
 {
-    public const string Name = "FE";
+    public const string Name = "FormEngine";
+
+    /// <summary>
+    /// The schema the module used before it was renamed. Kept so startup can carry the migration
+    /// history across and the rename migration can move what is still there.
+    /// </summary>
+    public const string PreviousName = "FE";
 
     public const string FormDefinitions = "FormDefinitions";
     public const string FormVersions = "FormVersions";

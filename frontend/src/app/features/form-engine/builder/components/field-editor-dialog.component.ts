@@ -22,7 +22,9 @@ import { RulesDialogComponent, type RuleFieldOption } from './rules-dialog.compo
 import { DefaultValueEditorComponent } from './default-value-editor.component';
 import { parseLocalDate, toLocalDate } from '../../../../shared/form-schema/form-schema-payload';
 import {
+  ACTION_TAKEN_DATA_NAME,
   BARCODE_FORMATS,
+  C2M_FA_STATUSES,
   BARCODE_FORMAT_LABELS,
   DATA_NAME_PATTERN,
   DATE_RULES,
@@ -258,6 +260,19 @@ export class FieldEditorDialogComponent {
     return el ? isAttachmentType(el.type) : false;
   });
 
+  /** Extra C2M outcome columns — only the Action Taken field's options close a field activity. */
+  protected readonly isActionTakenField = computed(
+    () => this.dataNameValue().trim() === ACTION_TAKEN_DATA_NAME,
+  );
+
+  protected readonly c2mFaStatusOptions = computed(() => {
+    this.activeLang();
+    return [
+      { value: C2M_FA_STATUSES.Completed, label: this.translate.instant('formBuilder.editor.c2mFaStatusCompleted') },
+      { value: C2M_FA_STATUSES.Cancelled, label: this.translate.instant('formBuilder.editor.c2mFaStatusCancelled') },
+    ];
+  });
+
   /** Other choice fields available as a cascading parent. */
   protected readonly parentFieldOptions = computed<RuleFieldOption[]>(() =>
     this.store
@@ -369,6 +384,8 @@ export class FieldEditorDialogComponent {
         label_en: [''],
         label_ar: [''],
         dependency_value: [null as string | null],
+        c2m_fa_status: [null as string | null],
+        c2m_reason: [null as string | null],
       }),
     );
   }
@@ -406,6 +423,8 @@ export class FieldEditorDialogComponent {
       // Trimmed because the server trims it too: a stray space here would leave the payload keyed
       // on 'leak_type ' while the column it must land in is 'leak_type'.
       data_name: typeof raw.data_name === 'string' ? raw.data_name.trim() : raw.data_name,
+      c2m_parameter_name:
+        typeof raw.c2m_parameter_name === 'string' ? raw.c2m_parameter_name.trim() || null : null,
       description_en: raw.description_en,
       description_ar: raw.description_ar,
       default_value: this.defaultValue(),
@@ -427,6 +446,8 @@ export class FieldEditorDialogComponent {
       parent_field: raw.parent_field || null,
       choices: ((raw.choices as Choice[] | null) ?? []).map((choice) => ({
         ...choice,
+        c2m_fa_status: typeof choice.c2m_fa_status === 'string' ? choice.c2m_fa_status.trim() || null : null,
+        c2m_reason: typeof choice.c2m_reason === 'string' ? choice.c2m_reason.trim() || null : null,
       })),
       max_files: raw.max_files ?? null,
       max_file_size_mb: raw.max_file_size_mb ?? null,
@@ -469,6 +490,7 @@ export class FieldEditorDialogComponent {
         label_en: [element.label_en],
         label_ar: [element.label_ar],
         data_name: [element.data_name],
+        c2m_parameter_name: [element.c2m_parameter_name ?? null],
         description_en: [element.description_en],
         description_ar: [element.description_ar],
         default_value: [element.default_value],
@@ -498,6 +520,8 @@ export class FieldEditorDialogComponent {
               label_en: [choice.label_en],
               label_ar: [choice.label_ar],
               dependency_value: [choice.dependency_value],
+              c2m_fa_status: [choice.c2m_fa_status ?? null],
+              c2m_reason: [choice.c2m_reason ?? null],
             }),
           ),
         ),

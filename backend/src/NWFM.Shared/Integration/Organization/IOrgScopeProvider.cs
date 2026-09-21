@@ -30,7 +30,25 @@ public interface IOrgDirectory
 
     /// <summary>Every active team with its coverage, for deciding who may take a piece of work.</summary>
     Task<IReadOnlyList<OrgTeamCoverage>> GetActiveTeamsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The names of org units at one level — one of <see cref="OrgLevels"/> or
+    /// <see cref="OrgUnitLevels.Department"/> — keyed by code, case-insensitively. Unknown codes are
+    /// simply absent. Work carries codes; this is for printing them as a person reads them.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, OrgUnitName>> GetUnitNamesAsync(
+        string level,
+        IReadOnlyCollection<string> codes,
+        CancellationToken cancellationToken);
 }
+
+/// <summary>The unit levels <see cref="IOrgDirectory.GetUnitNamesAsync"/> names beyond the territory ones.</summary>
+public static class OrgUnitLevels
+{
+    public const string Department = nameof(Department);
+}
+
+public sealed record OrgUnitName(string Code, string NameEn, string NameAr);
 
 public sealed record OrgTeamInfo(Guid Id, string Name, string? Mobile, bool IsActive);
 

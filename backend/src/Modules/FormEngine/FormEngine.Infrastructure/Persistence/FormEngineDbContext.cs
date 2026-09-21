@@ -10,7 +10,7 @@ namespace FormEngine.Infrastructure.Persistence;
 /// <summary>
 /// The FormEngine module's own context, in the <c>FE</c> schema. It does not map the per-form
 /// submission tables: each grows a column per published field, so they are created and widened by
-/// native SQL instead of by a migration (see <c>IFormSubmissionStore</c>). <c>FE.FormFields</c> is the
+/// native SQL instead of by a migration (see <c>IFormSubmissionStore</c>). <c>FormEngine.FormFields</c> is the
 /// EF-side record of what those tables hold.
 /// </summary>
 public sealed class FormEngineDbContext(DbContextOptions<FormEngineDbContext> options)

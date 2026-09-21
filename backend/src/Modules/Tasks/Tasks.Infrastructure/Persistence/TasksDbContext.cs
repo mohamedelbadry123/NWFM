@@ -17,6 +17,8 @@ public sealed class TasksDbContext(DbContextOptions<TasksDbContext> options) : D
     public DbSet<FieldTask> Tasks => Set<FieldTask>();
     public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
     public DbSet<TaskStatusHistory> TaskStatusHistory => Set<TaskStatusHistory>();
+    public DbSet<C2mActionMapping> C2mActionMappings => Set<C2mActionMapping>();
+    public DbSet<C2mDispatchLog> C2mDispatchLogs => Set<C2mDispatchLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

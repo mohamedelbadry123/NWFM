@@ -21,6 +21,7 @@ public sealed class TaskTypeConfiguration : IEntityTypeConfiguration<TaskType>
         builder.Property(x => x.DepartmentCode).HasMaxLength(TaskType.DepartmentCodeMaxLength);
         builder.Property(x => x.CreatedBy).HasMaxLength(TaskType.ActorMaxLength);
         builder.Property(x => x.UpdatedBy).HasMaxLength(TaskType.ActorMaxLength);
+        builder.Property(x => x.ClosesC2mActivity).HasDefaultValue(false);
         builder.Property(x => x.RowVersion).IsRowVersion();
 
         builder.HasIndex(x => x.Code).IsUnique();
@@ -47,6 +48,8 @@ public sealed class FieldTaskConfiguration : IEntityTypeConfiguration<FieldTask>
         builder.Property(x => x.Title).HasMaxLength(FieldTask.TitleMaxLength);
         builder.Property(x => x.Notes).HasMaxLength(FieldTask.NotesMaxLength);
         builder.Property(x => x.ExternalReference).HasMaxLength(FieldTask.ExternalReferenceMaxLength);
+        builder.Property(x => x.FaId).HasMaxLength(FieldTask.FaIdMaxLength);
+        builder.Property(x => x.C2mStatus).HasMaxLength(20);
         builder.Property(x => x.AdditionalDataJson).IsRequired().HasDefaultValue("{}");
         builder.Property(x => x.Address).HasMaxLength(FieldTask.AddressMaxLength);
         builder.Property(x => x.CbuCode).HasMaxLength(FieldTask.OrgCodeMaxLength);
@@ -74,6 +77,10 @@ public sealed class FieldTaskConfiguration : IEntityTypeConfiguration<FieldTask>
         builder.HasIndex(x => x.FormDefinitionId);
         builder.HasIndex(x => x.CreatedAt);
         builder.HasIndex(x => x.DueDate);
+        builder.HasIndex(x => x.FaId).HasFilter("[FaId] IS NOT NULL");
+
+        // The background sender's queue: approved tasks whose closure is still pending.
+        builder.HasIndex(x => new { x.C2mStatus, x.C2mLastAttemptAt }).HasFilter("[C2mStatus] IS NOT NULL");
 
         builder.HasOne<TaskType>()
             .WithMany()
@@ -131,5 +138,47 @@ public sealed class TaskStatusHistoryConfiguration : IEntityTypeConfiguration<Ta
         builder.Property(x => x.Note).HasMaxLength(TaskStatusHistory.NoteMaxLength);
 
         builder.HasIndex(x => new { x.FieldTaskId, x.ChangedDate });
+    }
+}
+
+public sealed class C2mActionMappingConfiguration : IEntityTypeConfiguration<C2mActionMapping>
+{
+    public void Configure(EntityTypeBuilder<C2mActionMapping> builder)
+    {
+        builder.ToTable(TasksSchema.C2mActionMappings, TasksSchema.Name);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.ActionCode).HasMaxLength(C2mActionMapping.CodeMaxLength).IsRequired();
+        builder.Property(x => x.FaStatus).HasMaxLength(1).IsRequired();
+        builder.Property(x => x.CancelReason).HasMaxLength(C2mActionMapping.ReasonMaxLength);
+        builder.Property(x => x.ClosureReason).HasMaxLength(C2mActionMapping.ReasonMaxLength);
+        builder.Property(x => x.NameEn).HasMaxLength(C2mActionMapping.NameMaxLength).IsRequired();
+        builder.Property(x => x.NameAr).HasMaxLength(C2mActionMapping.NameMaxLength).IsRequired();
+        builder.Property(x => x.CreatedBy).HasMaxLength(C2mActionMapping.ActorMaxLength);
+        builder.Property(x => x.UpdatedBy).HasMaxLength(C2mActionMapping.ActorMaxLength);
+
+        builder.HasIndex(x => x.ActionCode).IsUnique();
+    }
+}
+
+public sealed class C2mDispatchLogConfiguration : IEntityTypeConfiguration<C2mDispatchLog>
+{
+    public void Configure(EntityTypeBuilder<C2mDispatchLog> builder)
+    {
+        builder.ToTable(TasksSchema.C2mDispatchLogs, TasksSchema.Name);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.FaId).HasMaxLength(C2mDispatchLog.FaIdMaxLength).IsRequired();
+        builder.Property(x => x.OpStatus).HasMaxLength(1).IsRequired();
+        builder.Property(x => x.Status).HasMaxLength(20).IsRequired();
+        builder.Property(x => x.RequestJson).IsRequired();
+        builder.Property(x => x.ResponseCode).HasMaxLength(C2mDispatchLog.ResponseCodeMaxLength);
+        builder.Property(x => x.ErrorMessage).HasMaxLength(C2mDispatchLog.ErrorMaxLength);
+
+        // A loose reference, like the assignments' team: the log outlives nothing it needs a cascade for.
+        builder.HasIndex(x => new { x.TaskId, x.AttemptNumber }).IsUnique();
+        builder.HasIndex(x => x.FaId);
     }
 }

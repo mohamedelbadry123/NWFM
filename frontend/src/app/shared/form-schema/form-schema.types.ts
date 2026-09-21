@@ -188,7 +188,29 @@ export interface Choice {
   label_ar: string;
   /** Parent option value that activates this option (cascading). Null = always. */
   dependency_value: string | null;
+  /**
+   * C2M `FAStatus` for this option when the field is `wfm_action_taken`: `C` or `X`.
+   * Null = not set; the closure falls back to the C2M action mapping table, then the built-in rule.
+   */
+  c2m_fa_status?: string | null;
+  /**
+   * Optional reason sent with the status: the cancel reason when `X` (defaults to `value` when
+   * blank), the closure reason when `C`.
+   */
+  c2m_reason?: string | null;
 }
+
+/**
+ * The one field whose options carry a C2M close outcome. Matches `C2mFieldNames.ActionTaken` on the
+ * server — a task closes its C2M field activity with whatever the chosen option says.
+ */
+export const ACTION_TAKEN_DATA_NAME = 'wfm_action_taken';
+
+/** The two outcomes C2M accepts when a field activity closes. */
+export const C2M_FA_STATUSES = {
+  Completed: 'C',
+  Cancelled: 'X',
+} as const;
 
 export interface ValidationPattern {
   regex: string;
@@ -217,6 +239,11 @@ export interface FormElement {
   label_en: string;
   label_ar: string;
   data_name: string;
+  /**
+   * C2M `ParameterName` this field's answer is sent under when a task closes its field activity in
+   * C2M. Empty = not sent. Distinct from `data_name` (`wfm_building_units` → `CM_BUNIT`).
+   */
+  c2m_parameter_name?: string | null;
   description_en: string;
   description_ar: string;
 

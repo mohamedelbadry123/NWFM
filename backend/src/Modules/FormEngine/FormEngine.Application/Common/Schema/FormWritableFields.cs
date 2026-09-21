@@ -1,7 +1,7 @@
 namespace FormEngine.Application.Common.Schema;
 
 /// <summary>
-/// Every name a schema can write to <c>FE.Submissions</c>, with the field type its column is built
+/// Every name a schema can write to the form's submissions table, with the field type its column is built
 /// from: one per field, plus a <c>&lt;data_name&gt;_other</c> companion for each choice field offering
 /// "Other" (see <see cref="FormChoiceOther"/>), which holds free text and so is typed as <c>text</c>.
 /// </summary>

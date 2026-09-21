@@ -47,6 +47,11 @@ public static class TasksActionResults
             return StatusCodes.Status409Conflict;
         }
 
+        if (TaskErrors.Unavailable.Contains(code))
+        {
+            return StatusCodes.Status503ServiceUnavailable;
+        }
+
         return TaskErrors.Forbidden.Contains(code)
             ? StatusCodes.Status403Forbidden
             : StatusCodes.Status400BadRequest;
