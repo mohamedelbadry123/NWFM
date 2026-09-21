@@ -4,7 +4,7 @@ public sealed class TeamOtpChallenge
 {
     public string UserId { get; init; } = default!;
     public string UserName { get; init; } = default!;
-    public long TeamId { get; init; }
+    public Guid TeamId { get; init; }
     public string? Mobile { get; init; }
     public string OtpHash { get; init; } = default!;
     public int Attempts { get; set; }

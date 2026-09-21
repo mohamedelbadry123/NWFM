@@ -17,6 +17,7 @@ internal static class AuthErrors
         new("Auth.UnknownRoles", $"Unknown role(s): {string.Join(", ", roles)}.");
     public static readonly Error CrewRoleNotAllowed =
         new("Auth.CrewRoleNotAllowed", "The FieldTeam role cannot be assigned from user administration.");
+    public static readonly Error TeamLoginNotFound = new("Auth.TeamLoginNotFound", "The team has no login.");
 }
 
 /// <summary>
@@ -215,6 +216,91 @@ public sealed class UserAccountService(
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(AuthErrors.UnknownRoles(unknown));
     }
+
+    public async Task<Result<string>> CreateTeamLoginAsync(NewTeamLogin login, CancellationToken ct)
+    {
+        var userCode = login.UserCode.Trim();
+
+        if (await userManager.FindByNameAsync(userCode) is not null)
+            return Result<string>.Failure(AuthErrors.UserAlreadyExists(userCode));
+
+        var user = new ApplicationUser
+        {
+            UserName = userCode,
+            Email = string.IsNullOrWhiteSpace(login.Email) ? null : login.Email.Trim(),
+            PhoneNumber = string.IsNullOrWhiteSpace(login.PhoneNumber) ? null : login.PhoneNumber.Trim(),
+            TeamId = login.TeamId
+        };
+
+        var created = await userManager.CreateAsync(user, login.Password);
+        if (!created.Succeeded)
+            return Failed(created);
+
+        var assigned = await userManager.AddToRoleAsync(user, Roles.FieldTeam);
+        if (!assigned.Succeeded)
+        {
+            // An account with a team but no crew role cannot sign in as the crew; do not leave one.
+            await userManager.DeleteAsync(user);
+            return Failed(assigned);
+        }
+
+        return Result<string>.Success(user.Id.ToString());
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, TeamLogin>> GetTeamLoginsAsync(
+        IReadOnlyCollection<Guid> teamIds, CancellationToken ct)
+    {
+        if (teamIds.Count == 0)
+            return new Dictionary<Guid, TeamLogin>();
+
+        var ids = teamIds.Select(id => (Guid?)id).ToList();
+
+        var users = await userManager.Users
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.TeamId))
+            .ToListAsync(ct);
+
+        return users
+            .GroupBy(x => x.TeamId!.Value)
+            .ToDictionary(g => g.Key, g => ToTeamLogin(g.OrderBy(u => u.UserName).First()));
+    }
+
+    public async Task<Result<string>> UpdateTeamLoginAsync(
+        Guid teamId, string? email, string? phoneNumber, bool isEnabled, CancellationToken ct)
+    {
+        var user = await FindTeamLoginAsync(teamId, ct);
+        if (user is null)
+            return Result<string>.Failure(AuthErrors.TeamLoginNotFound);
+
+        user.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+
+        var updated = await userManager.UpdateAsync(user);
+        if (!updated.Succeeded)
+            return Failed(updated);
+
+        return await SetUserEnabledAsync(user.Id.ToString(), isEnabled, ct);
+    }
+
+    public async Task<Result<string>> ResetTeamLoginPasswordAsync(Guid teamId, string newPassword, CancellationToken ct)
+    {
+        var user = await FindTeamLoginAsync(teamId, ct);
+        return user is null
+            ? Result<string>.Failure(AuthErrors.TeamLoginNotFound)
+            : await ResetPasswordAsync(user.Id.ToString(), newPassword, ct);
+    }
+
+    private Task<ApplicationUser?> FindTeamLoginAsync(Guid teamId, CancellationToken ct) =>
+        userManager.Users.OrderBy(x => x.UserName).FirstOrDefaultAsync(x => x.TeamId == teamId, ct);
+
+    private static TeamLogin ToTeamLogin(ApplicationUser user) => new()
+    {
+        UserId = user.Id.ToString(),
+        UserCode = user.UserName ?? string.Empty,
+        Email = user.Email,
+        PhoneNumber = user.PhoneNumber,
+        IsEnabled = user.LockoutEnd is null || user.LockoutEnd <= DateTimeOffset.UtcNow
+    };
 
     private async Task<HashSet<Guid>> RoleUserIdsAsync(string role)
     {

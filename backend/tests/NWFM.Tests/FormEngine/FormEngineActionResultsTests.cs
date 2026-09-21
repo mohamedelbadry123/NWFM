@@ -14,7 +14,7 @@ public sealed class FormEngineActionResultsTests
     [InlineData(FormEngineErrors.Codes.VersionNotFound, 404)]
     [InlineData(FormEngineErrors.Codes.SubmissionNotFound, 404)]
     [InlineData(FormEngineErrors.Codes.FormDuplicateCode, 409)]
-    [InlineData(FormEngineErrors.Codes.FieldCatalogTypeConflict, 409)]
+    [InlineData(FormEngineErrors.Codes.FieldTypeConflict, 409)]
     [InlineData(FormEngineErrors.Codes.FormNotPublished, 409)]
     [InlineData(FormEngineErrors.Codes.FileNotDeletable, 409)]
     [InlineData(FormEngineErrors.Codes.FileForbidden, 403)]

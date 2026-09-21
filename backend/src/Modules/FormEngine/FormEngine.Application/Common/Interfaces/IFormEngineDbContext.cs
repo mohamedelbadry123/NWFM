@@ -8,7 +8,7 @@ public interface IFormEngineDbContext
 {
     DbSet<FormDefinition> FormDefinitions { get; }
     DbSet<FormVersion> FormVersions { get; }
-    DbSet<FieldCatalogEntry> FieldCatalog { get; }
+    DbSet<FormField> FormFields { get; }
     DbSet<SubmissionFile> SubmissionFiles { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);

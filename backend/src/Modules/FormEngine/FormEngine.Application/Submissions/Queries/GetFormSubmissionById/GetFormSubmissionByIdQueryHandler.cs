@@ -1,5 +1,7 @@
+using FormEngine.Application.Common;
 using FormEngine.Application.Common.Interfaces;
 using FormEngine.Application.Constants;
+using FormEngine.Application.Submissions.Common;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Results;
@@ -20,10 +22,14 @@ public sealed class GetFormSubmissionByIdQueryHandler(
             return Result.Failure<IReadOnlyDictionary<string, object?>>(FormEngineErrors.Form.NotFound);
         }
 
-        var row = await submissionStore.GetByIdAsync(request.FormDefinitionId, request.SubmissionId, ct);
+        var table = await FormTableLoader.LoadAsync(context, request.FormDefinitionId, ct);
+
+        var row = table is null
+            ? null
+            : await submissionStore.GetByIdAsync(table, request.SubmissionId, ct);
 
         return row is null
             ? Result.Failure<IReadOnlyDictionary<string, object?>>(FormEngineErrors.Submission.NotFound)
-            : Result.Success(row);
+            : Result.Success(SubmissionRows.WithForm(row, request.FormDefinitionId));
     }
 }

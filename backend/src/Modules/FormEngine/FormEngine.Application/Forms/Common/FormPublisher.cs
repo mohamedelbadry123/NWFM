@@ -19,6 +19,13 @@ public sealed class FormPublisher(
     ICacheService cache,
     TimeProvider timeProvider) : IFormPublisher
 {
+    /// <summary>
+    /// The most answer columns one form's table may hold, across all its versions. SQL Server caps a
+    /// table at 1,024 columns and an in-row record at 8,060 bytes; fixed-width columns (a DECIMAL is
+    /// 13 bytes) count in full against the second, so the practical ceiling sits well below the first.
+    /// </summary>
+    public const int MaxStoredFields = 500;
+
     /// <summary>Appended to a companion's labels so the catalog list reads as what it is.</summary>
     private const string OtherLabelSuffixEn = " (other)";
 
@@ -65,47 +72,56 @@ public sealed class FormPublisher(
             return Result.Failure<FormDefinition>(nameError);
         }
 
-        var catalogEntries = CatalogEntries(schema).ToList();
+        var candidates = FieldCandidates(schema).ToList();
 
         await using var transaction = await context.BeginTransactionIfNoneAsync(cancellationToken);
 
         try
         {
-            // Serialises publishes: two forms introducing the same data_name at once must not both
-            // pass the catalog check and then race to create the column.
-            await submissionStore.AcquireSchemaLockAsync(cancellationToken);
+            // Two publishes of this form at once must not both pass the type check and then race to
+            // alter its table. Publishes of other forms touch other tables and do not wait.
+            await submissionStore.AcquireLockAsync(FormStorageLocks.Form(form.Id), cancellationToken);
 
-            var existing = await LoadCatalogAsync(catalogEntries, cancellationToken);
+            var existing = await LoadFieldsAsync(form.Id, cancellationToken);
 
-            // Every conflict is found before anything is added, so a refused publish leaves the
+            // Every refusal is found before anything is changed, so a refused publish leaves the
             // change tracker exactly as it found it.
-            foreach (var entry in catalogEntries)
+            foreach (var candidate in candidates)
             {
-                if (existing.TryGetValue(entry.DataName, out var known)
-                    && !string.Equals(known.FieldType, entry.FieldType, StringComparison.OrdinalIgnoreCase))
+                if (existing.TryGetValue(candidate.DataName, out var known)
+                    && !string.Equals(known.FieldType, candidate.FieldType, StringComparison.OrdinalIgnoreCase))
                 {
                     return Result.Failure<FormDefinition>(
-                        FormEngineErrors.FieldCatalog.TypeConflict(entry.DataName, known.FieldType, entry.FieldType));
+                        FormEngineErrors.Field.TypeConflict(candidate.DataName, known.FieldType, candidate.FieldType));
                 }
             }
 
-            foreach (var entry in catalogEntries.Where(entry => !existing.ContainsKey(entry.DataName)))
+            // Columns are only ever added, so the table holds every field any version has declared.
+            var storedCount = existing.Count + candidates.Count(c => !existing.ContainsKey(c.DataName));
+            if (storedCount > MaxStoredFields)
             {
-                context.FieldCatalog.Add(FieldCatalogEntry.Create(entry.DataName, entry.FieldType, entry.LabelEn, entry.LabelAr));
+                return Result.Failure<FormDefinition>(FormEngineErrors.Schema.TooManyFields(storedCount, MaxStoredFields));
             }
+
+            var tableName = form.SubmissionTable ?? await AllocateTableNameAsync(form.Code, cancellationToken);
+
+            var utcNow = timeProvider.GetUtcNow().UtcDateTime;
 
             var snapshots = new[]
             {
                 new FormVersionSnapshot(FormTargetClients.Formly, form.SchemaJson, BuildSnapshotJson(form)),
             };
 
-            form.Publish(publishedBy, snapshots, timeProvider.GetUtcNow().UtcDateTime);
+            form.Publish(publishedBy, snapshots, utcNow);
+            form.AssignSubmissionTable(tableName);
+
+            Register(form.Id, form.CurrentVersionNo!.Value, candidates, existing, utcNow);
 
             await context.SaveChangesAsync(cancellationToken);
 
             // Inside the same transaction: SQL Server DDL is transactional, so a column that fails to
             // add rolls the version back with it instead of leaving a version nobody can submit to.
-            await submissionStore.ReconcileTableAsync(schema, cancellationToken);
+            await submissionStore.EnsureFormTableAsync(TableOf(form.Id, tableName, existing.Values), cancellationToken);
 
             if (transaction is not null)
             {
@@ -124,6 +140,76 @@ public sealed class FormPublisher(
         await cache.RemoveAsync(CacheKeys.FormEngine.FieldCatalog, cancellationToken);
 
         return Result.Success(form);
+    }
+
+    public async Task<Result> EnsureStorageAsync(Guid formDefinitionId, CancellationToken cancellationToken)
+    {
+        var form = await context.FormDefinitions
+            .FirstOrDefaultAsync(x => x.Id == formDefinitionId, cancellationToken);
+
+        if (form is null)
+        {
+            return Result.Failure(FormEngineErrors.Form.NotFound);
+        }
+
+        if (!form.HasPublishedVersion)
+        {
+            return Result.Success();
+        }
+
+        var versions = await context.FormVersions
+            .AsNoTracking()
+            .Where(v => v.FormDefinitionId == form.Id && v.TargetClient == FormTargetClients.Formly)
+            .OrderBy(v => v.VersionNo)
+            .Select(v => new { v.VersionNo, v.SchemaJson })
+            .ToListAsync(cancellationToken);
+
+        await using var transaction = await context.BeginTransactionIfNoneAsync(cancellationToken);
+
+        try
+        {
+            await submissionStore.AcquireLockAsync(FormStorageLocks.Form(form.Id), cancellationToken);
+
+            var existing = await LoadFieldsAsync(form.Id, cancellationToken);
+            var utcNow = timeProvider.GetUtcNow().UtcDateTime;
+
+            // Oldest first, so a field's column is typed by the version that introduced it — which is
+            // what the values already written under that version were.
+            foreach (var version in versions)
+            {
+                var candidates = FieldCandidates(FormSchemaParser.Parse(version.SchemaJson))
+                    .Where(c => FormDataName.IsValid(c.DataName) && !FormSubmissionColumns.IsBase(c.DataName))
+                    .Where(c => !existing.TryGetValue(c.DataName, out var known)
+                        || string.Equals(known.FieldType, c.FieldType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                Register(form.Id, version.VersionNo, candidates, existing, utcNow);
+            }
+
+            var tableName = form.SubmissionTable ?? await AllocateTableNameAsync(form.Code, cancellationToken);
+            form.AssignSubmissionTable(tableName);
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            await submissionStore.EnsureFormTableAsync(TableOf(form.Id, tableName, existing.Values), cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(FormEngineErrors.Form.ConcurrencyConflict);
+        }
+        catch (DomainException ex)
+        {
+            return Result.Failure(FormEngineErrors.Form.Invalid(ex.Message));
+        }
+
+        await cache.RemoveAsync(CacheKeys.FormEngine.FieldCatalog, cancellationToken);
+
+        return Result.Success();
     }
 
     /// <summary>
@@ -165,38 +251,98 @@ public sealed class FormPublisher(
         return duplicates.Count > 0 ? FormEngineErrors.Schema.DuplicateDataName(duplicates) : null;
     }
 
-    private async Task<Dictionary<string, FieldCatalogEntry>> LoadCatalogAsync(
-        IReadOnlyCollection<CatalogCandidate> entries,
-        CancellationToken cancellationToken)
+    private async Task<Dictionary<string, FormField>> LoadFieldsAsync(Guid formDefinitionId, CancellationToken cancellationToken)
     {
-        var names = entries.Select(e => e.DataName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-
-        var existing = await context.FieldCatalog
-            .Where(c => names.Contains(c.DataName))
+        var fields = await context.FormFields
+            .Where(f => f.FormDefinitionId == formDefinitionId)
             .ToListAsync(cancellationToken);
 
-        return existing.ToDictionary(c => c.DataName, StringComparer.OrdinalIgnoreCase);
+        return fields.ToDictionary(f => f.DataName, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// The names this form registers: its own fields, plus a <c>&lt;data_name&gt;_other</c> companion for
-    /// each choice field offering "Other". The companion is a real column carrying the typed free text,
-    /// so it belongs in the catalog like any other name — which is also what makes the type-conflict
-    /// check cover it.
+    /// Records <paramref name="candidates"/> as declared by <paramref name="versionNo"/>: a known field
+    /// is marked as still in use, a new one is added. <paramref name="known"/> is updated in place, so
+    /// it describes the whole table afterwards.
     /// </summary>
-    private static IEnumerable<CatalogCandidate> CatalogEntries(FormSchema schema)
+    private void Register(
+        Guid formDefinitionId,
+        int versionNo,
+        IEnumerable<FieldCandidate> candidates,
+        Dictionary<string, FormField> known,
+        DateTime utcNow)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (known.TryGetValue(candidate.DataName, out var field))
+            {
+                field.SeenIn(versionNo, candidate.LabelEn, candidate.LabelAr, utcNow);
+                continue;
+            }
+
+            field = FormField.Create(
+                formDefinitionId,
+                candidate.DataName,
+                candidate.FieldType,
+                candidate.LabelEn,
+                candidate.LabelAr,
+                candidate.IsCompanion,
+                versionNo,
+                utcNow);
+
+            context.FormFields.Add(field);
+            known[field.DataName] = field;
+        }
+    }
+
+    /// <summary>
+    /// The first name for the form's code that no other form holds. Serialised across every form,
+    /// because two codes can collapse to one name (<c>A-B</c> and <c>A_B</c>) and would otherwise both
+    /// claim it and fail on the unique index.
+    /// </summary>
+    private async Task<string> AllocateTableNameAsync(string formCode, CancellationToken cancellationToken)
+    {
+        await submissionStore.AcquireLockAsync(FormStorageLocks.TableNaming, cancellationToken);
+
+        var baseName = FormSubmissionTableName.For(formCode);
+
+        var taken = await context.FormDefinitions
+            .AsNoTracking()
+            .Where(f => f.SubmissionTable != null && f.SubmissionTable.StartsWith(baseName))
+            .Select(f => f.SubmissionTable!)
+            .ToListAsync(cancellationToken);
+
+        var used = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+
+        return FormSubmissionTableName.Candidates(formCode).FirstOrDefault(name => !used.Contains(name))
+            ?? throw new DomainException($"No free submission table name is left for form code '{formCode}'.");
+    }
+
+    private static FormTable TableOf(Guid formDefinitionId, string tableName, IEnumerable<FormField> fields) =>
+        FormTable.Create(
+            formDefinitionId,
+            tableName,
+            fields.Select(f => new KeyValuePair<string, string>(f.DataName, f.FieldType)));
+
+    /// <summary>
+    /// The columns this schema needs: its own fields, plus a <c>&lt;data_name&gt;_other</c> companion for
+    /// each choice field offering "Other". The companion carries the typed free text, so it is a real
+    /// column and is registered — and type-checked — like any other.
+    /// </summary>
+    private static IEnumerable<FieldCandidate> FieldCandidates(FormSchema schema)
     {
         foreach (var field in schema.Fields)
         {
-            yield return new CatalogCandidate(field.DataName, field.FieldType, field.LabelEn, field.LabelAr);
+            yield return new FieldCandidate(field.DataName, field.FieldType, field.LabelEn, field.LabelAr, IsCompanion: false);
 
             if (FormChoiceOther.NeedsCompanion(field))
             {
-                yield return new CatalogCandidate(
+                yield return new FieldCandidate(
                     FormChoiceOther.KeyFor(field.DataName),
                     FormElementTypes.Text,
                     Suffixed(field.LabelEn, OtherLabelSuffixEn),
-                    Suffixed(field.LabelAr, OtherLabelSuffixAr));
+                    Suffixed(field.LabelAr, OtherLabelSuffixAr),
+                    IsCompanion: true);
             }
         }
     }
@@ -213,5 +359,10 @@ public sealed class FormPublisher(
             category = form.Category,
         });
 
-    private sealed record CatalogCandidate(string DataName, string FieldType, string? LabelEn, string? LabelAr);
+    private sealed record FieldCandidate(
+        string DataName,
+        string FieldType,
+        string? LabelEn,
+        string? LabelAr,
+        bool IsCompanion);
 }

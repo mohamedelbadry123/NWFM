@@ -1,0 +1,158 @@
+<ng-container *translateContext="let t">
+  <p-dialog
+    [visible]="visible()"
+    (visibleChange)="visible.set($event)"
+    (onShow)="onShow()"
+    [header]="t('tasks.create.title')"
+    [modal]="true"
+    [maximizable]="true"
+    [draggable]="true"
+    [resizable]="false"
+    [style]="{ width: '620px' }"
+    [breakpoints]="{ '680px': '95vw' }"
+  >
+    <form [formGroup]="form" class="flex flex-col gap-4">
+      <div class="flex flex-col gap-2">
+        <label for="task-type" class="text-sm font-medium">
+          {{ t('tasks.fields.taskType') }} <span class="text-red-500">*</span>
+        </label>
+        <p-select
+          inputId="task-type"
+          formControlName="taskTypeId"
+          [options]="typeOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [filter]="true"
+          filterBy="label"
+          [loading]="loadingOptions()"
+          [placeholder]="t('tasks.create.typePlaceholder')"
+          (onChange)="onTypeChange($event.value)"
+          appendTo="body"
+          styleClass="w-full"
+        />
+        @if (form.controls.taskTypeId.touched && form.controls.taskTypeId.invalid) {
+          <small class="text-red-500">{{ t('tasks.validation.typeRequired') }}</small>
+        }
+        @if (selectedType(); as type) {
+          <small class="text-surface-500">
+            {{ t('tasks.create.formHint', { form: type.formCode, version: type.formCurrentVersionNo }) }}
+            @if (type.fillSlaHours) {
+              · {{ t('tasks.create.slaHint', { hours: type.fillSlaHours }) }}
+            }
+          </small>
+        } @else {
+          <small class="text-surface-500">{{ t('tasks.create.publishedOnlyHint') }}</small>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="flex flex-col gap-2 sm:col-span-2">
+          <label for="task-title" class="text-sm font-medium">{{ t('tasks.fields.title') }}</label>
+          <input pInputText id="task-title" formControlName="title" class="w-full" />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-number" class="text-sm font-medium">{{ t('tasks.fields.taskNumber') }}</label>
+          <input pInputText id="task-number" formControlName="taskNumber" class="w-full" [placeholder]="t('tasks.create.numberPlaceholder')" />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-reference" class="text-sm font-medium">{{ t('tasks.fields.externalReference') }}</label>
+          <input pInputText id="task-reference" formControlName="externalReference" class="w-full" />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-priority" class="text-sm font-medium">{{ t('tasks.fields.priority') }}</label>
+          <p-select
+            inputId="task-priority"
+            formControlName="priority"
+            [options]="priorityOptions()"
+            optionLabel="label"
+            optionValue="value"
+            appendTo="body"
+            styleClass="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-department" class="text-sm font-medium">{{ t('tasks.fields.department') }}</label>
+          <p-select
+            inputId="task-department"
+            formControlName="departmentCode"
+            [options]="departments()"
+            optionLabel="label"
+            optionValue="value"
+            [filter]="true"
+            filterBy="label"
+            [showClear]="true"
+            [loading]="loadingOptions()"
+            appendTo="body"
+            styleClass="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-due-date" class="text-sm font-medium">{{ t('tasks.fields.fillDueDate') }}</label>
+          <p-datepicker
+            inputId="task-due-date"
+            formControlName="dueDate"
+            dateFormat="yy-mm-dd"
+            [showTime]="true"
+            [showIcon]="true"
+            appendTo="body"
+            styleClass="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label for="task-completion-due" class="text-sm font-medium">{{ t('tasks.fields.completionDueDate') }}</label>
+          <p-datepicker
+            inputId="task-completion-due"
+            formControlName="completionDueDate"
+            dateFormat="yy-mm-dd"
+            [showTime]="true"
+            [showIcon]="true"
+            appendTo="body"
+            styleClass="w-full"
+          />
+        </div>
+
+        <div class="flex flex-col gap-2 sm:col-span-2">
+          <label for="task-notes" class="text-sm font-medium">{{ t('tasks.fields.notes') }}</label>
+          <textarea pTextarea id="task-notes" formControlName="notes" rows="2" class="w-full"></textarea>
+        </div>
+      </div>
+    </form>
+
+    <div class="mt-4 flex flex-col gap-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+      <span class="text-sm font-semibold">{{ t('tasks.fields.location') }}</span>
+      <app-org-scope-selector
+        mode="single"
+        [initialLocation]="locationSeed()"
+        [disabled]="saving()"
+        (locationChange)="onLocationChange($event)"
+      />
+    </div>
+
+    <div class="mt-4 flex flex-col gap-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+      <span class="text-sm font-semibold">
+        {{ t('tasks.fields.coordinates') }} <span class="text-red-500">*</span>
+      </span>
+      <app-geo-map [value]="locationPoint()" (valueChange)="onLocationPointChange($event)" height="300px" />
+      @if (locationTouched() && locationPoint() == null) {
+        <small class="text-red-500">{{ t('tasks.validation.coordinatesRequired') }}</small>
+      }
+    </div>
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="t('common.cancel')" severity="secondary" [text]="true" [disabled]="saving()" (onClick)="cancel()" />
+      <p-button
+        [label]="t('common.create')"
+        icon="pi pi-check"
+        [loading]="saving()"
+        [disabled]="saving()"
+        (onClick)="save()"
+      />
+    </ng-template>
+  </p-dialog>
+</ng-container>

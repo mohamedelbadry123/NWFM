@@ -32,6 +32,10 @@
     <ProjectReference Include="..\..\src\Modules\FormEngine\FormEngine.Application\FormEngine.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\FormEngine\FormEngine.Infrastructure\FormEngine.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\FormEngine\FormEngine.Api\FormEngine.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Domain\Tasks.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Application\Tasks.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Infrastructure\Tasks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Api\Tasks.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -6,7 +6,7 @@ public sealed class UserDetailDto
     public string UserName { get; init; } = default!;
     public string? Email { get; init; }
     public string? PhoneNumber { get; init; }
-    public long? TeamId { get; init; }
+    public Guid? TeamId { get; init; }
     public bool IsEnabled { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = [];
     public IReadOnlyList<OrgScopeAssignmentDto> Scopes { get; init; } = [];

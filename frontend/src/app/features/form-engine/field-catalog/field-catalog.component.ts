@@ -8,20 +8,21 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 import { FieldCatalogService } from '../../../core/form-engine/field-catalog.service';
 import { FieldCatalogItem } from '../../../core/form-engine/form-engine.models';
 
 /**
- * Every canonical field name and the type its stored column is built on.
+ * Every data name in use across the published forms, and the type it is stored as.
  *
- * Read-only by design: a name's type is fixed the moment it is first published, because changing it
- * would change what every existing answer under that name means. Names are added by publishing a
- * form that uses them.
+ * Read-only by design: names are added by publishing a form that uses them. Each form stores its
+ * answers in a table of its own, so a name can mean different types in different forms — allowed,
+ * and flagged here, because those answers are then not comparable across the forms.
  */
 @Component({
   selector: 'app-field-catalog',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, InputTextModule, TableModule, TagModule],
+  imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, InputTextModule, TableModule, TagModule, TooltipModule],
   template: `
     <div class="card mt-4">
       <p-table
@@ -61,21 +62,36 @@ import { FieldCatalogItem } from '../../../core/form-engine/form-engine.models';
             <th>{{ 'fieldCatalog.fieldType' | translate }}</th>
             <th>{{ 'fieldCatalog.labelEn' | translate }}</th>
             <th>{{ 'fieldCatalog.labelAr' | translate }}</th>
+            <th class="text-center">{{ 'fieldCatalog.formCount' | translate }}</th>
           </tr>
         </ng-template>
 
         <ng-template pTemplate="body" let-entry>
           <tr>
             <td class="font-mono text-sm">{{ entry.dataName }}</td>
-            <td><p-tag [value]="'formBuilder.types.' + entry.fieldType | translate" severity="secondary" /></td>
+            <td>
+              <div class="flex flex-wrap items-center gap-1">
+                @for (type of typesOf(entry); track type) {
+                  <p-tag [value]="'formBuilder.types.' + type | translate" severity="secondary" />
+                }
+                @if (entry.hasTypeConflict) {
+                  <p-tag
+                    [value]="'fieldCatalog.typeConflict' | translate"
+                    severity="warn"
+                    [pTooltip]="'fieldCatalog.typeConflictHint' | translate"
+                  />
+                }
+              </div>
+            </td>
             <td>{{ entry.labelEn || '—' }}</td>
             <td dir="rtl">{{ entry.labelAr || '—' }}</td>
+            <td class="text-center">{{ entry.formCount }}</td>
           </tr>
         </ng-template>
 
         <ng-template pTemplate="emptymessage">
           <tr>
-            <td colspan="4" class="p-6 text-center opacity-70">{{ 'fieldCatalog.empty' | translate }}</td>
+            <td colspan="5" class="p-6 text-center opacity-70">{{ 'fieldCatalog.empty' | translate }}</td>
           </tr>
         </ng-template>
       </p-table>
@@ -83,6 +99,11 @@ import { FieldCatalogItem } from '../../../core/form-engine/form-engine.models';
   `,
 })
 export class FieldCatalogComponent {
+  /** Every type the name is stored as; an older API answers with the single type only. */
+  protected typesOf(entry: FieldCatalogItem): string[] {
+    return entry.fieldTypes?.length ? entry.fieldTypes : [entry.fieldType];
+  }
+
   private readonly catalog = inject(FieldCatalogService);
   private readonly destroyRef = inject(DestroyRef);
 

@@ -36,6 +36,18 @@ internal static class FormEngineTestData
         }
         """;
 
+    /// <summary><see cref="SimpleSchema"/>'s field plus a second — what a republish adding a field looks like.</summary>
+    public const string TwoFieldSchema = """
+    {
+      "name_en": "Simple Form",
+      "name_ar": "نموذج بسيط",
+      "elements": [
+        { "type": "numeric", "data_name": "meter_reading", "label_en": "Reading", "label_ar": "القراءة" },
+        { "type": "numeric", "data_name": "depth_m", "label_en": "Depth", "label_ar": "العمق" }
+      ]
+    }
+    """;
+
     /// <summary>
     /// A section holding a required text field, a choice with "Other", and a hidden field — enough to
     /// exercise flattening, companions and inherited visibility.

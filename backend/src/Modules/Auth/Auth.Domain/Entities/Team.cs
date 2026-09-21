@@ -42,6 +42,16 @@ public sealed class Team : Entity
         SetUpdated(DateTime.UtcNow);
     }
 
+    public void Update(string name, string? mobile)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("A team must have a name.");
+
+        Name = name.Trim();
+        Mobile = string.IsNullOrWhiteSpace(mobile) ? null : mobile.Trim();
+        SetUpdated(DateTime.UtcNow);
+    }
+
     public void Activate()
     {
         IsActive = true;

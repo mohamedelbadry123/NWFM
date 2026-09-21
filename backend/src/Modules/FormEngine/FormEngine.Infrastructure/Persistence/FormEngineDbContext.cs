@@ -8,16 +8,17 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace FormEngine.Infrastructure.Persistence;
 
 /// <summary>
-/// The FormEngine module's own context, in the <c>FE</c> schema. It does not map
-/// <c>FE.Submissions</c>: that table grows a column per published field, so it is created and
-/// widened by native SQL instead of by a migration (see <c>IFormSubmissionStore</c>).
+/// The FormEngine module's own context, in the <c>FE</c> schema. It does not map the per-form
+/// submission tables: each grows a column per published field, so they are created and widened by
+/// native SQL instead of by a migration (see <c>IFormSubmissionStore</c>). <c>FE.FormFields</c> is the
+/// EF-side record of what those tables hold.
 /// </summary>
 public sealed class FormEngineDbContext(DbContextOptions<FormEngineDbContext> options)
     : DbContext(options), IFormEngineDbContext
 {
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormVersion> FormVersions => Set<FormVersion>();
-    public DbSet<FieldCatalogEntry> FieldCatalog => Set<FieldCatalogEntry>();
+    public DbSet<FormField> FormFields => Set<FormField>();
     public DbSet<SubmissionFile> SubmissionFiles => Set<SubmissionFile>();
 
     public async Task<IDbContextTransaction?> BeginTransactionIfNoneAsync(CancellationToken ct = default) =>

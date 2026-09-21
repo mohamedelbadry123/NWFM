@@ -18,6 +18,9 @@ public sealed class FormDefinition : Entity
     public const int DepartmentCodeMaxLength = 50;
     public const int ActorMaxLength = 256;
 
+    /// <summary>SQL Server's identifier limit.</summary>
+    public const int SubmissionTableMaxLength = 128;
+
     private const string EmptySchema = "{}";
 
     private readonly List<FormVersion> _versions = [];
@@ -64,6 +67,13 @@ public sealed class FormDefinition : Entity
 
     /// <summary>The latest published version, or null while the form has never been published.</summary>
     public int? CurrentVersionNo { get; private set; }
+
+    /// <summary>
+    /// The table this form's submissions are written to, in the <c>FE</c> schema. Named at the first
+    /// publish and fixed from then on: the rows already written live there, so renaming it would
+    /// orphan them. Null while the form has never been published.
+    /// </summary>
+    public string? SubmissionTable { get; private set; }
 
     /// <summary>
     /// The working form-builder document (<c>name_en</c>/<c>name_ar</c>/<c>elements</c>). This is the
@@ -211,6 +221,36 @@ public sealed class FormDefinition : Entity
         Status = FormStatuses.Published;
         Touch(publishedBy, utcNow);
         return primary!;
+    }
+
+    /// <summary>
+    /// Names the table the form's submissions go to. Idempotent for the name already held; refuses a
+    /// different one, since the rows already written would be left behind in the old table.
+    /// </summary>
+    public void AssignSubmissionTable(string tableName)
+    {
+        if (string.IsNullOrWhiteSpace(tableName))
+        {
+            throw new DomainException("A submission table must have a name.");
+        }
+
+        if (tableName.Length > SubmissionTableMaxLength)
+        {
+            throw new DomainException($"A submission table name cannot exceed {SubmissionTableMaxLength} characters.");
+        }
+
+        if (SubmissionTable is not null)
+        {
+            if (!string.Equals(SubmissionTable, tableName, StringComparison.Ordinal))
+            {
+                throw new DomainException(
+                    $"Form '{Code}' already stores its submissions in '{SubmissionTable}' and cannot move to '{tableName}'.");
+            }
+
+            return;
+        }
+
+        SubmissionTable = tableName;
     }
 
     public void Deprecate(string? updatedBy, DateTime utcNow)

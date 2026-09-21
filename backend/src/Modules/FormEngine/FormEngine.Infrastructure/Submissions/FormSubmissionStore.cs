@@ -15,62 +15,35 @@ using NWFM.Shared.Exceptions;
 namespace FormEngine.Infrastructure.Submissions;
 
 /// <summary>
-/// Native-SQL form submission store. Every form writes to the one shared <c>FE.Submissions</c> table:
-/// fixed base columns plus one nullable column per <c>data_name</c>, separated by
-/// <c>FormDefinitionId</c>. A column's SQL type comes from the canonical <c>FE.FieldCatalog</c> entry,
-/// so a <c>data_name</c> can never hold two different types. Identifiers are whitelisted against the
-/// form's own field set and wrapped with <c>[]</c>; all values flow through parameters.
+/// Native-SQL form submission store. Each published form writes to its own table in the <c>FE</c>
+/// schema: fixed base columns plus one typed column per <c>data_name</c>. A column's SQL type comes
+/// from the form's own <c>FE.FormFields</c> registry, handed in on the <see cref="FormTable"/>.
+/// Table names are checked against the closed <c>SUB_[A-Z0-9_]+</c> alphabet and column names against
+/// the data-name rule before either reaches SQL; every value flows through a parameter.
 /// </summary>
 public sealed partial class FormSubmissionStore(FormEngineDbContext context, SqlStatementStore sql) : IFormSubmissionStore
 {
-    /// <summary>What <c>OBJECT_ID</c> is asked about.</summary>
-    private static readonly string TableName = $"{FormEngineSchema.Name}.{FormEngineSchema.Submissions}";
-
     private static readonly IReadOnlyList<string> BaseColumns = FormSubmissionColumns.All;
 
-    /// <summary>
-    /// Base columns that a table created by an older build may lack. Reconciliation adds them the
-    /// same way it adds a form's field columns — nullable, never altering existing rows.
-    /// </summary>
-    private static readonly (string Column, string SqlType)[] AddableBaseColumns =
+    /// <summary>The indexes every submission table carries: name pattern, and the statement that creates it.</summary>
+    private static readonly (string NamePattern, string Statement)[] Indexes =
     [
-        (FormSubmissionColumns.ContextType, "NVARCHAR(100)"),
-        (FormSubmissionColumns.ContextId, "NVARCHAR(100)"),
-        (FormSubmissionColumns.SubmittedByName, "NVARCHAR(256)"),
-        (FormSubmissionColumns.ClientSubmissionId, "UNIQUEIDENTIFIER"),
-    ];
-
-    /// <summary>Indexes the table carries, and the statement that creates each.</summary>
-    private static readonly (string Name, string Statement)[] Indexes =
-    [
-        ("IX_FE_Submissions_Form_SubmittedDate", "CreateFormIndex"),
-        ("IX_FE_Submissions_Context", "CreateContextIndex"),
-        ("UX_FE_Submissions_ClientSubmissionId", "CreateClientSubmissionIndex"),
+        ("IX_{0}_SubmittedDate", "CreateSubmittedDateIndex"),
+        ("IX_{0}_Context", "CreateContextIndex"),
+        ("UX_{0}_ClientSubmissionId", "CreateClientSubmissionIndex"),
     ];
 
     /// <summary>SQL Server's duplicate-key errors: a unique index and a unique constraint.</summary>
     private static readonly int[] DuplicateKeyErrors = [2601, 2627];
 
-    public async Task EnsureTableAsync(CancellationToken cancellationToken)
-    {
-        await OpenAsync(cancellationToken);
-        try
-        {
-            await EnsureTableCoreAsync(cancellationToken);
-        }
-        finally
-        {
-            await CloseAsync();
-        }
-    }
-
-    public async Task AcquireSchemaLockAsync(CancellationToken cancellationToken)
+    public async Task AcquireLockAsync(string resource, CancellationToken cancellationToken)
     {
         await OpenAsync(cancellationToken);
         try
         {
             using var command = CreateCommand();
-            command.CommandText = sql.Get("AcquireSchemaLock");
+            command.CommandText = sql.Get("AcquireLock");
+            AddParameter(command, "@resource", resource);
 
             var result = await command.ExecuteScalarAsync(cancellationToken);
             var status = result is null or DBNull ? -1 : Convert.ToInt32(result, CultureInfo.InvariantCulture);
@@ -79,7 +52,7 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
             if (status < 0)
             {
                 throw new InvalidOperationException(
-                    "Timed out waiting for the submission table lock. Another publish is in progress.");
+                    $"Timed out waiting for the '{resource}' lock. Another publish is in progress.");
             }
         }
         finally
@@ -88,30 +61,48 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         }
     }
 
-    public async Task ReconcileTableAsync(FormSchema schema, CancellationToken cancellationToken)
+    public async Task EnsureFormTableAsync(FormTable table, CancellationToken cancellationToken)
     {
-        // Resolved before the connection is opened — this runs an EF query of its own.
-        var columns = await MapColumnsAsync(schema, cancellationToken);
+        var target = Target.Of(table);
 
         await OpenAsync(cancellationToken);
         try
         {
-            await EnsureTableCoreAsync(cancellationToken);
-
-            foreach (var (column, type) in columns)
+            if (!await TableExistsAsync(target, cancellationToken))
             {
-                if (await ColumnExistsAsync(column, cancellationToken))
+                await ExecuteAsync(Statement("CreateTable", target), cancellationToken);
+            }
+
+            // One catalog read rather than one per column: a form can carry hundreds of fields.
+            var existing = await LoadPhysicalColumnsAsync(target, cancellationToken);
+
+            foreach (var (column, fieldType) in table.FieldTypes)
+            {
+                var sqlType = SqlTypeFor(fieldType);
+
+                if (existing.Contains(column))
                 {
                     // A field type's column can grow between builds — geolocation gained an address,
                     // so a 100-character column no longer holds the answer. Widening here is what
                     // keeps a table created by an older build writable.
-                    await WidenIfNarrowerAsync(column, type, cancellationToken);
+                    await WidenIfNarrowerAsync(target, column, sqlType, cancellationToken);
                     continue;
                 }
 
                 await ExecuteAsync(
-                    sql.Get("AddColumn").Replace("{column}", Quote(column)).Replace("{type}", type),
+                    Statement("AddColumn", target).Replace("{column}", Quote(column)).Replace("{type}", sqlType),
                     cancellationToken);
+            }
+
+            // After the columns, so every index is created over columns that exist by then.
+            var indexes = await LoadIndexNamesAsync(target, cancellationToken);
+
+            foreach (var (namePattern, statement) in Indexes)
+            {
+                if (!indexes.Contains(string.Format(CultureInfo.InvariantCulture, namePattern, target.Bare)))
+                {
+                    await ExecuteAsync(Statement(statement, target), cancellationToken);
+                }
             }
         }
         finally
@@ -120,13 +111,14 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         }
     }
 
-    public async Task<Guid> InsertAsync(FormSubmissionInsert submission, CancellationToken cancellationToken)
+    public async Task<Guid> InsertAsync(FormTable table, FormSubmissionInsert submission, CancellationToken cancellationToken)
     {
+        var target = Target.Of(table);
+
         // Types, not just names: a value has to be handed to ADO as the CLR type its column was
         // created with, since the client speaks the form builder's vocabulary ('yes' for a yes/no
         // field) while the column is a BIT.
-        var fieldTypes = await ResolveFieldTypesAsync(submission.Schema, cancellationToken);
-        var accepted = Accept(submission.Answers, fieldTypes);
+        var accepted = Accept(submission.Answers, table.FieldTypes);
 
         var columnsBuilder = new StringBuilder();
         var paramsBuilder = new StringBuilder();
@@ -136,7 +128,6 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         {
             using var command = CreateCommand();
 
-            AddParameter(command, "@formDefinitionId", submission.FormDefinitionId);
             AddParameter(command, "@versionNo", submission.VersionNo);
             AddParameter(command, "@status", FormSubmissionStatuses.Submitted);
             AddParameter(command, "@contextType", submission.ContextType);
@@ -154,11 +145,11 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
                 var paramName = "@p" + index.ToString(CultureInfo.InvariantCulture);
                 columnsBuilder.Append(", ").Append(Quote(key));
                 paramsBuilder.Append(", ").Append(paramName);
-                AddParameter(command, paramName, CoerceForColumn(fieldTypes[key], key, value));
+                AddParameter(command, paramName, CoerceForColumn(table.FieldTypes[key], key, value));
                 index++;
             }
 
-            command.CommandText = sql.Get("Insert")
+            command.CommandText = Statement("Insert", target)
                 .Replace("{columns}", columnsBuilder.ToString())
                 .Replace("{params}", paramsBuilder.ToString());
 
@@ -177,78 +168,24 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         }
     }
 
-    public async Task UpdateAnswersAsync(
-        Guid formDefinitionId,
-        Guid submissionId,
-        FormSchema schema,
-        IReadOnlyDictionary<string, object?> answers,
-        CancellationToken cancellationToken)
-    {
-        var fieldTypes = await ResolveFieldTypesAsync(schema, cancellationToken);
-        var accepted = Accept(answers, fieldTypes);
-
-        // No accepted key means no SET clause, and `UPDATE ... SET WHERE` is a syntax error. Nothing
-        // to write is not a failure, so return rather than build an invalid statement.
-        if (accepted.Count == 0)
-        {
-            return;
-        }
-
-        var assignments = new StringBuilder();
-
-        await OpenAsync(cancellationToken);
-        try
-        {
-            using var command = CreateCommand();
-
-            AddParameter(command, "@submissionId", submissionId);
-            AddParameter(command, "@formDefinitionId", formDefinitionId);
-
-            var index = 0;
-            foreach (var (key, value) in accepted)
-            {
-                var paramName = "@p" + index.ToString(CultureInfo.InvariantCulture);
-
-                if (index > 0)
-                {
-                    assignments.Append(", ");
-                }
-
-                assignments.Append(Quote(key)).Append(" = ").Append(paramName);
-                AddParameter(command, paramName, CoerceForColumn(fieldTypes[key], key, value));
-                index++;
-            }
-
-            command.CommandText = sql.Get("UpdateAnswers").Replace("{assignments}", assignments.ToString());
-
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-        finally
-        {
-            await CloseAsync();
-        }
-    }
-
     public async Task<IReadOnlyDictionary<string, object?>?> GetByIdAsync(
-        Guid formDefinitionId,
+        FormTable table,
         Guid submissionId,
         CancellationToken cancellationToken)
     {
-        var allowed = await LoadColumnWhitelistAsync(formDefinitionId, cancellationToken);
+        var target = Target.Of(table);
 
         await OpenAsync(cancellationToken);
         try
         {
-            if (!await TableExistsAsync(cancellationToken))
+            if (!await TableExistsAsync(target, cancellationToken))
             {
                 return null;
             }
 
             using var command = CreateCommand();
-            command.CommandText = sql.Get("GetById")
-                .Replace("{select}", await BuildSelectListAsync(allowed, cancellationToken));
+            command.CommandText = Statement("GetById", target).Replace("{select}", SelectList(table));
             AddParameter(command, "@submissionId", submissionId);
-            AddParameter(command, "@formDefinitionId", formDefinitionId);
 
             using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
@@ -261,25 +198,23 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     }
 
     public async Task<IReadOnlyDictionary<string, object?>?> GetLatestByContextAsync(
-        Guid formDefinitionId,
+        FormTable table,
         string contextType,
         string contextId,
         CancellationToken cancellationToken)
     {
-        var allowed = await LoadColumnWhitelistAsync(formDefinitionId, cancellationToken);
+        var target = Target.Of(table);
 
         await OpenAsync(cancellationToken);
         try
         {
-            if (!await TableExistsAsync(cancellationToken))
+            if (!await TableExistsAsync(target, cancellationToken))
             {
                 return null;
             }
 
             using var command = CreateCommand();
-            command.CommandText = sql.Get("GetLatestByContext")
-                .Replace("{select}", await BuildSelectListAsync(allowed, cancellationToken));
-            AddParameter(command, "@formDefinitionId", formDefinitionId);
+            command.CommandText = Statement("GetLatestByContext", target).Replace("{select}", SelectList(table));
             AddParameter(command, "@contextType", contextType);
             AddParameter(command, "@contextId", contextId);
 
@@ -294,15 +229,16 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     }
 
     public async Task<(IReadOnlyList<IReadOnlyDictionary<string, object?>> Items, int Total)> ListAsync(
+        FormTable table,
         FormSubmissionListFilter filter,
         CancellationToken cancellationToken)
     {
-        var allowed = await LoadColumnWhitelistAsync(filter.FormDefinitionId, cancellationToken);
+        var target = Target.Of(table);
 
         await OpenAsync(cancellationToken);
         try
         {
-            if (!await TableExistsAsync(cancellationToken))
+            if (!await TableExistsAsync(target, cancellationToken))
             {
                 return ([], 0);
             }
@@ -310,20 +246,16 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
             int total;
             using (var countCommand = CreateCommand())
             {
-                countCommand.CommandText = sql.Get("CountByForm");
-                AddParameter(countCommand, "@formDefinitionId", filter.FormDefinitionId);
+                countCommand.CommandText = Statement("Count", target);
                 AddParameter(countCommand, "@contextType", filter.ContextType);
                 AddParameter(countCommand, "@contextId", filter.ContextId);
                 total = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
             }
 
-            var selectList = await BuildSelectListAsync(allowed, cancellationToken);
-
             var items = new List<IReadOnlyDictionary<string, object?>>();
             using (var listCommand = CreateCommand())
             {
-                listCommand.CommandText = sql.Get("ListByForm").Replace("{select}", selectList);
-                AddParameter(listCommand, "@formDefinitionId", filter.FormDefinitionId);
+                listCommand.CommandText = Statement("List", target).Replace("{select}", SelectList(table));
                 AddParameter(listCommand, "@contextType", filter.ContextType);
                 AddParameter(listCommand, "@contextId", filter.ContextId);
                 AddParameter(listCommand, "@skip", (filter.PageNumber - 1) * filter.PageSize);
@@ -345,24 +277,24 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     }
 
     public async Task<Guid?> FindByClientIdAsync(
-        Guid formDefinitionId,
+        FormTable table,
         Guid clientSubmissionId,
         CancellationToken cancellationToken)
     {
+        var target = Target.Of(table);
+
         await OpenAsync(cancellationToken);
         try
         {
-            // A database that has never taken a submission has no table to search, which is a
-            // "not seen before" answer rather than a failure.
-            if (!await TableExistsAsync(cancellationToken)
-                || !await ColumnExistsAsync(FormSubmissionColumns.ClientSubmissionId, cancellationToken))
+            // A form that has never taken a submission may have no table yet, which is a "not seen
+            // before" answer rather than a failure.
+            if (!await TableExistsAsync(target, cancellationToken))
             {
                 return null;
             }
 
             using var command = CreateCommand();
-            command.CommandText = sql.Get("GetIdByClientId");
-            AddParameter(command, "@formDefinitionId", formDefinitionId);
+            command.CommandText = Statement("GetIdByClientId", target);
             AddParameter(command, "@clientSubmissionId", clientSubmissionId);
 
             var result = await command.ExecuteScalarAsync(cancellationToken);
@@ -375,36 +307,8 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         }
     }
 
-    /// <summary>Creates the table, its late-added base columns and its indexes when any are missing.</summary>
-    private async Task EnsureTableCoreAsync(CancellationToken cancellationToken)
-    {
-        if (!await TableExistsAsync(cancellationToken))
-        {
-            await ExecuteAsync(sql.Get("CreateTable"), cancellationToken);
-        }
-
-        foreach (var (column, type) in AddableBaseColumns)
-        {
-            if (!await ColumnExistsAsync(column, cancellationToken))
-            {
-                await ExecuteAsync(
-                    sql.Get("AddColumn").Replace("{column}", Quote(column)).Replace("{type}", type),
-                    cancellationToken);
-            }
-        }
-
-        // After the columns, so every index is created over columns that exist by then.
-        foreach (var (name, statement) in Indexes)
-        {
-            if (!await IndexExistsAsync(name, cancellationToken))
-            {
-                await ExecuteAsync(sql.Get(statement), cancellationToken);
-            }
-        }
-    }
-
     /// <summary>
-    /// The answers that may be written: known to the schema, a legal identifier, and each column only
+    /// The answers that may be written: known to the table, a legal identifier, and each column only
     /// once. Case-insensitive, because SQL Server column names are — two keys differing only in case
     /// would otherwise produce the same column twice in one statement.
     /// </summary>
@@ -415,7 +319,7 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         return answers
-            // Trimmed to match the column even though the submit slice normalises keys first: this is
+            // Trimmed to match the column even though the submit path normalises keys first: this is
             // a public store, and a caller that skipped that step would otherwise have its answers
             // dropped in silence rather than written.
             .Select(kvp => (Key: kvp.Key.Trim(), kvp.Value))
@@ -424,158 +328,49 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     }
 
     /// <summary>
-    /// Base columns plus the form's own <c>data_name</c> columns that physically exist. Projecting
-    /// keeps a row payload to this form's fields instead of every column the shared table has
-    /// accumulated for other forms.
+    /// Base columns plus the form's registered answer columns. The registry is written in the same
+    /// transaction that creates the columns, so it lists exactly what the table holds — no need to ask
+    /// SQL Server on every read.
     /// </summary>
-    private async Task<string> BuildSelectListAsync(IReadOnlySet<string> allowed, CancellationToken cancellationToken)
+    private static string SelectList(FormTable table)
     {
-        var existing = await LoadPhysicalColumnsAsync(cancellationToken);
-
-        var selected = new List<string>(BaseColumns.Count + allowed.Count);
-        selected.AddRange(BaseColumns.Where(existing.Contains).Select(Quote));
-        selected.AddRange(allowed
-            .Where(column => existing.Contains(column) && !FormSubmissionColumns.IsBase(column))
+        var selected = new List<string>(BaseColumns.Count + table.FieldTypes.Count);
+        selected.AddRange(BaseColumns.Select(Quote));
+        selected.AddRange(table.FieldTypes.Keys
+            .Where(column => !FormSubmissionColumns.IsBase(column) && IsValidIdentifier(column))
             .Select(Quote));
 
-        return selected.Count == 0 ? "*" : string.Join(", ", selected);
+        return string.Join(", ", selected);
     }
 
-    private async Task<HashSet<string>> LoadPhysicalColumnsAsync(CancellationToken cancellationToken)
+    private async Task<HashSet<string>> LoadPhysicalColumnsAsync(Target target, CancellationToken cancellationToken) =>
+        await ReadNamesAsync("ColumnNames", target, cancellationToken);
+
+    private async Task<HashSet<string>> LoadIndexNamesAsync(Target target, CancellationToken cancellationToken) =>
+        await ReadNamesAsync("IndexNames", target, cancellationToken);
+
+    private async Task<HashSet<string>> ReadNamesAsync(string statement, Target target, CancellationToken cancellationToken)
     {
-        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         using var command = CreateCommand();
-        command.CommandText = sql.Get("ColumnNames");
-        AddParameter(command, "@tableName", TableName);
+        command.CommandText = sql.Get(statement);
+        AddParameter(command, "@tableName", target.ObjectName);
 
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            columns.Add(reader.GetString(0));
-        }
-
-        return columns;
-    }
-
-    /// <summary>
-    /// Every column any published version of this form can have written. The union matters because a
-    /// row written under version 1 may hold a field version 3 has since dropped, and a reader that
-    /// only knew the current schema would silently stop showing it.
-    /// </summary>
-    private async Task<HashSet<string>> LoadColumnWhitelistAsync(Guid formDefinitionId, CancellationToken cancellationToken)
-    {
-        var schemas = await context.FormVersions
-            .AsNoTracking()
-            .Where(v => v.FormDefinitionId == formDefinitionId && v.TargetClient == FormTargetClients.Formly)
-            .Select(v => v.SchemaJson)
-            .ToListAsync(cancellationToken);
-
-        // A form that has never been published can still be read against its working draft.
-        if (schemas.Count == 0)
-        {
-            var draft = await context.FormDefinitions
-                .AsNoTracking()
-                .Where(f => f.Id == formDefinitionId)
-                .Select(f => f.SchemaJson)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (draft is not null)
-            {
-                schemas.Add(draft);
-            }
-        }
-
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var schemaJson in schemas)
-        {
-            foreach (var (name, _) in FormWritableFields.Of(FormSchemaParser.Parse(schemaJson)))
-            {
-                names.Add(name);
-            }
+            names.Add(reader.GetString(0));
         }
 
         return names;
     }
 
-    /// <summary>
-    /// Resolves each field to the type its column is built on: the canonical <c>FE.FieldCatalog</c>
-    /// entry where the <c>data_name</c> is registered, the schema's own type otherwise. Insert and
-    /// reconciliation share this, so a value is never coerced to a type the column was not created with.
-    /// </summary>
-    private async Task<Dictionary<string, string>> ResolveFieldTypesAsync(FormSchema schema, CancellationToken cancellationToken)
-    {
-        var types = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (name, fieldType) in FormWritableFields.Of(schema))
-        {
-            types.TryAdd(name, fieldType);
-        }
-
-        if (types.Count == 0)
-        {
-            return types;
-        }
-
-        var names = types.Keys.ToList();
-
-        var canonical = await context.FieldCatalog
-            .AsNoTracking()
-            .Where(c => names.Contains(c.DataName))
-            .Select(c => new { c.DataName, c.FieldType })
-            .ToListAsync(cancellationToken);
-
-        foreach (var entry in canonical)
-        {
-            if (types.ContainsKey(entry.DataName))
-            {
-                types[entry.DataName] = entry.FieldType;
-            }
-        }
-
-        return types;
-    }
-
-    /// <summary>
-    /// Maps the schema's fields to (column, SQL type). The type is taken from the catalog so every
-    /// form sharing a <c>data_name</c> shares its column type; the field's own type is only a
-    /// fallback for a name not yet in the catalog.
-    /// </summary>
-    private async Task<IReadOnlyList<(string Column, string SqlType)>> MapColumnsAsync(
-        FormSchema schema,
-        CancellationToken cancellationToken)
-    {
-        var fieldTypes = await ResolveFieldTypesAsync(schema, cancellationToken);
-
-        return fieldTypes.Select(field => (field.Key, SqlTypeFor(field.Value))).ToList();
-    }
-
-    private async Task<bool> TableExistsAsync(CancellationToken cancellationToken)
+    private async Task<bool> TableExistsAsync(Target target, CancellationToken cancellationToken)
     {
         using var command = CreateCommand();
         command.CommandText = sql.Get("TableExists");
-        AddParameter(command, "@tableName", TableName);
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        return Convert.ToInt32(result, CultureInfo.InvariantCulture) == 1;
-    }
-
-    private async Task<bool> ColumnExistsAsync(string columnName, CancellationToken cancellationToken)
-    {
-        using var command = CreateCommand();
-        command.CommandText = sql.Get("ColumnExists");
-        AddParameter(command, "@tableName", TableName);
-        AddParameter(command, "@columnName", columnName);
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        return Convert.ToInt32(result, CultureInfo.InvariantCulture) == 1;
-    }
-
-    private async Task<bool> IndexExistsAsync(string indexName, CancellationToken cancellationToken)
-    {
-        using var command = CreateCommand();
-        command.CommandText = sql.Get("IndexExists");
-        AddParameter(command, "@tableName", TableName);
-        AddParameter(command, "@indexName", indexName);
+        AddParameter(command, "@tableName", target.ObjectName);
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(result, CultureInfo.InvariantCulture) == 1;
     }
@@ -586,6 +381,10 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         command.CommandText = commandText;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    /// <summary>A statement with its table placeholders filled in for <paramref name="target"/>.</summary>
+    private string Statement(string key, Target target) =>
+        sql.Get(key).Replace("{table}", target.Qualified).Replace("{name}", target.Bare);
 
     /// <summary>
     /// Every statement this store issues goes through here so it joins whatever transaction the caller
@@ -899,27 +698,27 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     /// Grows <paramref name="column"/> to <paramref name="sqlType"/> when it is a shorter
     /// <c>NVARCHAR</c>, or a <c>DECIMAL</c> of the same scale but lower precision, than the field now
     /// needs, and does nothing otherwise. Only widening is ever issued: it preserves every existing
-    /// row, so this can run on each reconciliation without a guard of its own.
+    /// row, so this can run on each publish without a guard of its own.
     /// </summary>
-    private async Task WidenIfNarrowerAsync(string column, string sqlType, CancellationToken cancellationToken)
+    private async Task WidenIfNarrowerAsync(Target target, string column, string sqlType, CancellationToken cancellationToken)
     {
-        if (!await IsNarrowerAsync(column, sqlType, cancellationToken))
+        if (!await IsNarrowerAsync(target, column, sqlType, cancellationToken))
         {
             return;
         }
 
         await ExecuteAsync(
-            sql.Get("AlterColumn").Replace("{column}", Quote(column)).Replace("{type}", sqlType),
+            Statement("AlterColumn", target).Replace("{column}", Quote(column)).Replace("{type}", sqlType),
             cancellationToken);
     }
 
-    private async Task<bool> IsNarrowerAsync(string column, string sqlType, CancellationToken cancellationToken)
+    private async Task<bool> IsNarrowerAsync(Target target, string column, string sqlType, CancellationToken cancellationToken)
     {
         var nvarchar = NVarCharLengthRegex().Match(sqlType);
         if (nvarchar.Success)
         {
             var wanted = int.Parse(nvarchar.Groups[1].Value, CultureInfo.InvariantCulture);
-            var current = await ColumnMaxLengthAsync(column, cancellationToken);
+            var current = await ColumnMaxLengthAsync(target, column, cancellationToken);
 
             // -1 is NVARCHAR(MAX) — already wider than any fixed length. Bytes, so two per character.
             return current is not (null or MaxLengthSentinel) && current / 2 < wanted;
@@ -930,7 +729,7 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
         {
             var wantedPrecision = int.Parse(decimalType.Groups[1].Value, CultureInfo.InvariantCulture);
             var wantedScale = int.Parse(decimalType.Groups[2].Value, CultureInfo.InvariantCulture);
-            var current = await ColumnDecimalPrecisionAsync(column, cancellationToken);
+            var current = await ColumnDecimalPrecisionAsync(target, column, cancellationToken);
 
             // A different scale is a different number, not a wider one — left alone.
             return current is (var precision, var scale) && scale == wantedScale && precision < wantedPrecision;
@@ -942,11 +741,11 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     /// <summary>What <c>sys.columns.max_length</c> reports for an unbounded column.</summary>
     private const int MaxLengthSentinel = -1;
 
-    private async Task<int?> ColumnMaxLengthAsync(string columnName, CancellationToken cancellationToken)
+    private async Task<int?> ColumnMaxLengthAsync(Target target, string columnName, CancellationToken cancellationToken)
     {
         using var command = CreateCommand();
         command.CommandText = sql.Get("ColumnMaxLength");
-        AddParameter(command, "@tableName", TableName);
+        AddParameter(command, "@tableName", target.ObjectName);
         AddParameter(command, "@columnName", columnName);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
@@ -954,11 +753,14 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     }
 
     /// <summary>Precision and scale of a <c>DECIMAL</c> column, or null when it is not one.</summary>
-    private async Task<(int Precision, int Scale)?> ColumnDecimalPrecisionAsync(string columnName, CancellationToken cancellationToken)
+    private async Task<(int Precision, int Scale)?> ColumnDecimalPrecisionAsync(
+        Target target,
+        string columnName,
+        CancellationToken cancellationToken)
     {
         using var command = CreateCommand();
         command.CommandText = sql.Get("ColumnDecimalPrecision");
-        AddParameter(command, "@tableName", TableName);
+        AddParameter(command, "@tableName", target.ObjectName);
         AddParameter(command, "@columnName", columnName);
 
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -994,4 +796,25 @@ public sealed partial class FormSubmissionStore(FormEngineDbContext context, Sql
     /// <summary>Matches <c>DECIMAL(p,s)</c>, capturing precision and scale.</summary>
     [GeneratedRegex(@"^DECIMAL\((\d+),(\d+)\)$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex DecimalPrecisionRegex();
+
+    /// <summary>
+    /// A form's table in the three shapes SQL needs it: bracket-quoted for statements, bare for index
+    /// and constraint names, and schema-dotted for <c>OBJECT_ID</c>. The name is re-checked here, the
+    /// last point before it reaches SQL, so a value edited in the database cannot become an injection.
+    /// </summary>
+    private readonly record struct Target(string Qualified, string Bare, string ObjectName)
+    {
+        public static Target Of(FormTable table)
+        {
+            if (!FormSubmissionTableName.IsValid(table.TableName))
+            {
+                throw new InvalidOperationException($"Rejected unsafe submission table name '{table.TableName}'.");
+            }
+
+            return new Target(
+                $"[{FormEngineSchema.Name}].[{table.TableName}]",
+                table.TableName,
+                $"{FormEngineSchema.Name}.{table.TableName}");
+        }
+    }
 }

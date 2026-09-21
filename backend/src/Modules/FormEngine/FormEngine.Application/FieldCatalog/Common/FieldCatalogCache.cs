@@ -8,9 +8,10 @@ using NWFM.Shared.Options;
 namespace FormEngine.Application.FieldCatalog.Common;
 
 /// <summary>
-/// Single read path for the cached field catalog. Both catalog queries come through here, so the one
-/// cached entry can never be written from two projections that have drifted apart. Publishing evicts
-/// it, which is the only thing that adds entries.
+/// Single read path for the cached field catalog. The catalog is no longer a table of its own: it is
+/// every form's field registry, grouped by data name. Both catalog queries come through here, so the
+/// one cached entry can never be written from two projections that have drifted apart. Publishing
+/// evicts it, which is the only thing that adds fields.
 /// </summary>
 internal static class FieldCatalogCache
 {
@@ -27,26 +28,53 @@ internal static class FieldCatalogCache
 
     private static async ValueTask<List<FieldCatalogItemDto>> LoadAllAsync(
         IFormEngineDbContext context,
-        CancellationToken cancellationToken) =>
-        await context.FieldCatalog
+        CancellationToken cancellationToken)
+    {
+        // Companions are columns, not names anyone types: offering "material_other" in the builder
+        // would invite a field that collides with the choice field's own free-text column.
+        var fields = await context.FormFields
             .AsNoTracking()
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.DataName)
-            .Select(c => new FieldCatalogItemDto
+            .Where(f => !f.IsCompanion)
+            .OrderBy(f => f.CreatedAt)
+            .Select(f => new
             {
-                Id = c.Id,
-                DataName = c.DataName,
-                FieldType = c.FieldType,
-                LabelEn = c.LabelEn,
-                LabelAr = c.LabelAr,
-                Description = c.Description,
+                f.Id,
+                f.FormDefinitionId,
+                f.DataName,
+                f.FieldType,
+                f.LabelEn,
+                f.LabelAr,
             })
             .ToListAsync(cancellationToken);
+
+        // Grouped in memory: the names are few, and a GroupBy that must also pick the first row's
+        // labels does not translate to SQL cleanly.
+        return fields
+            .GroupBy(f => f.DataName, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var first = group.First();
+                var types = group.Select(f => f.FieldType).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+                return new FieldCatalogItemDto
+                {
+                    Id = first.Id,
+                    DataName = first.DataName,
+                    FieldType = first.FieldType,
+                    LabelEn = group.Select(f => f.LabelEn).LastOrDefault(label => label is not null),
+                    LabelAr = group.Select(f => f.LabelAr).LastOrDefault(label => label is not null),
+                    FormCount = group.Select(f => f.FormDefinitionId).Distinct().Count(),
+                    HasTypeConflict = types.Count > 1,
+                    FieldTypes = types,
+                };
+            })
+            .OrderBy(entry => entry.DataName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     /// <summary>Matches a catalog entry against a free-text search, the way both queries do it.</summary>
     public static bool Matches(FieldCatalogItemDto entry, string term) =>
         entry.DataName.Contains(term, StringComparison.OrdinalIgnoreCase)
         || (entry.LabelEn is not null && entry.LabelEn.Contains(term, StringComparison.OrdinalIgnoreCase))
-        || (entry.LabelAr is not null && entry.LabelAr.Contains(term, StringComparison.OrdinalIgnoreCase))
-        || (entry.Description is not null && entry.Description.Contains(term, StringComparison.OrdinalIgnoreCase));
+        || (entry.LabelAr is not null && entry.LabelAr.Contains(term, StringComparison.OrdinalIgnoreCase));
 }

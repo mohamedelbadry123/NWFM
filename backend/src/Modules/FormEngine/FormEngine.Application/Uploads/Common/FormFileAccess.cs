@@ -1,3 +1,4 @@
+using FormEngine.Domain.Constants;
 using FormEngine.Domain.Entities;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Constants;
@@ -23,8 +24,15 @@ internal static class FormFileAccess
             return true;
         }
 
-        // Someone else's pending file is nobody's business; a submitted one is a reviewer's.
-        return !file.IsPending && user.HasPermission(NwfmPolicies.ViewSubmissions);
+        // Someone else's pending file is nobody's business. A submitted one is a reviewer's — and, when
+        // the fill belongs to a task, whoever can see tasks, since the task's own page shows it.
+        if (file.IsPending)
+        {
+            return false;
+        }
+
+        return user.HasPermission(NwfmPolicies.ViewSubmissions)
+            || (file.ContextType == FormContextTypes.Task && user.HasPermission(NwfmPolicies.ViewTasks));
     }
 
     private static bool IsAdministrator(ICurrentUser user) => user.IsInRole(NwfmRoles.Administrator);

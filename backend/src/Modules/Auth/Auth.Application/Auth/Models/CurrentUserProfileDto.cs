@@ -7,7 +7,7 @@ public sealed class CurrentUserProfileDto
     public string? Email { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = [];
     public IReadOnlyList<string> Permissions { get; init; } = [];
-    public long? TeamId { get; init; }
+    public Guid? TeamId { get; init; }
     public bool IsUnrestrictedScope { get; init; }
     public IReadOnlyList<AuthScopeDto> Scopes { get; init; } = [];
 }

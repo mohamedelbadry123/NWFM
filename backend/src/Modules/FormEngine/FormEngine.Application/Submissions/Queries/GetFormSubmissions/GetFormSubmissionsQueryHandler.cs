@@ -1,5 +1,7 @@
+using FormEngine.Application.Common;
 using FormEngine.Application.Common.Interfaces;
 using FormEngine.Application.Constants;
+using FormEngine.Application.Submissions.Common;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Results;
@@ -20,10 +22,19 @@ public sealed class GetFormSubmissionsQueryHandler(
             return Result.Failure<PaginatedResult<IReadOnlyDictionary<string, object?>>>(FormEngineErrors.Form.NotFound);
         }
 
+        var table = await FormTableLoader.LoadAsync(context, request.FormDefinitionId, ct);
+
+        // Never published, so nothing can have been submitted: an empty page, not an error.
+        if (table is null)
+        {
+            return Result.Success(new PaginatedResult<IReadOnlyDictionary<string, object?>>(
+                [], 0, request.PageNumber, request.PageSize));
+        }
+
         var (items, total) = await submissionStore.ListAsync(
+            table,
             new FormSubmissionListFilter
             {
-                FormDefinitionId = request.FormDefinitionId,
                 PageNumber = request.PageNumber,
                 PageSize = request.PageSize,
                 ContextType = request.ContextType,
@@ -31,7 +42,10 @@ public sealed class GetFormSubmissionsQueryHandler(
             },
             ct);
 
-        return Result.Success(
-            new PaginatedResult<IReadOnlyDictionary<string, object?>>(items, total, request.PageNumber, request.PageSize));
+        return Result.Success(new PaginatedResult<IReadOnlyDictionary<string, object?>>(
+            items.Select(row => SubmissionRows.WithForm(row, request.FormDefinitionId)).ToList(),
+            total,
+            request.PageNumber,
+            request.PageSize));
     }
 }

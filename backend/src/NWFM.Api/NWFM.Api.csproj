@@ -5,6 +5,8 @@
     <ProjectReference Include="../Modules/Auth/Auth.Infrastructure/Auth.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/FormEngine/FormEngine.Api/FormEngine.Api.csproj" />
     <ProjectReference Include="../Modules/FormEngine/FormEngine.Infrastructure/FormEngine.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Tasks/Tasks.Api/Tasks.Api.csproj" />
+    <ProjectReference Include="../Modules/Tasks/Tasks.Infrastructure/Tasks.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Api/Workflow.Api.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Infrastructure/Workflow.Infrastructure.csproj" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />

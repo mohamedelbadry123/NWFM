@@ -27,7 +27,8 @@ public static class FormEngineErrors
         public const string SchemaInvalidDataName = "FormEngine.Schema.InvalidDataName";
         public const string SchemaDuplicateDataName = "FormEngine.Schema.DuplicateDataName";
         public const string SchemaReservedDataName = "FormEngine.Schema.ReservedDataName";
-        public const string FieldCatalogTypeConflict = "FormEngine.FieldCatalog.TypeConflict";
+        public const string SchemaTooManyFields = "FormEngine.Schema.TooManyFields";
+        public const string FieldTypeConflict = "FormEngine.Field.TypeConflict";
         public const string SubmissionNotFound = "FormEngine.Submission.NotFound";
         public const string SubmissionAnswersInvalid = "FormEngine.Submission.AnswersInvalid";
         public const string SubmissionAnswerRejected = "FormEngine.Submission.AnswerRejected";
@@ -48,7 +49,7 @@ public static class FormEngineErrors
         Codes.FormInvalidStatusTransition,
         Codes.FormNotPublished,
         Codes.FormConcurrencyConflict,
-        Codes.FieldCatalogTypeConflict,
+        Codes.FieldTypeConflict,
         Codes.FileNotDeletable,
     };
 
@@ -106,13 +107,18 @@ public static class FormEngineErrors
         public static Error ReservedDataName(IEnumerable<string> names) =>
             new(Codes.SchemaReservedDataName,
                 $"Field data name '{string.Join("', '", names)}' is reserved for submission metadata. Rename the field.");
+
+        public static Error TooManyFields(int count, int max) =>
+            new(Codes.SchemaTooManyFields,
+                $"The form has {count} stored fields; a form can hold at most {max}. Split it into more than one form.");
     }
 
-    public static class FieldCatalog
+    public static class Field
     {
         public static Error TypeConflict(string dataName, string existingType, string requestedType) =>
-            new(Codes.FieldCatalogTypeConflict,
-                $"Field '{dataName}' already exists in the catalog as type '{existingType}' and cannot be reused as '{requestedType}'.");
+            new(Codes.FieldTypeConflict,
+                $"Field '{dataName}' was published in this form as type '{existingType}' and cannot become '{requestedType}': " +
+                "its column already holds answers of the first type. Give the field a new data name instead.");
     }
 
     public static class Submission

@@ -11,7 +11,7 @@ namespace FormEngine.Application.Uploads.Commands.UploadFormFile;
 /// <c>PENDING</c> with no submission; submitting the form links it. Files never travel inside the
 /// submit payload.
 /// </summary>
-[Authorize(Policy = NwfmPolicies.SubmitForms)]
+[Authorize(Policy = NwfmPolicies.FormUploaders)]
 public sealed record UploadFormFileCommand : IRequest<Result<UploadedFileDto>>
 {
     public Guid FormDefinitionId { get; init; }

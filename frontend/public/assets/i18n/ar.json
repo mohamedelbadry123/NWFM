@@ -33,7 +33,9 @@
     "english": "English",
     "arabic": "العربية",
     "toggleTheme": "تبديل المظهر",
-    "required": "مطلوب"
+    "required": "مطلوب",
+    "reset": "إعادة تعيين",
+    "apply": "تطبيق"
   },
   "error": {
     "ProcessingPurpose.NotFound": "غرض المعالجة غير موجود.",
@@ -74,11 +76,27 @@
     "FormEngine.Schema.InvalidDataName": "يجب أن يبدأ اسم الحقل بحرف أو شرطة سفلية وأن يتكوّن من حروف وأرقام وشرطات سفلية فقط.",
     "FormEngine.Schema.DuplicateDataName": "يوجد حقلان بنفس الاسم. لكل حقل اسمه الخاص.",
     "FormEngine.Schema.ReservedDataName": "هذا الاسم محجوز لبيانات الإرسالية. غيّر اسم الحقل.",
-    "FormEngine.FieldCatalog.TypeConflict": "اسم الحقل مستخدم بالفعل بنوع مختلف.",
+    "FormEngine.Field.TypeConflict": "سبق أن نشر هذا النموذج الحقل بنوع مختلف. استخدم اسم بيانات جديدًا للحقل بدلًا من ذلك.",
+    "FormEngine.Schema.TooManyFields": "يحتوي النموذج على حقول أكثر مما يمكن لنموذج واحد تخزينه. قسّمه إلى أكثر من نموذج.",
     "FormEngine.File.TooLarge": "حجم الملف أكبر من الحد المسموح.",
     "FormEngine.File.ExtensionNotAllowed": "نوع الملف غير مقبول لهذا الحقل.",
     "FormEngine.File.NotDeletable": "الملف يتبع نموذجًا مُرسلًا ولا يمكن حذفه.",
-    "FormEngine.File.Forbidden": "ليس لديك صلاحية الوصول إلى هذا الملف."
+    "FormEngine.File.Forbidden": "ليس لديك صلاحية الوصول إلى هذا الملف.",
+    "Tasks.Task.NotFound": "تعذر العثور على المهمة.",
+    "Tasks.Task.DuplicateNumber": "توجد مهمة بهذا الرقم بالفعل.",
+    "Tasks.Task.ConcurrencyConflict": "قام شخص آخر بتعديل هذه المهمة. أعد تحميلها وحاول مرة أخرى.",
+    "Tasks.Task.OutsideScope": "هذا الموقع خارج نطاقك.",
+    "Tasks.Type.NotFound": "تعذر العثور على نوع المهمة.",
+    "Tasks.Type.DuplicateCode": "يوجد نوع مهمة بهذا الرمز بالفعل.",
+    "Tasks.Type.Inactive": "نوع المهمة هذا موقوف.",
+    "Tasks.Form.NotFound": "تعذر العثور على نموذج نوع المهمة.",
+    "Tasks.Form.NotPublished": "لا يوجد إصدار منشور لنموذج نوع المهمة. انشره أولًا.",
+    "Tasks.Team.NotEligible": "هذا الفريق موقوف، أو أن نطاقه لا يغطي هذه المهمة.",
+    "Auth.TeamNotFound": "تعذر العثور على الفريق.",
+    "Auth.TeamDuplicateName": "يوجد فريق بهذا الاسم بالفعل.",
+    "Auth.UserAlreadyExists": "اسم الدخول هذا مستخدم بالفعل.",
+    "Tasks.Team.NotFound": "تعذر العثور على الفريق.",
+    "Auth.TeamLoginNotFound": "لا يوجد حساب دخول لهذا الفريق بعد."
   },
   "workflow": {
     "common": {
@@ -2012,7 +2030,11 @@
     "forms": "النماذج",
     "formsList": "إدارة النماذج",
     "fillForm": "تعبئة نموذج",
-    "fieldCatalog": "فهرس الحقول"
+    "fieldCatalog": "فهرس الحقول",
+    "fieldTasks": "المهام الميدانية",
+    "fieldTaskList": "المهام",
+    "taskTypes": "أنواع المهام",
+    "teams": "الفرق الميدانية"
   },
   "lookups": {
     "title": "البيانات المرجعية",
@@ -2082,7 +2104,9 @@
     "scope": "النطاق التنظيمي",
     "department": "القسم",
     "allDepartments": "كل الأقسام",
-    "everywhere": "كل المناطق"
+    "everywhere": "كل المناطق",
+    "filterByOrg": "تصفية حسب الجهة",
+    "filterHint": "حصر القائمة في مجموعة أو وحدة أعمال أو فرع أو منطقة عمليات. يبقى نطاقك الخاص مطبّقًا."
   },
   "admin": {
     "rolePermissions": {
@@ -2433,12 +2457,15 @@
   "fieldCatalog": {
     "title": "فهرس الحقول",
     "subtitle": "كل أسماء الحقول المستخدمة، ونوع العمود المخزّن لكل اسم.",
-    "hint": "يحتفظ الاسم بنوعه دائمًا: إعادة استخدامه في نموذج آخر تعيد استخدام العمود نفسه، وهذا ما يجعل الإجابات قابلة للمقارنة بين النماذج.",
+    "hint": "كل أسماء البيانات المستخدمة في النماذج المنشورة. إعادة استخدام الاسم تُبقي الإجابات قابلة للمقارنة بين النماذج.",
     "dataName": "اسم الحقل",
     "fieldType": "النوع",
     "labelEn": "التسمية (إنجليزي)",
     "labelAr": "التسمية (عربي)",
-    "empty": "لا توجد أسماء حقول بعد. نشر نموذج يسجّل الأسماء التي يستخدمها."
+    "empty": "لا توجد أسماء حقول بعد. نشر نموذج يسجّل الأسماء التي يستخدمها.",
+    "formCount": "النماذج",
+    "typeConflict": "أنواع مختلفة",
+    "typeConflictHint": "تخزّن النماذج هذا الاسم بأنواع مختلفة، لذا لا يمكن مقارنة إجاباته بينها."
   },
   "forms": {
     "title": "النماذج",
@@ -2543,5 +2570,257 @@
       "renderedWithVersion": "معروضة بالإصدار الذي تمت الإجابة عليه.",
       "empty": "لم يتم إرسال أي شيء بعد."
     }
+  },
+  "tasks": {
+    "title": "المهام الميدانية",
+    "subtitle": "إنشاء المهام الميدانية وإسنادها وتعبئتها ومراجعتها.",
+    "noTasks": "لا توجد مهام مطابقة.",
+    "status": {
+      "CREATED": "جديدة",
+      "ASSIGNED": "مسندة",
+      "IN_PROGRESS": "قيد التنفيذ",
+      "SUBMITTED": "معبأة",
+      "APPROVED": "مكتملة",
+      "RETURNED": "معادة",
+      "EXPIRED": "منتهية"
+    },
+    "assignmentStatus": {
+      "PENDING": "بانتظار البدء",
+      "IN_PROGRESS": "قيد التنفيذ",
+      "SUBMITTED": "معبأة",
+      "APPROVED": "مكتملة",
+      "RETURNED": "معادة",
+      "EXPIRED": "منتهية",
+      "REASSIGNED": "أعيد إسنادها"
+    },
+    "priority": {
+      "LOW": "منخفضة",
+      "NORMAL": "عادية",
+      "HIGH": "عالية",
+      "URGENT": "عاجلة"
+    },
+    "source": {
+      "MANUAL": "يدوي",
+      "API": "واجهة برمجية",
+      "IMPORT": "استيراد"
+    },
+    "returnReason": {
+      "INCOMPLETE_DATA": "بيانات ناقصة",
+      "WRONG_LOCATION": "موقع خاطئ",
+      "POOR_MEDIA": "صور أو وسائط غير واضحة",
+      "NEEDS_REVISIT": "تحتاج زيارة أخرى",
+      "OTHER": "أخرى"
+    },
+    "tags": {
+      "submittedAgain": "أعيدت تعبئتها",
+      "overdue": "متأخرة"
+    },
+    "fields": {
+      "taskNumber": "رقم المهمة",
+      "taskType": "نوع المهمة",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "title": "العنوان",
+      "branch": "الفرع",
+      "department": "الإدارة",
+      "team": "الفريق",
+      "created": "تاريخ الإنشاء",
+      "dueDate": "الاستحقاق",
+      "fills": "التعبئات",
+      "returnCount": "مرات الإعادة",
+      "returnedDate": "تاريخ الإعادة",
+      "submittedDate": "تاريخ التعبئة",
+      "externalReference": "مرجع خارجي",
+      "notes": "ملاحظات",
+      "note": "ملاحظة",
+      "fillDueDate": "موعد التعبئة",
+      "completionDueDate": "موعد المراجعة",
+      "location": "الموقع",
+      "coordinates": "الإحداثيات",
+      "address": "العنوان",
+      "source": "المصدر",
+      "sla": "مستوى الخدمة (تعبئة / مراجعة)",
+      "assigned": "الإسناد",
+      "completed": "الإكمال",
+      "expired": "الانتهاء",
+      "returnReason": "سبب الإعادة"
+    },
+    "filters": {
+      "searchPlaceholder": "الرقم أو العنوان أو المرجع",
+      "status": "الحالة",
+      "taskType": "نوع المهمة",
+      "priority": "الأولوية",
+      "source": "المصدر",
+      "returnReason": "سبب الإعادة",
+      "createdFrom": "من تاريخ",
+      "createdTo": "إلى تاريخ",
+      "clear": "مسح عوامل التصفية"
+    },
+    "actions": {
+      "newTask": "مهمة جديدة",
+      "viewDetail": "عرض التفاصيل",
+      "edit": "تعديل / نقل",
+      "assign": "إسناد",
+      "reassign": "إعادة الإسناد",
+      "fill": "تعبئة",
+      "submitFill": "إرسال",
+      "migrateVersion": "الانتقال إلى إصدار أحدث من النموذج",
+      "complete": "اعتماد",
+      "return": "إعادة",
+      "expire": "إنهاء"
+    },
+    "action": {
+      "complete": {
+        "title": "اعتماد المهمة",
+        "confirm": "اعتماد {{number}}؟ تصبح التعبئة السجل النهائي للمهمة.",
+        "success": "تم اعتماد المهمة."
+      },
+      "expire": {
+        "title": "إنهاء المهمة",
+        "confirm": "إنهاء {{number}}؟ تُغلق دون اعتماد، ولا يمكن تسجيل أي شيء عليها بعد ذلك.",
+        "success": "تم إنهاء المهمة."
+      }
+    },
+    "create": {
+      "title": "مهمة جديدة",
+      "typePlaceholder": "اختر نوع المهمة",
+      "publishedOnlyHint": "تظهر فقط الأنواع التي لنموذجها إصدار منشور.",
+      "formHint": "تُعبأ بالنموذج {{form}} الإصدار {{version}}",
+      "slaHint": "{{hours}} ساعة للتعبئة بعد الإسناد",
+      "numberPlaceholder": "اتركه فارغًا ليُولَّد تلقائيًا"
+    },
+    "edit": {
+      "title": "تعديل المهمة {{number}}",
+      "locationLocked": "عُبئت هذه المهمة، لذا موقعها ثابت — فالإجابات تصف ذلك المكان."
+    },
+    "assign": {
+      "title": "إسناد المهمة",
+      "subtitle": "إسناد {{number}} إلى فريق ميداني.",
+      "reassignHint": "سيؤدي هذا إلى سحب المهمة من {{team}}.",
+      "teamPlaceholder": "اختر الفريق",
+      "activeTasks": "{{count}} مهمة مفتوحة",
+      "noEligibleTeams": "لا يوجد فريق نشط يغطي موقع هذه المهمة. امنح أحد الفرق هذا النطاق أولًا.",
+      "slaHint": "إذا تُركت المواعيد فارغة تُحدَّد من مستوى خدمة نوع المهمة بدءًا من الآن.",
+      "notePlaceholder": "أي شيء ينبغي أن يعرفه الفريق"
+    },
+    "return": {
+      "title": "إعادة المهمة",
+      "subtitle": "إعادة {{number}} لاستكمال العمل.",
+      "reasonPlaceholder": "لماذا تُعاد؟",
+      "whatToDo": "ما المطلوب",
+      "reassignTo": "إسناد إعادة العمل إلى",
+      "sameTeam": "الفريق نفسه"
+    },
+    "fill": {
+      "title": "تعبئة المهمة",
+      "subtitle": "تُحفظ الإجابات على هذه المهمة، وتُرفع الصور والملفات فور اختيارها.",
+      "empty": "لا يحتوي نموذج المهمة على حقول.",
+      "loadFailed": "تعذر تحميل نموذج المهمة.",
+      "invalid": "بعض الإجابات تحتاج إلى مراجعة قبل الإرسال.",
+      "valid": "جاهزة للإرسال",
+      "invalidCount": "{{count}} حقل يحتاج إلى مراجعة",
+      "editingPrevious": "تعديل تعبئة {{by}} بتاريخ {{date}}.",
+      "returnedBecause": "أُعيدت: {{reason}}"
+    },
+    "detail": {
+      "title": "تفاصيل المهمة",
+      "loadFailed": "تعذر تحميل المهمة.",
+      "answers": "الإجابات",
+      "records": "التعبئات",
+      "timeline": "السجل الزمني",
+      "assignments": "الإسنادات",
+      "files": "الملفات",
+      "location": "الموقع",
+      "notFilled": "لم تتم أي تعبئة بعد.",
+      "fillBy": "عبأها {{by}} بتاريخ {{date}}",
+      "filledBy": "عبأها",
+      "version": "إصدار النموذج",
+      "viewFill": "عرض هذه التعبئة",
+      "noAssignments": "لم تُسند بعد.",
+      "noFiles": "لا توجد صور أو ملفات.",
+      "hours": "ساعة"
+    },
+    "migrateVersion": {
+      "tooltip": "الانتقال إلى إصدار النموذج {{version}}",
+      "success": "تستخدم المهمة الآن إصدار النموذج {{version}}.",
+      "failed": "تعذر نقل المهمة إلى الإصدار الأحدث من النموذج."
+    },
+    "messages": {
+      "loadFailed": "تعذر تحميل المهام.",
+      "created": "تم إنشاء المهمة.",
+      "createFailed": "تعذر إنشاء المهمة.",
+      "updated": "تم تحديث المهمة.",
+      "updateFailed": "تعذر تحديث المهمة.",
+      "assigned": "تم إسناد المهمة.",
+      "assignFailed": "تعذر إسناد المهمة.",
+      "filled": "تم إرسال التعبئة.",
+      "fillFailed": "تعذر إرسال التعبئة.",
+      "returned": "تمت إعادة المهمة."
+    },
+    "validation": {
+      "typeRequired": "اختر نوع المهمة.",
+      "coordinatesRequired": "حدد موقع المهمة على الخريطة.",
+      "teamRequired": "اختر الفريق.",
+      "reasonRequired": "اختر سبب الإعادة.",
+      "returnNoteRequired": "اذكر المطلوب."
+    }
+  },
+  "taskTypes": {
+    "title": "أنواع المهام",
+    "subtitle": "كل نوع من الأعمال الميدانية، والنموذج الذي تُعبأ به مهامه.",
+    "new": "نوع مهمة جديد",
+    "edit": "تعديل نوع المهمة",
+    "empty": "لا توجد أنواع مهام بعد.",
+    "searchPlaceholder": "الرمز أو الاسم",
+    "code": "الرمز",
+    "name": "الاسم",
+    "nameEn": "الاسم (بالإنجليزية)",
+    "nameAr": "الاسم (بالعربية)",
+    "descriptionEn": "الوصف (بالإنجليزية)",
+    "descriptionAr": "الوصف (بالعربية)",
+    "form": "النموذج",
+    "formPlaceholder": "اختر نموذجًا منشورًا",
+    "formHint": "تثبّت المهام الجديدة من هذا النوع الإصدار الحالي لهذا النموذج.",
+    "formChangeHint": "تحتفظ المهام المنشأة سابقًا بنموذجها؛ ولا يستخدم النموذج الجديد إلا المهام الجديدة.",
+    "formNotPublished": "غير منشور",
+    "formMissing": "النموذج غير موجود",
+    "sla": "مستوى الخدمة (تعبئة / مراجعة)",
+    "fillSla": "مهلة التعبئة",
+    "completionSla": "مهلة المراجعة",
+    "status": "الحالة",
+    "activate": "تفعيل",
+    "deactivate": "إيقاف",
+    "confirmActivate": "تفعيل {{name}}؟ يمكن للمهام الجديدة استخدامه مرة أخرى.",
+    "confirmDeactivate": "إيقاف {{name}}؟ لن تستخدمه أي مهام جديدة، وتستمر المهام القائمة.",
+    "codeInvalid": "استخدم الأحرف والأرقام و\"-\" و\"_\" فقط.",
+    "created": "تم إنشاء نوع المهمة.",
+    "updated": "تم تحديث نوع المهمة."
+  },
+  "teams": {
+    "title": "الفرق الميدانية",
+    "subtitle": "الفرق التي تُسند إليها المهام، وحسابات دخولها، ونطاق عمل كل منها.",
+    "new": "فريق جديد",
+    "edit": "تعديل الفريق",
+    "empty": "لا توجد فرق بعد.",
+    "searchPlaceholder": "الاسم أو الجوال",
+    "name": "الاسم",
+    "mobile": "الجوال",
+    "userCode": "رمز الدخول",
+    "territory": "النطاق",
+    "status": "الحالة",
+    "lastActive": "آخر نشاط",
+    "noScope": "بلا نطاق",
+    "activate": "تفعيل",
+    "deactivate": "إيقاف",
+    "territoryHint": "الأماكن وأنواع العمل التي يغطيها هذا الفريق، وتحدد المهام التي يمكن إسنادها إليه وما يراه منها.",
+    "nameRequired": "الاسم مطلوب.",
+    "userCodeRequired": "رمز الدخول مطلوب.",
+    "passwordTooShort": "8 أحرف على الأقل.",
+    "scopeRequired": "امنح الفريق نطاقًا واحدًا على الأقل.",
+    "resetHint": "كلمة مرور جديدة لـ {{code}}.",
+    "created": "تم إنشاء الفريق.",
+    "updated": "تم تحديث الفريق.",
+    "confirmActivate": "تفعيل {{name}}؟ يمكن لفريقه تسجيل الدخول وتلقي المهام مرة أخرى.",
+    "confirmDeactivate": "إيقاف {{name}}؟ لن يتمكن فريقه من تسجيل الدخول أو تلقي المهام."
   }
 }

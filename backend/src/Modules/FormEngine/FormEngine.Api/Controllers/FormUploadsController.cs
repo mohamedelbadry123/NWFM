@@ -24,7 +24,7 @@ namespace FormEngine.Api.Controllers;
 public sealed class FormUploadsController(ISender sender) : ControllerBase
 {
     [HttpPost]
-    [Authorize(Policy = NwfmPolicies.SubmitForms)]
+    [Authorize(Policy = NwfmPolicies.FormUploaders)]
     [ProducesResponseType(typeof(Result<UploadedFileDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Upload([FromForm] UploadFormFileRequest request, CancellationToken ct)
@@ -54,7 +54,7 @@ public sealed class FormUploadsController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{fileId:guid}")]
-    [Authorize(Policy = NwfmPolicies.SubmitForms)]
+    [Authorize(Policy = NwfmPolicies.FormUploaders)]
     [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Delete(Guid fileId, CancellationToken ct) =>

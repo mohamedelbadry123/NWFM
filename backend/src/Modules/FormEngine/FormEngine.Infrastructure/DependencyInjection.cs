@@ -1,7 +1,9 @@
 using FormEngine.Application.Common.Interfaces;
 using FormEngine.Application.Forms.Common;
+using FormEngine.Application.Submissions.Common;
 using FormEngine.Domain.Constants;
 using FormEngine.Domain.Options;
+using FormEngine.Infrastructure.Integration;
 using FormEngine.Infrastructure.Persistence;
 using FormEngine.Infrastructure.Submissions;
 using Microsoft.AspNetCore.Builder;
@@ -10,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Options;
 using NWFM.Shared.Persistence;
 using NWFM.Shared.Storage;
@@ -42,18 +45,22 @@ public static class DependencyInjection
         builder.Services.TryAddSingleton<IFileStorage, LocalFileStorage>();
         builder.Services.TryAddSingleton(TimeProvider.System);
 
-        // Holds the reloadable SQL text for the shared submissions table.
+        // Holds the reloadable SQL text for the per-form submission tables.
         builder.Services.AddSingleton<SqlStatementStore>();
         builder.Services.AddScoped<IFormSubmissionStore, FormSubmissionStore>();
         builder.Services.AddScoped<IFormPublisher, FormPublisher>();
+        builder.Services.AddScoped<IFormSubmissionService, FormSubmissionService>();
+
+        // How other modules — Tasks, a workflow task screen — read and fill forms without referencing this one.
+        builder.Services.AddScoped<IFormGateway, FormGateway>();
 
         builder.Services.AddScoped<FormEngineDatabaseInitializer>();
     }
 
     /// <summary>
-    /// Runs the FormEngine database initialiser (migrate, shared table, seed) using the three-flag
-    /// <see cref="DatabaseStartupOptions"/> pattern. Call after <c>builder.Build()</c>, before
-    /// <c>app.Run()</c>.
+    /// Runs the FormEngine database initialiser (migrate, submission tables, seed) using the
+    /// three-flag <see cref="DatabaseStartupOptions"/> pattern. Call after <c>builder.Build()</c>,
+    /// before <c>app.Run()</c>.
     /// </summary>
     public static async Task InitialiseFormEngineDatabaseAsync(this WebApplication app)
     {

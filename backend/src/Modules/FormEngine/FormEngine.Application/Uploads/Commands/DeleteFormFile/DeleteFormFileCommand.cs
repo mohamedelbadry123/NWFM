@@ -10,5 +10,5 @@ namespace FormEngine.Application.Uploads.Commands.DeleteFormFile;
 /// administrator) may remove it, and only while it is still pending — once a submission references a
 /// file, deleting it would leave that row pointing at nothing.
 /// </summary>
-[Authorize(Policy = NwfmPolicies.SubmitForms)]
+[Authorize(Policy = NwfmPolicies.FormUploaders)]
 public sealed record DeleteFormFileCommand(Guid FileId) : IRequest<Result>;

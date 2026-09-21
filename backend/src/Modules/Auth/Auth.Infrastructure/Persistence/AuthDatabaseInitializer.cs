@@ -295,7 +295,10 @@ public sealed class AuthDatabaseInitializer
                 NwfmPolicies.ManageDeadLetters, NwfmPolicies.ManageParticipants, NwfmPolicies.ManageGroups,
                 NwfmPolicies.ViewWorkload, NwfmPolicies.ManageLookups,
                 NwfmPolicies.ViewForms, NwfmPolicies.ManageForms, NwfmPolicies.SubmitForms,
-                NwfmPolicies.ViewSubmissions
+                NwfmPolicies.ViewSubmissions,
+                NwfmPolicies.ManageTeams,
+                NwfmPolicies.ViewTasks, NwfmPolicies.ManageTasks, NwfmPolicies.AssignTasks,
+                NwfmPolicies.SubmitTasks, NwfmPolicies.ReviewTasks, NwfmPolicies.ManageTaskTypes
             ],
 
             [Roles.Supervisor] =
@@ -303,27 +306,33 @@ public sealed class AuthDatabaseInitializer
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.StartWorkflows, NwfmPolicies.ClaimTasks,
                 NwfmPolicies.ViewInstances, NwfmPolicies.ManageIncidents,
                 NwfmPolicies.ViewWorkload,
-                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms, NwfmPolicies.ViewSubmissions
+                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms, NwfmPolicies.ViewSubmissions,
+                NwfmPolicies.ViewTasks, NwfmPolicies.AssignTasks, NwfmPolicies.ReviewTasks,
+                NwfmPolicies.SubmitTasks
             ],
 
             [Roles.Participant] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.ClaimTasks,
                 NwfmPolicies.ViewInstances,
-                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms
+                NwfmPolicies.ViewForms, NwfmPolicies.SubmitForms,
+                NwfmPolicies.ViewTasks, NwfmPolicies.SubmitTasks
             ],
 
             [Roles.FieldTeam] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.ClaimTasks,
-                NwfmPolicies.SubmitForms
+                NwfmPolicies.SubmitForms,
+                // A crew sees only the tasks assigned to its own team; the Tasks module enforces that.
+                NwfmPolicies.ViewTasks, NwfmPolicies.SubmitTasks
             ],
 
             [Roles.Monitor] =
             [
                 NwfmPolicies.ViewWorkflows, NwfmPolicies.ViewInstances,
                 NwfmPolicies.ViewWorkload,
-                NwfmPolicies.ViewForms, NwfmPolicies.ViewSubmissions
+                NwfmPolicies.ViewForms, NwfmPolicies.ViewSubmissions,
+                NwfmPolicies.ViewTasks
             ]
         };
     }
@@ -350,6 +359,13 @@ public sealed class AuthDatabaseInitializer
         (NwfmPolicies.ViewForms, "Forms", "View forms", "عرض النماذج"),
         (NwfmPolicies.ManageForms, "Forms", "Manage forms", "إدارة النماذج"),
         (NwfmPolicies.SubmitForms, "Forms", "Fill and submit forms", "تعبئة وإرسال النماذج"),
-        (NwfmPolicies.ViewSubmissions, "Forms", "View form submissions", "عرض إرساليات النماذج")
+        (NwfmPolicies.ViewSubmissions, "Forms", "View form submissions", "عرض إرساليات النماذج"),
+        (NwfmPolicies.ManageTeams, "Admin", "Manage field teams", "إدارة الفرق الميدانية"),
+        (NwfmPolicies.ViewTasks, "Tasks", "View tasks", "عرض المهام"),
+        (NwfmPolicies.ManageTasks, "Tasks", "Create and manage tasks", "إنشاء المهام وإدارتها"),
+        (NwfmPolicies.AssignTasks, "Tasks", "Assign tasks to teams", "إسناد المهام إلى الفرق"),
+        (NwfmPolicies.SubmitTasks, "Tasks", "Fill tasks", "تعبئة المهام"),
+        (NwfmPolicies.ReviewTasks, "Tasks", "Approve and return tasks", "اعتماد المهام وإرجاعها"),
+        (NwfmPolicies.ManageTaskTypes, "Tasks", "Manage task types", "إدارة أنواع المهام")
     ];
 }

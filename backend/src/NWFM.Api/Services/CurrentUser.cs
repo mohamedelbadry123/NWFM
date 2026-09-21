@@ -20,12 +20,12 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
         User?.Claims.Where(c => c.Type == PermissionClaimTypes.Permission).Select(c => c.Value).ToList()
         ?? (IReadOnlyList<string>)[];
 
-    public long? TeamId
+    public Guid? TeamId
     {
         get
         {
             var claim = User?.FindFirstValue(AppClaimTypes.TeamId);
-            return claim is not null && long.TryParse(claim, out var id) ? id : null;
+            return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
         }
     }
 

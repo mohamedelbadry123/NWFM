@@ -1,0 +1,216 @@
+<ng-container *translateContext="let t">
+  <p-dialog
+    [visible]="visible()"
+    (visibleChange)="visible.set($event)"
+    [header]="t('tasks.detail.title')"
+    [modal]="true"
+    [draggable]="true"
+    [maximizable]="true"
+    [style]="{ width: '72rem' }"
+    [contentStyle]="{ overflow: 'auto' }"
+    [breakpoints]="{ '960px': '95vw' }"
+  >
+    @if (loading()) {
+      <div class="flex justify-center py-10">
+        <p-progressSpinner styleClass="w-10 h-10" strokeWidth="4" />
+      </div>
+    } @else if (loadFailed()) {
+      <p-message severity="error" [text]="t('tasks.detail.loadFailed')" styleClass="w-full" />
+    } @else if (detail(); as d) {
+      <!-- Identity banner -->
+      <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-alt)] px-4 py-3">
+        <span class="text-lg font-semibold">{{ d.task.taskNumber }}</span>
+        <p-tag [value]="t('tasks.status.' + d.task.status)" [severity]="statusSeverity(d.task.status)" />
+        <p-tag [value]="t('tasks.priority.' + d.task.priority)" [severity]="prioritySeverity(d.task.priority)" />
+        @if (isOverdue(d.task)) {
+          <p-tag [value]="t('tasks.tags.overdue')" severity="danger" />
+        }
+        <span class="text-sm text-surface-500">{{ typeName() }}</span>
+        <span class="app-badge app-badge--code">{{ formName() }} v{{ d.task.formVersionNo }}</span>
+        @if (d.task.assignedTeamName) {
+          <span class="ms-auto text-sm"><i class="pi pi-users me-1"></i>{{ d.task.assignedTeamName }}</span>
+        }
+      </div>
+
+      @if (d.task.returnReasonCode) {
+        <!-- Why it came back is the first thing a returned task has to say. -->
+        <p-message severity="warn" styleClass="w-full mb-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <p-tag
+              [value]="t('tasks.returnReason.' + d.task.returnReasonCode)"
+              [severity]="returnReasonSeverity(d.task.returnReasonCode)"
+            />
+            <span>{{ d.task.returnReason }}</span>
+            <span class="text-xs text-surface-500">
+              {{ d.returnedBy }} · {{ d.task.returnedDate | date: 'yyyy-MM-dd HH:mm' }}
+            </span>
+          </div>
+        </p-message>
+      }
+
+      <!-- Facts -->
+      <div class="mb-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        <div class="sm:col-span-2 lg:col-span-3">
+          <span class="text-surface-500">{{ t('tasks.fields.title') }}:</span> {{ d.task.title || '—' }}
+        </div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.externalReference') }}:</span> {{ d.task.externalReference || '—' }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.source') }}:</span> {{ t('tasks.source.' + d.task.source) }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.created') }}:</span> {{ d.task.createdAt | date: 'yyyy-MM-dd HH:mm' }} · {{ d.createdBy || '—' }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.fillDueDate') }}:</span> {{ d.task.dueDate ? (d.task.dueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.completionDueDate') }}:</span> {{ d.task.completionDueDate ? (d.task.completionDueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</div>
+        <div>
+          <span class="text-surface-500">{{ t('tasks.fields.sla') }}:</span>
+          {{ d.fillSlaHours ?? '—' }} / {{ d.completionSlaHours ?? '—' }} {{ t('tasks.detail.hours') }}
+        </div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.assigned') }}:</span> {{ d.task.assignedDate ? (d.task.assignedDate | date: 'yyyy-MM-dd HH:mm') : '—' }} · {{ d.assignedBy || '—' }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.submittedDate') }}:</span> {{ d.task.submittedDate ? (d.task.submittedDate | date: 'yyyy-MM-dd HH:mm') : '—' }} · {{ d.lastFilledBy || '—' }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.fills') }}:</span> {{ d.task.submissionCount }}</div>
+        @if (d.completedDate) {
+          <div><span class="text-surface-500">{{ t('tasks.fields.completed') }}:</span> {{ d.completedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ d.completedBy }}</div>
+        }
+        @if (d.expiredDate) {
+          <div><span class="text-surface-500">{{ t('tasks.fields.expired') }}:</span> {{ d.expiredDate | date: 'yyyy-MM-dd HH:mm' }} · {{ d.expiredBy }}</div>
+        }
+        <div><span class="text-surface-500">{{ t('org.cbu') }}:</span> {{ orgNames.label('Cbu', d.task.cbuCode) }}</div>
+        <div><span class="text-surface-500">{{ t('org.branch') }}:</span> {{ orgNames.label('Branch', d.task.branchCode) }}</div>
+        <div><span class="text-surface-500">{{ t('org.operationArea') }}:</span> {{ orgNames.label('OperationArea', d.task.operationAreaCode) }}</div>
+        <div><span class="text-surface-500">{{ t('tasks.fields.department') }}:</span> {{ orgNames.label('Department', d.task.departmentCode) }}</div>
+        <div class="sm:col-span-2">
+          <span class="text-surface-500">{{ t('tasks.fields.address') }}:</span> {{ d.task.address || '—' }}
+          <span class="font-mono text-xs text-surface-500">({{ d.task.latitude }}, {{ d.task.longitude }})</span>
+        </div>
+        @if (d.notes) {
+          <div class="sm:col-span-2 lg:col-span-3 whitespace-pre-line">
+            <span class="text-surface-500">{{ t('tasks.fields.notes') }}:</span> {{ d.notes }}
+          </div>
+        }
+      </div>
+
+      <p-tabs [value]="activeTab()" (valueChange)="activeTab.set($any($event))">
+        <p-tablist>
+          <p-tab value="answers"><i class="pi pi-file-edit me-1"></i>{{ t('tasks.detail.answers') }}</p-tab>
+          <p-tab value="records"><i class="pi pi-history me-1"></i>{{ t('tasks.detail.records') }} ({{ fills().length }})</p-tab>
+          <p-tab value="timeline"><i class="pi pi-clock me-1"></i>{{ t('tasks.detail.timeline') }}</p-tab>
+          <p-tab value="assignments"><i class="pi pi-users me-1"></i>{{ t('tasks.detail.assignments') }} ({{ d.assignments.length }})</p-tab>
+          <p-tab value="files"><i class="pi pi-images me-1"></i>{{ t('tasks.detail.files') }} ({{ files().length }})</p-tab>
+          <p-tab value="location"><i class="pi pi-map-marker me-1"></i>{{ t('tasks.detail.location') }}</p-tab>
+        </p-tablist>
+
+        <p-tabpanels>
+          <p-tabpanel value="answers">
+            @if (shownFill(); as fill) {
+              <p class="mb-3 text-xs text-surface-500">
+                {{ t('tasks.detail.fillBy', { by: fill.submittedByName || fill.submittedBy || '—', date: (fill.submittedDate | date: 'yyyy-MM-dd HH:mm') || '' }) }}
+              </p>
+              <!-- The form as it was filled: the pinned version, read-only. -->
+              <app-dynamic-form-renderer
+                [definition]="definition()"
+                [answers]="fill.answers"
+                [readOnly]="true"
+                [emptyMessage]="t('tasks.fill.empty')"
+              />
+            } @else {
+              <p-message severity="info" [text]="t('tasks.detail.notFilled')" styleClass="w-full" />
+            }
+          </p-tabpanel>
+
+          <p-tabpanel value="records">
+            <p-table [value]="fills()" styleClass="app-table p-datatable-sm p-datatable-striped" [rowHover]="true">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>{{ t('tasks.fields.submittedDate') }}</th>
+                  <th>{{ t('tasks.detail.filledBy') }}</th>
+                  <th>{{ t('tasks.detail.version') }}</th>
+                  <th class="w-24"></th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-fill let-index="rowIndex">
+                <tr>
+                  <td>{{ fill.submittedDate | date: 'yyyy-MM-dd HH:mm' }}</td>
+                  <td>{{ fill.submittedByName || fill.submittedBy || '—' }}</td>
+                  <td>v{{ fill.versionNo }}</td>
+                  <td class="text-end">
+                    <p-button icon="pi pi-eye" [text]="true" [rounded]="true" size="small" [ariaLabel]="t('tasks.detail.viewFill')" (onClick)="showFill(fill)" />
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr><td colspan="4" class="p-4 text-center text-surface-500">{{ t('tasks.detail.notFilled') }}</td></tr>
+              </ng-template>
+            </p-table>
+          </p-tabpanel>
+
+          <p-tabpanel value="timeline">
+            <p-timeline [value]="timeline()" styleClass="app-timeline-directional">
+              <ng-template pTemplate="content" let-entry>
+                <div class="mb-3">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    @if (entry.fromStatus && entry.fromStatus !== entry.toStatus) {
+                      <p-tag [value]="t('tasks.status.' + entry.fromStatus)" [severity]="statusSeverity(entry.fromStatus)" />
+                      <i class="pi pi-arrow-right text-xs text-surface-500"></i>
+                    }
+                    <p-tag [value]="t('tasks.status.' + entry.toStatus)" [severity]="statusSeverity(entry.toStatus)" />
+                  </div>
+                  <div class="mt-1 text-xs text-surface-500">
+                    {{ entry.changedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ entry.changedBy || '—' }}
+                  </div>
+                  @if (entry.note) {
+                    <div class="mt-1 text-sm">{{ entry.note }}</div>
+                  }
+                </div>
+              </ng-template>
+            </p-timeline>
+          </p-tabpanel>
+
+          <p-tabpanel value="assignments">
+            <p-table [value]="d.assignments" styleClass="app-table p-datatable-sm p-datatable-striped" [rowHover]="true">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>{{ t('tasks.fields.team') }}</th>
+                  <th>{{ t('tasks.fields.status') }}</th>
+                  <th>{{ t('tasks.fields.assigned') }}</th>
+                  <th>{{ t('tasks.fields.fillDueDate') }}</th>
+                  <th>{{ t('tasks.fields.submittedDate') }}</th>
+                  <th>{{ t('tasks.fields.note') }}</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-a>
+                <tr [class.font-semibold]="a.isActive">
+                  <td>{{ a.teamName || a.teamId }}</td>
+                  <td>{{ t('tasks.assignmentStatus.' + a.status) }}</td>
+                  <td>{{ a.assignedDate | date: 'yyyy-MM-dd HH:mm' }} · {{ a.assignedBy || '—' }}</td>
+                  <td>{{ a.dueDate ? (a.dueDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</td>
+                  <td>{{ a.submittedDate ? (a.submittedDate | date: 'yyyy-MM-dd HH:mm') : '—' }}</td>
+                  <td class="app-col-wrap">{{ a.note || '—' }}</td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr><td colspan="6" class="p-4 text-center text-surface-500">{{ t('tasks.detail.noAssignments') }}</td></tr>
+              </ng-template>
+            </p-table>
+          </p-tabpanel>
+
+          <p-tabpanel value="files">
+            @if (mediaItems().length === 0) {
+              <p-message severity="info" [text]="t('tasks.detail.noFiles')" styleClass="w-full" />
+            } @else {
+              <div class="flex flex-wrap gap-3">
+                @for (item of mediaItems(); track item.fileId; let i = $index) {
+                  <app-media-thumbnail [item]="item" (open)="openMedia(i)" />
+                }
+              </div>
+              <app-media-viewer-dialog [(visible)]="viewerVisible" [items]="mediaItems()" [startIndex]="viewerIndex()" />
+            }
+          </p-tabpanel>
+
+          <!-- Lazy: a map drawn inside a hidden panel sizes itself to nothing. -->
+          <p-tabpanel value="location">
+            @if (activeTab() === 'location') {
+              <app-geo-map [value]="point()" [readonly]="true" height="360px" />
+            }
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
+    }
+  </p-dialog>
+</ng-container>

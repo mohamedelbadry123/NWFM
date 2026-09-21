@@ -1,0 +1,103 @@
+<ng-container *translateContext="let t">
+  <p-dialog
+    [visible]="visible()"
+    (visibleChange)="visible.set($event)"
+    (onShow)="onShow()"
+    [header]="t('tasks.edit.title', { number: task()?.taskNumber })"
+    [modal]="true"
+    [maximizable]="true"
+    [draggable]="false"
+    [style]="{ width: '44rem' }"
+    [breakpoints]="{ '760px': '95vw' }"
+  >
+    <form [formGroup]="form" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="flex flex-col gap-2 sm:col-span-2">
+        <label for="edit-title" class="text-sm font-medium">{{ t('tasks.fields.title') }}</label>
+        <input pInputText id="edit-title" formControlName="title" class="w-full" />
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label for="edit-reference" class="text-sm font-medium">{{ t('tasks.fields.externalReference') }}</label>
+        <input pInputText id="edit-reference" formControlName="externalReference" class="w-full" />
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label for="edit-priority" class="text-sm font-medium">{{ t('tasks.fields.priority') }}</label>
+        <p-select
+          inputId="edit-priority"
+          formControlName="priority"
+          [options]="priorityOptions()"
+          optionLabel="label"
+          optionValue="value"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label for="edit-due" class="text-sm font-medium">{{ t('tasks.fields.fillDueDate') }}</label>
+        <p-datepicker inputId="edit-due" formControlName="dueDate" dateFormat="yy-mm-dd" [showTime]="true" [showIcon]="true" appendTo="body" styleClass="w-full" />
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <label for="edit-completion" class="text-sm font-medium">{{ t('tasks.fields.completionDueDate') }}</label>
+        <p-datepicker inputId="edit-completion" formControlName="completionDueDate" dateFormat="yy-mm-dd" [showTime]="true" [showIcon]="true" appendTo="body" styleClass="w-full" />
+      </div>
+
+      <div class="flex flex-col gap-2 sm:col-span-2">
+        <label for="edit-department" class="text-sm font-medium">{{ t('tasks.fields.department') }}</label>
+        <p-select
+          inputId="edit-department"
+          formControlName="departmentCode"
+          [options]="departments()"
+          optionLabel="label"
+          optionValue="value"
+          [filter]="true"
+          filterBy="label"
+          [showClear]="true"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="flex flex-col gap-2 sm:col-span-2">
+        <label for="edit-notes" class="text-sm font-medium">
+          {{ t('tasks.fields.notes') }}
+          @if (loading()) {
+            <i class="pi pi-spin pi-spinner text-xs ms-1"></i>
+          }
+        </label>
+        <textarea pTextarea id="edit-notes" formControlName="notes" rows="2" class="w-full"></textarea>
+      </div>
+    </form>
+
+    @if (!canMove()) {
+      <p-message severity="info" [text]="t('tasks.edit.locationLocked')" styleClass="w-full mt-4" />
+    }
+
+    <div class="mt-4 flex flex-col gap-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+      <span class="text-sm font-semibold">{{ t('tasks.fields.location') }}</span>
+      <app-org-scope-selector
+        mode="single"
+        [initialLocation]="locationSeed()"
+        [disabled]="saving() || !canMove()"
+        (locationChange)="onLocationChange($event)"
+      />
+    </div>
+
+    <div class="mt-4 flex flex-col gap-2 border-t border-surface-200 pt-4 dark:border-surface-700">
+      <span class="text-sm font-semibold">{{ t('tasks.fields.coordinates') }}</span>
+      <app-geo-map
+        [value]="locationPoint()"
+        (valueChange)="onLocationPointChange($event)"
+        [readonly]="!canMove()"
+        height="280px"
+      />
+    </div>
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="t('common.cancel')" severity="secondary" [text]="true" [disabled]="saving()" (onClick)="cancel()" />
+      <p-button [label]="t('common.save')" icon="pi pi-check" [loading]="saving()" [disabled]="saving()" (onClick)="save()" />
+    </ng-template>
+  </p-dialog>
+</ng-container>

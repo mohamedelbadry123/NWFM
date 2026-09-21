@@ -1,3 +1,5 @@
+using Auth.Infrastructure.Organization;
+using NWFM.Shared.Integration.Organization;
 using System.Text;
 using Auth.Application.Common.Interfaces;
 using Auth.Domain.Options;
@@ -44,6 +46,11 @@ public static class DependencyInjection
         builder.Services.AddScoped<IPermissionResolver, PermissionResolver>();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddScoped<IUserAccountService, UserAccountService>();
+
+        // Territory for the modules that narrow work to it (Tasks), without referencing Auth.
+        builder.Services.AddScoped<OrgScopeProvider>();
+        builder.Services.AddScoped<IOrgScopeProvider>(sp => sp.GetRequiredService<OrgScopeProvider>());
+        builder.Services.AddScoped<IOrgDirectory>(sp => sp.GetRequiredService<OrgScopeProvider>());
         builder.Services.AddScoped<IRoleLookup, RoleLookup>();
 
         builder.Services.AddAuthorization();

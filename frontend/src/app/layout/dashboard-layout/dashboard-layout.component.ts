@@ -96,6 +96,23 @@ export class DashboardLayoutComponent {
       ],
     },
     {
+      labelKey: 'nav.fieldTasks',
+      icon: 'pi pi-map-marker',
+      children: [
+        {
+          labelKey: 'nav.fieldTaskList',
+          route: '/tasks',
+          exact: true,
+          permissions: [PERMISSIONS.viewTasks, ADMINISTRATOR_ROLE],
+        },
+        {
+          labelKey: 'nav.taskTypes',
+          route: '/tasks/types',
+          permissions: [PERMISSIONS.manageTaskTypes, ADMINISTRATOR_ROLE],
+        },
+      ],
+    },
+    {
       labelKey: 'nav.forms',
       icon: 'pi pi-file-edit',
       children: [
@@ -122,6 +139,12 @@ export class DashboardLayoutComponent {
       icon: 'pi pi-list',
       route: '/lookups',
       permissions: [PERMISSIONS.manageLookups, ADMINISTRATOR_ROLE],
+    },
+    {
+      labelKey: 'nav.teams',
+      icon: 'pi pi-users',
+      route: '/admin/teams',
+      permissions: [PERMISSIONS.manageTeams, ADMINISTRATOR_ROLE],
     },
     {
       labelKey: 'nav.users',

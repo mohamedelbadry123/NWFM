@@ -6,16 +6,24 @@ using Moq;
 using global::FormEngine.Application.Common.Interfaces;
 using global::FormEngine.Application.Common.Schema;
 using global::FormEngine.Application.Constants;
+using global::FormEngine.Application.Forms.Common;
 using global::FormEngine.Application.Submissions.Commands.SubmitForm;
+using global::FormEngine.Application.Submissions.Common;
 using global::FormEngine.Domain.Constants;
 using global::FormEngine.Domain.Entities;
 using global::FormEngine.Domain.Options;
 using global::FormEngine.Infrastructure.Persistence;
 using NWFM.Shared.Abstractions;
+using NWFM.Shared.Caching;
 using NWFM.Shared.Exceptions;
 using NWFM.Shared.Options;
 using NWFM.Shared.Storage;
 
+/// <summary>
+/// The submit path, through the endpoint's handler and the shared <see cref="FormSubmissionService"/>
+/// behind it. Forms are published with the real <see cref="FormPublisher"/>, so the table and field
+/// registry a fill is written against are the ones a publish really produces; only SQL is mocked.
+/// </summary>
 public sealed class SubmitFormCommandHandlerTests : IDisposable
 {
     private static readonly DateTime Now = new(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc);
@@ -24,6 +32,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     private readonly Mock<IFormSubmissionStore> _store = new();
     private readonly Mock<IFileStorage> _storage = new();
     private readonly Mock<ICurrentUser> _user = new();
+    private readonly FormPublisher _publisher;
     private readonly SubmitFormCommandHandler _handler;
 
     public SubmitFormCommandHandlerTests()
@@ -31,30 +40,43 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         _user.SetupGet(u => u.Id).Returns("user-1");
         _user.SetupGet(u => u.UserName).Returns("Tester");
 
-        _handler = new SubmitFormCommandHandler(
+        var clock = new FakeTimeProvider(Now);
+
+        _publisher = new FormPublisher(_context, _store.Object, new Mock<ICacheService>().Object, clock);
+
+        var service = new FormSubmissionService(
             _context,
             _store.Object,
+            _publisher,
             _storage.Object,
             _user.Object,
-            new FakeTimeProvider(Now),
+            clock,
             Options.Create(new FileStorageOptions()),
             Options.Create(new FormEngineOptions()));
+
+        _handler = new SubmitFormCommandHandler(service);
     }
 
     public void Dispose() => _context.Dispose();
 
-    private async Task<FormDefinition> AddPublishedFormAsync(string? schemaJson = null)
+    private async Task<FormDefinition> AddPublishedFormAsync(string? schemaJson = null, string code = "FRM-001")
     {
-        var json = schemaJson ?? FormEngineTestData.SimpleSchema();
-        var form = FormDefinition.Create("FRM-001", "Leak", "تسرب", FormCategories.Inspection, null, "tester", Now);
-        form.SetSchema(json, null, null, "tester", Now);
-        form.Publish("tester", [new FormVersionSnapshot(FormTargetClients.Formly, json, "{}")], Now);
+        var form = FormDefinition.Create(code, "Leak", "تسرب", FormCategories.Inspection, null, "tester", Now);
+        form.SetSchema(schemaJson ?? FormEngineTestData.SimpleSchema(), null, null, "tester", Now);
 
         _context.FormDefinitions.Add(form);
         await _context.SaveChangesAsync();
 
+        var published = await _publisher.PublishAsync(form.Id, "tester", CancellationToken.None);
+        published.IsSuccess.Should().BeTrue();
+
+        _store.Invocations.Clear();
         return form;
     }
+
+    private void InsertReturns(Guid id) =>
+        _store.Setup(s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(id);
 
     private static SubmitFormCommand Command(Guid formId, params (string Key, object? Value)[] answers) => new()
     {
@@ -63,12 +85,11 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     };
 
     [Fact]
-    public async Task Submit_RecordsTheFillAgainstTheCurrentVersion()
+    public async Task Submit_RecordsTheFillInTheFormsOwnTable()
     {
         var form = await AddPublishedFormAsync();
         var newId = Guid.NewGuid();
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(newId);
+        InsertReturns(newId);
 
         var result = await _handler.Handle(Command(form.Id, ("meter_reading", 42)), CancellationToken.None);
 
@@ -78,8 +99,49 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         result.Value.IsReplay.Should().BeFalse();
 
         _store.Verify(s => s.InsertAsync(
+            It.Is<FormTable>(t => t.TableName == "SUB_FRM_001"),
             It.Is<FormSubmissionInsert>(i => i.VersionNo == 1 && i.SubmittedBy == "user-1" && i.SubmittedByName == "Tester"),
             It.IsAny<CancellationToken>()));
+    }
+
+    [Fact]
+    public async Task Submit_AgainstAnOlderVersion_CannotWriteAFieldOnlyANewerOneHas()
+    {
+        var form = await AddPublishedFormAsync();
+        form.SetSchema(FormEngineTestData.TwoFieldSchema, null, null, "tester", Now);
+        await _context.SaveChangesAsync();
+        await _publisher.PublishAsync(form.Id, "tester", CancellationToken.None);
+
+        FormTable? written = null;
+        _store.Setup(s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
+            .Callback<FormTable, FormSubmissionInsert, CancellationToken>((table, _, _) => written = table)
+            .ReturnsAsync(Guid.NewGuid());
+
+        var command = Command(form.Id, ("meter_reading", 1), ("depth_m", 3)) with { VersionNo = 1 };
+        await _handler.Handle(command, CancellationToken.None);
+
+        // The table holds both columns, but version 1 never asked for depth_m.
+        written!.FieldTypes.Keys.Should().BeEquivalentTo(["meter_reading"]);
+    }
+
+    [Fact]
+    public async Task Submit_AFormPublishedBeforeItHadATableIsRepairedFirst()
+    {
+        // Published the way an older build did: a version, but no table and no field registry.
+        var json = FormEngineTestData.SimpleSchema();
+        var form = FormDefinition.Create("FRM-OLD", "Old", "قديم", FormCategories.General, null, "tester", Now);
+        form.SetSchema(json, null, null, "tester", Now);
+        form.Publish("tester", [new FormVersionSnapshot(FormTargetClients.Formly, json, "{}")], Now);
+        _context.FormDefinitions.Add(form);
+        await _context.SaveChangesAsync();
+
+        InsertReturns(Guid.NewGuid());
+
+        var result = await _handler.Handle(Command(form.Id, ("meter_reading", 1)), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        form.SubmissionTable.Should().Be("SUB_FRM_OLD");
+        _store.Verify(s => s.EnsureFormTableAsync(It.IsAny<FormTable>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -114,8 +176,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         form.SetSchema(FormEngineTestData.SimpleSchema("depth_m"), null, null, "tester", Now);
         await _context.SaveChangesAsync();
 
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Guid.NewGuid());
+        InsertReturns(Guid.NewGuid());
 
         var result = await _handler.Handle(Command(form.Id, ("meter_reading", 5)), CancellationToken.None);
 
@@ -142,7 +203,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         var clientKey = Guid.NewGuid();
         var originalId = Guid.NewGuid();
 
-        _store.Setup(s => s.FindByClientIdAsync(form.Id, clientKey, It.IsAny<CancellationToken>()))
+        _store.Setup(s => s.FindByClientIdAsync(It.IsAny<FormTable>(), clientKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(originalId);
 
         var command = Command(form.Id, ("meter_reading", 1)) with { ClientSubmissionId = clientKey };
@@ -151,7 +212,9 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
 
         result.Value.SubmissionId.Should().Be(originalId);
         result.Value.IsReplay.Should().BeTrue();
-        _store.Verify(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()), Times.Never);
+        _store.Verify(
+            s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -161,11 +224,11 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         var clientKey = Guid.NewGuid();
         var winnerId = Guid.NewGuid();
 
-        _store.SetupSequence(s => s.FindByClientIdAsync(form.Id, clientKey, It.IsAny<CancellationToken>()))
+        _store.SetupSequence(s => s.FindByClientIdAsync(It.IsAny<FormTable>(), clientKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Guid?)null)
             .ReturnsAsync(winnerId);
 
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
+        _store.Setup(s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DuplicateClientSubmissionException(clientKey));
 
         var command = Command(form.Id, ("meter_reading", 1)) with { ClientSubmissionId = clientKey };
@@ -182,8 +245,8 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     {
         var form = await AddPublishedFormAsync();
         FormSubmissionInsert? captured = null;
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
-            .Callback<FormSubmissionInsert, CancellationToken>((insert, _) => captured = insert)
+        _store.Setup(s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
+            .Callback<FormTable, FormSubmissionInsert, CancellationToken>((_, insert, _) => captured = insert)
             .ReturnsAsync(Guid.NewGuid());
 
         await _handler.Handle(Command(form.Id, (" meter_reading ", 7)), CancellationToken.None);
@@ -203,7 +266,9 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
 
         // Both problems are reported at once, named by the label the user saw rather than by data name.
         result.Error.Message.Should().Contain("Inspector").And.Contain("Depth");
-        _store.Verify(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()), Times.Never);
+        _store.Verify(
+            s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -214,7 +279,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
         var form = await AddPublishedFormAsync(
             FormEngineTestData.SimpleSchema("site_point", FormElementTypes.Geolocation));
 
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
+        _store.Setup(s => s.InsertAsync(It.IsAny<FormTable>(), It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new DomainException("The answer for 'site_point' is not a valid geolocation value: 'here'."));
 
         var result = await _handler.Handle(Command(form.Id, ("site_point", "here")), CancellationToken.None);
@@ -224,15 +289,14 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Submit_ReconcilesTheTableBeforeWriting()
+    public async Task Submit_AFormWhoseTableIsCompleteIsNotRebuilt()
     {
         var form = await AddPublishedFormAsync();
-        _store.Setup(s => s.InsertAsync(It.IsAny<FormSubmissionInsert>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Guid.NewGuid());
+        InsertReturns(Guid.NewGuid());
 
         await _handler.Handle(Command(form.Id, ("meter_reading", 1)), CancellationToken.None);
 
-        _store.Verify(s => s.ReconcileTableAsync(It.IsAny<global::FormEngine.Application.Common.Schema.FormSchema>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+        // Publishing built it; a fill must not issue DDL on every submit.
+        _store.Verify(s => s.EnsureFormTableAsync(It.IsAny<FormTable>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -10,7 +10,7 @@ namespace FormEngine.Infrastructure.Persistence.Seed;
 
 /// <summary>
 /// Seeds the two example forms, published through <see cref="IFormPublisher"/> so each one registers
-/// its field catalog entries and its <c>FE.Submissions</c> columns exactly as a publish from the UI
+/// its fields and creates its own submission table exactly as a publish from the UI
 /// would. Idempotent: a form already published is left alone, and one left as a draft by a failed
 /// run is published on the next start.
 /// </summary>
@@ -40,7 +40,7 @@ internal static class FormSeedData
     ];
 
     /// <summary>
-    /// Each form is seeded in its own scope. Publishing touches the change tracker and a shared
+    /// Each form is seeded in its own scope. Publishing touches the change tracker and the form's
     /// table, so a failure on one form must not leave half-applied state for the next.
     /// </summary>
     public static async Task SeedAsync(IServiceScopeFactory scopeFactory, ILogger logger, CancellationToken ct = default)

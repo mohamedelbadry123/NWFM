@@ -47,6 +47,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/form-engine/form-engine.routes').then(m => m.FORM_ENGINE_ROUTES),
       },
       {
+        path: 'tasks',
+        loadChildren: () => import('./features/tasks/tasks.routes').then(m => m.TASKS_ROUTES),
+      },
+      {
+        path: 'admin/teams',
+        canActivate: [permissionGuard(PERMISSIONS.manageTeams)],
+        data: { titleKey: 'teams.title', subtitleKey: 'teams.subtitle' },
+        loadComponent: () => import('./features/admin/teams/team-list.component').then(m => m.TeamListComponent),
+      },
+      {
         path: 'admin/users',
         canActivate: [permissionGuard(PERMISSIONS.manageUsers)],
         data: { titleKey: 'users.title', subtitleKey: 'users.subtitle' },

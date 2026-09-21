@@ -23,50 +23,6 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("FormEngine.Domain.Entities.FieldCatalogEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DataName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("FieldType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("LabelAr")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("LabelEn")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DataName")
-                        .IsUnique();
-
-                    b.ToTable("FieldCatalog", "FE");
-                });
-
             modelBuilder.Entity("FormEngine.Domain.Entities.FormDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -126,6 +82,10 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SubmissionTable")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -144,9 +104,64 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("SubmissionTable")
+                        .IsUnique()
+                        .HasFilter("[SubmissionTable] IS NOT NULL");
+
                     b.HasIndex("Status", "Category");
 
                     b.ToTable("FormDefinitions", "FE");
+                });
+
+            modelBuilder.Entity("FormEngine.Domain.Entities.FormField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DataName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("FirstVersionNo")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsCompanion")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LabelAr")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("LabelEn")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("LastVersionNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataName");
+
+                    b.HasIndex("FormDefinitionId", "DataName")
+                        .IsUnique();
+
+                    b.ToTable("FormFields", "FE");
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.FormVersion", b =>
@@ -273,6 +288,15 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("SubmissionFiles", "FE");
+                });
+
+            modelBuilder.Entity("FormEngine.Domain.Entities.FormField", b =>
+                {
+                    b.HasOne("FormEngine.Domain.Entities.FormDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FormEngine.Domain.Entities.FormVersion", b =>

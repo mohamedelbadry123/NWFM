@@ -81,6 +81,12 @@ export interface FieldCatalogItem {
   labelEn: string | null;
   labelAr: string | null;
   description: string | null;
+  /** How many forms store a column under this name. */
+  formCount: number;
+  /** True when forms store the name as more than one type. */
+  hasTypeConflict: boolean;
+  /** Every type the name is stored as, first-seen first. */
+  fieldTypes: string[];
 }
 
 export interface FormSubmissionCreated {

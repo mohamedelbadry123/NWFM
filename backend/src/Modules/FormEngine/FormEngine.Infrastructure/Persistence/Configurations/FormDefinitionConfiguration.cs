@@ -29,12 +29,16 @@ public sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<FormD
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.UpdatedAt).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.Property(x => x.SubmissionTable).HasMaxLength(FormDefinition.SubmissionTableMaxLength);
 
         builder.HasIndex(x => x.Code).IsUnique();
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.Category);
         builder.HasIndex(x => x.DepartmentCode);
         builder.HasIndex(x => new { x.Status, x.Category });
+
+        // Two forms writing to one table would mix their rows, so a name is held by one form at most.
+        builder.HasIndex(x => x.SubmissionTable).IsUnique().HasFilter("[SubmissionTable] IS NOT NULL");
 
         builder.HasMany(x => x.Versions)
             .WithOne()
