@@ -25,6 +25,7 @@
     "prev": "السابق",
     "next": "التالي",
     "actions": "إجراءات",
+    "pageReport": "عرض {first} إلى {last} من {totalRecords} سجلاً",
     "appName": "NWFM",
     "appFullName": "إدارة أعمال الميدان الوطنية",
     "logout": "تسجيل الخروج",

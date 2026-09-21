@@ -32,7 +32,7 @@ import { FormListItem, FormVersionSummary } from '../../../core/form-engine/form
         [paginator]="versions().length > 10"
         [rows]="10"
         paginatorDropdownAppendTo="body"
-        styleClass="p-datatable-sm"
+        styleClass="app-table p-datatable-sm p-datatable-striped"
       >
         <ng-template pTemplate="header">
           <tr>

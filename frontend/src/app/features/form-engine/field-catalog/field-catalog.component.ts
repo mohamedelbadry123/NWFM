@@ -23,7 +23,7 @@ import { FieldCatalogItem } from '../../../core/form-engine/form-engine.models';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, InputTextModule, TableModule, TagModule],
   template: `
-    <div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+    <div class="card mt-4">
       <p-table
         [value]="entries()"
         [lazy]="true"
@@ -33,8 +33,10 @@ import { FieldCatalogItem } from '../../../core/form-engine/form-engine.models';
         [totalRecords]="totalRecords()"
         [loading]="loading()"
         [rowsPerPageOptions]="[10, 25, 50]"
+        [showCurrentPageReport]="true"
+        [currentPageReportTemplate]="'common.pageReport' | translate"
         [rowHover]="true"
-        styleClass="p-datatable-sm p-datatable-striped"
+        styleClass="app-table p-datatable-sm p-datatable-striped"
       >
         <ng-template pTemplate="caption">
           <div class="flex flex-wrap items-center justify-between gap-2">

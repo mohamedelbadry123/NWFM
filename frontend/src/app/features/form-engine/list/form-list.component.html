@@ -1,72 +1,84 @@
 <p-toast />
 <p-confirmDialog />
 
-<div class="mb-4 flex justify-end">
-  <ng-container *hasPermission="PERMISSIONS.manageForms">
-    <p-button [label]="'forms.newForm' | translate" icon="pi pi-plus" (onClick)="openNew()" />
-  </ng-container>
-</div>
+<div class="card mt-4">
+  <!-- Page title/subtitle are rendered by the dashboard topbar (PageHeaderService). -->
+  <p-toolbar styleClass="mb-4">
+    <ng-template pTemplate="right">
+      <ng-container *hasPermission="PERMISSIONS.manageForms">
+        <p-button [label]="'forms.newForm' | translate" icon="pi pi-plus" (onClick)="openNew()" />
+      </ng-container>
+    </ng-template>
+  </p-toolbar>
 
-<div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
   <p-table
+    #dt
     [value]="forms()"
     [lazy]="true"
     (onLazyLoad)="load($event)"
-    [rows]="10"
     [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    [showCurrentPageReport]="true"
+    [currentPageReportTemplate]="'common.pageReport' | translate"
     [totalRecords]="totalRecords()"
     [loading]="loading()"
-    [rowsPerPageOptions]="[10, 25, 50]"
+    styleClass="app-table p-datatable-sm p-datatable-striped"
+    [scrollable]="true"
+    [tableStyle]="{ 'min-width': '64rem' }"
     [rowHover]="true"
-    styleClass="p-datatable-sm p-datatable-striped"
   >
-    <ng-template pTemplate="caption">
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <p-select
-          [options]="categoryOptions"
-          [(ngModel)]="category"
-          optionValue="value"
-          [showClear]="false"
-          (onChange)="applyFilters()"
-          styleClass="w-48"
-          appendTo="body"
-        >
-          <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
-          <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
-        </p-select>
-
-        <p-select
-          [options]="statusOptions"
-          [(ngModel)]="status"
-          optionValue="value"
-          (onChange)="applyFilters()"
-          styleClass="w-48"
-          appendTo="body"
-        >
-          <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
-          <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
-        </p-select>
-
-        <input
-          pInputText
-          type="search"
-          [(ngModel)]="search"
-          (keyup.enter)="applyFilters()"
-          [placeholder]="'common.search' | translate"
-          class="w-64"
-        />
-        <p-button icon="pi pi-search" [text]="true" (onClick)="applyFilters()" [ariaLabel]="'common.search' | translate" />
-      </div>
-    </ng-template>
-
     <ng-template pTemplate="header">
       <tr>
         <th>{{ 'forms.code' | translate }}</th>
         <th>{{ 'forms.name' | translate }}</th>
         <th>{{ 'forms.category' | translate }}</th>
         <th>{{ 'forms.status' | translate }}</th>
-        <th>{{ 'forms.version' | translate }}</th>
-        <th class="w-64">{{ 'common.actions' | translate }}</th>
+        <th class="text-center">{{ 'forms.version' | translate }}</th>
+        <th class="w-56 text-center">{{ 'common.actions' | translate }}</th>
+      </tr>
+      <tr>
+        <th>
+          <p-columnFilter
+            type="text"
+            field="search"
+            [showMenu]="false"
+            [showClearButton]="false"
+            [placeholder]="'common.search' | translate"
+          />
+        </th>
+        <th></th>
+        <th>
+          <p-select
+            [(ngModel)]="category"
+            [options]="categoryOptions"
+            optionValue="value"
+            [ariaLabel]="'forms.category' | translate"
+            (onChange)="onFilterChange(dt)"
+            appendTo="body"
+            styleClass="w-full"
+          >
+            <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+            <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+          </p-select>
+        </th>
+        <th>
+          <!-- Opens on "Active", so archived forms stay out until they are asked for. -->
+          <p-select
+            [(ngModel)]="status"
+            [options]="statusOptions"
+            optionValue="value"
+            [ariaLabel]="'forms.status' | translate"
+            (onChange)="onFilterChange(dt)"
+            appendTo="body"
+            styleClass="w-full"
+          >
+            <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+            <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+          </p-select>
+        </th>
+        <th></th>
+        <th></th>
       </tr>
     </ng-template>
 
@@ -78,19 +90,25 @@
         <td>
           <p-tag [value]="statusLabelKey(form.status) | translate" [severity]="statusSeverity(form.status)" />
         </td>
-        <td>{{ form.currentVersionNo ?? '—' }}</td>
-        <td>
-          <div class="flex items-center gap-1">
+        <td class="text-center">
+          <span class="font-semibold text-sm">v{{ form.currentVersionNo ?? 0 }}</span>
+        </td>
+        <td class="text-center">
+          <div class="flex justify-center gap-1">
             <ng-container *hasPermission="PERMISSIONS.manageForms">
               <p-button
                 icon="pi pi-pencil"
+                severity="secondary"
+                size="small"
                 [text]="true"
                 [rounded]="true"
                 [pTooltip]="'forms.actions.edit' | translate"
                 (onClick)="openEdit(form)"
               />
               <p-button
-                icon="pi pi-sitemap"
+                icon="pi pi-th-large"
+                severity="info"
+                size="small"
                 [text]="true"
                 [rounded]="true"
                 [pTooltip]="'forms.actions.design' | translate"
@@ -100,6 +118,8 @@
 
             <p-button
               icon="pi pi-eye"
+              severity="secondary"
+              size="small"
               [text]="true"
               [rounded]="true"
               [pTooltip]="'forms.actions.preview' | translate"
@@ -109,6 +129,8 @@
             <ng-container *hasPermission="PERMISSIONS.submitForms">
               <p-button
                 icon="pi pi-pen-to-square"
+                severity="secondary"
+                size="small"
                 [text]="true"
                 [rounded]="true"
                 [disabled]="!canFillForm(form)"
@@ -117,15 +139,31 @@
               />
             </ng-container>
 
+            <!-- Publish is promoted out of the overflow menu: it is the action a draft exists for. -->
+            @if (canPublishForm(form)) {
+              <p-button
+                icon="pi pi-check-circle"
+                severity="success"
+                size="small"
+                [text]="true"
+                [rounded]="true"
+                [loading]="busyId() === form.id"
+                [disabled]="busyId() !== null"
+                [pTooltip]="'forms.actions.publish' | translate"
+                (onClick)="publish(form)"
+              />
+            }
+
             <p-button
               icon="pi pi-ellipsis-v"
+              severity="secondary"
+              size="small"
               [text]="true"
               [rounded]="true"
-              [loading]="busyId() === form.id"
+              [disabled]="busyId() !== null"
               [ariaLabel]="'common.actions' | translate"
-              (onClick)="rowMenu.toggle($event)"
+              (onClick)="toggleMenu($event, form, rowMenu)"
             />
-            <p-menu #rowMenu [model]="menuFor(form)" [popup]="true" appendTo="body" />
           </div>
         </td>
       </tr>
@@ -133,11 +171,13 @@
 
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="6" class="p-6 text-center opacity-70">{{ 'forms.empty' | translate }}</td>
+        <td colspan="6" class="text-center py-4">{{ 'forms.empty' | translate }}</td>
       </tr>
     </ng-template>
   </p-table>
 </div>
+
+<p-menu #rowMenu [model]="menuItems()" [popup]="true" appendTo="body" />
 
 <app-form-details-dialog [(visible)]="detailsVisible" [form]="selected()" (saved)="load()" />
 <app-form-clone-dialog [(visible)]="cloneVisible" [form]="selected()" (cloned)="load()" />

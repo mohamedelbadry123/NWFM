@@ -44,7 +44,6 @@ import { PublishedForm } from '../../../core/form-engine/form-engine.models';
             <button
               type="button"
               class="card flex flex-col gap-2 p-4 text-start transition hover:shadow-app-md"
-              style="background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 0.75rem;"
               (click)="fill(form)"
             >
               <div class="flex items-start justify-between gap-2">

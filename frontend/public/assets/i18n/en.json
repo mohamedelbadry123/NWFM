@@ -25,6 +25,7 @@
     "prev": "Previous",
     "next": "Next",
     "actions": "Actions",
+    "pageReport": "Showing {first} to {last} of {totalRecords} entries",
     "appName": "NWFM",
     "appFullName": "National Water Field Management",
     "logout": "Sign out",

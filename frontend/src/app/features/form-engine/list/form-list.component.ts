@@ -8,12 +8,12 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { MenuModule } from 'primeng/menu';
+import { Menu, MenuModule } from 'primeng/menu';
 import { SelectModule } from 'primeng/select';
-import { TableLazyLoadEvent, TableModule } from 'primeng/table';
+import { Table, TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
+import { ToolbarModule } from 'primeng/toolbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { MenuItem } from 'primeng/api';
 import { HasPermissionDirective, PERMISSIONS } from '../../../core/auth/permissions';
@@ -44,14 +44,26 @@ interface FilterOption {
   labelKey: string;
 }
 
+/**
+ * Reads one field out of the table's own filter state. A column filter arrives as a metadata
+ * object, or as an array of them when a column carries several constraints.
+ */
+function filterValue(event: TableLazyLoadEvent | undefined, field: string): string | null {
+  const filter = event?.filters?.[field];
+  const meta = Array.isArray(filter) ? filter[0] : filter;
+  const value = meta?.value;
+
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
 /** The forms grid: design, publish and retire forms, and jump to filling or reviewing one. */
 @Component({
   selector: 'app-form-list',
   standalone: true,
   imports: [
     CommonModule, FormsModule, TranslateModule,
-    ButtonModule, ConfirmDialogModule, InputTextModule, MenuModule, SelectModule,
-    TableModule, TagModule, ToastModule, TooltipModule,
+    ButtonModule, ConfirmDialogModule, MenuModule, SelectModule,
+    TableModule, TagModule, ToastModule, ToolbarModule, TooltipModule,
     HasPermissionDirective,
     FormDetailsDialogComponent, FormCloneDialogComponent, FormVersionsDialogComponent,
     FormPreviewDialogComponent,
@@ -77,7 +89,10 @@ export class FormListComponent {
   protected readonly loading = signal(false);
   protected readonly busyId = signal<string | null>(null);
 
-  protected readonly search = signal('');
+  /**
+   * Category and status live here rather than in the table's filters so their defaults apply to
+   * the very first load, before anything has been touched. The search box is the table's own.
+   */
   protected readonly category = signal<string | null>(null);
   protected readonly status = signal<FormStatusFilterValue>(FormStatusFilter.Active);
 
@@ -89,6 +104,9 @@ export class FormListComponent {
 
   /** The schema behind the preview dialog, fetched on demand — the grid rows do not carry it. */
   protected readonly previewDefinition = signal<SerializedForm | null>(null);
+
+  /** Rebuilt for the row whose overflow button was pressed, so the labels match that row. */
+  protected readonly menuItems = signal<MenuItem[]>([]);
 
   protected readonly statusOptions: FilterOption[] = [
     { value: FormStatusFilter.Active, labelKey: formStatusFilterLabelKey(FormStatusFilter.Active) },
@@ -104,15 +122,25 @@ export class FormListComponent {
   private page = 1;
   private pageSize = 10;
 
+  /**
+   * The last paging/filter state the table asked for. Reloading with no argument would send the
+   * grid back to page one with the search cleared, which is not what finishing an action should do.
+   */
+  private lastLazyEvent?: TableLazyLoadEvent;
+
   /** Rows show the name in the reader's own language. */
   protected readonly nameOf = computed(() => (form: FormListItem) =>
     this.locale.locale() === 'ar' ? form.nameAr : form.nameEn);
 
   protected load(event?: TableLazyLoadEvent): void {
     if (event) {
-      this.pageSize = event.rows ?? this.pageSize;
-      this.page = Math.floor((event.first ?? 0) / this.pageSize) + 1;
+      this.lastLazyEvent = event;
+    } else {
+      event = this.lastLazyEvent;
     }
+
+    this.pageSize = event?.rows ?? this.pageSize;
+    this.page = Math.floor((event?.first ?? 0) / this.pageSize) + 1;
 
     const status = this.status();
 
@@ -121,8 +149,10 @@ export class FormListComponent {
       .list({
         pageNumber: this.page,
         pageSize: this.pageSize,
-        searchTerm: this.search() || null,
+        searchTerm: filterValue(event, 'search'),
         category: this.category(),
+        // "Active" and "All" are views, not statuses: neither sends one, and only "Active" asks
+        // the API to leave archived forms out.
         status: status === FormStatusFilter.Active || status === FormStatusFilter.All ? null : status,
         excludeArchived: status === FormStatusFilter.Active,
       })
@@ -136,9 +166,14 @@ export class FormListComponent {
       });
   }
 
-  protected applyFilters(): void {
-    this.page = 1;
-    this.load();
+  /**
+   * Routing a dropdown change through the table — rather than reloading directly — sends the grid
+   * back to page one and keeps the search box, which the table owns. The page the reader was on
+   * may not exist under the new filter.
+   */
+  protected onFilterChange(table: Table): void {
+    table.filters['category'] = { value: this.category(), matchMode: 'equals' };
+    table.filter(this.status(), 'status', 'equals');
   }
 
   protected openNew(): void {
@@ -209,8 +244,14 @@ export class FormListComponent {
     void this.router.navigate(['/forms', form.id, 'submissions']);
   }
 
+  protected toggleMenu(event: Event, form: FormListItem, menu: Menu): void {
+    this.selected.set(form);
+    this.menuItems.set(this.menuFor(form));
+    menu.toggle(event);
+  }
+
   /** The row overflow menu — the actions that are rarer or destructive. */
-  protected menuFor(form: FormListItem): MenuItem[] {
+  private menuFor(form: FormListItem): MenuItem[] {
     return [
       {
         label: this.translate.instant('forms.actions.versions'),
@@ -230,19 +271,19 @@ export class FormListComponent {
       { separator: true },
       {
         label: this.translate.instant('forms.actions.publish'),
-        icon: 'pi pi-cloud-upload',
+        icon: 'pi pi-check-circle',
         disabled: !canPublish(form.status),
         command: () => this.publish(form),
       },
       {
         label: this.translate.instant('forms.actions.deprecate'),
-        icon: 'pi pi-ban',
+        icon: 'pi pi-exclamation-circle',
         disabled: !canDeprecate(form.status),
         command: () => this.deprecate(form),
       },
       {
         label: this.translate.instant('forms.actions.archive'),
-        icon: 'pi pi-inbox',
+        icon: 'pi pi-box',
         disabled: !canArchive(form.status),
         command: () => this.archive(form),
       },
@@ -251,6 +292,10 @@ export class FormListComponent {
 
   protected canFillForm(form: FormListItem): boolean {
     return canFill(form.status, form.currentVersionNo);
+  }
+
+  protected canPublishForm(form: FormListItem): boolean {
+    return canPublish(form.status);
   }
 
   protected publish(form: FormListItem): void {

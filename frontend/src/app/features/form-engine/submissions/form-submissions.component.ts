@@ -47,7 +47,7 @@ import { SubmissionViewDialogComponent } from './submission-view-dialog.componen
         <p-message severity="error" [text]="error()!" />
       }
 
-      <div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+      <div class="card mt-4">
         <p-table
           [value]="rows()"
           [lazy]="true"
@@ -57,8 +57,10 @@ import { SubmissionViewDialogComponent } from './submission-view-dialog.componen
           [totalRecords]="totalRecords()"
           [loading]="loading()"
           [rowsPerPageOptions]="[20, 50, 100]"
+          [showCurrentPageReport]="true"
+          [currentPageReportTemplate]="'common.pageReport' | translate"
           [rowHover]="true"
-          styleClass="p-datatable-sm p-datatable-striped"
+          styleClass="app-table p-datatable-sm p-datatable-striped"
         >
           <ng-template pTemplate="header">
             <tr>

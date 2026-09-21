@@ -73,7 +73,7 @@ import { formEngineErrorMessage } from '../../../core/form-engine/form-engine-ap
         <p-message severity="success" [text]="'forms.fill.success' | translate" />
       }
 
-      <div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+      <div class="card p-4">
         <app-dynamic-form-renderer
           [definition]="schema()"
           [formId]="formId()"
