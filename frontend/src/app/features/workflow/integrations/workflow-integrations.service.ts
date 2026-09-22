@@ -10,7 +10,7 @@ export interface IntegrationOperation {
   id: string; workflowInstanceId: string; activityInstanceId: string; kind: string; status: string;
   attempts: number; nextAttemptAt: string; error?: string; statusCode?: number; createdAt: string;
 }
-export interface RequestResult { success: boolean; statusCode?: number; body: string; headers?: Record<string,string>; error?: string; timedOut: boolean; }
+export interface RequestResult { elapsedMilliseconds?: number; success: boolean; statusCode?: number; body: string; headers?: Record<string,string>; error?: string; timedOut: boolean; }
 export interface EventReceipt { id: string; eventId: string; eventKey: string; correlationId: string; status: string; activityInstanceId?: string; error?: string; createdAt: string; }
 export interface EventWait { id: string; workflowInstanceId: string; activityInstanceId: string; eventKey: string; correlationId: string; status: string; expiresAt: string; }
 @Injectable({ providedIn: 'root' })

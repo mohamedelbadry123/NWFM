@@ -13,6 +13,10 @@ public sealed class SlaPolicyConfiguration : IEntityTypeConfiguration<SlaPolicy>
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.OrganizationId);
+        builder.Property(x => x.DepartmentCode).HasMaxLength(50);
+        builder.Property(x => x.FieldActivityCode).HasMaxLength(50);
+        builder.HasIndex(x => new { x.OrganizationId, x.DepartmentCode, x.FieldActivityCode })
+            .IsUnique().HasFilter("[IsActive] = 1 AND [DepartmentCode] IS NOT NULL AND [FieldActivityCode] IS NOT NULL");
         builder.Property(x => x.PolicyCode).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.NameAr).HasMaxLength(200);

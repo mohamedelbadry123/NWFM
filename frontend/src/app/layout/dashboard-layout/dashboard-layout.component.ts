@@ -122,6 +122,7 @@ export class DashboardLayoutComponent {
       {labelKey:'workspace.workflows',icon:'pi pi-sitemap',route:'/admin/workflow/definitions',permissions:[PERMISSIONS.manageDefinitions]},
       {labelKey:'workspace.newInstance',icon:'pi pi-plus',route:'/workflow/start',permissions:[PERMISSIONS.startWorkflows]},
       {labelKey:'workspace.instances',icon:'pi pi-list',route:'/admin/workflow/instances',permissions:[PERMISSIONS.viewInstances]},
+      {labelKey:'workspace.sla',icon:'pi pi-clock',route:'/admin/workflow/sla-policies',permissions:[PERMISSIONS.manageSlaPolicies]},
       ...this.fullNavItems.filter(item => ['/lookups','/admin/users','/admin/roles'].includes(item.route || ''))
     ];
   }

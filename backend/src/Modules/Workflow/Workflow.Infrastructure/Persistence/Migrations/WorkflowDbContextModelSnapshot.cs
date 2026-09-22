@@ -264,6 +264,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<DateTime?>("NextSlaAlertAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
@@ -272,6 +275,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Phase")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SlaAlertCount")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("SlaBreachedAt")
                         .HasColumnType("datetime2");
@@ -515,6 +521,10 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DepartmentCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<int>("Duration")
                         .HasColumnType("int");
 
@@ -530,6 +540,10 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.Property<string>("EscalationThresholdsJson")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("FieldActivityCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -572,6 +586,10 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PolicyCode")
                         .IsUnique();
+
+                    b.HasIndex("OrganizationId", "DepartmentCode", "FieldActivityCode")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1 AND [DepartmentCode] IS NOT NULL AND [FieldActivityCode] IS NOT NULL");
 
                     b.ToTable("sla_policies", "Workflow");
                 });
@@ -1755,6 +1773,9 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("EventName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EventNodeKey")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("EventTrigger")

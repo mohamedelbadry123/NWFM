@@ -12,6 +12,7 @@ public sealed class ActivityDefinition : Entity
     public string? NameAr { get; private set; }
     public string? ActionKey { get; private set; }
     public string? ConfigurationJson { get; private set; }
+    public void SetPublishedConfiguration(string json) => ConfigurationJson = json;
     public double? PositionX { get; private set; }
     public double? PositionY { get; private set; }
 

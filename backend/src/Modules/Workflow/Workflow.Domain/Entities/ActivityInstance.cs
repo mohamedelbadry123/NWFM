@@ -24,6 +24,10 @@ public sealed class ActivityInstance : Entity, ITenantAware
     public string? Phase { get; private set; }
     public DateTime? DueAt { get; private set; }
     public DateTime? SlaBreachedAt { get; private set; }
+    public DateTime? NextSlaAlertAt { get; private set; }
+    public int SlaAlertCount { get; private set; }
+    public void ScheduleSlaAlert(DateTime? next) => NextSlaAlertAt = next;
+    public void AdvanceSlaAlert(DateTime? next) { SlaAlertCount++; NextSlaAlertAt = next; }
     public string? PendingOutcome { get; private set; }
     public void SetPhase(string phase) => Phase = phase;
     public void SetDeadline(DateTime? dueAt) => DueAt = dueAt;

@@ -106,6 +106,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
             {
                 var instanceEvents = await eventRepo.GetByInstanceIdAsync(item.WorkflowInstanceId, cancellationToken);
                 var activity = await activityRepo.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+                if (activity?.NextSlaAlertAt is not null || activity?.SlaAlertCount > 0) continue;
                 var nodeKey = activity?.ActivityNodeKey;
 
                 var alreadyReminded = instanceEvents.Any(e =>
@@ -184,6 +185,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
                 var policy = await ResolveSlaPolicyAsync(
                     slaRepo, item.OrganizationId, activityDef?.ConfigurationJson, cancellationToken);
                 using var configuration = JsonDocument.Parse(activityDef?.ConfigurationJson ?? "{}");
+                if (configuration.RootElement.TryGetProperty("publishedSla", out _)) continue;
                 var escalationKey = configuration.RootElement.TryGetProperty("slaEscalationKey", out var configuredKey)
                     ? configuredKey.GetString() : policy?.EscalationAssignmentKey;
                 if (string.IsNullOrWhiteSpace(escalationKey))

@@ -535,11 +535,11 @@
       "palette_title": "Nodes",
       "node_start": "Start",
       "node_user_task": "User Task",
-      "node_service_task": "Service Task",
+      "node_service_task": "API Request",
       "node_script_task": "Set Variables",
       "node_timer": "Timer",
       "node_wait_event": "Wait for Event",
-      "node_notification_task": "Notification",
+      "node_notification_task": "Email",
       "node_exclusive_gateway": "Decision",
       "node_inclusive_gateway": "Inclusive Gateway",
       "node_parallel_gateway": "Parallel Fork",
@@ -689,8 +689,8 @@
       "tab_help_general": "Task title, Arabic name, and instructions the reviewer sees on the task screen.",
       "tab_help_assignment": "Pick the company group that works this step. Groups come from the organization that owns this workflow.",
       "tab_help_outcomes": "Buttons the reviewer clicks (Approve, Reject, Return). They do nothing until you draw one Decision arrow per key.",
-      "tab_help_actions": "Optional automations when the task starts, completes, or fails (email, update the module).",
-      "tab_help_sla": "How many hours this task may take before it is marked overdue.",
+      "tab_help_actions": "Accept moves forward; Reject returns to an earlier activity.",
+      "tab_help_sla": "The matching Department and FA Type rule sets the deadline and alert schedule.",
       "tab_help_data": "Map request fields into this step and write results back to the module.",
       "tab_help_form": "Extra questions the reviewer must fill on the task screen.",
       "tab_help_advanced": "Technical JSON for rare options. Leave empty unless you need it.",
@@ -891,7 +891,9 @@
       "ctx_add_end": "Add End",
       "ctx_select_all": "Select all",
       "node_main_activity": "Main activity",
-      "node_desc_main_activity": "Child workflow followed by final approval"
+      "node_desc_main_activity": "Child workflow followed by final approval",
+      "node_sms": "SMS",
+      "node_desc_sms": "Send a message through an HTTP SMS provider"
     },
     "help": {
       "title": "Workflow Knowledge Base",
@@ -2082,6 +2084,7 @@
     "newInstance": "New Instance",
     "instances": "Instances",
     "fieldActivityTypes": "Field Activity Types",
-    "department": "Department"
+    "department": "Department",
+    "sla": "SLA"
   }
 }

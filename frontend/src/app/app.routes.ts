@@ -28,7 +28,7 @@ export const routes: Routes = [
       { path: 'admin/workflow/instances', data: {workspaceView: 'instances'}, canActivate: [permissionGuard(PERMISSIONS.viewInstances)], loadComponent: () => import('./features/workflow/workspace/workflow-workspace.component').then(m => m.WorkflowWorkspaceComponent) },
       { path: 'admin/workflow/instances/:id', canActivate: [permissionGuard(PERMISSIONS.viewInstances)], loadComponent: () => import('./features/workflow/workspace/workflow-instance-workspace.component').then(m => m.WorkflowInstanceWorkspaceComponent) },
       { path: 'admin/workflow/calendars', loadComponent: () => import('./features/admin/workflow-calendars/workflow-calendars.component').then(m => m.WorkflowCalendarsComponent) },
-      { path: 'admin/workflow/sla-policies', loadComponent: () => import('./features/admin/workflow-sla-policies/workflow-sla-policies.component').then(m => m.WorkflowSlaPoliciesComponent) },
+      { path: 'admin/workflow/sla-policies', canActivate: [permissionGuard(PERMISSIONS.manageSlaPolicies)], loadComponent: () => import('./features/workflow/workspace/workflow-sla-rules.component').then(m => m.WorkflowSlaRulesComponent) },
       { path: 'admin/workflow/incidents', loadComponent: () => import('./features/admin/workflow-incidents/workflow-incidents.component').then(m => m.WorkflowIncidentsComponent) },
       { path: 'admin/workflow/incidents/:id', loadComponent: () => import('./features/admin/workflow-incident-detail/workflow-incident-detail.component').then(m => m.WorkflowIncidentDetailComponent) },
       { path: 'admin/workflow/dead-letters', loadComponent: () => import('./features/admin/workflow-dead-letters/workflow-dead-letters.component').then(m => m.WorkflowDeadLettersComponent) },

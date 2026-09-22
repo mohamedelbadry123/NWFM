@@ -28,6 +28,7 @@ public static class DependencyInjection
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", "Workflow")));
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
+        services.AddScoped<Workflow.Application.Workspace.IWorkspaceSla, WorkspaceSla>();
         services.AddScoped<Workflow.Application.Workspace.IWorkflowWorkspacePublisher, WorkflowWorkspacePublisher>();
         services.AddTransient(typeof(MediatR.IPipelineBehavior<,>), typeof(WorkflowRuntimeCommandLock<,>));
         services.AddScoped<IWorkflowParticipantRepository, WorkflowParticipantRepository>();

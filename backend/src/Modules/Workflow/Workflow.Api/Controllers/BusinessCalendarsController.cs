@@ -72,6 +72,13 @@ public sealed class BusinessCalendarsController : WorkflowControllerBase
         return Ok(result.Value);
     }
 
+    [HttpDelete("{id:guid}/periods/{itemId:guid}")]
+    public async Task<IActionResult> RemovePeriod(Guid id, Guid itemId, CancellationToken ct)
+    { var result = await _sender.Send(new Workflow.Application.Commands.RemoveCalendarItem(id, itemId, false), ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
+    [HttpDelete("{id:guid}/holidays/{itemId:guid}")]
+    public async Task<IActionResult> RemoveHoliday(Guid id, Guid itemId, CancellationToken ct)
+    { var result = await _sender.Send(new Workflow.Application.Commands.RemoveCalendarItem(id, itemId, true), ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
+
     [HttpPost("{id:guid}/periods")]
     [ProducesResponseType(typeof(BusinessCalendarPeriodDto), StatusCodes.Status201Created)]
     public async Task<IActionResult> AddPeriod(

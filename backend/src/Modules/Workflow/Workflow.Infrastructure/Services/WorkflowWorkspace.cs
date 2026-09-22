@@ -36,7 +36,7 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             if (settings.Kind is not ("Main" or "Child")) return Result.Failure<WorkspaceCreated>(Invalid("Select Main or Child workflow."));
             if (settings.Kind == "Main" && !await references.IsValidGeographyAsync(new(settings.ClusterCode ?? "", settings.RegionCode ?? "", settings.CityCode ?? ""), ct))
                 return Result.Failure<WorkspaceCreated>(Invalid("Select a valid cluster, region and city."));
-            if (settings.Kind == "Child") settings = new("Child");
+            if (settings.Kind == "Child") settings = new("Child", DesignerVersion: settings.DesignerVersion);
             var created = await sender.Send(new CreateWorkflowDefinitionCommand(tenant.OrganizationId, "workflow-" + Guid.NewGuid().ToString("N"), input.Name, input.NameAr, null, null), ct);
             if (created.IsFailure) return Result.Failure<WorkspaceCreated>(created.Error);
             var draft = await sender.Send(new CreateWorkflowDraftCommand(created.Value.Id, actor), ct);
@@ -134,11 +134,13 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 {
                     var member = await groups.IsMemberAsync(instance.OrganizationId, item.AssignmentGroupId, effective, ct);
                     var canAct = running && member && (item.Status == WorkItemStatus.Pending || item.Status == WorkItemStatus.Claimed && item.ClaimedByUserId == effective);
-                    tasks.Add(new(await assembler.ToDtoAsync(item, true, ct), canAct, canAct ? null : !running ? "Workflow or parent is paused or finished." : !member ? "Assigned to another group." : "Task is completed or claimed by another user."));
+                    var completionBlocked = await db.IntegrationJobs.AnyAsync(j => j.ActivityInstanceId == activity.Id && j.IsActivityEvent && j.Required && j.Status != "Completed", ct);
+                    tasks.Add(new(await assembler.ToDtoAsync(item, true, ct), canAct, canAct ? null : !running ? "Workflow or parent is paused or finished." : !member ? "Assigned to another group." : "Task is completed or claimed by another user.", completionBlocked));
                 }
                 activityDtos.Add(new(activity.Id, activity.ActivityNodeKey, activity.Name, activity.ActivityType.ToString(), activity.Status.ToString(), activity.Phase,
                     activity.StartedAt, activity.CompletedAt, activity.DueAt, config.DepartmentCode, config.FieldActivityCode, tasks,
-                    definition.AssignmentRules.FirstOrDefault(r => r.IsActive)?.ReferenceId is Guid assigned ? groupNames.GetValueOrDefault(assigned) : null));
+                    definition.AssignmentRules.FirstOrDefault(r => r.IsActive)?.ReferenceId is Guid assigned ? groupNames.GetValueOrDefault(assigned) : null,
+                    WorkspaceDesign.Configuration(definition.ConfigurationJson)["publishedSla"]?.Deserialize<PublishedSla>(IntegrationJson.Options)));
             }
             tree.Add(new(instance.Id, instance.ParentInstanceId, instance.ParentActivityInstanceId, name, instance.Status.ToString(), activityDtos));
         }
@@ -148,7 +150,7 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
         var history = audit.OrderBy(e => e.OccurredAt).Select(e => new WorkspaceHistory(e.Id, e.WorkflowInstanceId, e.EventType.ToString(), e.ActivityNodeKey, e.ActorUserId,
             e.ActorUserId is Guid user ? actors.GetValueOrDefault(user) : null, e.OccurredAt, e.PayloadJson)).ToList();
         var operations = await db.IntegrationJobs.AsNoTracking().Where(j => ids.Contains(j.WorkflowInstanceId)).OrderByDescending(j => j.CreatedAt).Take(200)
-            .Select(j => new WorkspaceOperation(j.Id, j.WorkflowInstanceId, j.ActivityInstanceId, j.EventName, j.Kind, j.EventTrigger, j.Required, j.Status, j.Attempts, j.Error, j.StatusCode, j.DeliveryResultJson)).ToListAsync(ct);
+            .Select(j => new WorkspaceOperation(j.Id, j.WorkflowInstanceId, j.ActivityInstanceId, j.EventName, j.Kind, j.EventTrigger, j.Required, j.Status, j.Attempts, j.Error, j.StatusCode, j.DeliveryResultJson, j.EventNodeKey)).ToListAsync(ct);
         var demoActors = administrator && root.IsDemo ? await db.Participants.Where(p => p.IsActive && p.IsDemo).Select(p => new WorkspaceActor(p.UserId, p.DisplayName)).ToListAsync(ct) : [];
         return Result.Success(new WorkspaceDetail(root.Id, root.IsDemo, root.GeographyJson, tree, history, operations, demoActors));
     }

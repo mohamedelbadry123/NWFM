@@ -43,10 +43,40 @@ public static class WorkflowWorkspaceDemo
             department = Department.Create("DEMO-WATER", "Water Network", "شبكة المياه");
             auth.Departments.Add(department); await auth.SaveChangesAsync();
         }
-        foreach (var (code, name) in new[] { ("ISOLATION", "Isolation"), ("DEMO-REVIEW", "Demo — Request review"), ("DEMO-CLOSURE", "Demo — Closure") })
+        foreach (var (code, name) in new[] { ("ISOLATION", "Isolation"), ("DEMO-REVIEW", "Demo — Request review"), ("DEMO-CLOSURE", "Demo — Closure"), ("DEMO-OVERDUE", "Demo — Short SLA test") })
             if (!await auth.FieldActivityTypes.AnyAsync(f => f.DepartmentCode == department.Code && f.Code == code))
                 auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, code == "ISOLATION" ? "عزل" : "تجريبي — " + name, department.Code));
         await auth.SaveChangesAsync();
+        var demoFieldTypes = new[] {
+            ("11", "DEMO-BLOCKAGE", "Demo — Blockage Inspection", "تجريبي — فحص الانسداد"),
+            ("11", "DEMO-SEWER", "Demo — Sewer Cleaning", "تجريبي — تنظيف الصرف"),
+            ("50", "DEMO-SURVEY", "Demo — Site Survey", "تجريبي — المسح الميداني"),
+            ("50", "DEMO-CONNECTION", "Demo — Connection Installation", "تجريبي — تركيب التوصيلة") };
+        foreach (var (departmentCode, code, name, nameAr) in demoFieldTypes)
+            if (await auth.Departments.AnyAsync(d => d.Code == departmentCode && d.IsActive)
+                && !await auth.FieldActivityTypes.AnyAsync(f => f.Code == code && f.DepartmentCode == departmentCode))
+                auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, nameAr, departmentCode));
+        await auth.SaveChangesAsync();
+        var calendar = await db.BusinessCalendars.FirstOrDefaultAsync(c => c.Code == "DEMO-WORKSPACE-CALENDAR");
+        if (calendar is null)
+        {
+            calendar = BusinessCalendar.Create("DEMO-WORKSPACE-CALENDAR", "Demo — Sunday to Thursday", "Asia/Riyadh", now, tenant);
+            foreach (var day in new[] { DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday })
+                calendar.AddPeriod(day, TimeSpan.FromHours(8), TimeSpan.FromHours(16), now);
+            db.BusinessCalendars.Add(calendar); await db.SaveChangesAsync();
+        }
+        var seededTypes = new[] { (department.Code, "ISOLATION"), (department.Code, "DEMO-REVIEW"), (department.Code, "DEMO-CLOSURE"), (department.Code, "DEMO-OVERDUE") }
+            .Concat(demoFieldTypes.Select(f => (f.Item1, f.Item2)));
+        foreach (var (departmentCode, fieldCode) in seededTypes)
+        {
+            if (!await auth.FieldActivityTypes.AnyAsync(f => f.Code == fieldCode && f.DepartmentCode == departmentCode)) continue;
+            var code = "DEMO-SLA-" + departmentCode + "-" + fieldCode;
+            if (await db.SlaPolicies.AnyAsync(p => p.PolicyCode == code || p.OrganizationId == tenant && p.IsActive && p.DepartmentCode == departmentCode && p.FieldActivityCode == fieldCode)) continue;
+            var policy = SlaPolicy.Create(code, "Demo — " + fieldCode, fieldCode == "DEMO-OVERDUE" ? 1 : 24, fieldCode == "DEMO-OVERDUE" ? SlaDurationUnit.Minutes : SlaDurationUnit.Hours, calendar.Id, now, tenant,
+                reminderThresholdsJson: "[60,15]", escalationThresholdsJson: "[0,60]");
+            policy.BindFieldActivity(departmentCode, fieldCode); db.SlaPolicies.Add(policy);
+        }
+        await db.SaveChangesAsync();
         WorkflowGeography? geography = null;
         foreach (var cluster in await references.ListAsync("clusters", null, default))
         {
@@ -90,8 +120,8 @@ public static class WorkflowWorkspaceDemo
             if (result.IsFailure) throw new InvalidOperationException(result.Error.Message);
             return result.Value;
         }
-        var http = await Connection(new("Demo — Local HTTP", "Http", "http://127.0.0.1:5091", "None", AllowPrivateNetwork: true));
-        var smtp = await Connection(new("Demo — Local email", "Smtp", "127.0.0.1", "None", new() { ["fromAddress"] = "workflow@example.test" }, true, 2525, false));
+        var http = await Connection(new("Demo — Local HTTP", "Http", configuration["WorkflowDemo:HttpAddress"] ?? "http://127.0.0.1:5091", "None", AllowPrivateNetwork: true));
+        var smtp = await Connection(new("Demo — Local email", "Smtp", "127.0.0.1", "None", new() { ["fromAddress"] = "workflow@example.test" }, true, configuration.GetValue<int?>("WorkflowDemo:SmtpPort") ?? 2525, false));
         var callbackKey = configuration["WorkflowDemo:CallbackKey"];
         if (string.IsNullOrWhiteSpace(callbackKey) || callbackKey.Length < 32)
             throw new InvalidOperationException("Set WorkflowDemo:CallbackKey to a local demo credential of at least 32 characters.");
@@ -107,6 +137,9 @@ public static class WorkflowWorkspaceDemo
         XElement Edge(string from, string to) => new(ns + "Transition", new XAttribute("key", from + "-" + to), new XAttribute("from", from), new XAttribute("to", to));
         async Task<(WorkflowDefinition Definition, WorkflowVersion Version)> Publish(string key, string name, WorkflowWorkspaceDefinition settings, List<XElement> nodes)
         {
+            key += "-VISUAL";
+            name += " — Visual";
+            settings = settings with { DesignerVersion = 2 };
             var existing = await db.WorkflowDefinitions.FirstOrDefaultAsync(d => d.DefinitionKey == key);
             if (existing is not null)
             {
@@ -147,9 +180,13 @@ public static class WorkflowWorkspaceDemo
                     activityEvents.Add(Event("email", "OnComplete", "Email", false, new { connectionId = smtp.Id, channels = "Email", to = "reviewer@example.test", subject = "Demo workflow completed", body = "Request {{CorrelationId}} completed.", failurePolicy = "Retry" }));
                     activityEvents.Add(Event("sms", "OnComplete", "Sms", false, new { connectionId = http.Id, protocol = "Sms", method = "POST", path = "/sms", smsTo = "+966500000000", smsMessage = "Demo {{CorrelationId}} completed", body = "{\"to\":\"{{smsTo}}\",\"message\":\"{{smsMessage}}\"}", outputMappings = new { providerMessageId = "body.id" } }));
                 }
+                activityEvents.Add(Event("reminder", "OnSlaReminder", "Email", false, new { connectionId = smtp.Id, channels = "Email", to = "supervisor@example.test", subject = "Demo SLA reminder", body = names[i] + " is approaching its deadline.", failurePolicy = "Retry" }));
                 activityEvents.Add(Event("sla", "OnSlaBreach", "Email", false, new { connectionId = smtp.Id, channels = "Email", to = "supervisor@example.test", subject = "Demo SLA overdue", body = names[i] + " is overdue.", failurePolicy = "Retry" }));
-                nodes.Add(Node("stage-" + i, "MainActivity", names[i], new { departmentCode = department.Code, fieldActivityCode = fa[i], slaDurationHours = hours, definitionKey = children[i].Definition.DefinitionKey, versionId = children[i].Version.Id, rejectTargetNodeKey = "stage-" + Math.Max(0, i - 1), events = activityEvents }, groups[i].Id));
+                nodes.Add(Node("stage-" + i, "MainActivity", names[i], new { departmentCode = department.Code, fieldActivityCode = suffix == "OVERDUE" ? "DEMO-OVERDUE" : fa[i], slaDurationHours = hours, definitionKey = children[i].Definition.DefinitionKey, versionId = children[i].Version.Id, rejectTargetNodeKey = "stage-" + Math.Max(0, i - 1), events = activityEvents }, groups[i].Id));
             }
+            var audit = Node("delivery", "ServiceTask", "Send completion record", new { connectionId = http.Id, protocol = "Rest", method = "POST", path = "/rest", body = "{}", required = true });
+            audit.SetAttributeValue("actionKey", "http.request");
+            nodes.Add(audit);
             if (callback) nodes.Insert(1, Node("callback", "WaitEvent", "Wait for field confirmation", new { connectionId = webhook.Id, eventKey = "demo.field.completed", correlationVariable = "CorrelationId", timeoutSeconds = 86400 }));
             return await Publish("DEMO-MAIN-" + suffix, "Demo — Water isolation" + (suffix == "STANDARD" ? "" : " — " + suffix), new("Main", geography.ClusterCode, geography.RegionCode, geography.CityCode), nodes);
         }
@@ -159,7 +196,7 @@ public static class WorkflowWorkspaceDemo
         var callbackMain = await Main("CALLBACK", callback: true);
         foreach (var scenario in new[] { ("Child execution", main, 0, false), ("Pending main approval", main, 1, false), ("Rework", main, 2, true), ("Completion", main, 6, false), ("Overdue SLA", overdue, 0, false), ("Integration failure", failed, 6, false), ("Callback waiting", callbackMain, 2, false) })
         {
-            var reference = "Demo — " + scenario.Item1;
+            var reference = "Demo — " + scenario.Item1 + " — Visual";
             if (await db.WorkflowInstances.AnyAsync(i => i.IsDemo && i.CorrelationId == reference)) continue;
             var started = await workspace.StartAsync(scenario.Item2.Definition.Id, new(Guid.NewGuid(), reference, true), admin, true, default);
             if (started.IsFailure) throw new InvalidOperationException(started.Error.Message);

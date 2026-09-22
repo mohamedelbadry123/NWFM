@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { SimpleChange, signal } from '@angular/core';
 import { of } from 'rxjs';
 import { LocaleService } from '@core/i18n/locale.service';
 import { WorkflowIntegrationsService } from './workflow-integrations.service';
@@ -17,6 +17,13 @@ describe('Workflow integration configuration', () => {
   it('preserves extension fields when editing an existing connector', () => {
     editor.configuration=JSON.stringify({connectionId:'connection',method:'POST',custom:{keep:true},headers:{Accept:'application/json'}});editor.ngOnChanges();
     editor.form.path='/orders';const saved=editor.config();expect(saved['custom']).toEqual({keep:true});expect(saved['headers']).toEqual({Accept:'application/json'});expect(saved['method']).toBe('POST');
+  });
+  it('preserves unsaved request fields when canvas source lists refresh', () => {
+    editor.form.path='/edited';editor.form.body='{"name":"draft"}';
+    editor.rows.outputMappings.push({key:'externalId',value:'body.id'});
+    editor.ngOnChanges({nodes:new SimpleChange([], [{nodeKey:'review',name:'Review'}],false)});
+    expect(editor.form.path).toBe('/edited');expect(editor.form.body).toBe('{"name":"draft"}');
+    expect(editor.rows.outputMappings).toEqual([{key:'externalId',value:'body.id'}]);
   });
   it('does not contact the service while applying or previewing configuration', () => {
     editor.form.connectionId='connection';editor.apply();editor.preview();expect(api.test).not.toHaveBeenCalled();
@@ -42,5 +49,20 @@ describe('Workflow integration configuration', () => {
   });
   it('allows an in-app notification without an SMTP connection', () => {
     editor.kind='NotificationTask';editor.ngOnChanges();expect(editor.config()['connectionId']).toBeUndefined();
+  });
+  it('round trips a trigger binding and clears it when switched to sequence flow', () => {
+    editor.configuration=JSON.stringify({connectionId:'http',triggerBinding:{sourceNodeKey:'review',trigger:'OnComment'},required:true});editor.ngOnChanges();
+    expect(editor.config()['triggerBinding']).toEqual({sourceNodeKey:'review',trigger:'OnComment'});
+    editor.invocation='flow';expect(editor.config()['triggerBinding']).toBeUndefined();
+  });
+  it('forces SLA and failure alerts to background delivery', () => {
+    editor.form.connectionId='http';editor.invocation='trigger';editor.sourceNodeKey='review';editor.required=true;
+    for(const trigger of ['OnSlaReminder','OnSlaBreach','OnFailure']){editor.trigger=trigger;expect(editor.config()['required']).toBeFalse();}
+    editor.trigger='OnComment';expect(editor.config()['required']).toBeTrue();
+  });
+  it('defaults REST to required and SMS to background without changing an explicit choice', () => {
+    editor.configuration=JSON.stringify({connectionId:'http',protocol:'Sms'});editor.ngOnChanges();expect(editor.required).toBeFalse();
+    editor.configuration=JSON.stringify({connectionId:'http',protocol:'Rest'});editor.ngOnChanges();expect(editor.required).toBeTrue();
+    editor.configuration=JSON.stringify({connectionId:'http',protocol:'Sms',required:true});editor.ngOnChanges();expect(editor.required).toBeTrue();
   });
 });

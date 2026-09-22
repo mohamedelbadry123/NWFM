@@ -9,7 +9,7 @@ public sealed record ConnectionDto(Guid Id, string Name, string Kind, string Add
     bool HasCredentials, bool AllowPrivateNetwork, int Port, bool UseTls);
 public sealed record EventEnvelope(string EventId, string EventKey, string CorrelationId, JsonElement Payload);
 public sealed record IntegrationResult(bool Success, int? StatusCode, string Body, string? Error,
-    bool Retryable = false, bool TimedOut = false, Dictionary<string, string>? Headers = null, string? RequestSummary = null);
+    bool Retryable = false, bool TimedOut = false, Dictionary<string, string>? Headers = null, string? RequestSummary = null, long? ElapsedMilliseconds = null);
 public sealed record OperationDto(Guid Id, Guid WorkflowInstanceId, Guid ActivityInstanceId, string Kind,
     string Status, int Attempts, DateTime NextAttemptAt, string? Error, int? StatusCode, DateTime CreatedAt);
 public sealed record EventReceiptDto(Guid Id, string EventId, string EventKey, string CorrelationId, string Status, Guid? ActivityInstanceId, string? Error, DateTime CreatedAt);

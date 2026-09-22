@@ -41,14 +41,18 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
         if (!version.IsDraft)
             return Result.Failure<WorkflowVersionDto>(WorkflowErrors.Version.NotDraft);
 
-        var compileResult = _compiler.Compile(request.XmlContent, out var canonicalHash);
+        string normalizedXml;
+        try { normalizedXml = Workspace.WorkspaceDesign.NormalizeDraft(request.XmlContent); }
+        catch (Exception ex) when (ex is System.Xml.XmlException or System.Text.Json.JsonException or InvalidOperationException)
+        { return Result.Failure<WorkflowVersionDto>(new Error("Workflow.InvalidDraft", ex.Message)); }
+        var compileResult = _compiler.Compile(normalizedXml, out var canonicalHash);
         if (compileResult.IsFailure)
             return Result.Failure<WorkflowVersionDto>(compileResult.Error);
 
         var doc = compileResult.Value!;
         var now = DateTime.UtcNow;
 
-        version.UpdateXml(request.XmlContent, canonicalHash, now);
+        version.UpdateXml(normalizedXml, canonicalHash, now);
         version.SetWorkspace(doc.WorkspaceJson);
         if (request.DesignerJson is not null)
             version.UpdateDesignerJson(request.DesignerJson, now);

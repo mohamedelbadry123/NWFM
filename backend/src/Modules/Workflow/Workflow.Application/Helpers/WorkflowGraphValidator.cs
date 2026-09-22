@@ -62,6 +62,7 @@ public static class WorkflowGraphValidator
         foreach (var a in doc.Activities)
         {
             var typeName = a.ActivityTypeName;
+            if (Workspace.WorkspaceDesign.Binding(a.ConfigurationJson) is not null) continue;
             var isEnd = string.Equals(typeName, ActivityType.End.ToString(), StringComparison.OrdinalIgnoreCase);
             var isStart = string.Equals(typeName, ActivityType.Start.ToString(), StringComparison.OrdinalIgnoreCase);
 

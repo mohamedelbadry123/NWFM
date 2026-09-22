@@ -1520,6 +1520,13 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var ai = ActivityInstance.Start(
             instance.OrganizationId, instance.Id,
             activity.NodeKey, activity.ActivityType, activity.Name, now);
+        var snapshot = Workflow.Application.Workspace.WorkspaceDesign.Configuration(activity.ConfigurationJson)["publishedSla"];
+        if (snapshot is not null)
+        {
+            var sla = snapshot.Deserialize<Workflow.Application.Workspace.PublishedSla>(IntegrationJson.Options)!;
+            ai.SetDeadline(Workflow.Application.Workspace.PublishedSlaClock.Deadline(sla, now));
+            ai.ScheduleSlaAlert(Workflow.Application.Workspace.PublishedSlaClock.Alerts(sla, now).FirstOrDefault()?.At);
+        }
         await _activityRepo.AddAsync(ai, cancellationToken);
         return ai;
     }
@@ -1844,6 +1851,8 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             var root = doc.RootElement;
 
             SlaPolicy? policy = null;
+            if (root.TryGetProperty("publishedSla", out var pinnedSla))
+                return Workflow.Application.Workspace.PublishedSlaClock.Deadline(pinnedSla.Deserialize<Workflow.Application.Workspace.PublishedSla>(IntegrationJson.Options)!, now);
             if (root.TryGetProperty("slaPolicyId", out var idProp)
                 && idProp.ValueKind == JsonValueKind.String
                 && Guid.TryParse(idProp.GetString(), out var policyId))

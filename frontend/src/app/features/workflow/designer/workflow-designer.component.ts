@@ -1,3 +1,4 @@
+import { WorkflowActivitySlaComponent } from '../workspace/workflow-activity-sla.component';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -13,7 +14,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
@@ -292,7 +293,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowGeographyComponent],
+  imports: [WorkflowActivitySlaComponent, FormsModule, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowGeographyComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -444,12 +445,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly userTaskTabs: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
     { id: 'general',    labelKey: 'workflow.designer.tab_general',    helpKey: 'workflow.designer.tab_help_general'    },
     { id: 'assignment', labelKey: 'workflow.designer.tab_assignment', helpKey: 'workflow.designer.tab_help_assignment' },
-    { id: 'outcomes',   labelKey: 'workflow.designer.tab_outcomes',   helpKey: 'workflow.designer.tab_help_outcomes'   },
     { id: 'actions',    labelKey: 'workflow.designer.tab_actions',    helpKey: 'workflow.designer.tab_help_actions'    },
     { id: 'sla',        labelKey: 'workflow.designer.tab_sla',        helpKey: 'workflow.designer.tab_help_sla'        },
-    { id: 'data',       labelKey: 'workflow.designer.tab_data',       helpKey: 'workflow.designer.tab_help_data'       },
-    { id: 'form',       labelKey: 'workflow.designer.tab_form',       helpKey: 'workflow.designer.tab_help_form'       },
-    { id: 'advanced',   labelKey: 'workflow.designer.tab_advanced',   helpKey: 'workflow.designer.tab_help_advanced'   },
   ];
   protected readonly activeTabHelpKey = computed(() =>
     this.userTaskTabs.find(t => t.id === this.inspectorTab())?.helpKey
@@ -457,7 +454,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   );
 
   // ── Palette
-  protected readonly paletteNodes: { type: NodeType; labelKey: string; label: string; category: string; descKey: string }[] = [
+  protected readonly paletteNodes: { type: NodeType; protocol?: string; labelKey: string; label: string; category: string; descKey: string }[] = [
     { type: 'Start',            labelKey: 'workflow.designer.node_start',             label: 'Start',          category: 'flow',       descKey: 'workflow.designer.node_desc_start'            },
     { type: 'End',              labelKey: 'workflow.designer.node_end',               label: 'End',            category: 'flow',       descKey: 'workflow.designer.node_desc_end'              },
     { type: 'ExclusiveGateway', labelKey: 'workflow.designer.node_exclusive_gateway', label: 'Decision',           category: 'flow',       descKey: 'workflow.designer.node_desc_exclusive_gateway'},
@@ -466,10 +463,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     { type: 'JoinGateway',      labelKey: 'workflow.designer.node_join_gateway',      label: 'Join',               category: 'flow',       descKey: 'workflow.designer.node_desc_join_gateway'     },
     { type: 'MainActivity', labelKey: 'workflow.designer.node_main_activity', label: 'Main Activity', category: 'tasks', descKey: 'workflow.designer.node_desc_main_activity' },
     { type: 'UserTask',         labelKey: 'workflow.designer.node_user_task',         label: 'User Task',          category: 'tasks',      descKey: 'workflow.designer.node_desc_user_task'        },
-    { type: 'ServiceTask',      labelKey: 'workflow.designer.node_service_task',      label: 'Service Task',       category: 'automation', descKey: 'workflow.designer.node_desc_service_task'     },
-    { type: 'CallActivity',     labelKey: 'workflow.designer.node_call_activity',     label: 'Call Activity',      category: 'automation', descKey: 'workflow.designer.node_desc_call_activity'    },
-    { type: 'ScriptTask',       labelKey: 'workflow.designer.node_script_task',       label: 'Set Variables',      category: 'automation', descKey: 'workflow.designer.node_desc_script_task'      },
-    { type: 'NotificationTask', labelKey: 'workflow.designer.node_notification_task', label: 'Notification',       category: 'automation', descKey: 'workflow.designer.node_desc_notification_task'},
+    { type: 'ServiceTask', protocol: 'Sms', labelKey: 'workflow.designer.node_sms', label: 'SMS', category: 'events', descKey: 'workflow.designer.node_desc_sms' },
+    { type: 'ServiceTask',      labelKey: 'workflow.designer.node_service_task',      label: 'API Request',       category: 'automation', descKey: 'workflow.designer.node_desc_service_task'     },
+    { type: 'NotificationTask', labelKey: 'workflow.designer.node_notification_task', label: 'Email',       category: 'automation', descKey: 'workflow.designer.node_desc_notification_task'},
     { type: 'Timer',            labelKey: 'workflow.designer.node_timer',             label: 'Timer',              category: 'events',     descKey: 'workflow.designer.node_desc_timer'            },
     { type: 'WaitEvent',        labelKey: 'workflow.designer.node_wait_event',        label: 'Wait for Event',     category: 'events',     descKey: 'workflow.designer.node_desc_wait_event'       },
   ];
@@ -678,6 +674,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           try { this.workspace.set(v.workspaceJson ? JSON.parse(v.workspaceJson) : undefined); } catch { this.workspace.set(undefined); }
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
+          if (v.status === 'Draft' && this.workspace()) { this.workspace.update(w => ({...w!, designerVersion: 2})); this.ensureSimpleActions(); this.convertEmbeddedEvents(); }
           this.relayoutIfCollapsed();
           if (v.status !== 'Draft') {
             this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
@@ -945,6 +942,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     };
     this.pushUndo();
     this.nodes.update(ns => [...ns, node]);
+    this.ensureSimpleActions();
     this.markUnsaved();
   }
 
@@ -1035,6 +1033,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private saveToBackend(): Observable<WorkflowVersionDto | null> {
     if (this.isReadonly()) return of(null);
+    this.ensureSimpleActions();
     this.saveStatus.set('saving');
     const state: CanvasState = { nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() };
     const xml = buildNWFMXml(state);
@@ -1109,7 +1108,38 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Canvas interactions ──────────────────────────────────────────────────
 
-  protected addNode(type: NodeType, x?: number, y?: number): void {
+  private convertEmbeddedEvents():void {
+    const added:CanvasNode[]=[];
+    this.nodes.update(nodes=>nodes.map(n=>{const c=this.parseConfig(n.configurationJson) as any;if(!Array.isArray(c.events)||!c.events.length)return n;const remaining=[];
+      for(const ev of c.events){if(!['Http','Soap','Sms','Email'].includes(ev.kind)){remaining.push(ev);continue;}
+        const key='event_'+n.id.replaceAll('-','')+'_'+String(ev.id).replaceAll('-','');
+        added.push({id:key,nodeKey:key,type:ev.kind==='Email'?'NotificationTask':'ServiceTask',name:ev.name||ev.kind,nameAr:'',actionKey:ev.kind==='Email'?'':'http.request',assignmentKey:'',assignmentGroupId:'',assignmentPurpose:'',outcomes:[],actions:[],x:n.x+300,y:n.y+140+added.length*120,configurationJson:JSON.stringify({...ev.configuration,protocol:ev.kind==='Http'?'Rest':ev.kind,required:ev.required??['Http','Soap'].includes(ev.kind),...(ev.kind==='Email'?{channels:'Email',failurePolicy:'Retry'}:{}),triggerBinding:{sourceNodeKey:n.nodeKey,trigger:ev.trigger}})});
+      }return {...n,configurationJson:JSON.stringify({...c,events:remaining})};}));
+    if(added.length){this.nodes.update(nodes=>[...nodes,...added]);this.markUnsaved();}
+  }
+  private ensureSimpleActions(): void {
+    if (!this.workspace() || this.isReadonly()) return;
+    this.nodes.update(nodes => nodes.map(n => {
+      if(n.type!=='UserTask'&&n.type!=='MainActivity') return n;
+      if(n.outcomes.some(o=>!['APPROVE','REJECT'].includes(o.key))) return n;
+      const outcomes: CanvasOutcome[] = ['APPROVE','REJECT'].map((key,i)=>({...n.outcomes.find(o=>o.key===key),id:n.outcomes.find(o=>o.key===key)?.id||crypto.randomUUID(),key,label:i?'Reject':'Accept',labelAr:i?'رفض':'قبول',description:'',descriptionAr:'',sortOrder:i,isDefault:i===0,requiresComment:i===1,requiresAttachment:false,isActive:true,resultValue:key}));
+      return {...n,outcomes};
+    }));
+  }
+  protected rejectTarget(value:string):void {const n=this.selectedNode();if(!n)return;this.applyIntegrationConfiguration(JSON.stringify({...this.parseConfig(n.configurationJson),rejectTargetNodeKey:value}));}
+  protected businessNodes(){return this.nodes().filter(n=>n.type==='UserTask'||n.type==='MainActivity');}
+  protected activityTabKey(event:KeyboardEvent,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const step=(event.key==='ArrowRight'?1:-1)*(this.locale.isRtl()?-1:1);const next=event.key==='Home'?0:event.key==='End'?this.userTaskTabs.length-1:(index+step+this.userTaskTabs.length)%this.userTaskTabs.length;this.inspectorTab.set(this.userTaskTabs[next].id);(event.target as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();}
+  protected rejectionDestinations(){
+    const current=this.selectedNode();if(!current)return [];
+    const reaches=(from:string,to:string)=>{const pending=[from],seen=new Set<string>();while(pending.length){const id=pending.pop()!;if(seen.has(id))continue;seen.add(id);for(const edge of this.edges().filter(e=>e.fromNodeId===id)){if(edge.toNodeId===to)return true;pending.push(edge.toNodeId);}}return false;};
+    const business=this.businessNodes();return business.filter(n=>n.id===current.id?!business.some(b=>b.id!==n.id&&reaches(b.id,n.id)):reaches(n.id,current.id)&&!reaches(current.id,n.id));
+  }
+  protected selectedConfig(): any {return this.parseConfig(this.selectedNode()?.configurationJson||'{}');}
+  protected resetSimpleActions(){const n=this.selectedNode();if(!n||this.isReadonly())return;this.nodes.update(nodes=>nodes.map(x=>x.id===n.id?{...x,outcomes:[],actions:[]}:x));this.ensureSimpleActions();this.markUnsaved();}
+  protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
+  protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
+
+  protected addNode(type: NodeType, x?: number, y?: number, protocol?: string): void {
     if (this.isReadonly()) return;
     const count = this.nodes().length;
     const px = x ?? 160 + (count % 4) * 48;
@@ -1122,7 +1152,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       x: px, y: py, outcomes: [], actions: [],
     };
     this.pushUndo();
+    if(type==='ServiceTask') { node.actionKey='http.request'; node.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
+    if(protocol==='Sms') node.name='SMS';
+    if(type==='NotificationTask') node.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
     this.nodes.update(ns => [...ns, node]);
+    this.ensureSimpleActions();
     this.selectedNodeId.set(node.id);
     this.selectedEdgeId.set(null);
     this.inspectorTab.set('general');
@@ -1130,8 +1164,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.markUnsaved();
   }
 
-  protected onPaletteDragStart(event: DragEvent, type: NodeType): void {
+  protected onPaletteDragStart(event: DragEvent, type: NodeType, protocol?:string): void {
     event.dataTransfer?.setData('nodeType', type);
+    event.dataTransfer?.setData('nodeProtocol', protocol||'');
   }
 
   protected onCanvasDrop(event: DragEvent): void {
@@ -1143,7 +1178,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const rect = svg.getBoundingClientRect();
     const x = (event.clientX - rect.left - this.panX()) / this.zoom();
     const y = (event.clientY - rect.top  - this.panY()) / this.zoom();
-    this.addNode(type, x, y);
+    this.addNode(type, x, y, event.dataTransfer?.getData('nodeProtocol'));
   }
 
   protected onCanvasDragOver(event: DragEvent): void { event.preventDefault(); }
@@ -2441,11 +2476,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!code) return 'general';
     const lower = code.toLowerCase();
     if (lower.includes('assignment') || lower.includes('assignmentkey')) return 'assignment';
-    if (lower.includes('outcome')) return 'outcomes';
+    if (lower.includes('outcome') || lower.includes('reject') || lower.includes('accept')) return 'actions';
     if (lower.includes('action')) return 'actions';
     if (lower.includes('sla') || lower.includes('timer')) return 'sla';
-    if (lower.includes('form') || lower.includes('formkey')) return 'form';
-    if (lower.includes('variable') || lower.includes('input') || lower.includes('output')) return 'data';
     return 'general';
   }
 
@@ -2646,12 +2679,15 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       setOrDelete('fallbackAssignmentKey', v.fallbackAssignmentKey, !!v.fallbackAssignmentKey?.trim());
       setOrDelete('requiresClaim', true, !!v.requiresClaim);
       setOrDelete('allowSelfClaim', true, !!v.allowSelfClaim);
+      if (!this.workspace()) {
       setOrDelete('slaPolicyId', v.slaPolicyId, !!v.slaPolicyId?.trim());
       setOrDelete('slaDurationHours', v.slaDurationHours, (v.slaDurationHours ?? 0) > 0);
       setOrDelete('slaEscalationKey', v.slaEscalationKey, !!v.slaEscalationKey?.trim());
       setOrDelete('inputMappingJson', v.inputMappingJson, !!v.inputMappingJson?.trim());
       setOrDelete('outputMappingJson', v.outputMappingJson, !!v.outputMappingJson?.trim());
       setOrDelete('formKey', v.formKey, !!v.formKey?.trim());
+      }
+      if (!this.workspace()) {
       const fields = this.formFields()
         .map(({ key, labelEn, labelAr, type: fieldType, required, options }) => ({
           key: key.trim(),
@@ -2669,6 +2705,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         catch { cfg['formSchemaJson'] = v.formSchemaJson; }
       } else {
         delete cfg['formSchemaJson'];
+      }
       }
       return Object.keys(cfg).length ? JSON.stringify(cfg) : '';
     }
@@ -3068,7 +3105,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     return { x: n.x + NODE_W + 10, y: n.y + NODE_H / 2 + 26 };
   }
 
-  protected quickAddNode(type: NodeType): void {
+  protected quickAddNode(type: NodeType, protocol?:string): void {
     if (this.isReadonly()) return;
     const sourceId = this.quickAddSourceId();
     if (!sourceId) return;
@@ -3093,7 +3130,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       priority: this.edges().filter(e => e.fromNodeId === sourceId).length,
     };
     this.pushUndo();
+    if(type==='ServiceTask') { newNode.actionKey='http.request'; newNode.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
+    if(protocol==='Sms') newNode.name='SMS';
+    if(type==='NotificationTask') newNode.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
     this.nodes.update(ns => [...ns, newNode]);
+    this.ensureSimpleActions();
     this.edges.update(es => [...es, edge]);
     this.quickAddSourceId.set(null);
     this.selectedNodeId.set(id);

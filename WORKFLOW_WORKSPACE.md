@@ -1,5 +1,7 @@
 # Workflow workspace: architecture, deployment and walkthrough
 
+**Current visual workspace revision:** see [WORKFLOW_VISUAL_EDITOR.md](WORKFLOW_VISUAL_EDITOR.md) for the five-page navigation, fixed Accept/Reject actions, automatic SLA rules, visual event nodes, migration and current test evidence. The remainder records the original workspace foundation.
+
 The workspace runs persisted workflows through the existing engine. Its four pages are **Workflows**, **New Instance**, **Instances** and **Lookups**. Auth login/logout, user administration and role permissions remain available according to permission grants. The complete designer palette remains available, including the new **Main Activity**.
 
 ## Architecture decisions

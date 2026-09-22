@@ -19,7 +19,7 @@ http.createServer(async (req,res) => {
   if(req.url==='/soap-fault'){res.setHeader('Content-Type','text/xml');res.end('<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Server</faultcode><faultstring>Demo fault</faultstring></s:Fault></s:Body></s:Envelope>');return;}
   if(req.url==='/stats'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({operations:operations.size}));return;}
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify(operations.get(key)));
-}).listen(5091,'127.0.0.1',()=>console.log('Demo REST, SOAP and SMS: http://127.0.0.1:5091'));
+}).listen(Number(process.env.DEMO_HTTP_PORT||5091),'127.0.0.1',()=>console.log(`Demo REST, SOAP and SMS: http://127.0.0.1:${process.env.DEMO_HTTP_PORT||5091}`));
 
 net.createServer(socket=>{
   socket.setEncoding('utf8');socket.write('220 localhost demo SMTP\r\n');let buffer='',data=false;
@@ -30,4 +30,4 @@ net.createServer(socket=>{
     else if(/^QUIT/.test(line)){socket.end('221 Bye\r\n');}
     else socket.write('250 OK\r\n');
   }});socket.on('error',()=>{});
-}).listen(2525,'127.0.0.1',()=>console.log('Demo SMTP: 127.0.0.1:2525'));
+}).listen(Number(process.env.DEMO_SMTP_PORT||2525),'127.0.0.1',()=>console.log(`Demo SMTP: 127.0.0.1:${process.env.DEMO_SMTP_PORT||2525}`));

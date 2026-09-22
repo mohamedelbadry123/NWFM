@@ -10,6 +10,8 @@ export const ROLES = {
 
 export const PERMISSIONS = {
   manageDefinitions: 'ManageDefinitions',
+  manageSlaPolicies: 'ManageSlaPolicies',
+  manageCalendars: 'ManageCalendars',
   startWorkflows: 'StartWorkflows',
   viewInstances: 'ViewInstances',
   claimTasks: 'ClaimTasks',

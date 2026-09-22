@@ -24,7 +24,7 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
     <details class="rounded-xl border bg-white dark:bg-dark-800 p-5" open><summary class="text-lg font-medium cursor-pointer">{{ t('Events and integrations','الأحداث والتكاملات') }}</summary><div class="space-y-3 mt-4">
       @for (operation of model.operations; track operation.id) {
         <article class="border rounded-lg p-3"><div class="flex flex-wrap items-center justify-between gap-3"><strong>{{ operation.name || operation.kind }}</strong><span>{{ operation.status }} · {{ operation.attempts }} {{ t('attempts','محاولات') }}</span></div><p class="text-sm mt-1">{{ operation.trigger }} · {{ operation.required ? t('Required before advancing','مطلوب قبل الانتقال') : t('Background delivery','إرسال في الخلفية') }}</p>
-        @if (operation.error) {<p class="text-red-600 mt-2">{{ operation.error }}</p>}
+        @if(operation.eventNodeKey){<p class="text-xs opacity-70">{{ t('Event node','عقدة الحدث') }}: {{ operation.eventNodeKey }} · {{ t('Source','المصدر') }}: {{ sourceName(operation.activityId) }}</p>}@if (operation.error) {<p class="text-red-600 mt-2">{{ operation.error }}</p>}
         @if (operation.status === 'Failed' && canManage()) {<button class="wf-btn-secondary mt-2" [disabled]="busy()" (click)="retry(operation.id)">{{ t('Retry delivery','إعادة محاولة الإرسال') }}</button>}
         @if (operation.responseJson) {<details class="mt-2"><summary>{{ t('Response details','تفاصيل الاستجابة') }}</summary><pre class="text-xs overflow-auto max-h-56 p-3">{{ operation.responseJson }}</pre></details>}
         </article>
@@ -41,7 +41,7 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
     <article class="rounded-xl border p-4 bg-white dark:bg-dark-800" [class.border-primary]="activity.status === 'Active'">
       <div class="flex flex-wrap justify-between gap-3"><h2 class="font-semibold">{{ activity.name }}</h2><span>{{ phase(activity.phase) || activity.status }}</span></div>
       <p class="text-xs opacity-70 mt-2">{{ activity.departmentCode }} @if (activity.fieldActivityCode) {· {{ activity.fieldActivityCode }}} @if (activity.dueAt) {· {{ t('Due','الاستحقاق') }} {{ activity.dueAt | date:'medium' }} @if (overdue(activity.dueAt,activity.status)) {<strong class="text-red-600">{{ t('Overdue','متأخر') }}</strong>}}</p>
-      @if (activity.assignedGroup && !activity.tasks.length) {<p class="text-sm mt-2">{{ t('Assigned group','المجموعة المسؤولة') }}: {{ activity.assignedGroup }}</p>}
+      <p class="text-sm">{{ activity.sla?.name }} @if(activity.sla){· {{ activity.sla.duration }} {{ activity.sla.durationUnit }} · {{ activity.sla.timeZone }}}</p>@if (activity.assignedGroup && !activity.tasks.length) {<p class="text-sm mt-2">{{ t('Assigned group','المجموعة المسؤولة') }}: {{ activity.assignedGroup }}</p>}
       @if (activity.phase === 'WaitingForChild') {<p class="text-sm mt-2">{{ t('Complete the child workflow before approving this activity.','أكمل سير العمل الفرعي قبل اعتماد هذا النشاط.') }}</p>}
       @if (activity.phase === 'ChildFailed') {<p class="text-red-600 mt-2">{{ t('The child workflow failed or was cancelled. Parent approval is blocked.','فشل سير العمل الفرعي أو تم إلغاؤه. الاعتماد الرئيسي متوقف.') }}</p>}
       @for (child of children(run.id,activity.id); track child.id) {<details class="mt-4 border-s-2 ps-4" open><summary class="cursor-pointer font-medium">{{ child.name }} · {{ child.status }}</summary><div class="mt-3"><ng-container *ngTemplateOutlet="execution; context: {$implicit:child}" /></div></details>}
@@ -58,7 +58,7 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
             </label>
           }
           <label class="block text-sm">{{ t('Comment','تعليق') }}<textarea class="wf-input" rows="3" maxlength="4000" [(ngModel)]="comments[entry.task.id]"></textarea></label>
-          <div class="flex flex-wrap gap-2">@for (outcome of entry.task.availableOutcomes || []; track outcome.id) {<button class="wf-btn-primary" [disabled]="busy()" (click)="act(entry,outcome.outcomeKey)">{{ outcome.name }}</button>}<button class="wf-btn-secondary" [disabled]="busy() || !comments[entry.task.id]?.trim()" (click)="act(entry,'comment')">{{ t('Add comment','إضافة تعليق') }}</button></div>
+          @if(entry.completionBlocked){<p role="status">{{ t('Waiting for required events to finish. See Events and integrations for details.','بانتظار اكتمال الأحداث المطلوبة. راجع تفاصيل الأحداث والتكاملات.') }}</p>}<div class="flex flex-wrap gap-2">@for (outcome of entry.task.availableOutcomes || []; track outcome.id) {<button class="wf-btn-primary" [disabled]="busy() || entry.completionBlocked" (click)="act(entry,outcome.outcomeKey)">{{ outcome.outcomeKey === 'APPROVE' ? t('Accept','قبول') : outcome.outcomeKey === 'REJECT' ? t('Reject','رفض') : outcome.name }}</button>}<button class="wf-btn-secondary" [disabled]="busy() || !comments[entry.task.id]?.trim()" (click)="act(entry,'comment')">{{ t('Add comment','إضافة تعليق') }}</button></div>
         } @else {<p class="text-sm opacity-70">{{ entry.disabledReason }}</p>}
         </div>
       }
@@ -90,6 +90,7 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
       error:e=>{if(sequence!==this.loadSequence)return;this.loading.set(false);this.error.set(e.error?.message || 'Could not load instance.');}
     });
   }
+  sourceName(id:string){for(const run of this.detail()?.tree||[]){const activity=run.activities.find(a=>a.id===id);if(activity)return activity.name;}return id;}
   children(instance: string, activity: string): WorkspaceExecution[] { return this.detail()?.tree.filter(x=>x.parentInstanceId===instance&&x.parentActivityInstanceId===activity)||[]; }
   geography(raw?: string) { try { const g=JSON.parse(raw||'{}');return [g.clusterCode,g.regionCode,g.cityCode].filter(Boolean).join(' / '); } catch{return '';} }
   comment(raw?: string) { try{return JSON.parse(raw||'{}').comment || '';}catch{return '';} }

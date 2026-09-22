@@ -30,6 +30,10 @@ internal sealed class WorkflowRuntimeCommandLock<TRequest, TResponse>(WorkflowDb
         {
             if (workItemId.HasValue && !await WorkflowTreeGuard.CanRunAsync(db, instanceId.Value, ct))
                 throw new UnauthorizedAccessException("This workflow or one of its parents is suspended or no longer running.");
+            if (request is CompleteWorkItemCommand && await db.WorkItems.AnyAsync(w => w.Id == workItemId
+                && db.IntegrationJobs.Any(j => j.ActivityInstanceId == w.ActivityInstanceId && j.IsActivityEvent && j.Required && j.Status != "Completed"), ct))
+                return (TResponse)(object)NWFM.Shared.Results.Result.Failure<Workflow.Application.DTOs.WorkItemDto>(
+                    new NWFM.Shared.Results.Error("Workflow.Events.Pending", "Required activity events must finish before completing this task."));
             return await next();
         }, ct);
     }

@@ -70,7 +70,9 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
         if (errors.Count > 0) return Result.Failure<IntegrationResult>(new Error("Workflow.Integration.Invalid", errors[0]));
         var connection = await db.IntegrationConnections.FindAsync([configuration.ConnectionId], ct);
         if (connection?.Kind != "Http") return Result.Failure<IntegrationResult>(new Error("Workflow.Connection.NotFound", "Select an HTTP connection."));
-        return Result.Success(await transport.SendHttpAsync(connection, Credentials(connection), configuration, variables, "test:" + Guid.NewGuid(), ct));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var response = await transport.SendHttpAsync(connection, Credentials(connection), configuration, variables, "test:" + Guid.NewGuid(), ct);
+        return Result.Success(response with { ElapsedMilliseconds = clock.ElapsedMilliseconds });
     }
     public async Task<Result<Guid>> ReceiveEventAsync(Guid connectionId, string rawBody, string? timestamp, string? signature, string? apiKey, CancellationToken ct)
     {

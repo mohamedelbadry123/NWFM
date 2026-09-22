@@ -144,7 +144,7 @@ public static class WorkflowActivityConfigurationValidator
                             Error("VARIABLE_ASSIGNMENTS_INVALID", "Each variable assignment requires a name and value.");
                         break;
                     case ActivityType.NotificationTask:
-                        if (string.IsNullOrWhiteSpace(Text("templateKey")))
+                        if (string.IsNullOrWhiteSpace(Text("templateKey")) && string.IsNullOrWhiteSpace(Text("connectionId")))
                             Error("NOTIFICATION_TEMPLATE_REQUIRED", "Select a notification template.");
                         var policy = Text("failurePolicy") ?? Text("notificationFailurePolicy") ?? "Continue";
                         if (!Enum.TryParse<NotificationFailurePolicy>(policy, true, out var parsedPolicy) || !Enum.IsDefined(parsedPolicy))

@@ -22,6 +22,14 @@ internal sealed partial class WorkflowRuntimeEngine
         await _events.AppendAsync(instance.OrganizationId, instance.Id, WorkflowEventType.ActivityStarted, now,
             activity.NodeKey, payloadJson: JsonSerializer.Serialize(new { operation = kind, execution.Id }), cancellationToken: ct);
         instance.AdvanceTo(activity.NodeKey, now);
+        var settings = Workflow.Application.Workspace.WorkspaceDesign.Configuration(activity.ConfigurationJson);
+        var job = await _db.IntegrationJobs.SingleAsync(j => j.ActivityInstanceId == execution.Id, ct);
+        job.SetEventNode(activity.NodeKey);
+        if (settings["required"]?.GetValue<bool>() == false)
+        {
+            job.ConfigureEvent(false, "InFlow", activity.Name);
+            return await CompleteExternalActivityAsync(execution.Id, new Dictionary<string, object?>(), "success", null, now, ct);
+        }
         return Result.Success();
     }
 

@@ -25,6 +25,8 @@ public sealed class WorkflowIntegrationJob : Entity, ITenantAware
     public bool Required { get; private set; }
     public string? EventTrigger { get; private set; }
     public string? EventName { get; private set; }
+    public string? EventNodeKey { get; private set; }
+    public void SetEventNode(string nodeKey) => EventNodeKey = nodeKey;
     public string? DeliveryResultJson { get; private set; }
     public void ConfigureEvent(bool required, string trigger, string name)
     { IsActivityEvent = true; Required = required; EventTrigger = trigger; EventName = name; }

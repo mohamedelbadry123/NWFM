@@ -12,7 +12,7 @@ using Workflow.Infrastructure.Persistence;
 
 namespace Workflow.Infrastructure.Services;
 
-internal sealed class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
+internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
     IWorkflowVersionRepository versions) : IWorkflowWorkspacePublisher
 {
     public async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateAsync(WorkflowVersion version, CancellationToken ct)
@@ -29,6 +29,13 @@ internal sealed class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflow
         catch (JsonException) { errors.Add(new("WORKSPACE_INVALID", "Workflow settings are invalid.")); return errors; }
         if (workspace is null || workspace.Kind is not ("Main" or "Child"))
         { errors.Add(new("WORKSPACE_KIND", "Select Main or Child workflow.")); return errors; }
+        var simplified = WorkspaceDesign.IsSimplified(version.WorkspaceJson);
+        if (simplified)
+        {
+            try { await ValidateSimplifiedAsync(version, errors, ct); }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+            { errors.Add(new("ACTIVITY_CONFIG", "Activity settings contain an invalid value.")); }
+        }
         if (workspace.Kind == "Main" && !await references.IsValidGeographyAsync(new(workspace.ClusterCode ?? "", workspace.RegionCode ?? "", workspace.CityCode ?? ""), ct))
             errors.Add(new("WORKSPACE_GEOGRAPHY", "Select an active cluster, region and city in the same hierarchy."));
         if (workspace.Kind == "Child" && new[] { workspace.ClusterCode, workspace.RegionCode, workspace.CityCode }.Any(x => !string.IsNullOrEmpty(x)))
@@ -49,9 +56,9 @@ internal sealed class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflow
                 foreach (var rule in activity.AssignmentRules.Where(r => r.IsActive))
                     if (rule.ReferenceId is Guid group && !await db.AssignmentGroups.AnyAsync(g => g.Id == group && g.IsActive, ct))
                         Error("ACTIVITY_GROUP", "Select an active assigned group in this tenant.");
-                if (config.SlaDurationHours is null or <= 0 && config.SlaPolicyId is null)
+                if (!simplified && config.SlaDurationHours is null or <= 0 && config.SlaPolicyId is null)
                     Error("ACTIVITY_SLA", "Set a positive SLA duration or choose an SLA policy.");
-                if (config.SlaPolicyId is Guid policyId && !await db.SlaPolicies.AnyAsync(p => p.Id == policyId && p.IsActive, ct))
+                if (!simplified && config.SlaPolicyId is Guid policyId && !await db.SlaPolicies.AnyAsync(p => p.Id == policyId && p.IsActive, ct))
                     Error("ACTIVITY_SLA", "Select an active SLA policy available to this tenant.");
                 if (activity.Outcomes.Any(o => o.OutcomeKey.Equals("reject", StringComparison.OrdinalIgnoreCase)))
                 {
@@ -97,6 +104,18 @@ internal sealed class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflow
         var errors = await ValidateAsync(version, ct);
         if (errors.Count > 0) return Result.Failure(new Error(errors[0].Code, errors[0].Message));
         if (version.WorkspaceJson is null) return Result.Success();
+        if (WorkspaceDesign.IsSimplified(version.WorkspaceJson))
+            foreach (var activity in version.Activities.Where(a => a.ActivityType is ActivityType.UserTask or ActivityType.MainActivity))
+            {
+                var config = WorkspaceDesign.Configuration(activity.ConfigurationJson);
+                var department = config["departmentCode"]!.GetValue<string>();
+                var field = config["fieldActivityCode"]!.GetValue<string>();
+                var organizationId = await db.WorkflowDefinitions.Where(d => d.Id == version.WorkflowDefinitionId).Select(d => d.OrganizationId).SingleAsync(ct);
+                var policy = await db.SlaPolicies.SingleAsync(p => p.OrganizationId == organizationId && p.IsActive && p.DepartmentCode == department && p.FieldActivityCode == field, ct);
+                config["publishedSla"] = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(await WorkspaceSla.SnapshotAsync(db, policy, ct), IntegrationJson.Options));
+                config.Remove("slaPolicyId"); config.Remove("slaDurationHours"); config.Remove("slaEscalationKey");
+                activity.SetPublishedConfiguration(config.ToJsonString());
+            }
         var pins = new Dictionary<string, Guid>();
         foreach (var activity in version.Activities.Where(a => a.ActivityType is ActivityType.MainActivity or ActivityType.CallActivity))
         {

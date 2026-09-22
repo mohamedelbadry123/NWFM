@@ -535,11 +535,11 @@
       "palette_title": "العقد",
       "node_start": "بداية",
       "node_user_task": "مهمة مستخدم",
-      "node_service_task": "مهمة خدمة",
+      "node_service_task": "طلب API",
       "node_script_task": "تعيين المتغيرات",
       "node_timer": "مؤقت",
       "node_wait_event": "انتظار حدث",
-      "node_notification_task": "إشعار",
+      "node_notification_task": "بريد إلكتروني",
       "node_exclusive_gateway": "قرار",
       "node_inclusive_gateway": "بوابة شاملة",
       "node_parallel_gateway": "تفرع متوازي",
@@ -689,7 +689,7 @@
       "tab_help_general": "عنوان المهمة واسمها بالعربية وتعليمات المراجع التي تظهر في شاشة المهمة.",
       "tab_help_assignment": "اختر مجموعة الشركة التي تعمل على هذه الخطوة. المجموعات تأتي من المؤسسة المالكة لهذا سير العمل.",
       "tab_help_outcomes": "أزرار المراجع (موافقة، رفض، إعادة). لا تعمل حتى ترسم سهماً من القرار لكل مفتاح.",
-      "tab_help_actions": "أتمتة اختيارية عند بدء المهمة أو إكمالها أو فشلها (بريد، تحديث الوحدة).",
+      "tab_help_actions": "قبول للمتابعة ورفض للعودة إلى نشاط سابق.",
       "tab_help_sla": "عدد الساعات المسموح بها لهذه المهمة قبل اعتبارها متأخرة.",
       "tab_help_data": "ربط حقول الطلب بهذه الخطوة وإعادة النتائج إلى الوحدة.",
       "tab_help_form": "أسئلة إضافية يجب أن يعبئها المراجع في شاشة المهمة.",
@@ -891,7 +891,9 @@
       "ctx_add_end": "إضافة نهاية",
       "ctx_select_all": "تحديد الكل",
       "node_main_activity": "نشاط رئيسي",
-      "node_desc_main_activity": "سير عمل فرعي ثم اعتماد رئيسي"
+      "node_desc_main_activity": "سير عمل فرعي ثم اعتماد رئيسي",
+      "node_sms": "SMS",
+      "node_desc_sms": "إرسال رسالة نصية عبر مزود HTTP"
     },
     "help": {
       "title": "قاعدة معرفة سير العمل",
@@ -2082,6 +2084,7 @@
     "newInstance": "نسخة جديدة",
     "instances": "النسخ",
     "fieldActivityTypes": "أنواع النشاط الميداني",
-    "department": "القسم"
+    "department": "القسم",
+    "sla": "مدة الخدمة"
   }
 }
