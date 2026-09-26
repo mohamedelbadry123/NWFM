@@ -7,7 +7,7 @@ public interface ICurrentUser
     string? Email { get; }
     IReadOnlyList<string> Roles { get; }
     IReadOnlyList<string> Permissions { get; }
-    long? TeamId { get; }
+    Guid? TeamId { get; }
     bool IsInRole(string role);
     bool HasPermission(string permissionCode);
 }

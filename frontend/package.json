@@ -22,6 +22,8 @@
     "@angular/router": "^21.2.21",
     "@hugeicons/angular": "^1.0.10",
     "@hugeicons/core-free-icons": "^4.2.3",
+    "@ngx-formly/core": "^7.1.0",
+    "@ngx-formly/primeng": "^7.1.0",
     "@ngx-translate/core": "^17.0.0",
     "@ngx-translate/http-loader": "^17.0.0",
     "@primeng/themes": "^21.0.4",

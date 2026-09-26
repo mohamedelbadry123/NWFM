@@ -18,6 +18,17 @@ export const PERMISSIONS = {
   manageLookups: 'ManageLookups',
   manageUsers: 'ManageUsers',
   manageRolePermissions: 'CanManageRolePermissions',
+  viewForms: 'ViewForms',
+  manageForms: 'ManageForms',
+  submitForms: 'SubmitForms',
+  viewSubmissions: 'ViewSubmissions',
+  manageTeams: 'ManageTeams',
+  viewTasks: 'ViewTasks',
+  manageTasks: 'ManageTasks',
+  assignTasks: 'AssignTasks',
+  submitTasks: 'SubmitTasks',
+  reviewTasks: 'ReviewTasks',
+  manageTaskTypes: 'ManageTaskTypes',
 } as const;
 
 @Directive({ selector: '[hasPermission]', standalone: true })

@@ -97,10 +97,29 @@ export class DashboardLayoutComponent {
       ],
     },
     {
+      labelKey: 'nav.fieldTasks',
+      icon: 'pi pi-map-marker',
+      route: '/tasks',
+      permissions: [PERMISSIONS.viewTasks, ADMINISTRATOR_ROLE],
+    },
+    {
+      labelKey: 'nav.forms',
+      icon: 'pi pi-file-edit',
+      route: '/forms',
+      permissions: [PERMISSIONS.viewForms, ADMINISTRATOR_ROLE],
+    },
+    {
+      // Org lookups plus task types, C2M action mappings and the field catalog, one tab each.
       labelKey: 'nav.lookups',
       icon: 'pi pi-list',
       route: '/lookups',
-      permissions: [PERMISSIONS.manageLookups, ADMINISTRATOR_ROLE],
+      permissions: [PERMISSIONS.manageLookups, PERMISSIONS.manageTaskTypes, PERMISSIONS.viewForms, ADMINISTRATOR_ROLE],
+    },
+    {
+      labelKey: 'nav.teams',
+      icon: 'pi pi-users',
+      route: '/admin/teams',
+      permissions: [PERMISSIONS.manageTeams, ADMINISTRATOR_ROLE],
     },
     {
       labelKey: 'nav.users',

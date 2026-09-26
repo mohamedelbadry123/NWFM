@@ -1,3 +1,5 @@
+using NWFM.Shared.Caching;
+using NWFM.Shared.Constants;
 using Auth.Application.Common.Interfaces;
 using Auth.Application.Constants;
 using Auth.Application.Lookups.Queries;
@@ -7,7 +9,7 @@ using NWFM.Shared.Results;
 
 namespace Auth.Application.Lookups.Commands.SetLookupStatus;
 
-public sealed class SetLookupStatusCommandHandler(IAuthDbContext context)
+public sealed class SetLookupStatusCommandHandler(IAuthDbContext context, ICacheService cache)
     : IRequestHandler<SetLookupStatusCommand, Result<LookupItemDto>>
 {
     public async Task<Result<LookupItemDto>> Handle(SetLookupStatusCommand request, CancellationToken ct)
@@ -28,6 +30,9 @@ public sealed class SetLookupStatusCommandHandler(IAuthDbContext context)
             return updated;
 
         await context.SaveChangesAsync(ct);
+
+        // Scopes are expanded through the org hierarchy, so a changed unit must not be read from the old one.
+        await cache.RemoveAsync(CacheKeys.Lookups.OrgHierarchy, ct);
         return updated;
     }
 

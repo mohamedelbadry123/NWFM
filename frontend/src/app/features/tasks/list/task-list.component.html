@@ -1,0 +1,359 @@
+<ng-container *translateContext="let t">
+  <p-toast />
+
+  <!-- Page title/subtitle are rendered by the dashboard topbar (PageHeaderService). -->
+  <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
+    <ng-container *hasPermission="PERMISSIONS.manageTasks">
+      <p-button [label]="t('tasks.actions.newTask')" icon="pi pi-plus" (onClick)="openCreate()" />
+    </ng-container>
+  </div>
+
+  <div class="card p-4">
+    <p-table
+      [value]="tasks()"
+      [lazy]="true"
+      (onLazyLoad)="loadTasks($event)"
+      [rows]="pageSize"
+      [paginator]="true"
+      [totalRecords]="totalRecords()"
+      [loading]="loading()"
+      [rowsPerPageOptions]="[10, 25, 50, 100]"
+      [sortOrder]="sortOrder"
+      dataKey="id"
+      [contextMenu]="rowContextMenu"
+      [(contextMenuSelection)]="contextTask"
+      (onContextMenuSelect)="onContextMenu($event)"
+      styleClass="app-table p-datatable-sm p-datatable-striped"
+      [scrollable]="true"
+      [tableStyle]="{ 'min-width': '96rem' }"
+      [rowHover]="true"
+      [showCurrentPageReport]="true"
+      [currentPageReportTemplate]="t('common.pageReport')"
+    >
+      <ng-template pTemplate="caption">
+        <div class="flex flex-wrap items-center gap-2.5 p-1">
+          <p-iconfield iconPosition="left" class="w-full min-w-0 sm:w-64 shrink-0">
+            <p-inputicon styleClass="pi pi-search" />
+            <input
+              pInputText
+              type="text"
+              [(ngModel)]="search"
+              (keyup.enter)="applyFilters()"
+              [placeholder]="t('tasks.filters.searchPlaceholder')"
+              class="w-full"
+            />
+          </p-iconfield>
+
+          <p-select
+            [(ngModel)]="status"
+            [options]="statusOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.status')"
+            (onChange)="applyFilters()"
+            appendTo="body"
+            class="w-full sm:w-40 shrink-0"
+            styleClass="w-full"
+          />
+
+          <p-select
+            [(ngModel)]="taskTypeId"
+            [options]="taskTypeOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            [filter]="true"
+            [placeholder]="t('tasks.filters.taskType')"
+            (onChange)="applyFilters()"
+            appendTo="body"
+            class="w-full sm:w-52 shrink-0"
+            styleClass="w-full"
+          />
+
+          <p-select
+            [(ngModel)]="priority"
+            [options]="priorityOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.priority')"
+            (onChange)="applyFilters()"
+            appendTo="body"
+            class="w-full sm:w-36 shrink-0"
+            styleClass="w-full"
+          />
+
+          <p-select
+            [(ngModel)]="source"
+            [options]="sourceOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.source')"
+            (onChange)="applyFilters()"
+            appendTo="body"
+            class="w-full sm:w-32 shrink-0"
+            styleClass="w-full"
+          />
+
+          <p-select
+            [(ngModel)]="returnReasonCode"
+            [options]="returnReasonOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.returnReason')"
+            (onChange)="applyFilters()"
+            appendTo="body"
+            class="w-full sm:w-48 shrink-0"
+            styleClass="w-full"
+          />
+
+          <p-datepicker
+            [(ngModel)]="createdFrom"
+            (ngModelChange)="applyFilters()"
+            dateFormat="yy-mm-dd"
+            [showIcon]="true"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.createdFrom')"
+            appendTo="body"
+            class="inline-flex w-full sm:w-48 max-w-full shrink-0 [&_.p-inputtext]:min-w-0 [&_.p-inputtext]:w-full"
+            styleClass="w-full"
+            inputStyleClass="w-full"
+          />
+
+          <p-datepicker
+            [(ngModel)]="createdTo"
+            (ngModelChange)="applyFilters()"
+            dateFormat="yy-mm-dd"
+            [showIcon]="true"
+            [showClear]="true"
+            [placeholder]="t('tasks.filters.createdTo')"
+            appendTo="body"
+            class="inline-flex w-full sm:w-48 max-w-full shrink-0 [&_.p-inputtext]:min-w-0 [&_.p-inputtext]:w-full"
+            styleClass="w-full"
+            inputStyleClass="w-full"
+          />
+
+          <!-- The cascade lives in a dialog; open here, and show what is in force so the filter is
+               still readable while closed. -->
+          <p-button
+            [label]="t('org.filterByOrg')"
+            icon="pi pi-sitemap"
+            severity="secondary"
+            [outlined]="!orgFilterLabel"
+            [disabled]="loading()"
+            [badge]="orgFilterLabel ?? undefined"
+            badgeSeverity="contrast"
+            class="shrink-0"
+            styleClass="whitespace-nowrap"
+            (onClick)="orgFilterVisible.set(true)"
+          />
+
+          <div class="flex items-center gap-2 ms-auto shrink-0">
+            <p-button
+              [label]="t('common.apply')"
+              icon="pi pi-filter"
+              severity="secondary"
+              [outlined]="true"
+              [disabled]="loading()"
+              (onClick)="applyFilters()"
+            />
+
+            @if (hasFilters) {
+              <p-button
+                [label]="t('tasks.filters.clear')"
+                icon="pi pi-filter-slash"
+                severity="secondary"
+                [text]="true"
+                [disabled]="loading()"
+                (onClick)="clearFilters()"
+              />
+            }
+          </div>
+        </div>
+      </ng-template>
+
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="taskNumber" class="cursor-pointer select-none">
+            <div class="flex items-center justify-between">
+              <span>{{ t('tasks.fields.taskNumber') }}</span>
+              <p-sortIcon field="taskNumber" />
+            </div>
+          </th>
+          <th>{{ t('tasks.fields.taskType') }}</th>
+          <th pSortableColumn="status" class="app-col-wrap w-[15rem] cursor-pointer select-none">
+            <div class="flex items-center justify-between gap-2">
+              <span>{{ t('tasks.fields.status') }}</span>
+              <p-sortIcon field="status" />
+            </div>
+          </th>
+          <th pSortableColumn="priority" class="cursor-pointer select-none">
+            <div class="flex items-center justify-between">
+              <span>{{ t('tasks.fields.priority') }}</span>
+              <p-sortIcon field="priority" />
+            </div>
+          </th>
+          <th>{{ t('tasks.fields.title') }}</th>
+          <th>{{ t('tasks.fields.branch') }}</th>
+          <th>{{ t('tasks.fields.department') }}</th>
+          <th>{{ t('tasks.fields.team') }}</th>
+          <th pSortableColumn="createdAt" class="cursor-pointer select-none">
+            <div class="flex items-center justify-between">
+              <span>{{ t('tasks.fields.created') }}</span>
+              <p-sortIcon field="createdAt" />
+            </div>
+          </th>
+          <th pSortableColumn="dueDate" class="cursor-pointer select-none">
+            <div class="flex items-center justify-between">
+              <span>{{ t('tasks.fields.dueDate') }}</span>
+              <p-sortIcon field="dueDate" />
+            </div>
+          </th>
+          <th pSortableColumn="submissionCount" class="cursor-pointer select-none">
+            <div class="flex items-center justify-between">
+              <span>{{ t('tasks.fields.fills') }}</span>
+              <p-sortIcon field="submissionCount" />
+            </div>
+          </th>
+          <th class="w-[6rem] text-end">{{ t('common.actions') }}</th>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="body" let-task>
+        <tr [pContextMenuRow]="task">
+          <td class="font-medium">
+            <button type="button" class="text-primary hover:underline" (click)="openDetail(task)">
+              {{ task.taskNumber }}
+            </button>
+          </td>
+          <td>
+            <div class="flex items-center gap-1.5">
+              <span>{{ taskTypeLabel(task) }}</span>
+              <span class="app-badge app-badge--code">v{{ task.formVersionNo }}</span>
+            </div>
+            <!-- Pinned to an older form than its form now publishes; offer the move forward. -->
+            @if (canMigrate(task)) {
+              <p-button
+                icon="pi pi-arrow-up-right"
+                size="small"
+                severity="warn"
+                [text]="true"
+                [label]="'v' + task.formCurrentVersionNo"
+                [loading]="migratingTaskId() === task.id"
+                [disabled]="migratingTaskId() !== null"
+                [pTooltip]="t('tasks.migrateVersion.tooltip', { version: task.formCurrentVersionNo })"
+                tooltipPosition="top"
+                (onClick)="migrateVersion(task)"
+              />
+            }
+          </td>
+          <td class="app-col-wrap">
+            <div class="flex flex-wrap items-center gap-1">
+              <p-tag [value]="t('tasks.status.' + task.status)" [severity]="statusSeverity(task.status)" />
+              <!-- Why it came back, beside the status; the note itself is on the tooltip. -->
+              @if (task.returnReasonCode) {
+                <p-tag
+                  [value]="t('tasks.returnReason.' + task.returnReasonCode)"
+                  [severity]="returnReasonSeverity(task.returnReasonCode)"
+                  [pTooltip]="task.returnReason || ''"
+                  tooltipPosition="top"
+                />
+              }
+              @if (wasSubmittedAgain(task)) {
+                <p-tag
+                  [value]="t('tasks.tags.submittedAgain')"
+                  severity="info"
+                  [pTooltip]="
+                    t('tasks.fields.returnedDate') + ': ' + (task.returnedDate | date: 'yyyy-MM-dd HH:mm') +
+                    ' · ' + t('tasks.fields.submittedDate') + ': ' + (task.submittedDate | date: 'yyyy-MM-dd HH:mm')
+                  "
+                  tooltipPosition="top"
+                />
+              }
+              @if (isOverdue(task)) {
+                <p-tag [value]="t('tasks.tags.overdue')" severity="danger" />
+              }
+              @if (task.c2mStatus) {
+                <p-tag
+                  [value]="'C2M · ' + t('tasks.c2m.status.' + task.c2mStatus)"
+                  [severity]="c2mSeverity(task.c2mStatus)"
+                  [pTooltip]="task.faId || ''"
+                  tooltipPosition="top"
+                />
+              }
+              @if (task.returnCount) {
+                <span class="text-xs text-surface-500" [pTooltip]="t('tasks.fields.returnCount')" tooltipPosition="top"
+                  >×{{ task.returnCount }}</span
+                >
+              }
+            </div>
+          </td>
+          <td>
+            <p-tag [value]="t('tasks.priority.' + task.priority)" [severity]="prioritySeverity(task.priority)" />
+          </td>
+          <td class="app-col-wrap max-w-[18rem]">{{ task.title || '—' }}</td>
+          <td>{{ orgNames.label('Branch', task.branchCode) }}</td>
+          <td>{{ orgNames.name('Department', task.departmentCode) || task.departmentCode || '—' }}</td>
+          <td>{{ task.assignedTeamName || '—' }}</td>
+          <td>{{ task.createdAt | date: 'yyyy-MM-dd HH:mm' }}</td>
+          <td>{{ task.dueDate ? (task.dueDate | date: 'yyyy-MM-dd') : '—' }}</td>
+          <td>{{ task.submissionCount ?? 0 }}</td>
+          <td class="text-end">
+            <p-button
+              icon="pi pi-ellipsis-v"
+              [rounded]="true"
+              [text]="true"
+              severity="secondary"
+              [ariaLabel]="t('common.actions')"
+              (onClick)="toggleMenu($event, task, rowMenu)"
+            />
+            <p-menu #rowMenu [model]="menuItems" [popup]="true" appendTo="body" />
+          </td>
+        </tr>
+      </ng-template>
+
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="12" class="p-8 text-center">
+            <div class="flex flex-col items-center justify-center gap-2 text-surface-500">
+              <i class="pi pi-inbox text-4xl"></i>
+              <span class="font-medium text-base">{{ t('tasks.noTasks') }}</span>
+              @if (hasFilters) {
+                <p-button
+                  [label]="t('tasks.filters.clear')"
+                  icon="pi pi-filter-slash"
+                  severity="secondary"
+                  [text]="true"
+                  size="small"
+                  (onClick)="clearFilters()"
+                />
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+
+    <!-- Right-click anywhere on a row for the same actions as its ellipsis menu. -->
+    <p-contextMenu #rowContextMenu [model]="contextMenuItems" appendTo="body" />
+  </div>
+
+  <app-org-filter-dialog [(visible)]="orgFilterVisible" [location]="orgFilter" (applied)="onOrgFilterApplied($event)" />
+
+  <app-task-create-dialog [(visible)]="createVisible" (created)="loadTasks()" />
+  <app-task-edit-dialog [(visible)]="editVisible" [task]="selectedTask()" (updated)="loadTasks()" />
+  <app-task-assign-dialog [(visible)]="assignVisible" [task]="selectedTask()" (assigned)="loadTasks()" />
+  <app-task-action-dialog
+    [(visible)]="actionVisible"
+    [task]="selectedTask()"
+    [action]="currentAction()"
+    (completed)="loadTasks()"
+  />
+  <app-task-return-dialog [(visible)]="returnVisible" [task]="selectedTask()" (completed)="loadTasks()" />
+  <app-task-fill-dialog [(visible)]="fillVisible" [taskId]="selectedTask()?.id ?? null" (filled)="loadTasks()" />
+  <app-task-detail-dialog [(visible)]="detailVisible" [taskId]="selectedTask()?.id ?? null" />
+  <app-task-preview-dialog [(visible)]="previewVisible" [taskId]="selectedTask()?.id ?? null" />
+</ng-container>

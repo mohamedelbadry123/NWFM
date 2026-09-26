@@ -41,9 +41,25 @@ export const routes: Routes = [
       { path: 'org/workflow', loadChildren: () => import('./features/workflow/routes').then(m => m.WORKFLOW_ROUTES) },
       {
         path: 'lookups',
-        canActivate: [permissionGuard(PERMISSIONS.manageLookups)],
+        // The page holds the org lookups and the reference lists of other modules (task types, C2M
+        // action mappings, the field catalog); each tab checks its own permission.
+        canActivate: [permissionGuard(PERMISSIONS.manageLookups, PERMISSIONS.manageTaskTypes, PERMISSIONS.viewForms)],
         data: { titleKey: 'lookups.title', subtitleKey: 'lookups.subtitle' },
         loadComponent: () => import('./features/lookups/lookups.component').then(m => m.LookupsComponent),
+      },
+      {
+        path: 'forms',
+        loadChildren: () => import('./features/form-engine/form-engine.routes').then(m => m.FORM_ENGINE_ROUTES),
+      },
+      {
+        path: 'tasks',
+        loadChildren: () => import('./features/tasks/tasks.routes').then(m => m.TASKS_ROUTES),
+      },
+      {
+        path: 'admin/teams',
+        canActivate: [permissionGuard(PERMISSIONS.manageTeams)],
+        data: { titleKey: 'teams.title', subtitleKey: 'teams.subtitle' },
+        loadComponent: () => import('./features/admin/teams/team-list.component').then(m => m.TeamListComponent),
       },
       {
         path: 'admin/users',

@@ -29,9 +29,9 @@ internal static class JwtTokenGenerator
         if (!string.IsNullOrWhiteSpace(user.Email))
             claims.Add(new Claim(JwtRegisteredClaimNames.Email, user.Email));
 
-        if (user.TeamId is long teamId)
+        if (user.TeamId is Guid teamId)
         {
-            claims.Add(new Claim(AppClaimTypes.TeamId, teamId.ToString(CultureInfo.InvariantCulture)));
+            claims.Add(new Claim(AppClaimTypes.TeamId, teamId.ToString()));
             if (!string.IsNullOrWhiteSpace(user.UserName))
                 claims.Add(new Claim(AppClaimTypes.UserCode, user.UserName));
         }

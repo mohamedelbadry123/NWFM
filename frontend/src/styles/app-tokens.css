@@ -27,6 +27,21 @@
   --acc-danger-fg: #9d2727;
   --acc-neutral-bg: #eaeff2;
   --acc-neutral-fg: #4b5f6a;
+
+  /* Section tints for a rendered form: each section takes the next tone, so a long form
+     stays readable without every panel looking the same. */
+  --sec-1-bg: #f2f8fa;
+  --sec-1-accent: #248fac;
+  --sec-2-bg: #f3f6fb;
+  --sec-2-accent: #5b7bc4;
+  --sec-3-bg: #f3f4fb;
+  --sec-3-accent: #6f6fc0;
+  --sec-4-bg: #f2f9f5;
+  --sec-4-accent: #3f9c74;
+  --sec-5-bg: #fbf7f1;
+  --sec-5-accent: #b58447;
+  --sec-6-bg: #faf3f6;
+  --sec-6-accent: #b0648a;
 }
 
 [data-theme='dark'] {
@@ -52,6 +67,20 @@
   --acc-danger-fg: #f0908f;
   --acc-neutral-bg: rgba(176, 195, 204, 0.12);
   --acc-neutral-fg: #b0c3cc;
+
+  /* The same six tones, as tints over a dark surface rather than washes of white. */
+  --sec-1-bg: rgba(69, 173, 199, 0.09);
+  --sec-1-accent: #5cb6cd;
+  --sec-2-bg: rgba(111, 145, 224, 0.09);
+  --sec-2-accent: #8ba6e0;
+  --sec-3-bg: rgba(139, 139, 224, 0.09);
+  --sec-3-accent: #a3a3e2;
+  --sec-4-bg: rgba(63, 176, 126, 0.09);
+  --sec-4-accent: #64c49b;
+  --sec-5-bg: rgba(201, 152, 82, 0.09);
+  --sec-5-accent: #d3a86a;
+  --sec-6-bg: rgba(199, 116, 156, 0.09);
+  --sec-6-accent: #d894b4;
 }
 
 html, body, app-root {

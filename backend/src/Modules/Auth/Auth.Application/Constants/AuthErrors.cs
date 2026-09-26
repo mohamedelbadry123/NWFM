@@ -23,4 +23,6 @@ public static class AuthErrors
     public static readonly Error LookupDuplicate = new("Auth.LookupDuplicate", "A lookup item with this code already exists.");
     public static readonly Error LookupParentRequired = new("Auth.LookupParentRequired", "A parent code is required for this lookup.");
     public static Error LookupUnknownType(string type) => new("Auth.LookupUnknownType", $"Unknown lookup type: {type}.");
+    public static readonly Error TeamNotFound = new("Auth.TeamNotFound", "Team not found.");
+    public static readonly Error TeamDuplicateName = new("Auth.TeamDuplicateName", "A team with this name already exists.");
 }

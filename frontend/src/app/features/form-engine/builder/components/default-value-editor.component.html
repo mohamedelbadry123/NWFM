@@ -1,0 +1,165 @@
+<ng-container>
+  @if (isSupported()) {
+    <div>
+      <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.defaultValue' | translate) }}</label>
+
+      <!--
+        A date/time default may be resolved from the fill-time clock instead of stored, so those
+        types choose a mode first. Every other type has only the one thing a default can be.
+      -->
+      @if (isClockType()) {
+        <p-select
+          [options]="modeOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="editorMode()"
+          (ngModelChange)="onModeChange($event)"
+          appendTo="body"
+          styleClass="w-full mb-2"
+        />
+      }
+
+      @if (showControl()) {
+        @switch (type()) {
+          @case (elementTypes.Date) {
+            <p-datepicker
+              [ngModel]="dateValue()"
+              (ngModelChange)="onDateChange($event)"
+              [dateFormat]="dateFormat"
+              [showIcon]="true"
+              [showClear]="true"
+              appendTo="body"
+              styleClass="w-full"
+              inputStyleClass="w-full"
+            />
+          }
+
+          @case (elementTypes.DateTime) {
+            <!-- min-w-0 on both cells: a grid item otherwise refuses to shrink below an input's
+                 intrinsic width, which forces the pair onto two lines. -->
+            <div class="grid grid-cols-[1fr_minmax(0,11rem)] items-start gap-2">
+              <div class="min-w-0">
+                <p-datepicker
+                  [ngModel]="dateHalf()"
+                  (ngModelChange)="onDateTimeDateChange($event)"
+                  [dateFormat]="dateFormat"
+                  [showIcon]="true"
+                  [showClear]="true"
+                  [placeholder]="('formly.dateTime.date' | translate)"
+                  appendTo="body"
+                  styleClass="w-full"
+                  inputStyleClass="w-full"
+                />
+              </div>
+              <app-time-picker
+                [value]="timeHalf()"
+                (valueChange)="onDateTimeTimeChange($event)"
+                [ariaLabel]="('formly.dateTime.time' | translate)"
+              />
+            </div>
+          }
+
+          @case (elementTypes.Time) {
+            <app-time-picker
+              [value]="timeHalf()"
+              (valueChange)="onTimeChange($event)"
+              [ariaLabel]="('formBuilder.editor.defaultValue' | translate)"
+            />
+          }
+
+          @case (elementTypes.Numeric) {
+            <p-inputNumber
+              [ngModel]="numberHalf()"
+              (ngModelChange)="onNumberChange($event)"
+              [maxFractionDigits]="maxFractionDigits()"
+              [showButtons]="false"
+              styleClass="w-full"
+            />
+          }
+
+          @case (elementTypes.YesNo) {
+            <p-select
+              [options]="yesNoOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="value()"
+              (ngModelChange)="onChoiceChange($event)"
+              [showClear]="true"
+              [placeholder]="('formBuilder.editor.noDefault' | translate)"
+              appendTo="body"
+              styleClass="w-full"
+            />
+          }
+
+          @case (elementTypes.SingleChoice) {
+            <p-select
+              [options]="choiceOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="value()"
+              (ngModelChange)="onChoiceChange($event)"
+              [showClear]="true"
+              [placeholder]="('formBuilder.editor.noDefault' | translate)"
+              appendTo="body"
+              styleClass="w-full"
+            />
+          }
+
+          @case (elementTypes.MultipleChoice) {
+            <p-multiSelect
+              [options]="choiceOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="multiValue()"
+              (ngModelChange)="onMultiChoiceChange($event)"
+              [showClear]="true"
+              [placeholder]="('formBuilder.editor.noDefault' | translate)"
+              appendTo="body"
+              styleClass="w-full"
+            />
+          }
+
+          @case (elementTypes.Geolocation) {
+            <div class="grid grid-cols-2 gap-2">
+              <p-inputNumber
+                [ngModel]="latHalf()"
+                (ngModelChange)="onLatChange($event)"
+                [maxFractionDigits]="6"
+                [showButtons]="false"
+                [placeholder]="('formBuilder.editor.latitude' | translate)"
+                styleClass="w-full"
+              />
+              <p-inputNumber
+                [ngModel]="lngHalf()"
+                (ngModelChange)="onLngChange($event)"
+                [maxFractionDigits]="6"
+                [showButtons]="false"
+                [placeholder]="('formBuilder.editor.longitude' | translate)"
+                styleClass="w-full"
+              />
+            </div>
+          }
+
+          @case (elementTypes.Memo) {
+            <textarea
+              pTextarea
+              rows="4"
+              class="w-full"
+              [ngModel]="value()"
+              (ngModelChange)="onTextChange($event)"
+            ></textarea>
+          }
+
+          @default {
+            <input
+              pInputText
+              class="w-full"
+              [ngModel]="value()"
+              (ngModelChange)="onTextChange($event)"
+            />
+          }
+        }
+      }
+    </div>
+  }
+</ng-container>

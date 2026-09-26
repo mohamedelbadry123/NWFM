@@ -50,7 +50,7 @@ public sealed class AuthService(
         Result<AuthTokenDto>? ssoGate = await EnsureLocalLoginAllowedAsync(user);
         if (ssoGate is not null) return ssoGate;
 
-        if (user.TeamId is long teamId && !await TeamIsActiveAsync(teamId, ct))
+        if (user.TeamId is Guid teamId && !await TeamIsActiveAsync(teamId, ct))
             return Result<AuthTokenDto>.Failure(TeamInactive);
 
         Result<AuthTokenDto>? scopeGate = await EnsureRequiredScopeAsync(user, ct);
@@ -74,9 +74,9 @@ public sealed class AuthService(
         if (postGate is not null)
             return Result<TeamLoginContext>.Failure(postGate.Error);
 
-        long teamId = user.TeamId!.Value;
+        Guid teamId = user.TeamId!.Value;
         string? mobile = await context.Teams.AsNoTracking()
-            .Where(t => t.Id == Guid.Parse(teamId.ToString(CultureInfo.InvariantCulture)))
+            .Where(t => t.Id == teamId)
             .Select(t => t.Mobile)
             .FirstOrDefaultAsync(ct);
 
@@ -237,7 +237,7 @@ public sealed class AuthService(
     {
         if (await userManager.IsLockedOutAsync(user))
             return Result<AuthTokenDto>.Failure(TeamInactive);
-        if (user.TeamId is not long teamId || !await userManager.IsInRoleAsync(user, Roles.FieldTeam))
+        if (user.TeamId is not Guid teamId || !await userManager.IsInRoleAsync(user, Roles.FieldTeam))
             return Result<AuthTokenDto>.Failure(InvalidTeamCredentials);
         if (!await TeamIsActiveAsync(teamId, ct))
             return Result<AuthTokenDto>.Failure(TeamInactive);
@@ -266,18 +266,18 @@ public sealed class AuthService(
     private async Task<Result<AuthTokenDto>?> EnsureRequiredScopeAsync(ApplicationUser user, CancellationToken ct)
     {
         if (await userManager.IsInRoleAsync(user, Roles.Administrator)) return null;
-        if (user.TeamId is long teamId)
+        if (user.TeamId is Guid teamId)
         {
-            return await HasActiveScopeAsync(OrgScopeOwnerTypes.Team, teamId.ToString(CultureInfo.InvariantCulture), ct)
+            return await HasActiveScopeAsync(OrgScopeOwnerTypes.Team, OrgScopeOwnerTypes.TeamOwnerId(teamId), ct)
                 ? null : Result<AuthTokenDto>.Failure(TeamScopeRequired);
         }
         return await HasActiveScopeAsync(OrgScopeOwnerTypes.User, user.Id.ToString(), ct)
             ? null : Result<AuthTokenDto>.Failure(UserScopeRequired);
     }
 
-    private Task<bool> TeamIsActiveAsync(long teamId, CancellationToken ct) =>
+    private Task<bool> TeamIsActiveAsync(Guid teamId, CancellationToken ct) =>
         context.Teams.AsNoTracking()
-            .AnyAsync(t => t.Id == Guid.Parse(teamId.ToString(CultureInfo.InvariantCulture)) && t.IsActive, ct);
+            .AnyAsync(t => t.Id == teamId && t.IsActive, ct);
 
     private Task<bool> HasActiveScopeAsync(string ownerType, string ownerId, CancellationToken ct) =>
         context.OrgScopes.AsNoTracking()

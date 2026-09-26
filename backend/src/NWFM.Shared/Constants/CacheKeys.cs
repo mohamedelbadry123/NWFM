@@ -27,4 +27,14 @@ public static class CacheKeys
         public const string Branches = $"{Prefix}:Lookups:Branches";
         public const string OperationAreas = $"{Prefix}:Lookups:OperationAreas";
     }
+
+    public static class FormEngine
+    {
+        public const string FieldCatalog = $"{Prefix}:FormEngine:FieldCatalog";
+    }
+
+    public static class Tasks
+    {
+        public const string C2mActionMappings = $"{Prefix}:Tasks:C2mActionMappings";
+    }
 }
