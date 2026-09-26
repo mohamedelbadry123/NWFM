@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.DTOs;
@@ -14,6 +16,7 @@ using Workflow.Domain.Enums;
 [ApiController]
 [Route("api/workflow/requests")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ViewInstances)]
 public sealed class WorkflowRequestsController : WorkflowControllerBase
 {
     private readonly ISender _sender;

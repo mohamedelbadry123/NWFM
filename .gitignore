@@ -56,9 +56,18 @@ packages/
 *.pem
 *.key
 
+# ---- Uploaded form media (FileStorage:Root) ----
+backend/src/NWFM.Api/Media/
+
 # ---- OS ----
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+# Local workflow acceptance results and restart-test state
+.work/workflow-*.json
+.work/workspace-*
+.work/*-workspace-edits.cjs
+/refernceApp

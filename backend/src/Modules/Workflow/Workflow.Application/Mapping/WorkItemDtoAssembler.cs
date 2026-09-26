@@ -7,6 +7,9 @@ using Workflow.Application.Queries.GetWorkflowVersionById;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
+using Workflow.Application.Helpers;
+using Workflow.Application.Integrations;
+using System.Text.Json;
 
 public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
 {
@@ -15,19 +18,21 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
     private readonly IWorkflowInstanceRepository _instances;
     private readonly IActivityInstanceRepository _activities;
     private readonly IWorkflowVersionRepository _versions;
+    private readonly IWorkflowVariableRepository? _variables;
 
     public WorkItemDtoAssembler(
         IWorkflowRequestRepository requests,
         IWorkflowAssignmentGroupRepository groups,
         IWorkflowInstanceRepository instances,
         IActivityInstanceRepository activities,
-        IWorkflowVersionRepository versions)
+        IWorkflowVersionRepository versions, IWorkflowVariableRepository? variables = null)
     {
         _requests = requests;
         _groups = groups;
         _instances = instances;
         _activities = activities;
         _versions = versions;
+        _variables = variables;
     }
 
     public async Task<WorkItemDto> ToDtoAsync(
@@ -39,7 +44,26 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
             return dto;
 
         var outcomes = await LoadOutcomesAsync(item, cancellationToken);
-        return dto with { AvailableOutcomes = outcomes };
+        var instance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
+        var activity = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+        var version = instance is null ? null : await _versions.GetByIdWithProjectionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
+        var definition = version?.Activities.FirstOrDefault(a => a.NodeKey == activity?.ActivityNodeKey);
+        try
+        {
+            var config = WorkflowTaskForm.Parse(definition?.ConfigurationJson);
+            var values = new Dictionary<string, object?>();
+            if (item.FormDataJson is not null) values = JsonSerializer.Deserialize<Dictionary<string, object?>>(item.FormDataJson) ?? [];
+            else if (_variables is not null && config.InputMappingJson is not null)
+            {
+                var variables = (await _variables.GetByInstanceIdAsync(item.WorkflowInstanceId, cancellationToken))
+                    .ToDictionary(v => v.VariableName, v => JsonSerializer.Deserialize<JsonElement>(v.ValueJson ?? "null"));
+                values = IntegrationValueMapper.Map(JsonSerializer.Serialize(new { variables }), WorkflowTaskForm.Mappings(config.InputMappingJson));
+            }
+            return dto with { AvailableOutcomes = outcomes, FormFields = config.FormFields, FormValues = values,
+                InstructionsEn = config.InstructionsEn, InstructionsAr = config.InstructionsAr };
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        { return dto with { AvailableOutcomes = outcomes }; }
     }
 
     public async Task<IReadOnlyList<WorkItemDto>> ToDtoListAsync(

@@ -44,13 +44,16 @@ internal sealed class WorkflowAssignmentResolver : IWorkflowAssignmentResolver
         if (!string.IsNullOrWhiteSpace(assignmentKey))
         {
             var byCode = await _groupRepo.GetByCodeAsync(assignmentKey.Trim(), organizationId, cancellationToken);
-            if (byCode is not null)
+            if (byCode is not null && byCode.IsActive)
                 return Result.Success(byCode.Id);
 
             var mapping = await _mappingRepo.GetByAssignmentKeyAsync(
                 workflowBindingId, organizationId, assignmentKey, cancellationToken);
             if (mapping is not null)
-                return Result.Success(mapping.AssignmentGroupId);
+            {
+                var mappedGroup = await _groupRepo.GetByIdAsync(mapping.AssignmentGroupId, organizationId, cancellationToken);
+                if (mappedGroup is not null && mappedGroup.IsActive) return Result.Success(mappedGroup.Id);
+            }
         }
 
         return Result.Failure<Guid>(WorkflowErrors.Instance.AssignmentKeyNotMapped);

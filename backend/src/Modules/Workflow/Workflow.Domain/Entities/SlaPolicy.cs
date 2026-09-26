@@ -20,6 +20,14 @@ public sealed class SlaPolicy : Entity
     public string? EscalationThresholdsJson { get; private set; }
     public string? EscalationAssignmentKey { get; private set; }
     public bool IsActive { get; private set; }
+    public string? DepartmentCode { get; private set; }
+    public string? FieldActivityCode { get; private set; }
+    public void BindFieldActivity(string departmentCode, string fieldActivityCode)
+    {
+        DepartmentCode = departmentCode;
+        FieldActivityCode = fieldActivityCode;
+        EscalationAssignmentKey = null;
+    }
     public byte[] RowVersion { get; private set; } = [];
 
     private SlaPolicy() { }

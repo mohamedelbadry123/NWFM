@@ -34,6 +34,8 @@ public sealed class WorkflowBinding : Entity, ITenantAware
     public string? ConditionJson { get; private set; }
 
     public bool IsActive { get; private set; }
+    public bool IsDemo { get; private set; }
+    public void MarkDemo() => IsDemo = true;
     public byte[] RowVersion { get; private set; } = [];
 
     private WorkflowBinding() { }

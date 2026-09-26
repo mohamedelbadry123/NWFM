@@ -1,0 +1,1064 @@
+[
+    {
+        "code":  "AS-01",
+        "cbuCode":  "AS",
+        "nameEn":  "Abhaa Main Branch",
+        "nameAr":  "أبها الفرع الرئيسي"
+    },
+    {
+        "code":  "AS-02",
+        "cbuCode":  "AS",
+        "nameEn":  "Ahad Rafidah",
+        "nameAr":  "أحد رفيدة"
+    },
+    {
+        "code":  "AS-03",
+        "cbuCode":  "AS",
+        "nameEn":  "Al Barak",
+        "nameAr":  "البرك"
+    },
+    {
+        "code":  "AS-04",
+        "cbuCode":  "AS",
+        "nameEn":  "Bishah",
+        "nameAr":  "بيشة"
+    },
+    {
+        "code":  "AS-05",
+        "cbuCode":  "AS",
+        "nameEn":  "Khamis Mushait",
+        "nameAr":  "خميس مشيط"
+    },
+    {
+        "code":  "AS-06",
+        "cbuCode":  "AS",
+        "nameEn":  "Mahayel",
+        "nameAr":  "محايل"
+    },
+    {
+        "code":  "AS-07",
+        "cbuCode":  "AS",
+        "nameEn":  "Alwadieen",
+        "nameAr":  "الواديين"
+    },
+    {
+        "code":  "AS-08",
+        "cbuCode":  "AS",
+        "nameEn":  "Madinat Sultan",
+        "nameAr":  "مدينة سلطان"
+    },
+    {
+        "code":  "AS-09",
+        "cbuCode":  "AS",
+        "nameEn":  "Alnamas",
+        "nameAr":  "النماص"
+    },
+    {
+        "code":  "AS-10",
+        "cbuCode":  "AS",
+        "nameEn":  "Almajardah",
+        "nameAr":  "المجاردة"
+    },
+    {
+        "code":  "AS-11",
+        "cbuCode":  "AS",
+        "nameEn":  "SARAT ABEEDAH",
+        "nameAr":  "سراة عبيده"
+    },
+    {
+        "code":  "AS-12",
+        "cbuCode":  "AS",
+        "nameEn":  "TATHLEETH",
+        "nameAr":  "تثليث"
+    },
+    {
+        "code":  "AS-13",
+        "cbuCode":  "AS",
+        "nameEn":  "REJAL ALMA",
+        "nameAr":  "رجال المع"
+    },
+    {
+        "code":  "AS-14",
+        "cbuCode":  "AS",
+        "nameEn":  "DHAHRAN ALJANOUB",
+        "nameAr":  "ظهران الجنوب"
+    },
+    {
+        "code":  "AS-15",
+        "cbuCode":  "AS",
+        "nameEn":  "BALQARN",
+        "nameAr":  "بالقرن"
+    },
+    {
+        "code":  "AS-16",
+        "cbuCode":  "AS",
+        "nameEn":  "TAREEB",
+        "nameAr":  "طريب"
+    },
+    {
+        "code":  "AS-17",
+        "cbuCode":  "AS",
+        "nameEn":  "TANOOMAH",
+        "nameAr":  "تنومة"
+    },
+    {
+        "code":  "AS-18",
+        "cbuCode":  "AS",
+        "nameEn":  "ALARAJAH",
+        "nameAr":  "الحرجه"
+    },
+    {
+        "code":  "BA-01",
+        "cbuCode":  "BA",
+        "nameEn":  "Bahaa Main Branch",
+        "nameAr":  "الباحة الفرع الرئيسي"
+    },
+    {
+        "code":  "BA-02",
+        "cbuCode":  "BA",
+        "nameEn":  "Baljorashi",
+        "nameAr":  "بلجرشي"
+    },
+    {
+        "code":  "BA-03",
+        "cbuCode":  "BA",
+        "nameEn":  "Al Aqiq",
+        "nameAr":  "العقيق"
+    },
+    {
+        "code":  "BA-04",
+        "cbuCode":  "BA",
+        "nameEn":  "Al Qara",
+        "nameAr":  "القرى"
+    },
+    {
+        "code":  "BA-05",
+        "cbuCode":  "BA",
+        "nameEn":  "Al Mandaq and Bani Hassan",
+        "nameAr":  "المندق و بني حسن"
+    },
+    {
+        "code":  "BA-06",
+        "cbuCode":  "BA",
+        "nameEn":  "Al Makhwah and Ghamid Al Zinad",
+        "nameAr":  "المخواه وغامد الزناد"
+    },
+    {
+        "code":  "BA-07",
+        "cbuCode":  "BA",
+        "nameEn":  "Qilwah",
+        "nameAr":  "قلوه"
+    },
+    {
+        "code":  "BA-08",
+        "cbuCode":  "BA",
+        "nameEn":  "Al Hajra",
+        "nameAr":  "الحجره"
+    },
+    {
+        "code":  "HA-01",
+        "cbuCode":  "HA",
+        "nameEn":  "Hail – Main Branch",
+        "nameAr":  "حائل - الفرع الرئيسي"
+    },
+    {
+        "code":  "HA-02",
+        "cbuCode":  "HA",
+        "nameEn":  "Al Shanan",
+        "nameAr":  "الشنان"
+    },
+    {
+        "code":  "HA-03",
+        "cbuCode":  "HA",
+        "nameEn":  "Baqa’a",
+        "nameAr":  "بقعاء"
+    },
+    {
+        "code":  "HA-04",
+        "cbuCode":  "HA",
+        "nameEn":  "Al Ghazalah",
+        "nameAr":  "الغزالة"
+    },
+    {
+        "code":  "HA-05",
+        "cbuCode":  "HA",
+        "nameEn":  "Al Hayet",
+        "nameAr":  "الحائط"
+    },
+    {
+        "code":  "HA-06",
+        "cbuCode":  "HA",
+        "nameEn":  "Al Halifah",
+        "nameAr":  "الحليفة"
+    },
+    {
+        "code":  "HA-07",
+        "cbuCode":  "HA",
+        "nameEn":  "Al Shamli",
+        "nameAr":  "الشملي"
+    },
+    {
+        "code":  "HS-01",
+        "cbuCode":  "HS",
+        "nameEn":  "Arar",
+        "nameAr":  "عرعر - المركز الرئيسي"
+    },
+    {
+        "code":  "HS-02",
+        "cbuCode":  "HS",
+        "nameEn":  "Rafhaa",
+        "nameAr":  "رفحاء"
+    },
+    {
+        "code":  "HS-03",
+        "cbuCode":  "HS",
+        "nameEn":  "Turayf",
+        "nameAr":  "طريف"
+    },
+    {
+        "code":  "HS-04",
+        "cbuCode":  "HS",
+        "nameEn":  "Al Uwayqilah",
+        "nameAr":  "العويقيلة"
+    },
+    {
+        "code":  "JC-01",
+        "cbuCode":  "JCBU",
+        "nameEn":  "Jeddah",
+        "nameAr":  "مدينة جدة"
+    },
+    {
+        "code":  "JC-02",
+        "cbuCode":  "JCBU",
+        "nameEn":  "JCBU Key Accounts",
+        "nameAr":  "كبار العملاء - جده"
+    },
+    {
+        "code":  "JC-03",
+        "cbuCode":  "JCBU",
+        "nameEn":  "JCBU Call Center",
+        "nameAr":  "مركز الإتصال - جده"
+    },
+    {
+        "code":  "JF-01",
+        "cbuCode":  "JF",
+        "nameEn":  "Sakakah – Main Branch",
+        "nameAr":  "سكاكا - الفرع الرئيسي"
+    },
+    {
+        "code":  "JF-02",
+        "cbuCode":  "JF",
+        "nameEn":  "Al Qurayyat",
+        "nameAr":  "القريات"
+    },
+    {
+        "code":  "JF-03",
+        "cbuCode":  "JF",
+        "nameEn":  "Dumat Al Jandal",
+        "nameAr":  "دومة الجندل"
+    },
+    {
+        "code":  "JF-04",
+        "cbuCode":  "JF",
+        "nameEn":  "Tabarjal",
+        "nameAr":  "طبرجل"
+    },
+    {
+        "code":  "JF-05",
+        "cbuCode":  "JF",
+        "nameEn":  "Suwair",
+        "nameAr":  "صوير"
+    },
+    {
+        "code":  "JF-06",
+        "cbuCode":  "JF",
+        "nameEn":  "Abu Ajram",
+        "nameAr":  "ابو عجرم"
+    },
+    {
+        "code":  "JF-07",
+        "cbuCode":  "JF",
+        "nameEn":  "Al Issawieyah",
+        "nameAr":  "العيساوية"
+    },
+    {
+        "code":  "1",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Jazan - Main",
+        "nameAr":  "جازان - الرئيسي"
+    },
+    {
+        "code":  "2",
+        "cbuCode":  "JZBU",
+        "nameEn":  "AL Aridhah",
+        "nameAr":  "العارضة"
+    },
+    {
+        "code":  "3",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Al Edabi",
+        "nameAr":  "العيدابي"
+    },
+    {
+        "code":  "4",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Sabya",
+        "nameAr":  "صبيا"
+    },
+    {
+        "code":  "5",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Ad Darb",
+        "nameAr":  "الدرب"
+    },
+    {
+        "code":  "6",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Damad",
+        "nameAr":  "ضمد"
+    },
+    {
+        "code":  "7",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Samtah Ahad Al Masarihah",
+        "nameAr":  "صامطة واحد المسارحة"
+    },
+    {
+        "code":  "8",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Abu Arish",
+        "nameAr":  "أبو عريش"
+    },
+    {
+        "code":  "9",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Farasan",
+        "nameAr":  "فرسان"
+    },
+    {
+        "code":  "10",
+        "cbuCode":  "JZBU",
+        "nameEn":  "Baish",
+        "nameAr":  "بيش"
+    },
+    {
+        "code":  "MC-01",
+        "cbuCode":  "MCBU",
+        "nameEn":  "Makkah",
+        "nameAr":  "مكه"
+    },
+    {
+        "code":  "MC-02",
+        "cbuCode":  "MCBU",
+        "nameEn":  "MCBU Main Back Office",
+        "nameAr":  "عملاء مكة"
+    },
+    {
+        "code":  "MD-01",
+        "cbuCode":  "MD",
+        "nameEn":  "Madinah - Main Branch",
+        "nameAr":  "المدينة - الرئيسي"
+    },
+    {
+        "code":  "MD-02",
+        "cbuCode":  "MD",
+        "nameEn":  "Madinah - West Branch",
+        "nameAr":  "فرع غرب المدينة"
+    },
+    {
+        "code":  "MD-03",
+        "cbuCode":  "MD",
+        "nameEn":  "Madinah - G1",
+        "nameAr":  "فرع المدينة الخدمة الشاملة 1"
+    },
+    {
+        "code":  "MD-04",
+        "cbuCode":  "MD",
+        "nameEn":  "Madinah - G2",
+        "nameAr":  "فرع المدينة الخدمة الشاملة 2"
+    },
+    {
+        "code":  "MD-05",
+        "cbuCode":  "MD",
+        "nameEn":  "Yanbu Branch",
+        "nameAr":  "فرع ينبع"
+    },
+    {
+        "code":  "MD-06",
+        "cbuCode":  "MD",
+        "nameEn":  "Yanbu alnakhl Branch",
+        "nameAr":  "فرع ينبع النخل"
+    },
+    {
+        "code":  "MD-07",
+        "cbuCode":  "MD",
+        "nameEn":  "Badr Branch",
+        "nameAr":  "فرع بدر"
+    },
+    {
+        "code":  "MD-08",
+        "cbuCode":  "MD",
+        "nameEn":  "Ale'ess Branch",
+        "nameAr":  "فرع العيص"
+    },
+    {
+        "code":  "MD-09",
+        "cbuCode":  "MD",
+        "nameEn":  "Abar almashi Branch",
+        "nameAr":  "فرع آبار الماشي"
+    },
+    {
+        "code":  "MD-10",
+        "cbuCode":  "MD",
+        "nameEn":  "Alfuraish Branch",
+        "nameAr":  "فرع الفريش"
+    },
+    {
+        "code":  "MD-11",
+        "cbuCode":  "MD",
+        "nameEn":  "Al ulaa Branch",
+        "nameAr":  "فرع العلا"
+    },
+    {
+        "code":  "MD-12",
+        "cbuCode":  "MD",
+        "nameEn":  "Khyber Branch",
+        "nameAr":  "فرع خيبر"
+    },
+    {
+        "code":  "MD-13",
+        "cbuCode":  "MD",
+        "nameEn":  "Almelelih Branch",
+        "nameAr":  "فرع المليليح"
+    },
+    {
+        "code":  "MD-14",
+        "cbuCode":  "MD",
+        "nameEn":  "Henakeh Branch",
+        "nameAr":  "فرع الحناكية"
+    },
+    {
+        "code":  "MD-15",
+        "cbuCode":  "MD",
+        "nameEn":  "Alsuidrah Branch",
+        "nameAr":  "فرع الصويدرة"
+    },
+    {
+        "code":  "MD-16",
+        "cbuCode":  "MD",
+        "nameEn":  "Wady Al fara'a Branch",
+        "nameAr":  "فرع وادي الفرع"
+    },
+    {
+        "code":  "MD-17",
+        "cbuCode":  "MD",
+        "nameEn":  "Alutimuh Branch",
+        "nameAr":  "فرع اليتمة"
+    },
+    {
+        "code":  "MD-18",
+        "cbuCode":  "MD",
+        "nameEn":  "Almahad Branch",
+        "nameAr":  "فرع المهد"
+    },
+    {
+        "code":  "MK-02",
+        "cbuCode":  "MK",
+        "nameEn":  "Rabigh",
+        "nameAr":  "رابغ"
+    },
+    {
+        "code":  "MK-03",
+        "cbuCode":  "MK",
+        "nameEn":  "Ranyah",
+        "nameAr":  "رنية"
+    },
+    {
+        "code":  "MK-04",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Khurmah",
+        "nameAr":  "الخرمة"
+    },
+    {
+        "code":  "MK-05",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Lith",
+        "nameAr":  "الليث"
+    },
+    {
+        "code":  "MK-06",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Qunfidhah",
+        "nameAr":  "القنفذة"
+    },
+    {
+        "code":  "MK-07",
+        "cbuCode":  "MK",
+        "nameEn":  "Turubah",
+        "nameAr":  "تربة"
+    },
+    {
+        "code":  "MK-08",
+        "cbuCode":  "MK",
+        "nameEn":  "Qura and Hajr Al Taif (Al Mequat + Hadan)",
+        "nameAr":  "قرى و هجر الطائف (الميقات + حضن)"
+    },
+    {
+        "code":  "MK-09",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Kamil",
+        "nameAr":  "الكامل"
+    },
+    {
+        "code":  "MK-10",
+        "cbuCode":  "MK",
+        "nameEn":  "Khulays",
+        "nameAr":  "خليص"
+    },
+    {
+        "code":  "MK-11",
+        "cbuCode":  "MK",
+        "nameEn":  "Adham",
+        "nameAr":  "أظم"
+    },
+    {
+        "code":  "MK-12",
+        "cbuCode":  "MK",
+        "nameEn":  "Hala",
+        "nameAr":  "حلي"
+    },
+    {
+        "code":  "MK-13",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Qouz.",
+        "nameAr":  "القوز"
+    },
+    {
+        "code":  "MK-14",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Ardeyat",
+        "nameAr":  "العرضيات"
+    },
+    {
+        "code":  "MK-15",
+        "cbuCode":  "MK",
+        "nameEn":  "Mesaan",
+        "nameAr":  "ميسان"
+    },
+    {
+        "code":  "MK-16",
+        "cbuCode":  "MK",
+        "nameEn":  "Al Moya",
+        "nameAr":  "المويه"
+    },
+    {
+        "code":  "MK-19",
+        "cbuCode":  "MK",
+        "nameEn":  "Thowal",
+        "nameAr":  "ثول"
+    },
+    {
+        "code":  "NJ-01",
+        "cbuCode":  "NJ",
+        "nameEn":  "Najran Main Branch",
+        "nameAr":  "نجران الفرع الرئيسي"
+    },
+    {
+        "code":  "NJ-02",
+        "cbuCode":  "NJ",
+        "nameEn":  "Khubash",
+        "nameAr":  "خباش"
+    },
+    {
+        "code":  "NJ-03",
+        "cbuCode":  "NJ",
+        "nameEn":  "Yadamah",
+        "nameAr":  "يدمه"
+    },
+    {
+        "code":  "NJ-04",
+        "cbuCode":  "NJ",
+        "nameEn":  "Hubuna",
+        "nameAr":  "حبونا"
+    },
+    {
+        "code":  "NJ-05",
+        "cbuCode":  "NJ",
+        "nameEn":  "Badr Al Janub",
+        "nameAr":  "بدر الجنوب"
+    },
+    {
+        "code":  "NJ-06",
+        "cbuCode":  "NJ",
+        "nameEn":  "Thar",
+        "nameAr":  "ثار"
+    },
+    {
+        "code":  "NJ-07",
+        "cbuCode":  "NJ",
+        "nameEn":  "Sharurah",
+        "nameAr":  "شروره"
+    },
+    {
+        "code":  "QS-01",
+        "cbuCode":  "QS",
+        "nameEn":  "Buraydah",
+        "nameAr":  "بريدة"
+    },
+    {
+        "code":  "QS-02",
+        "cbuCode":  "QS",
+        "nameEn":  "Unaizah",
+        "nameAr":  "عنيزة"
+    },
+    {
+        "code":  "QS-03",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Rass",
+        "nameAr":  "الرس"
+    },
+    {
+        "code":  "QS-04",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Badayea",
+        "nameAr":  "البدائع"
+    },
+    {
+        "code":  "QS-05",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Bukayriah",
+        "nameAr":  "البكيرية"
+    },
+    {
+        "code":  "QS-06",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Mithnab",
+        "nameAr":  "المذنب"
+    },
+    {
+        "code":  "QS-07",
+        "cbuCode":  "QS",
+        "nameEn":  "Riyadh Al Khabra",
+        "nameAr":  "رياض الخبراء"
+    },
+    {
+        "code":  "QS-08",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Asyeah",
+        "nameAr":  "الأسياح"
+    },
+    {
+        "code":  "QS-09",
+        "cbuCode":  "QS",
+        "nameEn":  "Uyun Al Jawa",
+        "nameAr":  "عيون الجواء"
+    },
+    {
+        "code":  "QS-10",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Shimasiyah",
+        "nameAr":  "الشماسية"
+    },
+    {
+        "code":  "QS-11",
+        "cbuCode":  "QS",
+        "nameEn":  "Al Nabhaniyah",
+        "nameAr":  "النبهانية"
+    },
+    {
+        "code":  "QS-12",
+        "cbuCode":  "QS",
+        "nameEn":  "Daryah",
+        "nameAr":  "ضرية"
+    },
+    {
+        "code":  "QS-13",
+        "cbuCode":  "QS",
+        "nameEn":  "Uglat Asugour",
+        "nameAr":  "عقلة الصقور"
+    },
+    {
+        "code":  "CCNT-RCBU",
+        "cbuCode":  "RCBU",
+        "nameEn":  "RCBU Call Center-Riyadh",
+        "nameAr":  "مركز الإتصال - الرياض"
+    },
+    {
+        "code":  "R-16",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Al Moraba-Riyadh",
+        "nameAr":  "فرع المربع - الرياض"
+    },
+    {
+        "code":  "R-21",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Al Rawabi-Riyadh",
+        "nameAr":  "فرع الروابي - الرياض"
+    },
+    {
+        "code":  "R-22",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Shobra-Riyadh",
+        "nameAr":  "فرع شبرا - الرياض"
+    },
+    {
+        "code":  "R-23",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Al Mourouj-Riyadh",
+        "nameAr":  "فرع المروج - الرياض"
+    },
+    {
+        "code":  "RC-01",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Riyadh City",
+        "nameAr":  "مدينة الرياض"
+    },
+    {
+        "code":  "RC-02",
+        "cbuCode":  "RCBU",
+        "nameEn":  "RCBU Key Accounts",
+        "nameAr":  "كبار العملاء"
+    },
+    {
+        "code":  "RC-03",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Al Rawabi",
+        "nameAr":  "فرع الروابي"
+    },
+    {
+        "code":  "RC-04",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Shobra",
+        "nameAr":  "فرع شبرا"
+    },
+    {
+        "code":  "RC-05",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Al Mourouj",
+        "nameAr":  "فرع المروج"
+    },
+    {
+        "code":  "RC-06",
+        "cbuCode":  "RCBU",
+        "nameEn":  "RCBU Call Center",
+        "nameAr":  "مركز الإتصال - الرياض"
+    },
+    {
+        "code":  "RC-07",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Nuzha Branch",
+        "nameAr":  "فرع النزهة"
+    },
+    {
+        "code":  "R-KEY",
+        "cbuCode":  "RCBU",
+        "nameEn":  "RCBU Key Accounts-Riyadh",
+        "nameAr":  "كبار العملاء - الرياض"
+    },
+    {
+        "code":  "R-NUZHA",
+        "cbuCode":  "RCBU",
+        "nameEn":  "Nuzha Branch-Riyadh",
+        "nameAr":  "فرع النزهه - الرياض"
+    },
+    {
+        "code":  "RI-01",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Kharaj",
+        "nameAr":  "الخرج"
+    },
+    {
+        "code":  "RI-02",
+        "cbuCode":  "RI",
+        "nameEn":  "Shaqraa",
+        "nameAr":  "شقراء"
+    },
+    {
+        "code":  "RI-03",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Mujamaa",
+        "nameAr":  "المجمعة"
+    },
+    {
+        "code":  "RI-04",
+        "cbuCode":  "RI",
+        "nameEn":  "Marat",
+        "nameAr":  "مرات"
+    },
+    {
+        "code":  "RI-05",
+        "cbuCode":  "RI",
+        "nameEn":  "Hareemlaa",
+        "nameAr":  "حريملاء"
+    },
+    {
+        "code":  "RI-06",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Hareeq",
+        "nameAr":  "الحريق"
+    },
+    {
+        "code":  "RI-07",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Ghatt",
+        "nameAr":  "الغاط"
+    },
+    {
+        "code":  "RI-08",
+        "cbuCode":  "RI",
+        "nameEn":  "Remah",
+        "nameAr":  "رماح"
+    },
+    {
+        "code":  "RI-09",
+        "cbuCode":  "RI",
+        "nameEn":  "Dharmaa",
+        "nameAr":  "ضرماء"
+    },
+    {
+        "code":  "RI-10",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Salail",
+        "nameAr":  "السليل"
+    },
+    {
+        "code":  "RI-11",
+        "cbuCode":  "RI",
+        "nameEn":  "Wadi Al Dawaser",
+        "nameAr":  "وادي الدواسر"
+    },
+    {
+        "code":  "RI-12",
+        "cbuCode":  "RI",
+        "nameEn":  "Hotta Bani Tameem",
+        "nameAr":  "حوطة بني تميم"
+    },
+    {
+        "code":  "RI-13",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Muzahemiyah",
+        "nameAr":  "المزاحمية"
+    },
+    {
+        "code":  "RI-14",
+        "cbuCode":  "RI",
+        "nameEn":  "Thadiq",
+        "nameAr":  "ثادق"
+    },
+    {
+        "code":  "RI-15",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Aflaj",
+        "nameAr":  "الأفلاج"
+    },
+    {
+        "code":  "RI-16",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Quweiyah",
+        "nameAr":  "القويعية"
+    },
+    {
+        "code":  "RI-17",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Dawadmi",
+        "nameAr":  "الدوادمي"
+    },
+    {
+        "code":  "RI-18",
+        "cbuCode":  "RI",
+        "nameEn":  "Afif",
+        "nameAr":  "عفيف"
+    },
+    {
+        "code":  "RI-19",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Zalfi",
+        "nameAr":  "الزلفي"
+    },
+    {
+        "code":  "RI-20",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Dalm",
+        "nameAr":  "الدلم"
+    },
+    {
+        "code":  "RI-21",
+        "cbuCode":  "RI",
+        "nameEn":  "Al-Uyaynah",
+        "nameAr":  "العيينة"
+    },
+    {
+        "code":  "RI-22",
+        "cbuCode":  "RI",
+        "nameEn":  "Al Rain",
+        "nameAr":  "الرين"
+    },
+    {
+        "code":  "SH-01",
+        "cbuCode":  "SH",
+        "nameEn":  "HOFUF",
+        "nameAr":  "الهفوف"
+    },
+    {
+        "code":  "SH-02",
+        "cbuCode":  "SH",
+        "nameEn":  "Almobaraz",
+        "nameAr":  "المبرز"
+    },
+    {
+        "code":  "SH-03",
+        "cbuCode":  "SH",
+        "nameEn":  "DAMMAM",
+        "nameAr":  "الدمام"
+    },
+    {
+        "code":  "SH-04",
+        "cbuCode":  "SH",
+        "nameEn":  "KHOBAR",
+        "nameAr":  "الخبر"
+    },
+    {
+        "code":  "SH-05",
+        "cbuCode":  "SH",
+        "nameEn":  "SAIHAT",
+        "nameAr":  "سيهات"
+    },
+    {
+        "code":  "SH-06",
+        "cbuCode":  "SH",
+        "nameEn":  "RASTANUREA",
+        "nameAr":  "رأس تنورة"
+    },
+    {
+        "code":  "SH-07",
+        "cbuCode":  "SH",
+        "nameEn":  "SAFWA",
+        "nameAr":  "صفوى"
+    },
+    {
+        "code":  "SH-08",
+        "cbuCode":  "SH",
+        "nameEn":  "QATIF",
+        "nameAr":  "القطيف"
+    },
+    {
+        "code":  "SH-09",
+        "cbuCode":  "SH",
+        "nameEn":  "ABQAI",
+        "nameAr":  "بقيق"
+    },
+    {
+        "code":  "SH-10",
+        "cbuCode":  "SH",
+        "nameEn":  "Al-Oyon",
+        "nameAr":  "العيون"
+    },
+    {
+        "code":  "SH-11",
+        "cbuCode":  "SH",
+        "nameEn":  "Al-Omran",
+        "nameAr":  "العمران"
+    },
+    {
+        "code":  "SH-12",
+        "cbuCode":  "SH",
+        "nameEn":  "HAFR BATIN",
+        "nameAr":  "حفر الباطن"
+    },
+    {
+        "code":  "SH-13",
+        "cbuCode":  "SH",
+        "nameEn":  "QAISUMA",
+        "nameAr":  "القيصومة"
+    },
+    {
+        "code":  "SH-14",
+        "cbuCode":  "SH",
+        "nameEn":  "Al Omran villages",
+        "nameAr":  "قرى العمران"
+    },
+    {
+        "code":  "SH-15",
+        "cbuCode":  "SH",
+        "nameEn":  "Oyoon villages",
+        "nameAr":  "قرى العيون"
+    },
+    {
+        "code":  "SH-16",
+        "cbuCode":  "SH",
+        "nameEn":  "MULAIJA",
+        "nameAr":  "مليجه"
+    },
+    {
+        "code":  "SH-17",
+        "cbuCode":  "SH",
+        "nameEn":  "OLAYA VILAGE",
+        "nameAr":  "القرية العليا"
+    },
+    {
+        "code":  "SH-18",
+        "cbuCode":  "SH",
+        "nameEn":  "JUBAIL",
+        "nameAr":  "الجبيل"
+    },
+    {
+        "code":  "SH-19",
+        "cbuCode":  "SH",
+        "nameEn":  "Alkhafji",
+        "nameAr":  "الخفجي"
+    },
+    {
+        "code":  "SH-20",
+        "cbuCode":  "SH",
+        "nameEn":  "Al-Nayriah",
+        "nameAr":  "النعيريه"
+    },
+    {
+        "code":  "TB-01",
+        "cbuCode":  "TB",
+        "nameEn":  "Tabuk- Main Branch",
+        "nameAr":  "تبوك-الرئيسي"
+    },
+    {
+        "code":  "TB-02",
+        "cbuCode":  "TB",
+        "nameEn":  "Haql Branch",
+        "nameAr":  "فرع حقل"
+    },
+    {
+        "code":  "TB-03",
+        "cbuCode":  "TB",
+        "nameEn":  "Duba Branch",
+        "nameAr":  "فرع ضباء"
+    },
+    {
+        "code":  "TB-04",
+        "cbuCode":  "TB",
+        "nameEn":  "Alwajeh Branch",
+        "nameAr":  "فرع الوجه"
+    },
+    {
+        "code":  "TB-05",
+        "cbuCode":  "TB",
+        "nameEn":  "Umleg Branch",
+        "nameAr":  "فرع أملج"
+    },
+    {
+        "code":  "TB-06",
+        "cbuCode":  "TB",
+        "nameEn":  "Tayma Branch",
+        "nameAr":  "فرع تيماء"
+    },
+    {
+        "code":  "TB-07",
+        "cbuCode":  "TB",
+        "nameEn":  "Albeda Branch",
+        "nameAr":  "فرع البدع"
+    },
+    {
+        "code":  "TC-01",
+        "cbuCode":  "TCBU",
+        "nameEn":  "TCBU Main Back Office",
+        "nameAr":  "عملاء الطائف"
+    }
+]

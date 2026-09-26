@@ -25,6 +25,11 @@ public sealed class WorkflowIntegrationInbox : Entity, ITenantAware
     public string? ErrorMessage { get; private set; }
     public Guid? BindingId { get; private set; }
     public Guid? WorkflowInstanceId { get; private set; }
+    public string Operation { get; private set; } = "Start";
+    public Guid? TargetActivityInstanceId { get; private set; }
+
+    public void SetSignalTarget(Guid instanceId, Guid? activityInstanceId)
+    { Operation = "Signal"; WorkflowInstanceId = instanceId; TargetActivityInstanceId = activityInstanceId; }
     public byte[] RowVersion { get; private set; } = [];
 
     private WorkflowIntegrationInbox() { }

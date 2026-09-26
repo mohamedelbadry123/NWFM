@@ -198,6 +198,77 @@ html[dir="rtl"] h2 { line-height: 1.2 !important; }
 .lang-pill button.active { color:#FFFFFF; }
 .lang-pill .thumb { position:absolute; top:3px; bottom:3px; width: calc(50% - 3px); background:#5040D6; border-radius:999px; transition: transform .25s ease; inset-inline-start: 3px; }
 
+/* ── Page card ───────────────────────────────────────────────────────────────
+ * The frame a list or detail page sits in. Several pages already carried
+ * `class="card"` while nothing defined it, so each looked like whatever its own
+ * utility classes happened to give it. One definition is what makes them agree.
+ */
+.card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--app-shadow-sm);
+}
+
+/* ── Data grid skin ──────────────────────────────────────────────────────────
+ * Opted into with `styleClass="app-table …"` on a p-table. Unlayered, so it wins
+ * over PrimeNG's own cascade layer without `!important`.
+ */
+.p-datatable.app-table .p-datatable-table-container {
+  /* What `[scrollable]` turns into the viewport: the sideways overflow belongs
+     here, not on the page. No border — the surrounding .card already frames it. */
+  border-radius: 0.625rem;
+  overflow-x: auto;
+}
+
+.p-datatable.app-table .p-datatable-thead > tr > th {
+  background: var(--app-surface-alt);
+  border-bottom: 1px solid var(--app-border);
+  /* Columns are sized from their content by the table's min-width; a wrapping
+     header defeats that and gives three-line headings. */
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+  padding: 0.625rem 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.p-datatable.app-table .p-datatable-tbody > tr > td {
+  /* Same reason as the headers: a value that wraps makes every row a different
+     height and the grid loses its scanline. */
+  white-space: nowrap;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--app-border), transparent 45%);
+  vertical-align: middle;
+}
+
+/* Opt-in for the few columns that need to breathe. Put it on the th and the td. */
+.p-datatable.app-table .app-col-wrap {
+  white-space: normal;
+}
+
+.p-datatable.app-table .p-datatable-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+.p-datatable.app-table .p-datatable-paginator-bottom {
+  border: 0;
+  padding-top: 0.75rem;
+}
+
+/* The caption holds the filter bar; it reads as part of the page, not as another
+   boxed panel stacked on the table. */
+.p-datatable.app-table .p-datatable-header {
+  background: transparent;
+  border: 0;
+  padding: 0 0 0.75rem 0;
+}
+
 /* ── Workflow surfaces (light + dark) ─────────────────────────────────────── */
 @layer components {
   .wf-card {
@@ -229,4 +300,52 @@ html[dir="rtl"] h2 { line-height: 1.2 !important; }
   .wf-muted {
     @apply text-ink-500 dark:text-ink-300;
   }
+}
+
+/* ---- Badge / tag system ------------------------------------------------
+ * One shape, six approved tones — the accent tokens in app-tokens.css. `--code` is the monospace
+ * variant for codes and version pins (`v3`). Ported from the reference styles; the task screens
+ * used the classes before they existed here, so their badges rendered as bare text.
+ */
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--acc-neutral-bg);
+  color: var(--acc-neutral-fg);
+}
+
+.app-badge--brand { background: var(--acc-brand-bg); color: var(--acc-brand-fg); }
+.app-badge--rule { background: var(--acc-rule-bg); color: var(--acc-rule-fg); }
+.app-badge--success { background: var(--acc-success-bg); color: var(--acc-success-fg); }
+.app-badge--warn { background: var(--acc-warn-bg); color: var(--acc-warn-fg); }
+.app-badge--danger { background: var(--acc-danger-bg); color: var(--acc-danger-fg); }
+.app-badge--neutral { background: var(--acc-neutral-bg); color: var(--acc-neutral-fg); }
+
+.app-badge--code {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * PrimeNG's timeline pins `direction: ltr`, so a status trail keeps its markers on the left even on
+ * an Arabic page, and it always renders the "opposite" column, parking the markers mid-width. Both
+ * are opt-in via this class — a timeline that does use an opposite template must not add it.
+ */
+.p-timeline.app-timeline-directional {
+  direction: inherit;
+}
+
+.p-timeline.app-timeline-directional .p-timeline-event-opposite {
+  display: none;
+}
+
+.p-timeline.app-timeline-directional .p-timeline-event-content {
+  text-align: start;
 }

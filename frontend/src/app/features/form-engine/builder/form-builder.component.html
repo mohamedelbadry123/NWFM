@@ -1,0 +1,122 @@
+<ng-container *translateContext="let t">
+  <p-toast />
+  <div class="p-1 md:p-1 space-y-4">
+    <!-- Page title/subtitle are rendered by the dashboard topbar (PageHeaderService). -->
+
+    <!-- Builder body -->
+    <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_260px] gap-4 min-h-[520px]">
+      @if (loading() || loadingSample()) {
+        <div
+          class="lg:col-span-2 flex flex-col items-center justify-center gap-3 min-h-[520px] rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)]"
+          role="status"
+          [attr.aria-label]="t('formBuilder.loading')"
+        >
+          <i class="pi pi-spin pi-spinner text-3xl text-primary" aria-hidden="true"></i>
+          <span class="text-sm text-[var(--p-text-muted-color)]">{{ t('formBuilder.loading') }}</span>
+        </div>
+      } @else {
+        <aside class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] overflow-hidden">
+          <app-field-palette [connectedTo]="listIds()" (add)="onPaletteAdd($event)" />
+        </aside>
+        <section class="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] overflow-hidden">
+          <app-builder-canvas (edit)="openEditor($event)" />
+        </section>
+      }
+
+      <!-- Settings column: form names + actions -->
+      <aside
+        class="order-first xl:order-none lg:col-span-2 xl:col-span-1 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 space-y-4 self-start"
+      >
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+          {{ t('formBuilder.settings') }}
+        </h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+          <div>
+            <label class="block text-xs font-semibold mb-1">{{ t('formBuilder.formNameEn') }}</label>
+            <input pInputText class="w-full" [ngModel]="store.nameEn()" (ngModelChange)="store.setNameEn($event)" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">{{ t('formBuilder.formNameAr') }}</label>
+            <input pInputText class="w-full" dir="rtl" [ngModel]="store.nameAr()" (ngModelChange)="store.setNameAr($event)" />
+          </div>
+        </div>
+
+        <div class="border-t border-[var(--app-border)] pt-4 space-y-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wide text-[var(--p-text-muted-color)]">
+            {{ t('formBuilder.actions') }}
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
+            <!-- Preview is a non-committal action: brand outline, not a filled
+                 accent. Only Publish carries a coloured fill in this stack. -->
+            <p-button
+              styleClass="w-full"
+              [label]="t('formBuilder.preview.open')"
+              icon="pi pi-eye"
+              [outlined]="true"
+              [disabled]="loading() || loadingSample() || saving() || publishing()"
+              (onClick)="openPreview()"
+            />
+            @if (isDesigner()) {
+              <p-button
+                styleClass="w-full"
+                [label]="t('formBuilder.save')"
+                icon="pi pi-save"
+                [loading]="saving()"
+                [disabled]="loading() || saving() || publishing()"
+                (onClick)="save()"
+              />
+              <p-button
+                styleClass="w-full"
+                [label]="t('formBuilder.publish')"
+                icon="pi pi-check-circle"
+                severity="success"
+                [loading]="publishing()"
+                [disabled]="loading() || saving() || publishing()"
+                (onClick)="publish()"
+              />
+              <p-button
+                styleClass="w-full"
+                [label]="t('formBuilder.backToForms')"
+                icon="pi pi-arrow-left"
+                [text]="true"
+                severity="secondary"
+                [disabled]="loading() || saving() || publishing()"
+                (onClick)="backToForms()"
+              />
+            } @else {
+              <p-button
+                styleClass="w-full"
+                [label]="t('formBuilder.loadSample')"
+                icon="pi pi-file-import"
+                [loading]="loadingSample()"
+                [disabled]="loadingSample()"
+                (onClick)="loadSample()"
+              />
+              <p-button
+                styleClass="w-full"
+                [label]="t('formBuilder.newForm')"
+                icon="pi pi-plus"
+                [outlined]="true"
+                severity="secondary"
+                [disabled]="loadingSample()"
+                (onClick)="newForm()"
+              />
+            }
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    @if (!loading() && !loadingSample()) {
+      <!-- JSON output -->
+      <app-json-output [json]="store.json()" />
+    }
+  </div>
+
+  <!-- Field editor -->
+  <app-field-editor-dialog [(visible)]="editorVisible" [elementKey]="editingKey()" />
+
+  <!-- Live Formly preview -->
+  <app-form-preview-dialog [(visible)]="previewVisible" [definition]="store.definition()" />
+</ng-container>

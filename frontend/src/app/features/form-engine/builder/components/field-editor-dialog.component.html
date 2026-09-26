@@ -1,0 +1,414 @@
+<ng-container>
+  <p-dialog
+    [header]="('formBuilder.editor.title' | translate)"
+    [visible]="visible()"
+    (visibleChange)="visible.set($event)"
+    [modal]="true"
+    [style]="{ width: '52rem' }"
+    [draggable]="false"
+    [maximizable]="true"
+  >
+    @if (form(); as fg) {
+      <form [formGroup]="fg" class="space-y-4">
+        <!-- Common: bilingual labels -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.labelEn' | translate) }}</label>
+            <input pInputText class="w-full" formControlName="label_en" />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.labelAr' | translate) }}</label>
+            <input pInputText class="w-full" dir="rtl" formControlName="label_ar" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.dataName' | translate) }}</label>
+          <p-autoComplete
+            formControlName="data_name"
+            [suggestions]="catalogSuggestions()"
+            (completeMethod)="searchCatalog($event)"
+            (onSelect)="onCatalogSelect($event)"
+            optionLabel="dataName"
+            [dropdown]="true"
+            [forceSelection]="false"
+            appendTo="body"
+            styleClass="w-full"
+            inputStyleClass="w-full"
+          />
+          @if (dataNameInvalid()) {
+            <small class="block mt-1 text-[var(--p-red-500)]">{{ ('formBuilder.dataNameInvalid' | translate) }}</small>
+          } @else if (dataNameTypeMismatch()) {
+            <small class="block mt-1 text-[var(--p-red-500)]">{{ ('formBuilder.dataNameTypeMismatch' | translate) }}</small>
+          } @else if (dataNameIsNew()) {
+            <small class="block mt-1 text-[var(--p-text-muted-color)]">{{ ('formBuilder.dataNameNewFieldHint' | translate) }}</small>
+          }
+        </div>
+
+        @if (!isSection()) {
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.c2mParameterName' | translate) }}</label>
+            <input pInputText class="w-full font-mono" formControlName="c2m_parameter_name" dir="ltr" />
+            <small class="block mt-1 text-[var(--p-text-muted-color)]">{{ ('formBuilder.editor.c2mParameterNameHint' | translate) }}</small>
+          </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.descriptionEn' | translate) }}</label>
+            <textarea pTextarea rows="2" class="w-full" formControlName="description_en"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.descriptionAr' | translate) }}</label>
+            <textarea pTextarea rows="2" class="w-full" dir="rtl" formControlName="description_ar"></textarea>
+          </div>
+        </div>
+
+        @if (element(); as el) {
+          <app-default-value-editor
+            [type]="el.type"
+            [choices]="liveChoices()"
+            [format]="el.format"
+            [seedToken]="el.key"
+            [(value)]="defaultValue"
+            [(mode)]="defaultValueMode"
+          />
+          @if (defaultOutOfRange()) {
+            <small class="block -mt-2 text-[var(--p-orange-500)]">{{ ('formBuilder.editor.defaultOutOfRange' | translate) }}</small>
+          }
+        }
+
+        <!-- Flags -->
+        <div class="flex flex-wrap gap-x-6 gap-y-2">
+          @if (!isSection()) {
+            <div class="flex items-center gap-2">
+              <p-checkbox formControlName="required" [binary]="true" inputId="fld_required" />
+              <label for="fld_required" class="text-sm">{{ ('formBuilder.editor.required' | translate) }}</label>
+            </div>
+          }
+          <div class="flex items-center gap-2">
+            <p-checkbox formControlName="hidden" [binary]="true" inputId="fld_hidden" />
+            <label for="fld_hidden" class="text-sm">{{ ('formBuilder.editor.hidden' | translate) }}</label>
+          </div>
+          @if (!isSection()) {
+            <div class="flex items-center gap-2">
+              <p-checkbox formControlName="disabled" [binary]="true" inputId="fld_disabled" />
+              <label for="fld_disabled" class="text-sm">{{ ('formBuilder.editor.readonly' | translate) }}</label>
+            </div>
+          }
+        </div>
+
+        <!-- Text-specific -->
+        @if (isText()) {
+          <div class="pt-3 border-t border-[var(--app-border)] space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.minLength' | translate) }}</label>
+                <p-inputNumber formControlName="min_length" [showButtons]="false" styleClass="w-full" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.maxLength' | translate) }}</label>
+                <p-inputNumber formControlName="max_length" [showButtons]="false" styleClass="w-full" />
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <p-button [label]="('formBuilder.editor.validationPattern' | translate)" icon="pi pi-code" [outlined]="true" size="small" (onClick)="patternDialogVisible.set(true)" />
+              @if (pattern(); as p) {
+                <span class="text-xs text-[var(--p-text-muted-color)]">{{ p.description }} <code class="ml-1">{{ p.regex }}</code></span>
+                <p-button icon="pi pi-times" [text]="true" size="small" severity="danger" (onClick)="clearPattern()" />
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Numeric-specific -->
+        @if (isNumeric()) {
+          <div class="pt-3 border-t border-[var(--app-border)] space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.format' | translate) }}</label>
+              <p-select [options]="formatOptions" optionLabel="label" optionValue="value" formControlName="format" appendTo="body" styleClass="w-full" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.minValue' | translate) }}</label>
+                <p-inputNumber formControlName="min" [showButtons]="false" styleClass="w-full" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.maxValue' | translate) }}</label>
+                <p-inputNumber formControlName="max" [showButtons]="false" styleClass="w-full" />
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Date / date-time constraints -->
+        @if (isDateRuleField()) {
+          <div class="pt-3 border-t border-[var(--app-border)] space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.dateRule' | translate) }}</label>
+              <p-select
+                [options]="dateRuleOptions()"
+                optionLabel="label"
+                optionValue="value"
+                formControlName="date_rule"
+                appendTo="body"
+                styleClass="w-full"
+              />
+              <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">{{ ('formBuilder.editor.dateRuleHint' | translate) }}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.minDate' | translate) }}</label>
+                <p-datepicker
+                  formControlName="min_date"
+                  dateFormat="dd/mm/yy"
+                  [showIcon]="true"
+                  [showClear]="true"
+                  appendTo="body"
+                  styleClass="w-full"
+                  inputStyleClass="w-full"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.maxDate' | translate) }}</label>
+                <p-datepicker
+                  formControlName="max_date"
+                  dateFormat="dd/mm/yy"
+                  [showIcon]="true"
+                  [showClear]="true"
+                  appendTo="body"
+                  styleClass="w-full"
+                  inputStyleClass="w-full"
+                />
+              </div>
+            </div>
+            @if (dateBoundsInvalid()) {
+              <small class="block text-[var(--p-red-500)]">{{ ('formBuilder.editor.dateBoundsInvalid' | translate) }}</small>
+            } @else {
+              <p class="text-[11px] text-[var(--p-text-muted-color)]">{{ ('formBuilder.editor.dateBoundsHint' | translate) }}</p>
+            }
+          </div>
+        }
+
+        <!-- Choice-specific -->
+        @if (isChoice()) {
+          <div class="pt-3 border-t border-[var(--app-border)] space-y-4">
+            <div class="flex items-center gap-2">
+              <p-checkbox formControlName="allow_other" [binary]="true" inputId="fld_allow_other" />
+              <label for="fld_allow_other" class="text-sm">{{ ('formBuilder.editor.allowOther' | translate) }}</label>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.parentField' | translate) }}</label>
+              <p-select
+                [options]="parentFieldOptions()"
+                optionLabel="label"
+                optionValue="data_name"
+                formControlName="parent_field"
+                [showClear]="true"
+                [placeholder]="('formBuilder.editor.noParent' | translate)"
+                appendTo="body"
+                styleClass="w-full"
+              />
+              <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">{{ ('formBuilder.editor.parentFieldHint' | translate) }}</p>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-semibold">{{ ('formBuilder.editor.choices' | translate) }}</label>
+                <p-button [label]="('formBuilder.editor.addChoice' | translate)" icon="pi pi-plus" size="small" [text]="true" (onClick)="addChoice()" />
+              </div>
+
+              <div formArrayName="choices" class="space-y-2">
+                @for (choice of choices.controls; track $index) {
+                  <div [formGroupName]="$index" class="space-y-2">
+                    <div class="grid grid-cols-12 gap-2 items-center">
+                      <input pInputText class="col-span-3" formControlName="value" [placeholder]="('formBuilder.editor.optionValue' | translate)" />
+                      <input pInputText class="col-span-3" formControlName="label_en" [placeholder]="('formBuilder.editor.optionLabelEn' | translate)" />
+                      <input pInputText class="col-span-3" dir="rtl" formControlName="label_ar" [placeholder]="('formBuilder.editor.optionLabelAr' | translate)" />
+                      @if (fg.get('parent_field')?.value) {
+                        <p-select
+                          class="col-span-2"
+                          [options]="parentChoiceOptions()"
+                          optionLabel="label"
+                          optionValue="value"
+                          formControlName="dependency_value"
+                          [showClear]="true"
+                          [placeholder]="('formBuilder.editor.dependsOn' | translate)"
+                          appendTo="body"
+                          styleClass="w-full"
+                        />
+                      } @else {
+                        <span class="col-span-2"></span>
+                      }
+                      <p-button class="col-span-1" icon="pi pi-times" [text]="true" size="small" severity="danger" (onClick)="removeChoice($index)" />
+                    </div>
+                    @if (isActionTakenField()) {
+                      <div class="grid grid-cols-12 gap-2 items-start ps-1">
+                        <div class="col-span-5">
+                          <p-select
+                            [options]="c2mFaStatusOptions()"
+                            optionLabel="label"
+                            optionValue="value"
+                            formControlName="c2m_fa_status"
+                            [showClear]="true"
+                            [placeholder]="('formBuilder.editor.c2mFaStatus' | translate)"
+                            appendTo="body"
+                            styleClass="w-full"
+                          />
+                        </div>
+                        <div class="col-span-6">
+                          <input pInputText class="w-full" formControlName="c2m_reason" [placeholder]="('formBuilder.editor.c2mReason' | translate)" />
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+              @if (isActionTakenField()) {
+                <p class="text-[11px] text-[var(--p-text-muted-color)] mt-2">
+                  {{ ('formBuilder.editor.c2mFaStatusHint' | translate) }} {{ ('formBuilder.editor.c2mReasonHint' | translate) }}
+                </p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Media-specific (photo / video / audio) -->
+        @if (isAttachment()) {
+          <div class="pt-3 border-t border-[var(--app-border)]">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.maxFiles' | translate) }}</label>
+                <p-inputNumber formControlName="max_files" [min]="1" [showButtons]="false" styleClass="w-full" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.maxFileSize' | translate) }}</label>
+                <p-inputNumber formControlName="max_file_size_mb" [min]="1" [showButtons]="false" styleClass="w-full" />
+              </div>
+            </div>
+            <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">{{ ('formBuilder.editor.mediaHint' | translate) }}</p>
+
+            <div class="mt-4">
+              <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.allowedExtensions' | translate) }}</label>
+              <p-autoComplete
+                formControlName="allowed_extensions"
+                [multiple]="true"
+                [typeahead]="false"
+                separator=","
+                [placeholder]="('formBuilder.editor.allowedExtensionsPlaceholder' | translate)"
+                appendTo="body"
+                styleClass="w-full"
+                inputStyleClass="w-full"
+              />
+              <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">
+                {{ ('formBuilder.editor.allowedExtensionsHint' | translate) }}
+              </p>
+              <div class="flex items-center gap-2 mt-2">
+                <p-button
+                  [label]="('formBuilder.editor.resetExtensions' | translate)"
+                  icon="pi pi-refresh"
+                  size="small"
+                  [text]="true"
+                  (onClick)="resetExtensions()"
+                />
+                <p-button
+                  [label]="('formBuilder.editor.clearExtensions' | translate)"
+                  icon="pi pi-times"
+                  size="small"
+                  [text]="true"
+                  severity="secondary"
+                  (onClick)="clearExtensions()"
+                />
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Barcode-specific -->
+        @if (isBarcode()) {
+          <div class="pt-3 border-t border-[var(--app-border)]">
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.barcodeFormats' | translate) }}</label>
+            <p-multiSelect
+              formControlName="barcode_formats"
+              [options]="barcodeFormatOptions"
+              optionLabel="label"
+              optionValue="value"
+              [placeholder]="('formBuilder.editor.barcodeFormatsPlaceholder' | translate)"
+              [filter]="false"
+              [showToggleAll]="true"
+              appendTo="body"
+              styleClass="w-full"
+            />
+            <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">
+              {{ ('formBuilder.editor.barcodeFormatsHint' | translate) }}
+            </p>
+            <div class="flex items-center gap-2 mt-2">
+              <p-button
+                [label]="('formBuilder.editor.resetBarcodeFormats' | translate)"
+                icon="pi pi-refresh"
+                size="small"
+                [text]="true"
+                (onClick)="resetBarcodeFormats()"
+              />
+            </div>
+          </div>
+        }
+
+        <!-- Geolocation-specific -->
+        @if (isGeolocation()) {
+          <div class="pt-3 border-t border-[var(--app-border)]">
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.mapZoom' | translate) }}</label>
+            <p-inputNumber formControlName="map_zoom" [min]="1" [max]="20" [showButtons]="false" styleClass="w-full" />
+            <p class="text-[11px] text-[var(--p-text-muted-color)] mt-1">{{ ('formBuilder.editor.mapZoomHint' | translate) }}</p>
+          </div>
+        }
+
+        <!-- Section-specific -->
+        @if (isSection()) {
+          <div class="pt-3 border-t border-[var(--app-border)]">
+            <label class="block text-sm font-semibold mb-1">{{ ('formBuilder.editor.display' | translate) }}</label>
+            <p-select [options]="displayOptions" optionLabel="label" optionValue="value" formControlName="display" appendTo="body" styleClass="w-full" />
+          </div>
+        }
+
+        <!-- Rules -->
+        <div class="pt-3 border-t border-[var(--app-border)] flex flex-wrap gap-3">
+          <p-button [label]="('formBuilder.rules.visibilityRules' | translate)" icon="pi pi-eye" [outlined]="true" size="small" (onClick)="visibilityDialogVisible.set(true)" />
+          @if (!isSection()) {
+            <p-button [label]="('formBuilder.rules.requirementRules' | translate)" icon="pi pi-flag" [outlined]="true" size="small" (onClick)="requirementDialogVisible.set(true)" />
+          }
+        </div>
+      </form>
+    }
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="('formBuilder.actions.cancel' | translate)" [text]="true" (onClick)="close()" />
+      <p-button [label]="('formBuilder.actions.save' | translate)" [disabled]="dataNameInvalid()" (onClick)="save()" />
+    </ng-template>
+  </p-dialog>
+
+  <!-- Sub-dialogs -->
+  <app-validation-pattern-dialog
+    [(visible)]="patternDialogVisible"
+    [pattern]="pattern()"
+    (patternChange)="onPatternChange($event)"
+  />
+
+  <app-rules-dialog
+    [(visible)]="visibilityDialogVisible"
+    [mode]="visibilityMode"
+    [rules]="visibleConditions()"
+    [fields]="ruleFieldOptions()"
+    (rulesChange)="onVisibilityChange($event)"
+  />
+
+  <app-rules-dialog
+    [(visible)]="requirementDialogVisible"
+    [mode]="requirementMode"
+    [rules]="requiredConditions()"
+    [fields]="ruleFieldOptions()"
+    (rulesChange)="onRequirementChange($event)"
+  />
+</ng-container>

@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -21,6 +23,7 @@ using Workflow.Application.Queries.ListWorkflowVersions;
 [ApiController]
 [Route("api/workflow/definitions/{definitionId:guid}/versions")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageDefinitions)]
 public sealed class WorkflowVersionsController : WorkflowControllerBase
 {
     private readonly ISender _sender;

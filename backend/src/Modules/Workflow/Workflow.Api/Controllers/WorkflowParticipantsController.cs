@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.Commands.DeactivateParticipant;
@@ -14,6 +16,7 @@ using NWFM.Shared.Results;
 [ApiController]
 [Route("api/workflow/participants")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageParticipants)]
 public sealed class WorkflowParticipantsController : WorkflowControllerBase
 {
     private readonly ISender _sender;
@@ -80,7 +83,7 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     {
         if (!TryGetOrganizationId(out var orgId)) return Forbid();
 
-        var command = new RegisterParticipantCommand(orgId, request.DisplayName, request.Email, request.DisplayNameAr, request.EmployeeNumber);
+        var command = new RegisterParticipantCommand(orgId, request.DisplayName, request.Email, request.DisplayNameAr, request.EmployeeNumber, request.UserId);
         var result = await _sender.Send(command, cancellationToken);
 
         if (result.IsFailure && result.Error.Code == "Workflow.Participant.AlreadyRegistered")
@@ -104,10 +107,6 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     {
         if (!TryGetOrganizationId(out var orgId)) return Forbid();
 
-        var participant = await _sender.Send(new GetParticipantByIdQuery(id, orgId), cancellationToken);
-        if (participant.IsSuccess && participant.Value.UserId == Context.DefaultActorId)
-            return Conflict(new { Code = "Participant.DefaultActor", Message = "The default participant cannot be deactivated. Configure another default participant first." });
-
         var result = await _sender.Send(new DeactivateParticipantCommand(id, orgId), cancellationToken);
 
         if (result.IsFailure && result.Error.Code == "Workflow.Participant.NotFound")
@@ -120,4 +119,4 @@ public sealed class WorkflowParticipantsController : WorkflowControllerBase
     }
 }
 
-public sealed record RegisterParticipantRequest(string DisplayName, string Email, string? DisplayNameAr = null, string? EmployeeNumber = null);
+public sealed record RegisterParticipantRequest(string DisplayName, string Email, string? DisplayNameAr = null, string? EmployeeNumber = null, Guid? UserId = null);

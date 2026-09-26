@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.DTOs;
@@ -10,6 +12,7 @@ using Workflow.Application.Queries.ListWorkflowActionsCatalog;
 [ApiController]
 [Route("api/workflow/actions-catalog")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageDefinitions)]
 public sealed class WorkflowActionsCatalogController : WorkflowControllerBase
 {
     private readonly ISender _sender;

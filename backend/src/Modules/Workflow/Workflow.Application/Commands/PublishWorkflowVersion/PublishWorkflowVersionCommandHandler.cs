@@ -9,6 +9,8 @@ using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
 using Workflow.Application.Helpers;
 using Workflow.Domain.Repositories;
+using NWFM.Shared.Integration.Workflow;
+using Workflow.Application.Integrations;
 
 public sealed class PublishWorkflowVersionCommandHandler
     : IRequestHandler<PublishWorkflowVersionCommand, Result<WorkflowVersionDto>>
@@ -17,17 +19,24 @@ public sealed class PublishWorkflowVersionCommandHandler
     private readonly IWorkflowDefinitionRepository _definitionRepo;
     private readonly IWorkflowVersionRepository _versionRepo;
     private readonly IWorkflowXmlCompiler _compiler;
+    private readonly IWorkflowActionRegistry? _actionRegistry;
+    private readonly IWorkflowIntegrations? _integrations;
+    private readonly Workflow.Application.Workspace.IWorkflowWorkspacePublisher? _workspace;
 
     public PublishWorkflowVersionCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitionRepo,
         IWorkflowVersionRepository versionRepo,
-        IWorkflowXmlCompiler compiler)
+        IWorkflowXmlCompiler compiler,
+        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null, Workflow.Application.Workspace.IWorkflowWorkspacePublisher? workspace = null)
     {
         _gate = gate;
         _definitionRepo = definitionRepo;
         _versionRepo = versionRepo;
         _compiler = compiler;
+        _actionRegistry = actionRegistry;
+        _integrations = integrations;
+        _workspace = workspace;
     }
 
     public async Task<Result<WorkflowVersionDto>> Handle(
@@ -65,9 +74,11 @@ public sealed class PublishWorkflowVersionCommandHandler
         }
         else
         {
-            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings);
+            WorkflowGraphValidator.Validate(compileResult.Value!, errors, warnings, _actionRegistry);
+            if (_integrations is not null) errors.AddRange(await _integrations.ValidateConnectionsAsync(compileResult.Value!, cancellationToken));
         }
 
+        if (_workspace is not null) errors.AddRange(await _workspace.ValidateAsync(version, cancellationToken));
         var isValid = errors.Count == 0;
         var resultDto = new WorkflowValidationResultDto(isValid, errors, warnings);
         version.SetValidationResult(isValid, JsonSerializer.Serialize(resultDto), DateTime.UtcNow);
@@ -81,6 +92,7 @@ public sealed class PublishWorkflowVersionCommandHandler
                 first));
         }
 
+        if (_workspace is not null) { var prepared = await _workspace.PreparePublicationAsync(version, cancellationToken); if (prepared.IsFailure) return Result.Failure<WorkflowVersionDto>(prepared.Error); }
         var now = DateTime.UtcNow;
         version.Publish(request.PublishedByUserId, now);
         await _versionRepo.SaveChangesAsync(cancellationToken);

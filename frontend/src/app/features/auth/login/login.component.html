@@ -1,0 +1,115 @@
+@if (handingOver()) {
+  <div class="handover-page">
+    <div class="handover-card">
+      <span class="brand-wordmark">{{ 'common.appName' | translate }}</span>
+      <p-progress-spinner strokeWidth="4" [style]="{ width: '48px', height: '48px' }" />
+      <h2>{{ 'auth.sso.redirecting' | translate }}</h2>
+      <p>{{ 'auth.sso.pleaseWait' | translate }}</p>
+    </div>
+  </div>
+} @else {
+  <div class="login-page">
+    <section class="hero-pane animate-slide-in-start">
+      <div class="hero-overlay"></div>
+      <span class="droplet droplet-1"></span>
+      <span class="droplet droplet-2"></span>
+      <span class="droplet droplet-3"></span>
+      <span class="droplet droplet-4"></span>
+
+      <div class="hero-content">
+        <h1 class="hero-title">{{ 'auth.heroTitle' | translate }}</h1>
+        <p class="hero-subtitle">{{ 'auth.heroSubtitle' | translate }}</p>
+        <ul class="hero-points">
+          <li><i class="pi pi-check-square"></i>{{ 'nav.tasks' | translate }}</li>
+          <li><i class="pi pi-inbox"></i>{{ 'nav.requests' | translate }}</li>
+          <li><i class="pi pi-sitemap"></i>{{ 'nav.definitions' | translate }}</li>
+        </ul>
+      </div>
+
+      <div class="waves">
+        <svg class="wave wave-back" viewBox="0 0 1440 120" preserveAspectRatio="none">
+          <path d="M0,64 C240,120 480,0 720,48 C960,96 1200,24 1440,64 L1440,120 L0,120 Z"></path>
+        </svg>
+        <svg class="wave wave-front" viewBox="0 0 1440 120" preserveAspectRatio="none">
+          <path d="M0,80 C240,32 480,120 720,72 C960,24 1200,96 1440,56 L1440,120 L0,120 Z"></path>
+        </svg>
+      </div>
+    </section>
+
+    <section class="form-pane animate-slide-in-end">
+      <div class="form-topbar">
+        <button type="button" class="lang-toggle" (click)="toggleLanguage()" [attr.aria-label]="'common.language' | translate">
+          <i class="pi pi-globe"></i>
+          <span>{{ locale.locale() === 'ar' ? ('common.english' | translate) : ('common.arabic' | translate) }}</span>
+        </button>
+      </div>
+
+      <div class="form-wrapper">
+        <div class="form-heading animate-fade-in-up">
+          <span class="login-wordmark">{{ 'common.appName' | translate }}</span>
+          <h2>{{ 'auth.welcome' | translate }}</h2>
+          <p>{{ 'auth.subtitle' | translate }}</p>
+        </div>
+
+        @if (errorMessage()) {
+          <p-message severity="error" [text]="(errorMessage()! | translate)" styleClass="mb-4 w-full" />
+        }
+
+        @if (ssoEnabled()) {
+          <div class="sso-block animate-fade-in-up">
+            <button pButton type="button" class="submit-btn sso-btn" (click)="signInWithSso()" [disabled]="redirecting()"
+              [label]="redirecting() ? ('auth.sso.redirecting' | translate) : ('auth.sso.signInWithSso' | translate)"
+              icon="pi pi-id-card">
+            </button>
+
+            @if (localLoginOffered() && !showCredentialsForm()) {
+              <div class="sso-divider"><span>{{ 'auth.sso.or' | translate }}</span></div>
+              <button type="button" class="link-btn" (click)="revealCredentialsForm()">
+                {{ 'auth.sso.administratorSignIn' | translate }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (showCredentialsForm()) {
+          <form [formGroup]="form" (ngSubmit)="submit()" class="login-form">
+            <div class="field animate-fade-in-up">
+              <label for="userName">{{ 'auth.username' | translate }}</label>
+              <input pInputText id="userName" formControlName="userName"
+                [placeholder]="'auth.usernamePlaceholder' | translate"
+                autocomplete="username"
+                [ngClass]="{ 'ng-invalid ng-dirty': f.userName.invalid && f.userName.touched }" />
+              @if (f.userName.invalid && f.userName.touched) {
+                <small class="error">{{ 'auth.usernameRequired' | translate }}</small>
+              }
+            </div>
+
+            <div class="field animate-fade-in-up">
+              <label for="password">{{ 'auth.password' | translate }}</label>
+              <p-password inputId="password" formControlName="password" [feedback]="false" [toggleMask]="true"
+                styleClass="w-full" [inputStyleClass]="'w-full'"
+                [placeholder]="'auth.passwordPlaceholder' | translate" />
+              @if (f.password.invalid && f.password.touched) {
+                <small class="error">{{ 'auth.passwordRequired' | translate }}</small>
+              }
+            </div>
+
+            <div class="field-inline animate-fade-in-up">
+              <div class="remember">
+                <p-checkbox inputId="rememberMe" formControlName="rememberMe" [binary]="true" />
+                <label for="rememberMe">{{ 'auth.rememberMe' | translate }}</label>
+              </div>
+            </div>
+
+            <button pButton type="submit" class="submit-btn animate-fade-in-up"
+              [disabled]="submitting()"
+              [label]="submitting() ? ('auth.signingIn' | translate) : ('auth.signIn' | translate)">
+            </button>
+          </form>
+        }
+
+        <p class="form-footer">{{ 'common.appFullName' | translate }}</p>
+      </div>
+    </section>
+  </div>
+}

@@ -20,6 +20,21 @@ public sealed class ActivityInstance : Entity, ITenantAware
     public DateTime? CompletedAt { get; private set; }
     public DateTime? FailedAt { get; private set; }
     public string? FailureReason { get; private set; }
+    public Guid? ExecutionTokenId { get; private set; }
+    public string? Phase { get; private set; }
+    public DateTime? DueAt { get; private set; }
+    public DateTime? SlaBreachedAt { get; private set; }
+    public DateTime? NextSlaAlertAt { get; private set; }
+    public int SlaAlertCount { get; private set; }
+    public void ScheduleSlaAlert(DateTime? next) => NextSlaAlertAt = next;
+    public void AdvanceSlaAlert(DateTime? next) { SlaAlertCount++; NextSlaAlertAt = next; }
+    public string? PendingOutcome { get; private set; }
+    public void SetPhase(string phase) => Phase = phase;
+    public void SetDeadline(DateTime? dueAt) => DueAt = dueAt;
+    public void MarkSlaBreached(DateTime at) => SlaBreachedAt ??= at;
+    public void SetPendingOutcome(string? outcome) => PendingOutcome = outcome;
+    public void AttachToken(Guid? tokenId) => ExecutionTokenId = tokenId;
+    public void Reopen() { Status = ActivityInstanceStatus.Active; FailedAt = null; FailureReason = null; }
 
     private ActivityInstance() { }
 
@@ -48,6 +63,7 @@ public sealed class ActivityInstance : Entity, ITenantAware
     public void Complete(DateTime completedAt)
     {
         Status      = ActivityInstanceStatus.Completed;
+        Phase = "Completed";
         CompletedAt = completedAt;
         SetUpdated(completedAt);
     }

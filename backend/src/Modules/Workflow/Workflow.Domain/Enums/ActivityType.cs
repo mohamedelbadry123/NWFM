@@ -15,5 +15,6 @@ public enum ActivityType
     WaitEvent          = 10,  // waits for external signal / correlation
     InclusiveGateway   = 11,  // OR-split: start ALL matching condition transitions; if none match, take default
     CallActivity       = 12,  // start child published definition, optionally wait for completion
+    MainActivity       = 13,  // required child workflow, then an assigned approval
 }
 

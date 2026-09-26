@@ -11,6 +11,7 @@ public sealed class WorkflowDbContext : BaseDbContext
         : base(options, currentTenant) { }
 
     public DbSet<WorkflowParticipant> Participants => Set<WorkflowParticipant>();
+    public DbSet<WorkflowWorkspaceAction> WorkspaceActions => Set<WorkflowWorkspaceAction>();
     public DbSet<WorkflowAssignmentGroup> AssignmentGroups => Set<WorkflowAssignmentGroup>();
     public DbSet<WorkflowGroupMember> GroupMembers => Set<WorkflowGroupMember>();
     public DbSet<WorkflowDepartment> Departments => Set<WorkflowDepartment>();
@@ -47,6 +48,10 @@ public sealed class WorkflowDbContext : BaseDbContext
     public DbSet<WorkflowIntegrationInbox> WorkflowIntegrationInbox => Set<WorkflowIntegrationInbox>();
     public DbSet<WorkflowNotificationLog> WorkflowNotificationLogs => Set<WorkflowNotificationLog>();
     public DbSet<WorkflowRequest> WorkflowRequests => Set<WorkflowRequest>();
+    public DbSet<WorkflowIntegrationConnection> IntegrationConnections => Set<WorkflowIntegrationConnection>();
+    public DbSet<WorkflowIntegrationJob> IntegrationJobs => Set<WorkflowIntegrationJob>();
+    public DbSet<WorkflowEventSubscription> EventSubscriptions => Set<WorkflowEventSubscription>();
+    public DbSet<WorkflowEventReceipt> EventReceipts => Set<WorkflowEventReceipt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

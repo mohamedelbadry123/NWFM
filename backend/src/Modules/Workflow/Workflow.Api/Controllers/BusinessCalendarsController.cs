@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -16,6 +18,7 @@ using Workflow.Application.Queries.ListBusinessCalendars;
 [ApiController]
 [Route("api/workflow/calendars")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageCalendars)]
 public sealed class BusinessCalendarsController : WorkflowControllerBase
 {
     private readonly ISender _sender;
@@ -68,6 +71,13 @@ public sealed class BusinessCalendarsController : WorkflowControllerBase
         if (result.IsFailure) return BadRequest(new { result.Error.Code, result.Error.Message });
         return Ok(result.Value);
     }
+
+    [HttpDelete("{id:guid}/periods/{itemId:guid}")]
+    public async Task<IActionResult> RemovePeriod(Guid id, Guid itemId, CancellationToken ct)
+    { var result = await _sender.Send(new Workflow.Application.Commands.RemoveCalendarItem(id, itemId, false), ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
+    [HttpDelete("{id:guid}/holidays/{itemId:guid}")]
+    public async Task<IActionResult> RemoveHoliday(Guid id, Guid itemId, CancellationToken ct)
+    { var result = await _sender.Send(new Workflow.Application.Commands.RemoveCalendarItem(id, itemId, true), ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
 
     [HttpPost("{id:guid}/periods")]
     [ProducesResponseType(typeof(BusinessCalendarPeriodDto), StatusCodes.Status201Created)]

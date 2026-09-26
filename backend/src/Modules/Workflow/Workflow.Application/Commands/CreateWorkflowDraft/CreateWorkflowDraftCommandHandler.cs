@@ -65,5 +65,5 @@ public sealed class CreateWorkflowDraftCommandHandler
         new(v.Id, v.WorkflowDefinitionId, v.VersionNumber,
             v.Status, v.SchemaVersion, v.ValidationStatus,
             v.ChangeSummary, v.CreatedByUserId, v.PublishedByUserId,
-            v.PublishedAt, v.CreatedAt, v.UpdatedAt);
+            v.PublishedAt, v.CreatedAt, v.UpdatedAt, v.WorkspaceJson, v.PinnedChildVersionsJson);
 }

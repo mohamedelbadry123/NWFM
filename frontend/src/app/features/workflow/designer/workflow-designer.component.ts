@@ -1,3 +1,4 @@
+import { WorkflowActivitySlaComponent } from '../workspace/workflow-activity-sla.component';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -13,10 +14,16 @@ import {
   ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
+import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
+import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
+import { WorkflowBusinessActivityComponent } from '../workspace/workflow-business-activity.component';
+import { WorkflowGeographyComponent } from '../workspace/workflow-geography.component';
+import { WorkspaceSettings } from '../workspace/workflow-workspace.service';
+import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { canvasWorldSize, layoutWorkflowGraph, mapCanvasIdsToActivities, nodesAreCollapsed } from './workflow-canvas-layout';
@@ -43,6 +50,7 @@ import { LocaleService } from '@core/i18n/locale.service';
 export type NodeType =
   | 'Start'
   | 'UserTask'
+  | 'MainActivity'
   | 'ExclusiveGateway'
   | 'InclusiveGateway'
   | 'ServiceTask'
@@ -64,6 +72,7 @@ export interface FormFieldRow {
   labelAr: string;
   type: FormFieldType;
   required: boolean;
+  options?: string;
 }
 
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
@@ -107,7 +116,7 @@ export interface CanvasVariable {
   variableKey: string;
   name: string;
   nameAr: string;
-  dataType: 'String' | 'Number' | 'Boolean' | 'DateTime' | 'Guid' | 'Json';
+  dataType: 'String' | 'Number' | 'Integer' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime' | 'Guid' | 'Json';
   defaultValue: string;
   isRequired: boolean;
   isSensitive: boolean;
@@ -147,6 +156,7 @@ export interface CanvasEdge {
 }
 
 export interface CanvasState {
+  workspace?: WorkspaceSettings;
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   variables: CanvasVariable[];
@@ -263,7 +273,7 @@ export function buildNWFMXml(state: CanvasState): string {
     : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<WorkflowDefinition xmlns="https://privora.io/workflow/v1">
+<WorkflowDefinition xmlns="https://privora.io/workflow/v1"${state.workspace ? ` workspaceJson="${escXml(JSON.stringify(state.workspace))}"` : ''}>
   <Activities>
 ${nodes}
   </Activities>
@@ -283,7 +293,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslateModule, RouterLink],
+  imports: [WorkflowActivitySlaComponent, FormsModule, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowGeographyComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -326,6 +336,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private readonly autosave$    = new Subject<void>();
 
   // ── Canvas state
+  protected readonly workspace = signal<WorkspaceSettings | undefined>(undefined);
+  protected updateWorkspace(settings: WorkspaceSettings): void { if (!this.isReadonly()) { this.workspace.set(settings); this.markUnsaved(); } }
   protected readonly nodes     = signal<CanvasNode[]>([]);
   protected readonly edges     = signal<CanvasEdge[]>([]);
   protected readonly variables = signal<CanvasVariable[]>([]);
@@ -402,6 +414,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     correlationVariable:    [''],
     definitionKey:          [''],
     waitForCompletion:      [true],
+    callVersionId:          [''],
+    callInputMappingsJson:  ['{}'],
+    callOutputMappingsJson: ['{}'],
   });
 
   protected readonly formFieldTypes: FormFieldType[] = ['text', 'textarea', 'number', 'date', 'select'];
@@ -420,22 +435,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   });
 
   // ── Enums / options
-  protected readonly timerTypeOptions: TimerTypeOption[] = ['DueDate', 'Duration', 'ExternalSignal'];
+  protected readonly timerTypeOptions: TimerTypeOption[] = ['DueDate', 'Duration'];
   protected readonly notifFailurePolicyOptions: NotificationFailurePolicyOption[] = ['Continue', 'Retry', 'FailWorkflow'];
   protected readonly executionTriggerOptions = ['OnEnter', 'OnComplete', 'OnOutcome', 'OnFailure'];
   protected readonly actionFailurePolicyOptions = ['Continue', 'Retry', 'FailActivity', 'FailWorkflow', 'CreateIncident'];
-  protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Number', 'Boolean', 'DateTime', 'Guid', 'Json'];
+  protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Integer', 'Decimal', 'Boolean', 'Date', 'DateTime', 'Guid', 'Json'];
 
   // ── Inspector tab definitions
   protected readonly userTaskTabs: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
     { id: 'general',    labelKey: 'workflow.designer.tab_general',    helpKey: 'workflow.designer.tab_help_general'    },
     { id: 'assignment', labelKey: 'workflow.designer.tab_assignment', helpKey: 'workflow.designer.tab_help_assignment' },
-    { id: 'outcomes',   labelKey: 'workflow.designer.tab_outcomes',   helpKey: 'workflow.designer.tab_help_outcomes'   },
     { id: 'actions',    labelKey: 'workflow.designer.tab_actions',    helpKey: 'workflow.designer.tab_help_actions'    },
     { id: 'sla',        labelKey: 'workflow.designer.tab_sla',        helpKey: 'workflow.designer.tab_help_sla'        },
-    { id: 'data',       labelKey: 'workflow.designer.tab_data',       helpKey: 'workflow.designer.tab_help_data'       },
-    { id: 'form',       labelKey: 'workflow.designer.tab_form',       helpKey: 'workflow.designer.tab_help_form'       },
-    { id: 'advanced',   labelKey: 'workflow.designer.tab_advanced',   helpKey: 'workflow.designer.tab_help_advanced'   },
   ];
   protected readonly activeTabHelpKey = computed(() =>
     this.userTaskTabs.find(t => t.id === this.inspectorTab())?.helpKey
@@ -443,18 +454,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   );
 
   // ── Palette
-  protected readonly paletteNodes: { type: NodeType; labelKey: string; label: string; category: string; descKey: string }[] = [
+  protected readonly paletteNodes: { type: NodeType; protocol?: string; labelKey: string; label: string; category: string; descKey: string }[] = [
     { type: 'Start',            labelKey: 'workflow.designer.node_start',             label: 'Start',          category: 'flow',       descKey: 'workflow.designer.node_desc_start'            },
     { type: 'End',              labelKey: 'workflow.designer.node_end',               label: 'End',            category: 'flow',       descKey: 'workflow.designer.node_desc_end'              },
     { type: 'ExclusiveGateway', labelKey: 'workflow.designer.node_exclusive_gateway', label: 'Decision',           category: 'flow',       descKey: 'workflow.designer.node_desc_exclusive_gateway'},
     { type: 'InclusiveGateway', labelKey: 'workflow.designer.node_inclusive_gateway', label: 'Inclusive Gateway',  category: 'flow',       descKey: 'workflow.designer.node_desc_inclusive_gateway'},
     { type: 'ParallelGateway',  labelKey: 'workflow.designer.node_parallel_gateway',  label: 'Parallel Fork',      category: 'flow',       descKey: 'workflow.designer.node_desc_parallel_gateway' },
     { type: 'JoinGateway',      labelKey: 'workflow.designer.node_join_gateway',      label: 'Join',               category: 'flow',       descKey: 'workflow.designer.node_desc_join_gateway'     },
+    { type: 'MainActivity', labelKey: 'workflow.designer.node_main_activity', label: 'Main Activity', category: 'tasks', descKey: 'workflow.designer.node_desc_main_activity' },
     { type: 'UserTask',         labelKey: 'workflow.designer.node_user_task',         label: 'User Task',          category: 'tasks',      descKey: 'workflow.designer.node_desc_user_task'        },
-    { type: 'ServiceTask',      labelKey: 'workflow.designer.node_service_task',      label: 'Service Task',       category: 'automation', descKey: 'workflow.designer.node_desc_service_task'     },
-    { type: 'CallActivity',     labelKey: 'workflow.designer.node_call_activity',     label: 'Call Activity',      category: 'automation', descKey: 'workflow.designer.node_desc_call_activity'    },
-    { type: 'ScriptTask',       labelKey: 'workflow.designer.node_script_task',       label: 'Set Variables',      category: 'automation', descKey: 'workflow.designer.node_desc_script_task'      },
-    { type: 'NotificationTask', labelKey: 'workflow.designer.node_notification_task', label: 'Notification',       category: 'automation', descKey: 'workflow.designer.node_desc_notification_task'},
+    { type: 'ServiceTask', protocol: 'Sms', labelKey: 'workflow.designer.node_sms', label: 'SMS', category: 'events', descKey: 'workflow.designer.node_desc_sms' },
+    { type: 'ServiceTask',      labelKey: 'workflow.designer.node_service_task',      label: 'API Request',       category: 'automation', descKey: 'workflow.designer.node_desc_service_task'     },
+    { type: 'NotificationTask', labelKey: 'workflow.designer.node_notification_task', label: 'Email',       category: 'automation', descKey: 'workflow.designer.node_desc_notification_task'},
     { type: 'Timer',            labelKey: 'workflow.designer.node_timer',             label: 'Timer',              category: 'events',     descKey: 'workflow.designer.node_desc_timer'            },
     { type: 'WaitEvent',        labelKey: 'workflow.designer.node_wait_event',        label: 'Wait for Event',     category: 'events',     descKey: 'workflow.designer.node_desc_wait_event'       },
   ];
@@ -606,15 +617,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly GATEWAY_R = GATEWAY_R;
 
   ngOnInit(): void {
-    const defId = this.route.snapshot.paramMap.get('definitionId') ?? '';
-    const verId = this.route.snapshot.paramMap.get('versionId') ?? '';
-    this.definitionId.set(defId);
-    this.versionId.set(verId);
-
-    this.loadVersion();
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      this.definitionId.set(params.get('definitionId') ?? '');
+      this.versionId.set(params.get('versionId') ?? '');
+      this.selectedNodeId.set(null);
+      this.selectedEdgeId.set(null);
+      this.selectedNodeIds.set([]);
+      this.validationResult.set(null);
+      this.saveStatus.set('saved');
+      this.undoStack = [];
+      this.redoStack = [];
+      this.loadVersion();
+      this.loadDefinitionName();
+    });
     this.loadActionCatalog();
     this.loadSlaPolicies();
-    this.loadDefinitionName();
 
     this.autosave$.pipe(
       debounceTime(2000),
@@ -647,16 +664,20 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private loadVersion(): void {
     this.isLoading.set(true);
-    this.versionsService.getById(this.definitionId(), this.versionId())
+    const requestedVersion = this.versionId();
+    this.versionsService.getById(this.definitionId(), requestedVersion)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: v => {
+          if (this.versionId() !== requestedVersion) return;
           this.version.set(v);
+          try { this.workspace.set(v.workspaceJson ? JSON.parse(v.workspaceJson) : undefined); } catch { this.workspace.set(undefined); }
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
+          if (v.status === 'Draft' && this.workspace()) { this.workspace.update(w => ({...w!, designerVersion: 2})); this.ensureSimpleActions(); this.convertEmbeddedEvents(); }
           this.relayoutIfCollapsed();
           if (v.status !== 'Draft') {
-            this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables() }));
+            this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
           }
         },
         error: (err: { error?: { message?: string } }) => {
@@ -687,14 +708,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           labelAr:      e.labelAr      ?? '',
           descriptionEn: e.descriptionEn ?? '',
         })));
-        this.variables.set(state.variables ?? []);
+        this.variables.set(state.variables?.length ? state.variables : this.projectVariables(v));
         return;
       } catch { /* fall through */ }
     }
 
     this.nodes.set((v.activities ?? []).map((a, i) => this.activityToCanvasNode(a, i)));
     this.edges.set(this.transitionsToEdges(v));
-    this.variables.set([]);
+    this.variables.set(this.projectVariables(v));
+  }
+
+  private projectVariables(v: WorkflowVersionDetailDto): CanvasVariable[] {
+    return (v.variables ?? []).map(variable => ({ id: variable.id || crypto.randomUUID(), variableKey: variable.variableKey || '',
+      name: variable.name || '', nameAr: variable.nameAr || '', dataType: (variable.dataType || 'String') as CanvasVariable['dataType'],
+      defaultValue: variable.defaultValue || '', isRequired: !!variable.isRequired, isSensitive: !!variable.isSensitive,
+      description: variable.description || '', descriptionAr: variable.descriptionAr || '' }));
   }
 
   private activityToCanvasNode(a: ActivityDefinitionDto, i: number): CanvasNode {
@@ -914,6 +942,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     };
     this.pushUndo();
     this.nodes.update(ns => [...ns, node]);
+    this.ensureSimpleActions();
     this.markUnsaved();
   }
 
@@ -1004,8 +1033,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private saveToBackend(): Observable<WorkflowVersionDto | null> {
     if (this.isReadonly()) return of(null);
+    this.ensureSimpleActions();
     this.saveStatus.set('saving');
-    const state: CanvasState = { nodes: this.nodes(), edges: this.edges(), variables: this.variables() };
+    const state: CanvasState = { nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() };
     const xml = buildNWFMXml(state);
     const designerJson = JSON.stringify(state);
     return this.versionsService.saveXml(this.definitionId(), this.versionId(), xml, designerJson).pipe(
@@ -1054,7 +1084,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected switchTab(tab: 'designer' | 'xml'): void {
     if (tab === 'xml') {
-      this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables() }));
+      this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
     }
     this.activeTab.set(tab);
   }
@@ -1078,7 +1108,38 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Canvas interactions ──────────────────────────────────────────────────
 
-  protected addNode(type: NodeType, x?: number, y?: number): void {
+  private convertEmbeddedEvents():void {
+    const added:CanvasNode[]=[];
+    this.nodes.update(nodes=>nodes.map(n=>{const c=this.parseConfig(n.configurationJson) as any;if(!Array.isArray(c.events)||!c.events.length)return n;const remaining=[];
+      for(const ev of c.events){if(!['Http','Soap','Sms','Email'].includes(ev.kind)){remaining.push(ev);continue;}
+        const key='event_'+n.id.replaceAll('-','')+'_'+String(ev.id).replaceAll('-','');
+        added.push({id:key,nodeKey:key,type:ev.kind==='Email'?'NotificationTask':'ServiceTask',name:ev.name||ev.kind,nameAr:'',actionKey:ev.kind==='Email'?'':'http.request',assignmentKey:'',assignmentGroupId:'',assignmentPurpose:'',outcomes:[],actions:[],x:n.x+300,y:n.y+140+added.length*120,configurationJson:JSON.stringify({...ev.configuration,protocol:ev.kind==='Http'?'Rest':ev.kind,required:ev.required??['Http','Soap'].includes(ev.kind),...(ev.kind==='Email'?{channels:'Email',failurePolicy:'Retry'}:{}),triggerBinding:{sourceNodeKey:n.nodeKey,trigger:ev.trigger}})});
+      }return {...n,configurationJson:JSON.stringify({...c,events:remaining})};}));
+    if(added.length){this.nodes.update(nodes=>[...nodes,...added]);this.markUnsaved();}
+  }
+  private ensureSimpleActions(): void {
+    if (!this.workspace() || this.isReadonly()) return;
+    this.nodes.update(nodes => nodes.map(n => {
+      if(n.type!=='UserTask'&&n.type!=='MainActivity') return n;
+      if(n.outcomes.some(o=>!['APPROVE','REJECT'].includes(o.key))) return n;
+      const outcomes: CanvasOutcome[] = ['APPROVE','REJECT'].map((key,i)=>({...n.outcomes.find(o=>o.key===key),id:n.outcomes.find(o=>o.key===key)?.id||crypto.randomUUID(),key,label:i?'Reject':'Accept',labelAr:i?'رفض':'قبول',description:'',descriptionAr:'',sortOrder:i,isDefault:i===0,requiresComment:i===1,requiresAttachment:false,isActive:true,resultValue:key}));
+      return {...n,outcomes};
+    }));
+  }
+  protected rejectTarget(value:string):void {const n=this.selectedNode();if(!n)return;this.applyIntegrationConfiguration(JSON.stringify({...this.parseConfig(n.configurationJson),rejectTargetNodeKey:value}));}
+  protected businessNodes(){return this.nodes().filter(n=>n.type==='UserTask'||n.type==='MainActivity');}
+  protected activityTabKey(event:KeyboardEvent,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const step=(event.key==='ArrowRight'?1:-1)*(this.locale.isRtl()?-1:1);const next=event.key==='Home'?0:event.key==='End'?this.userTaskTabs.length-1:(index+step+this.userTaskTabs.length)%this.userTaskTabs.length;this.inspectorTab.set(this.userTaskTabs[next].id);(event.target as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();}
+  protected rejectionDestinations(){
+    const current=this.selectedNode();if(!current)return [];
+    const reaches=(from:string,to:string)=>{const pending=[from],seen=new Set<string>();while(pending.length){const id=pending.pop()!;if(seen.has(id))continue;seen.add(id);for(const edge of this.edges().filter(e=>e.fromNodeId===id)){if(edge.toNodeId===to)return true;pending.push(edge.toNodeId);}}return false;};
+    const business=this.businessNodes();return business.filter(n=>n.id===current.id?!business.some(b=>b.id!==n.id&&reaches(b.id,n.id)):reaches(n.id,current.id)&&!reaches(current.id,n.id));
+  }
+  protected selectedConfig(): any {return this.parseConfig(this.selectedNode()?.configurationJson||'{}');}
+  protected resetSimpleActions(){const n=this.selectedNode();if(!n||this.isReadonly())return;this.nodes.update(nodes=>nodes.map(x=>x.id===n.id?{...x,outcomes:[],actions:[]}:x));this.ensureSimpleActions();this.markUnsaved();}
+  protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
+  protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
+
+  protected addNode(type: NodeType, x?: number, y?: number, protocol?: string): void {
     if (this.isReadonly()) return;
     const count = this.nodes().length;
     const px = x ?? 160 + (count % 4) * 48;
@@ -1091,7 +1152,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       x: px, y: py, outcomes: [], actions: [],
     };
     this.pushUndo();
+    if(type==='ServiceTask') { node.actionKey='http.request'; node.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
+    if(protocol==='Sms') node.name='SMS';
+    if(type==='NotificationTask') node.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
     this.nodes.update(ns => [...ns, node]);
+    this.ensureSimpleActions();
     this.selectedNodeId.set(node.id);
     this.selectedEdgeId.set(null);
     this.inspectorTab.set('general');
@@ -1099,8 +1164,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.markUnsaved();
   }
 
-  protected onPaletteDragStart(event: DragEvent, type: NodeType): void {
+  protected onPaletteDragStart(event: DragEvent, type: NodeType, protocol?:string): void {
     event.dataTransfer?.setData('nodeType', type);
+    event.dataTransfer?.setData('nodeProtocol', protocol||'');
   }
 
   protected onCanvasDrop(event: DragEvent): void {
@@ -1112,7 +1178,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const rect = svg.getBoundingClientRect();
     const x = (event.clientX - rect.left - this.panX()) / this.zoom();
     const y = (event.clientY - rect.top  - this.panY()) / this.zoom();
-    this.addNode(type, x, y);
+    this.addNode(type, x, y, event.dataTransfer?.getData('nodeProtocol'));
   }
 
   protected onCanvasDragOver(event: DragEvent): void { event.preventDefault(); }
@@ -1149,7 +1215,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     // Normal click: single-select (clear multi-select)
     if (this.selectedNodeId() !== nodeId) {
       const userTaskOnlyTabs: InspectorTab[] = ['assignment', 'outcomes', 'actions', 'sla', 'data', 'form', 'advanced'];
-      if (node?.type !== 'UserTask' && userTaskOnlyTabs.includes(this.inspectorTab())) {
+      if ((node?.type !== 'UserTask' && node?.type !== 'MainActivity') && userTaskOnlyTabs.includes(this.inspectorTab())) {
         this.inspectorTab.set('general');
       }
     }
@@ -2108,6 +2174,22 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.markUnsaved();
   }
 
+  protected applyIntegrationConfiguration(configurationJson: string): void {
+    if (this.isReadonly()) return;
+    const nodeId = this.selectedNodeId();
+    this.pushUndo();
+    this.nodes.update(nodes => nodes.map(n => n.id === nodeId
+      ? { ...n, configurationJson, actionKey: n.type === 'ServiceTask' ? 'http.request' : n.actionKey } : n));
+    const node = this.nodes().find(n => n.id === nodeId);
+    if (node) this.patchPropsFromNode(node);
+    this.markUnsaved();
+  }
+
+  protected applyTypedVariables(values: string): void {
+    this.applyIntegrationConfiguration(JSON.stringify({ ...this.parseConfig(this.selectedNode()?.configurationJson || '{}'),
+      assignmentFormat: 'typed', setVariables: JSON.parse(values) }));
+  }
+
   // ── Edge props form ───────────────────────────────────────────────────────
 
   protected applyEdgeProps(): void {
@@ -2135,7 +2217,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const incoming = this.edges().find(e => e.toNodeId === nodeId);
     if (!incoming) return null;
     const src = this.nodes().find(n => n.id === incoming.fromNodeId) ?? null;
-    return src?.type === 'UserTask' ? src : null;
+    return (src?.type === 'UserTask' || src?.type === 'MainActivity') ? src : null;
   }
 
   protected outgoingEdgesOf(nodeId: string): CanvasEdge[] {
@@ -2146,7 +2228,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const edge = this.selectedEdge();
     if (edge) {
       const from = this.nodes().find(n => n.id === edge.fromNodeId);
-      if (from?.type === 'UserTask') return from.outcomes.filter(o => !!o.key);
+      if ((from?.type === 'UserTask' || from?.type === 'MainActivity')) return from.outcomes.filter(o => !!o.key);
       if (from && this.isGateway(from.type)) {
         return this.incomingUserTask(from.id)?.outcomes.filter(o => !!o.key) ?? [];
       }
@@ -2383,7 +2465,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.centerOnNode(node.id);
 
     const tab = this.inferTabFromCode(errorCode);
-    if (node.type === 'UserTask' || !['assignment', 'outcomes', 'actions', 'sla', 'data', 'form', 'advanced'].includes(tab)) {
+    if ((node.type === 'UserTask' || node.type === 'MainActivity') || !['assignment', 'outcomes', 'actions', 'sla', 'data', 'form', 'advanced'].includes(tab)) {
       this.inspectorTab.set(tab as InspectorTab);
     } else {
       this.inspectorTab.set('general');
@@ -2394,11 +2476,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!code) return 'general';
     const lower = code.toLowerCase();
     if (lower.includes('assignment') || lower.includes('assignmentkey')) return 'assignment';
-    if (lower.includes('outcome')) return 'outcomes';
+    if (lower.includes('outcome') || lower.includes('reject') || lower.includes('accept')) return 'actions';
     if (lower.includes('action')) return 'actions';
     if (lower.includes('sla') || lower.includes('timer')) return 'sla';
-    if (lower.includes('form') || lower.includes('formkey')) return 'form';
-    if (lower.includes('variable') || lower.includes('input') || lower.includes('output')) return 'data';
     return 'general';
   }
 
@@ -2458,7 +2538,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       allowSelfClaim:        typeof cfg['allowSelfClaim'] === 'boolean' ? cfg['allowSelfClaim'] as boolean : false,
       configJson:            node.configurationJson || '',
       timerType:             (cfg['timerType'] as TimerTypeOption) || 'Duration',
-      dueAt:                 typeof cfg['dueAt'] === 'string' ? (cfg['dueAt'] as string).slice(0, 16) : '',
+      dueAt:                 typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
       duration:              typeof cfg['duration'] === 'string' ? cfg['duration'] as string : '',
       signalKey:             typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] as string : '',
       templateKey:           typeof cfg['templateKey'] === 'string' ? cfg['templateKey'] as string : '',
@@ -2474,11 +2554,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         : (cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
           ? JSON.stringify(cfg['formSchemaJson'], null, 2)
           : ''),
-      setVariablesJson:      this.formatSetVariables(cfg['setVariables']),
-      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] as string : '',
+      setVariablesJson:      this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
+      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] : typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] : '',
       correlationVariable:   typeof cfg['correlationVariable'] === 'string' ? cfg['correlationVariable'] as string : '',
       definitionKey:         typeof cfg['definitionKey'] === 'string' ? cfg['definitionKey'] as string : '',
       waitForCompletion:     typeof cfg['waitForCompletion'] === 'boolean' ? cfg['waitForCompletion'] as boolean : true,
+      callVersionId:         typeof cfg['versionId'] === 'string' ? cfg['versionId'] as string : '',
+      callInputMappingsJson: JSON.stringify(cfg['inputMappings'] || {}, null, 2),
+      callOutputMappingsJson: JSON.stringify(cfg['outputMappings'] || {}, null, 2),
     });
     this.formFields.set(this.parseFormFields(cfg['formFields']));
   }
@@ -2497,6 +2580,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         labelAr: typeof row['labelAr'] === 'string' ? row['labelAr'] : '',
         type,
         required: !!row['required'],
+        options: Array.isArray(row['options']) ? (row['options'] as string[]).join(', ') : '',
       };
     });
   }
@@ -2562,17 +2646,23 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private buildConfigurationJson(type: NodeType, v: typeof this.propsForm.value): string {
+    const existing = this.parseConfig(
+      this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
+    );
     if (type === 'Timer') {
-      const cfg: Record<string, string> = { timerType: (v.timerType as string) || 'Duration' };
-      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = v.dueAt.length === 16 ? `${v.dueAt}:00Z` : v.dueAt;
+      const cfg: Record<string, unknown> = { ...existing, timerType: (v.timerType as string) || 'Duration' };
+      delete cfg['dueAt'];
+      delete cfg['duration'];
+      delete cfg['signalKey'];
+      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = toUtcDateTime(v.dueAt);
       if (v.timerType === 'Duration' && v.duration)  cfg['duration'] = v.duration;
       if (v.timerType === 'ExternalSignal' && v.signalKey) cfg['signalKey'] = v.signalKey;
       return JSON.stringify(cfg);
     }
     if (type === 'NotificationTask') {
-      return JSON.stringify({ templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
+      return JSON.stringify({ ...existing, templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
     }
-    if (type === 'UserTask') {
+    if (type === 'UserTask' || type === 'MainActivity') {
       const existing = this.parseConfig(
         this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
       );
@@ -2589,19 +2679,23 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       setOrDelete('fallbackAssignmentKey', v.fallbackAssignmentKey, !!v.fallbackAssignmentKey?.trim());
       setOrDelete('requiresClaim', true, !!v.requiresClaim);
       setOrDelete('allowSelfClaim', true, !!v.allowSelfClaim);
+      if (!this.workspace()) {
       setOrDelete('slaPolicyId', v.slaPolicyId, !!v.slaPolicyId?.trim());
       setOrDelete('slaDurationHours', v.slaDurationHours, (v.slaDurationHours ?? 0) > 0);
       setOrDelete('slaEscalationKey', v.slaEscalationKey, !!v.slaEscalationKey?.trim());
       setOrDelete('inputMappingJson', v.inputMappingJson, !!v.inputMappingJson?.trim());
       setOrDelete('outputMappingJson', v.outputMappingJson, !!v.outputMappingJson?.trim());
       setOrDelete('formKey', v.formKey, !!v.formKey?.trim());
+      }
+      if (!this.workspace()) {
       const fields = this.formFields()
-        .map(({ key, labelEn, labelAr, type: fieldType, required }) => ({
+        .map(({ key, labelEn, labelAr, type: fieldType, required, options }) => ({
           key: key.trim(),
           labelEn: labelEn.trim(),
           labelAr: labelAr.trim(),
           type: fieldType,
           required: !!required,
+          ...(fieldType === 'select' ? { options: (options || '').split(',').map(s => s.trim()).filter(Boolean) } : {}),
         }))
         .filter(f => f.key.length > 0);
       if (fields.length > 0) cfg['formFields'] = fields;
@@ -2612,25 +2706,35 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       } else {
         delete cfg['formSchemaJson'];
       }
+      }
       return Object.keys(cfg).length ? JSON.stringify(cfg) : '';
     }
     if (type === 'CallActivity') {
+      const parseMapping = (text: string | null | undefined) => { try { return JSON.parse(text || '{}') as unknown; } catch { return text; } };
       return JSON.stringify({
+        ...existing,
         definitionKey: v.definitionKey ?? '',
         waitForCompletion: v.waitForCompletion ?? true,
+        versionId: v.callVersionId?.trim() || null,
+        inputMappings: parseMapping(v.callInputMappingsJson),
+        outputMappings: parseMapping(v.callOutputMappingsJson),
       });
     }
     if (type === 'ScriptTask') {
       const raw = (v.setVariablesJson ?? '').trim();
-      if (!raw) return JSON.stringify({ setVariables: {} });
+      // Legacy assignments are replaced when the user edits the canonical field.
+      delete existing['assignments'];
+      if (!raw) return JSON.stringify({ ...existing, setVariables: {} });
       try {
-        return JSON.stringify({ setVariables: JSON.parse(raw) as unknown });
+        return JSON.stringify({ ...existing, setVariables: JSON.parse(raw) as unknown });
       } catch {
-        return JSON.stringify({ setVariables: raw });
+        return JSON.stringify({ ...existing, setVariables: raw });
       }
     }
     if (type === 'WaitEvent') {
+      delete existing['signalKey'];
       return JSON.stringify({
+        ...existing,
         eventKey: v.eventKey ?? '',
         correlationVariable: v.correlationVariable ?? '',
       });
@@ -2945,7 +3049,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   protected nodeSubLabel(n: CanvasNode): string {
-    if (n.type === 'UserTask') {
+    if ((n.type === 'UserTask' || n.type === 'MainActivity')) {
       return this.selectedAssignmentGroupName(n.assignmentGroupId) || n.assignmentKey || '';
     }
     if (n.type === 'ServiceTask' && n.actionKey) return n.actionKey;
@@ -3001,7 +3105,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     return { x: n.x + NODE_W + 10, y: n.y + NODE_H / 2 + 26 };
   }
 
-  protected quickAddNode(type: NodeType): void {
+  protected quickAddNode(type: NodeType, protocol?:string): void {
     if (this.isReadonly()) return;
     const sourceId = this.quickAddSourceId();
     if (!sourceId) return;
@@ -3026,7 +3130,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       priority: this.edges().filter(e => e.fromNodeId === sourceId).length,
     };
     this.pushUndo();
+    if(type==='ServiceTask') { newNode.actionKey='http.request'; newNode.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
+    if(protocol==='Sms') newNode.name='SMS';
+    if(type==='NotificationTask') newNode.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
     this.nodes.update(ns => [...ns, newNode]);
+    this.ensureSimpleActions();
     this.edges.update(es => [...es, edge]);
     this.quickAddSourceId.set(null);
     this.selectedNodeId.set(id);

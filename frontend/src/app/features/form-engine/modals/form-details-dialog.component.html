@@ -1,0 +1,82 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [draggable]="false"
+  [style]="{ width: '34rem' }"
+  [header]="(isEdit ? 'forms.editForm' : 'forms.newForm') | translate"
+  (onShow)="onShow()"
+>
+  <form [formGroup]="model" class="flex flex-col gap-4" (ngSubmit)="save()">
+    <div class="flex flex-col gap-2">
+      <label for="form-code" class="text-sm font-medium">{{ 'forms.code' | translate }}</label>
+      <input id="form-code" pInputText formControlName="code" autocomplete="off" />
+      @if (model.controls.code.touched && model.controls.code.invalid) {
+        <small class="text-red-500">{{ 'forms.codeInvalid' | translate }}</small>
+      }
+      @if (isEdit) {
+        <small class="opacity-70">{{ 'forms.codeImmutable' | translate }}</small>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="form-name-en" class="text-sm font-medium">{{ 'forms.nameEn' | translate }}</label>
+      <input id="form-name-en" pInputText formControlName="nameEn" />
+      @if (model.controls.nameEn.touched && model.controls.nameEn.invalid) {
+        <small class="text-red-500">{{ 'common.required' | translate }}</small>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="form-name-ar" class="text-sm font-medium">{{ 'forms.nameAr' | translate }}</label>
+      <input id="form-name-ar" pInputText formControlName="nameAr" dir="rtl" />
+      @if (model.controls.nameAr.touched && model.controls.nameAr.invalid) {
+        <small class="text-red-500">{{ 'common.required' | translate }}</small>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="form-category" class="text-sm font-medium">{{ 'forms.category' | translate }}</label>
+      <p-select
+        inputId="form-category"
+        formControlName="category"
+        [options]="categories"
+        appendTo="body"
+      >
+        <ng-template let-value pTemplate="item">{{ 'forms.categories.' + value | translate }}</ng-template>
+        <ng-template let-value pTemplate="selectedItem">{{ 'forms.categories.' + value | translate }}</ng-template>
+      </p-select>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="form-department" class="text-sm font-medium">{{ 'forms.department' | translate }}</label>
+      <p-select
+        inputId="form-department"
+        formControlName="departmentCode"
+        [options]="departments()"
+        optionValue="code"
+        [showClear]="true"
+        [placeholder]="'forms.noDepartment' | translate"
+        appendTo="body"
+      >
+        <ng-template let-item pTemplate="item">{{ departmentLabel(item) }}</ng-template>
+        <ng-template let-item pTemplate="selectedItem">{{ departmentLabel(item) }}</ng-template>
+      </p-select>
+    </div>
+  </form>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      [label]="'common.cancel' | translate"
+      [text]="true"
+      [disabled]="saving()"
+      (onClick)="cancel()"
+    />
+    <p-button
+      [label]="'common.save' | translate"
+      icon="pi pi-check"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (onClick)="save()"
+    />
+  </ng-template>
+</p-dialog>

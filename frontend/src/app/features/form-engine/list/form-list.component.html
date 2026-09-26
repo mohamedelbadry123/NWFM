@@ -1,0 +1,175 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="card mt-4">
+  <!-- Page title/subtitle are rendered by the dashboard topbar (PageHeaderService). -->
+  <p-toolbar styleClass="mb-4">
+    <ng-template pTemplate="right">
+      <ng-container *hasPermission="PERMISSIONS.manageForms">
+        <p-button [label]="'forms.newForm' | translate" icon="pi pi-plus" (onClick)="openNew()" />
+      </ng-container>
+    </ng-template>
+  </p-toolbar>
+
+  <p-table
+    #dt
+    [value]="forms()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 20, 50, 100]"
+    [showCurrentPageReport]="true"
+    [currentPageReportTemplate]="'common.pageReport' | translate"
+    [totalRecords]="totalRecords()"
+    [loading]="loading()"
+    styleClass="app-table p-datatable-sm p-datatable-striped"
+    [scrollable]="true"
+    [tableStyle]="{ 'min-width': '64rem' }"
+    [rowHover]="true"
+  >
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'forms.code' | translate }}</th>
+        <th>{{ 'forms.name' | translate }}</th>
+        <th>{{ 'forms.category' | translate }}</th>
+        <th>{{ 'forms.status' | translate }}</th>
+        <th class="text-center">{{ 'forms.version' | translate }}</th>
+        <th class="w-56 text-center">{{ 'common.actions' | translate }}</th>
+      </tr>
+      <tr>
+        <th>
+          <p-columnFilter
+            type="text"
+            field="search"
+            [showMenu]="false"
+            [showClearButton]="false"
+            [placeholder]="'common.search' | translate"
+          />
+        </th>
+        <th></th>
+        <th>
+          <p-select
+            [(ngModel)]="category"
+            [options]="categoryOptions"
+            optionValue="value"
+            [ariaLabel]="'forms.category' | translate"
+            (onChange)="onFilterChange(dt)"
+            appendTo="body"
+            styleClass="w-full"
+          >
+            <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+            <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+          </p-select>
+        </th>
+        <th>
+          <!-- Opens on "Active", so archived forms stay out until they are asked for. -->
+          <p-select
+            [(ngModel)]="status"
+            [options]="statusOptions"
+            optionValue="value"
+            [ariaLabel]="'forms.status' | translate"
+            (onChange)="onFilterChange(dt)"
+            appendTo="body"
+            styleClass="w-full"
+          >
+            <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+            <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
+          </p-select>
+        </th>
+        <th></th>
+        <th></th>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-form>
+      <tr>
+        <td class="font-mono text-sm">{{ form.code }}</td>
+        <td>{{ nameOf()(form) }}</td>
+        <td>{{ 'forms.categories.' + form.category | translate }}</td>
+        <td>
+          <p-tag [value]="statusLabelKey(form.status) | translate" [severity]="statusSeverity(form.status)" />
+        </td>
+        <td class="text-center">
+          <span class="font-semibold text-sm">v{{ form.currentVersionNo ?? 0 }}</span>
+        </td>
+        <td class="text-center">
+          <div class="flex justify-center gap-1">
+            <ng-container *hasPermission="PERMISSIONS.manageForms">
+              <p-button
+                icon="pi pi-pencil"
+                severity="secondary"
+                size="small"
+                [text]="true"
+                [rounded]="true"
+                [pTooltip]="'forms.actions.edit' | translate"
+                (onClick)="openEdit(form)"
+              />
+              <p-button
+                icon="pi pi-th-large"
+                severity="info"
+                size="small"
+                [text]="true"
+                [rounded]="true"
+                [pTooltip]="'forms.actions.design' | translate"
+                (onClick)="design(form)"
+              />
+            </ng-container>
+
+            <p-button
+              icon="pi pi-eye"
+              severity="secondary"
+              size="small"
+              [text]="true"
+              [rounded]="true"
+              [pTooltip]="'forms.actions.preview' | translate"
+              (onClick)="preview(form)"
+            />
+
+            <!-- Publish is promoted out of the overflow menu: it is the action a draft exists for. -->
+            @if (canPublishForm(form)) {
+              <p-button
+                icon="pi pi-check-circle"
+                severity="success"
+                size="small"
+                [text]="true"
+                [rounded]="true"
+                [loading]="busyId() === form.id"
+                [disabled]="busyId() !== null"
+                [pTooltip]="'forms.actions.publish' | translate"
+                (onClick)="publish(form)"
+              />
+            }
+
+            <p-button
+              icon="pi pi-ellipsis-v"
+              severity="secondary"
+              size="small"
+              [text]="true"
+              [rounded]="true"
+              [disabled]="busyId() !== null"
+              [ariaLabel]="'common.actions' | translate"
+              (onClick)="toggleMenu($event, form, rowMenu)"
+            />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="6" class="text-center py-4">{{ 'forms.empty' | translate }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<p-menu #rowMenu [model]="menuItems()" [popup]="true" appendTo="body" />
+
+<app-form-details-dialog [(visible)]="detailsVisible" [form]="selected()" (saved)="load()" />
+<app-form-clone-dialog [(visible)]="cloneVisible" [form]="selected()" (cloned)="load()" />
+<app-form-versions-dialog [(visible)]="versionsVisible" [form]="selected()" />
+
+@if (previewVisible()) {
+  <app-form-preview-dialog [(visible)]="previewVisible" [definition]="previewDefinition()" />
+}

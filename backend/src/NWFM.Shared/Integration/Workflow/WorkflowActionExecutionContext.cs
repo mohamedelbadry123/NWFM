@@ -5,4 +5,6 @@ public sealed record WorkflowActionExecutionContext(
     Guid WorkflowInstanceId,
     string ActionKey,
     IReadOnlyDictionary<string, object?> InputVariables,
-    string IdempotencyKey);
+    string IdempotencyKey,
+    string? ConfigurationJson = null,
+    Guid? ActivityInstanceId = null);

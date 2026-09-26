@@ -31,9 +31,13 @@ public sealed class RegisterParticipantCommandHandler
         if (gateResult.IsFailure) return Result.Failure<WorkflowParticipantDto>(gateResult.Error);
 
         var now = DateTime.UtcNow;
+        var userId = request.UserId ?? Guid.NewGuid();
+        if (userId == Guid.Empty) return Result.Failure<WorkflowParticipantDto>(new Error("Workflow.Participant.InvalidUser", "A valid user identifier is required."));
+        if (await _repo.ExistsByUserIdAsync(userId, request.OrganizationId, cancellationToken))
+            return Result.Failure<WorkflowParticipantDto>(new Error("Workflow.Participant.AlreadyRegistered", "This authenticated user already has a participant projection."));
         var participant = WorkflowParticipant.Create(
             organizationId: request.OrganizationId,
-            userId: Guid.NewGuid(),
+            userId: userId,
             displayName: request.DisplayName.Trim(),
             email: request.Email.Trim(),
             createdAt: now,

@@ -47,6 +47,12 @@ public sealed class WorkflowInstance : Entity, ITenantAware
 
     /// <summary>NodeKey of the CallActivity on the parent that spawned this child.</summary>
     public string? ParentActivityNodeKey { get; private set; }
+    public Guid? ParentActivityInstanceId { get; private set; }
+    public string? GeographyJson { get; private set; }
+    public bool IsDemo { get; private set; }
+    public void SetExecutionContext(string? geographyJson, bool isDemo)
+    { GeographyJson = geographyJson; IsDemo = isDemo; }
+    public void AttachParentActivity(Guid? activityInstanceId) => ParentActivityInstanceId = activityInstanceId;
 
     public byte[] RowVersion { get; private set; } = [];
 
@@ -115,6 +121,7 @@ public sealed class WorkflowInstance : Entity, ITenantAware
     {
         Status      = WorkflowInstanceStatus.Running;
         SuspendedAt = null;
+        FailureReason = null;
         SetUpdated(updatedAt);
     }
 
