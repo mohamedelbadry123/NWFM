@@ -84,11 +84,3 @@ export function canArchive(status?: string): boolean {
   return normalize(status) === FORM_STATUSES.deprecated;
 }
 
-/** A form can be filled while it has a published version and has not been retired. */
-export function canFill(status?: string, currentVersionNo?: number | null): boolean {
-  const value = normalize(status);
-
-  return currentVersionNo != null
-    && value !== FORM_STATUSES.deprecated
-    && value !== FORM_STATUSES.archived;
-}

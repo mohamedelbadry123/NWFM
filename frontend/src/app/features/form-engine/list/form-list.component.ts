@@ -27,7 +27,6 @@ import {
   FormStatusFilterValue,
   canArchive,
   canDeprecate,
-  canFill,
   canPublish,
   formStatusFilterLabelKey,
   formStatusLabelKey,
@@ -56,7 +55,7 @@ function filterValue(event: TableLazyLoadEvent | undefined, field: string): stri
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
 }
 
-/** The forms grid: design, publish and retire forms, and jump to filling or reviewing one. */
+/** The forms grid: design, publish and retire forms, and jump to reviewing one's submissions. */
 @Component({
   selector: 'app-form-list',
   standalone: true,
@@ -236,10 +235,6 @@ export class FormListComponent {
       });
   }
 
-  protected fill(form: FormListItem): void {
-    void this.router.navigate(['/forms', form.id, 'fill']);
-  }
-
   protected submissions(form: FormListItem): void {
     void this.router.navigate(['/forms', form.id, 'submissions']);
   }
@@ -288,10 +283,6 @@ export class FormListComponent {
         command: () => this.archive(form),
       },
     ];
-  }
-
-  protected canFillForm(form: FormListItem): boolean {
-    return canFill(form.status, form.currentVersionNo);
   }
 
   protected canPublishForm(form: FormListItem): boolean {

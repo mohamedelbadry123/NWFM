@@ -126,19 +126,6 @@
               (onClick)="preview(form)"
             />
 
-            <ng-container *hasPermission="PERMISSIONS.submitForms">
-              <p-button
-                icon="pi pi-pen-to-square"
-                severity="secondary"
-                size="small"
-                [text]="true"
-                [rounded]="true"
-                [disabled]="!canFillForm(form)"
-                [pTooltip]="'forms.actions.fill' | translate"
-                (onClick)="fill(form)"
-              />
-            </ng-container>
-
             <!-- Publish is promoted out of the overflow menu: it is the action a draft exists for. -->
             @if (canPublishForm(form)) {
               <p-button

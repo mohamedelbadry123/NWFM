@@ -49,12 +49,12 @@ The **FormEngine** module (SQL schema `FormEngine`) holds the forms people fill 
 versioned publish lifecycle, and the submissions themselves. [docs/form-engine.md](docs/form-engine.md)
 explains forms, fields and submission handling in depth.
 
-1. Open **Forms → Manage forms**, create a form, then **Design fields** to lay it out. Saving keeps a
-   working draft; nothing is registered until you publish.
+1. Open **Forms**, create a form, then **Design fields** to lay it out. Saving keeps a working draft;
+   nothing is registered until you publish.
 2. **Publish** freezes the design as a version. It also records each field's data name and type in
    `FormEngine.FormFields`, and creates or widens the form's own submissions table.
-3. **Fill a form** lists everything with a published version. Media fields upload as soon as a file is
-   picked, so a submission carries references rather than bytes.
+3. Forms are filled through **Field tasks**: a task pins a form version, and its fill dialog uploads
+   media as soon as a file is picked, so a submission carries references rather than bytes.
 4. **Submissions** shows what has been filled in, rendered through the version each row answered.
 
 Each form stores its submissions in its own table, `FormEngine.SUB_<CODE>`. The name is chosen at first
@@ -65,7 +65,7 @@ so one form's publish does not block another's.
 
 A data name is a SQL column, so it must be a legal identifier. It keeps one type **within its form**:
 republishing a field under a different type is refused. Another form may use the same name with a
-different type, and the **Field catalog** page flags such names. A form can store at most 500 fields.
+different type, and the **Field catalog** tab under **Lookups** flags such names. A form can store at most 500 fields.
 
 Editing a published form reopens it as a draft; it keeps accepting submissions against its published
 version until it is deprecated or archived, so work already pinned to a version is never broken.
@@ -92,9 +92,9 @@ fill there.
 
 1. **Admin → Field teams** creates a crew together with the login its members sign in with, and gives
    it a territory (org scopes: department, cluster, CBU, branch or operation area).
-2. **Field tasks → Task types** binds each kind of work to a published form and its SLA hours. Types
-   can use different forms, so each kind of task collects its own inputs.
-3. **Field tasks → Tasks** raises a task at a location on the map. The task pins the type's form at its
+2. **Lookups → Task types** binds each kind of work to a published form and its SLA hours. Types can
+   use different forms, so each kind of task collects its own inputs.
+3. **Field tasks** raises a task at a location on the map. The task pins the type's form at its
    current published version.
 4. **Assign** lists only active teams whose territory covers the task. Deadlines default from the SLA.
 5. **Fill** saves the answers to the form's own table, linked to the task. A retried fill with the same

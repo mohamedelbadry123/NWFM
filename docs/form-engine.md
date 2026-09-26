@@ -372,9 +372,9 @@ once as a blob and reuses it for the thumbnail, the viewer and the download butt
 
 ## 10. What a fill belongs to: ContextType and ContextId
 
-A form does not know what it is used for. The same form can be filled on its own from **Fill a form**,
-for a field task, or — later — for a workflow step. Each fill says what it belongs to with two
-columns that every submissions table has:
+A form does not know what it is used for. In the app, forms are filled for field tasks; a fill posted
+straight to the form engine's API with no context is a standalone fill, and workflow steps are
+expected later. Each fill says what it belongs to with two columns that every submissions table has:
 
 | Column | Holds | Example |
 |---|---|---|
@@ -427,9 +427,9 @@ that owns that something may make it:
 - The form engine's own endpoint, `POST /forms/{id}/submissions`, **refuses** `ContextType = Task`.
   Otherwise anyone who can submit forms could post a fill in any task's name. The list of refused
   contexts is `FormContextTypes.OwnedByModules`.
-- `WorkItem` is not on that list yet. The fill page still accepts `?contextType=&contextId=` for the
-  workflow screens that are meant to use it. When workflow records its fills through a module of its
-  own, add `WorkItem` to the list.
+- `WorkItem` is not on that list yet: the form engine's endpoint still accepts it, for workflow screens
+  that post a fill directly. When workflow records its fills through a module of its own, add
+  `WorkItem` to the list.
 
 **Reading by context.** The submissions API filters by context:
 `GET /forms/{formId}/submissions?contextType=Task&contextId=<taskId>`.
@@ -466,7 +466,7 @@ same `data_name` used in two forms is therefore **two columns in two tables**, e
 
 - **Types are independent.** A name can be numeric in one form and text in another. Publishing never
   compares forms.
-- **The field catalog groups names across forms.** The **Field catalog** page and the builder's
+- **The field catalog groups names across forms.** The **Field catalog** tab under **Lookups** and the builder's
   autocomplete read `FormFields` grouped by `data_name`. They show how many forms use a name, and flag
   names whose type differs between forms. Reuse an existing name when a field means the same thing in
   another form (`meter_reading`, `wfm_action_taken`). A report can then line the forms up by name.
@@ -574,7 +574,7 @@ section 3):
 The Action Taken answer is looked up in this order (`C2mActionMappingResolver`):
 
 1. **The answered option on the form**, when it names a `c2m_fa_status`.
-2. **The C2M action mapping table** (**Field tasks → C2M action mappings**, table
+2. **The C2M action mapping table** (**Lookups → C2M action mappings**, table
    `Task.C2mActionMappings`). Each mapping is an action code with its status and one reason. C2M
    rejects a reason that does not match the status, so a mapping keeps only the matching one. The
    table is cached and evicted on every change. Startup seeds the reference app's codes when

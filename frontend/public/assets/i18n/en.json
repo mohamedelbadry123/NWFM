@@ -2033,11 +2033,8 @@
     "users": "User accounts",
     "rolePermissions": "Role permissions",
     "forms": "Forms",
-    "formsList": "Manage forms",
-    "fillForm": "Fill a form",
     "fieldCatalog": "Field catalog",
     "fieldTasks": "Field tasks",
-    "fieldTaskList": "Tasks",
     "taskTypes": "Task types",
     "teams": "Field teams",
     "c2mActions": "C2M action mappings"
@@ -2529,7 +2526,6 @@
       "edit": "Edit details",
       "design": "Design fields",
       "preview": "Preview",
-      "fill": "Fill in",
       "versions": "Version history",
       "clone": "Clone",
       "submissions": "Submissions",
@@ -2557,22 +2553,6 @@
     },
     "preview": {
       "invalidSchema": "The saved design could not be read."
-    },
-    "fill": {
-      "title": "Fill in a form",
-      "subtitle": "Answer the form and submit it.",
-      "submit": "Submit",
-      "success": "Submission recorded.",
-      "error": "The form could not be submitted.",
-      "invalid": "Some answers need attention",
-      "invalidDetail": "{{count}} field(s) are missing or invalid.",
-      "closed": "This form is no longer accepting submissions.",
-      "empty": "This form has no fields to fill in."
-    },
-    "published": {
-      "title": "Fill a form",
-      "subtitle": "The forms you can fill in right now.",
-      "empty": "No forms are available to fill in yet."
     },
     "submissions": {
       "title": "Submissions",

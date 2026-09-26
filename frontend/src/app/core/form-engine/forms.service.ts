@@ -11,7 +11,6 @@ import {
   FormListQuery,
   FormVersionDetail,
   FormVersionSummary,
-  PublishedForm,
   UpdateFormPayload,
 } from './form-engine.models';
 
@@ -46,13 +45,6 @@ export class FormsService {
     }
 
     return this.http.get<ApiResult<PaginatedResult<FormListItem>>>(FORM_ENGINE_FORMS_PATH, { params });
-  }
-
-  /** The forms that can be filled, with every version a consumer could pin. */
-  published(search?: string | null): Observable<ApiResult<PublishedForm[]>> {
-    const params = search ? new HttpParams().set('searchTerm', search) : undefined;
-
-    return this.http.get<ApiResult<PublishedForm[]>>(`${FORM_ENGINE_FORMS_PATH}/published`, { params });
   }
 
   get(id: string): Observable<ApiResult<FormDetail>> {

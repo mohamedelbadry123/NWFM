@@ -38,7 +38,9 @@ export const routes: Routes = [
       { path: 'org/workflow', loadChildren: () => import('./features/workflow/routes').then(m => m.WORKFLOW_ROUTES) },
       {
         path: 'lookups',
-        canActivate: [permissionGuard(PERMISSIONS.manageLookups)],
+        // The page holds the org lookups and the reference lists of other modules (task types, C2M
+        // action mappings, the field catalog); each tab checks its own permission.
+        canActivate: [permissionGuard(PERMISSIONS.manageLookups, PERMISSIONS.manageTaskTypes, PERMISSIONS.viewForms)],
         data: { titleKey: 'lookups.title', subtitleKey: 'lookups.subtitle' },
         loadComponent: () => import('./features/lookups/lookups.component').then(m => m.LookupsComponent),
       },

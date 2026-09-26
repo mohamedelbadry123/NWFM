@@ -61,19 +61,6 @@ export interface FormVersionDetail extends FormVersionSummary {
   acceptsSubmissions: boolean;
 }
 
-/** A form that can be filled right now. */
-export interface PublishedForm {
-  id: string;
-  code: string;
-  nameEn: string;
-  nameAr: string;
-  category: string;
-  status: FormStatus;
-  departmentCode: string | null;
-  currentVersionNo: number;
-  versionNos: number[];
-}
-
 export interface FieldCatalogItem {
   id: string;
   dataName: string;
@@ -87,13 +74,6 @@ export interface FieldCatalogItem {
   hasTypeConflict: boolean;
   /** Every type the name is stored as, first-seen first. */
   fieldTypes: string[];
-}
-
-export interface FormSubmissionCreated {
-  submissionId: string;
-  versionNo: number;
-  /** True when the server recognised this as a retry and returned the original submission. */
-  isReplay: boolean;
 }
 
 /** A submission row: base columns plus whatever answer columns the form declares. */
@@ -113,15 +93,6 @@ export interface CloneFormPayload {
   newCode: string;
   newNameEn: string;
   newNameAr: string;
-}
-
-export interface SubmitFormPayload {
-  versionNo?: number | null;
-  contextType?: string | null;
-  contextId?: string | null;
-  clientSubmissionId?: string | null;
-  clientFilledAt?: string | null;
-  answers: Record<string, unknown>;
 }
 
 export interface FormListQuery {

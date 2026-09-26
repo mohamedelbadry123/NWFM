@@ -18,19 +18,9 @@ export const TASKS_ROUTES: Routes = [
         data: { titleKey: 'tasks.title', subtitleKey: 'tasks.subtitle' },
         loadComponent: () => import('./list/task-list.component').then((m) => m.TaskListComponent),
       },
-      {
-        path: 'types',
-        canActivate: [permissionGuard(PERMISSIONS.manageTaskTypes)],
-        data: { titleKey: 'taskTypes.title', subtitleKey: 'taskTypes.subtitle' },
-        loadComponent: () => import('./types/task-type-list.component').then((m) => m.TaskTypeListComponent),
-      },
-      {
-        path: 'c2m-actions',
-        canActivate: [permissionGuard(PERMISSIONS.manageTaskTypes)],
-        data: { titleKey: 'c2mMappings.title', subtitleKey: 'c2mMappings.subtitle' },
-        loadComponent: () =>
-          import('./c2m/c2m-action-mapping-list.component').then((m) => m.C2mActionMappingListComponent),
-      },
+      // Task types and C2M action mappings are tabs of Lookups now; old links land on them.
+      { path: 'types', redirectTo: '/lookups?tab=task-types' },
+      { path: 'c2m-actions', redirectTo: '/lookups?tab=c2m-actions' },
     ],
   },
 ];
