@@ -2383,7 +2383,7 @@
       "empty": "No computed columns yet.",
       "addColumn": "Add column",
       "key": "Key",
-      "keyHint": "Lower-case letters, digits and _, starting with a letter. Keep it stable: the grid is sorted and remembered by it.",
+      "keyHint": "Lower-case letters, digits and _, starting with a letter.",
       "outputType": "Output",
       "outputTypes": {
         "text": "Text",
@@ -2417,7 +2417,13 @@
         "noConditions": "rule {{rule}} needs at least one condition.",
         "expression": "rule {{rule}}'s value does not read correctly.",
         "defaultExpression": "the default value does not read correctly."
-      }
+      },
+      "keyAuto": "Made from the English title as you type. You rarely need to change it.",
+      "keyStable": "Saved with the form. Avoid changing it once published: the task grid sorts and remembers columns by it.",
+      "changeKey": "Change",
+      "labelEnPlaceholder": "e.g. Leak severity",
+      "insertField": "Insert a field into the value you last clicked",
+      "helpExamples": "Examples: 'High' · leak_rate_lph * hours_leaking / 1000 · round(sum(a, b) / 2, 1) · concat(pipe_material, ' pipe')"
     }
   },
   "formly": {

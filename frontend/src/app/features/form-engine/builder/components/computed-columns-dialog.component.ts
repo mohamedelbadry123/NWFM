@@ -107,21 +107,31 @@ interface ColumnProblem {
             <div class="flex flex-col gap-4">
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div class="flex flex-col gap-1">
-                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.key') }}</label>
-                  <input pInputText class="font-mono" [(ngModel)]="column.key" [placeholder]="'severity'" />
-                  <small class="text-[var(--p-text-muted-color)]">{{ t('formBuilder.computed.keyHint') }}</small>
+                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.labelEn') }}</label>
+                  <input pInputText [ngModel]="column.label_en" (ngModelChange)="onLabelEnChange(column, $event)" [placeholder]="t('formBuilder.computed.labelEnPlaceholder')" />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.labelAr') }}</label>
+                  <input pInputText dir="rtl" [(ngModel)]="column.label_ar" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <label class="text-xs font-semibold">{{ t('formBuilder.computed.outputType') }}</label>
                   <p-select [options]="outputTypes" optionLabel="label" optionValue="value" [(ngModel)]="column.output_type" appendTo="body" />
                 </div>
                 <div class="flex flex-col gap-1">
-                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.labelEn') }}</label>
-                  <input pInputText [(ngModel)]="column.label_en" />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.labelAr') }}</label>
-                  <input pInputText dir="rtl" [(ngModel)]="column.label_ar" />
+                  <label class="text-xs font-semibold">{{ t('formBuilder.computed.key') }}</label>
+                  @if (editingKey() === column) {
+                    <input pInputText class="font-mono" [ngModel]="column.key" (ngModelChange)="onKeyChange(column, $event)" (blur)="editingKey.set(null)" />
+                    <small class="text-[var(--p-text-muted-color)]">{{ t('formBuilder.computed.keyHint') }}</small>
+                  } @else {
+                    <div class="flex items-center gap-2">
+                      <code class="rounded bg-[var(--p-content-hover-background)] px-2 py-1 text-sm">{{ column.key || '—' }}</code>
+                      <p-button [label]="t('formBuilder.computed.changeKey')" size="small" [text]="true" (onClick)="editingKey.set(column)" />
+                    </div>
+                    <small class="text-[var(--p-text-muted-color)]">
+                      {{ t(isAutoKey(column) ? 'formBuilder.computed.keyAuto' : 'formBuilder.computed.keyStable') }}
+                    </small>
+                  }
                 </div>
                 <div class="flex items-center gap-2 sm:col-span-2">
                   <p-checkbox [(ngModel)]="column.show_in_task_grid" [binary]="true" inputId="computed-show" />
@@ -144,7 +154,13 @@ interface ColumnProblem {
                         (onClick)="editConditions(r)"
                       />
                       <span class="text-sm font-semibold">{{ t('formBuilder.computed.then') }}</span>
-                      <input pInputText class="min-w-[12rem] flex-1 font-mono" [(ngModel)]="rule.then" [placeholder]="t('formBuilder.computed.expressionPlaceholder')" />
+                      <input
+                        pInputText
+                        class="min-w-[12rem] flex-1 font-mono"
+                        [(ngModel)]="rule.then"
+                        (focus)="focusTarget(column, r)"
+                        [placeholder]="t('formBuilder.computed.expressionPlaceholder')"
+                      />
                       <p-button icon="pi pi-arrow-up" size="small" [text]="true" [rounded]="true" severity="secondary" [disabled]="firstRule" (onClick)="moveRule(r, -1)" />
                       <p-button icon="pi pi-arrow-down" size="small" [text]="true" [rounded]="true" severity="secondary" [disabled]="lastRule" (onClick)="moveRule(r, 1)" />
                       <p-button icon="pi pi-times" size="small" [text]="true" [rounded]="true" severity="danger" (onClick)="removeRule(r)" />
@@ -167,10 +183,32 @@ interface ColumnProblem {
 
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-semibold">{{ t(column.rules.length > 0 ? 'formBuilder.computed.otherwise' : 'formBuilder.computed.value') }}</label>
-                <input pInputText class="font-mono" [(ngModel)]="column.default" [placeholder]="t('formBuilder.computed.expressionPlaceholder')" />
+                <input
+                  pInputText
+                  class="font-mono"
+                  [(ngModel)]="column.default"
+                  (focus)="focusTarget(column, null)"
+                  [placeholder]="t('formBuilder.computed.expressionPlaceholder')"
+                />
                 @if (column.default.trim() && expressionError(column.default); as error) {
                   <small class="text-red-500">{{ error }}</small>
                 }
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold">{{ t('formBuilder.computed.insertField') }}</span>
+                <div class="flex flex-wrap gap-1">
+                  @for (field of fields(); track field.data_name) {
+                    <p-button
+                      [label]="field.label"
+                      size="small"
+                      severity="secondary"
+                      [outlined]="true"
+                      [pTooltip]="field.data_name"
+                      (onClick)="insertField(column, field.data_name)"
+                    />
+                  }
+                </div>
               </div>
 
               <details class="rounded-lg bg-[var(--p-content-hover-background)] p-3 text-sm">
@@ -180,12 +218,8 @@ interface ColumnProblem {
                   <li>{{ t('formBuilder.computed.helpFields') }}</li>
                   <li>{{ t('formBuilder.computed.helpMath') }}</li>
                   <li>{{ t('formBuilder.computed.helpFunctions') }}</li>
+                  <li>{{ t('formBuilder.computed.helpExamples') }}</li>
                 </ul>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  @for (field of fields(); track field.data_name) {
-                    <code class="rounded bg-[var(--app-surface)] px-1.5 py-0.5 text-xs" [pTooltip]="field.label">{{ field.data_name }}</code>
-                  }
-                </div>
               </details>
             </div>
           }
@@ -232,6 +266,18 @@ export class ComputedColumnsDialogComponent {
   protected readonly columns = signal<ComputedColumn[]>([]);
   protected readonly selected = signal(0);
 
+  /** The column whose key is being edited by hand; the key otherwise shows read-only. */
+  protected readonly editingKey = signal<ComputedColumn | null>(null);
+
+  /**
+   * Columns made in this sitting whose key still follows their English title. A column that came
+   * with the form keeps its key: the task grid sorts and remembers columns by it.
+   */
+  private readonly autoKeyed = new WeakSet<ComputedColumn>();
+
+  /** The value box last focused, so a field chip knows where to go. */
+  private target: { column: ComputedColumn; rule: number | null } | null = null;
+
   protected readonly rulesVisible = signal(false);
   private readonly editingRule = signal<number | null>(null);
   protected readonly editingWhen = signal<RuleGroup | null>(null);
@@ -246,13 +292,64 @@ export class ComputedColumnsDialogComponent {
       if (this.visible()) {
         this.columns.set(structuredClone(this.value()));
         this.selected.set(0);
+        this.editingKey.set(null);
+        this.target = null;
       }
     });
   }
 
+  protected isAutoKey(column: ComputedColumn): boolean {
+    return this.autoKeyed.has(column);
+  }
+
+  /** The English title drives the key while the column is new and its key untouched. */
+  protected onLabelEnChange(column: ComputedColumn, label: string): void {
+    column.label_en = label;
+    if (this.autoKeyed.has(column)) {
+      column.key = this.uniqueKey(toKey(label), column);
+    }
+  }
+
+  /** A key typed by hand is the author's choice; the title stops overwriting it. */
+  protected onKeyChange(column: ComputedColumn, key: string): void {
+    column.key = key;
+    this.autoKeyed.delete(column);
+  }
+
+  protected focusTarget(column: ComputedColumn, rule: number | null): void {
+    this.target = { column, rule };
+  }
+
+  /**
+   * Adds a field's data name to the value box last focused — the default when none was. Appended
+   * with a space, so building `a + b` is click, type "+", click.
+   */
+  protected insertField(column: ComputedColumn, dataName: string): void {
+    const target = this.target?.column === column ? this.target : { column, rule: null };
+    const append = (text: string) => (text.trim() ? `${text.trimEnd()} ${dataName}` : dataName);
+
+    if (target.rule !== null && column.rules[target.rule]) {
+      column.rules[target.rule].then = append(column.rules[target.rule].then);
+    } else {
+      column.default = append(column.default);
+    }
+
+    this.columns.update((columns) => [...columns]);
+  }
+
+  /** A key no other column has: `severity`, then `severity_2`, … */
+  private uniqueKey(base: string, self: ComputedColumn | null): string {
+    const taken = new Set(this.columns().filter((c) => c !== self).map((c) => c.key));
+    let key = base;
+    for (let n = 2; taken.has(key); n++) {
+      key = `${base.slice(0, 60)}_${n}`;
+    }
+    return key;
+  }
+
   protected addColumn(): void {
     const next: ComputedColumn = {
-      key: `column_${this.columns().length + 1}`,
+      key: this.uniqueKey('column', null),
       label_en: '',
       label_ar: '',
       output_type: COMPUTED_OUTPUT_TYPES.Text,
@@ -260,6 +357,7 @@ export class ComputedColumnsDialogComponent {
       rules: [],
       default: '',
     };
+    this.autoKeyed.add(next);
     this.columns.update((columns) => [...columns, next]);
     this.selected.set(this.columns().length - 1);
   }
@@ -397,6 +495,25 @@ export class ComputedColumnsDialogComponent {
     this.applied.emit(structuredClone(this.columns()));
     this.visible.set(false);
   }
+}
+
+/**
+ * A title as a column key: lower-case, words joined by `_`, starting with a letter. An Arabic-only
+ * or blank title gives `column`, which the author can rename.
+ */
+export function toKey(title: string): string {
+  const key = title
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+
+  if (!key) {
+    return 'column';
+  }
+
+  return /^[a-z]/.test(key) ? key : `c_${key}`.slice(0, 64);
 }
 
 function swap<T>(items: T[], from: number, to: number): T[] {

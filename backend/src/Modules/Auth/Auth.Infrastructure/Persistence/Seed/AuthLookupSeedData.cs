@@ -32,6 +32,30 @@ internal static class AuthLookupSeedData
 
         await UpsertOperationAreasAsync(context, ct);
         await context.SaveChangesAsync(ct);
+
+        await InsertFieldActivityTypesAsync(context, ct);
+        await context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Field activities the example forms are filed under. Inserted when missing and never
+    /// overwritten, so an edit made on the lookups screen survives a restart.
+    /// </summary>
+    private static async Task InsertFieldActivityTypesAsync(AuthDbContext context, CancellationToken ct)
+    {
+        (string DepartmentCode, string Code, string NameEn, string NameAr)[] activities =
+        [
+            ("10", "LEAK_REPAIR", "Leak repair", "إصلاح التسربات"),
+        ];
+
+        foreach (var (departmentCode, code, nameEn, nameAr) in activities)
+        {
+            if (await context.Departments.AnyAsync(d => d.Code == departmentCode, ct)
+                && !await context.FieldActivityTypes.AnyAsync(f => f.DepartmentCode == departmentCode && f.Code == code, ct))
+            {
+                context.FieldActivityTypes.Add(FieldActivityType.Create(code, nameEn, nameAr, departmentCode));
+            }
+        }
     }
 
     private static async Task UpsertDepartmentsAsync(AuthDbContext context, CancellationToken ct)

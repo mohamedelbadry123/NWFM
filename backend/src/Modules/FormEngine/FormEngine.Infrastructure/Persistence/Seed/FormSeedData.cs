@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace FormEngine.Infrastructure.Persistence.Seed;
 
 /// <summary>
-/// Seeds the two example forms, published through <see cref="IFormPublisher"/> so each one registers
+/// Seeds the example forms, published through <see cref="IFormPublisher"/> so each one registers
 /// its fields and creates its own submission table exactly as a publish from the UI
 /// would. Idempotent: a form already published is left alone, and one left as a draft by a failed
 /// run is published on the next start.
@@ -21,7 +21,19 @@ internal static class FormSeedData
     private const string ResourceNamespace = "FormEngine.Infrastructure.Persistence.Seed.Forms.";
 
     /// <param name="ResourceFile">An embedded form-builder document; see the Forms folder.</param>
-    private sealed record FormSeed(string Code, string NameEn, string NameAr, string Category, string ResourceFile);
+    /// <param name="DepartmentCode">The owning department (Auth's lookup seed); null for none.</param>
+    /// <param name="FieldActivityCode">One of that department's field activities; null for none.</param>
+    private sealed record FormSeed(
+        string Code,
+        string NameEn,
+        string NameAr,
+        string Category,
+        string ResourceFile,
+        string? DepartmentCode = null,
+        string? FieldActivityCode = null);
+
+    /// <summary>The computed-columns demo; see <c>docs/computed-columns.md</c>.</summary>
+    public const string LeakInspectionCode = "DEMO-LEAK-INSPECTION";
 
     private static readonly FormSeed[] Forms =
     [
@@ -37,6 +49,14 @@ internal static class FormSeedData
             "جميع أنواع الحقول (نموذج تجريبي)",
             FormCategories.General,
             "all-input-types.json"),
+        new(
+            LeakInspectionCode,
+            "Leak Inspection (Computed Columns Demo)",
+            "فحص التسربات (نموذج الأعمدة المحسوبة)",
+            FormCategories.Inspection,
+            "leak-inspection-computed.json",
+            "10",
+            "LEAK_REPAIR"),
     ];
 
     /// <summary>
@@ -82,7 +102,8 @@ internal static class FormSeedData
         {
             var schemaJson = await ReadResourceAsync(seed.ResourceFile, ct);
 
-            form = FormDefinition.Create(seed.Code, seed.NameEn, seed.NameAr, seed.Category, null, null, SeedActor, utcNow);
+            form = FormDefinition.Create(
+                seed.Code, seed.NameEn, seed.NameAr, seed.Category, seed.DepartmentCode, seed.FieldActivityCode, SeedActor, utcNow);
             form.SetSchema(schemaJson, seed.NameEn, seed.NameAr, SeedActor, utcNow);
 
             context.FormDefinitions.Add(form);
