@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, input, model, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { catchError, finalize, forkJoin, of } from 'rxjs';
 
@@ -8,6 +9,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { MessageModule } from 'primeng/message';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { SelectModule } from 'primeng/select';
 import { TabsModule } from 'primeng/tabs';
 import { TagModule } from 'primeng/tag';
 import { TimelineModule } from 'primeng/timeline';
@@ -18,7 +20,17 @@ import { LocaleService } from '../../../../core/i18n/locale.service';
 import { MediaObjectUrlService } from '../../../../core/form-engine/media-object-url.service';
 import { OrgNamesService } from '../../../../core/lookups/org-names.service';
 import { TasksService } from '../../../../core/tasks/tasks.service';
-import { C2mDispatchLog, TaskAnswerView, TaskDetail, TaskFile, TaskFill, TaskHistoryEntry } from '../../../../core/tasks/tasks.models';
+import {
+  C2mDispatchLog,
+  FormOption,
+  TASK_FORM_SOURCES,
+  TaskAnswerView,
+  TaskDetail,
+  TaskFile,
+  TaskFill,
+  TaskForm,
+  TaskHistoryEntry,
+} from '../../../../core/tasks/tasks.models';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import { ADMINISTRATOR_ROLE, PERMISSIONS } from '../../../../core/auth/permissions';
 import { apiErrorMessage } from '../../../../core/api/api-error-message';
@@ -28,8 +40,11 @@ import { MediaThumbnailComponent } from '../../../../shared/components/media-vie
 import { MediaViewerDialogComponent } from '../../../../shared/components/media-viewer/media-viewer-dialog.component';
 import { MediaItem } from '../../../../shared/components/media-viewer/media-kind';
 import {
+  TaskStatus,
   c2mStatusSeverity,
+  canMigrateFormVersion,
   canRetryC2m,
+  canReassign,
   isOverdue,
   taskPrioritySeverity,
   taskReturnReasonSeverity,
@@ -64,11 +79,13 @@ interface FileCard {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     TranslateContextDirective,
     ButtonModule,
     DialogModule,
     MessageModule,
     ProgressSpinnerModule,
+    SelectModule,
     TabsModule,
     TagModule,
     TimelineModule,
@@ -133,9 +150,10 @@ export class TaskDetailDialogComponent {
   protected readonly viewerVisible = signal(false);
   protected readonly viewerIndex = signal(0);
 
-  /** The read-only form; `previewSubmissionId` null means the newest fill. */
+  /** The read-only form; `previewSubmissionId` null means the newest fill of `previewFormId`. */
   protected readonly previewVisible = signal(false);
   protected readonly previewSubmissionId = signal<string | null>(null);
+  protected readonly previewFormId = signal<string | null>(null);
 
   protected readonly answerMapVisible = signal(false);
   protected readonly answerMapPoint = signal<GeoPoint | null>(null);
@@ -144,11 +162,58 @@ export class TaskDetailDialogComponent {
   /** File ids whose download is in flight, so only that tile's button spins. */
   private readonly downloading = signal<ReadonlySet<string>>(new Set());
 
-  /** The fills come newest first; the first is what the task currently holds. */
-  protected readonly latestFill = computed<TaskFill | null>(() => this.fills()[0] ?? null);
+  /** The task's forms, in the order a crew meets them. */
+  protected readonly forms = computed<TaskForm[]>(() =>
+    [...(this.detail()?.task.forms ?? [])].sort((a, b) => a.sortOrder - b.sortOrder));
 
-  /** Older fills, kept on the Records tab — the latest sits above the tabs. */
-  protected readonly earlierFills = computed<TaskFill[]>(() => this.fills().slice(1));
+  protected readonly multiForm = computed(() => this.forms().length > 1);
+
+  /**
+   * Each form's newest fill — what the task currently holds for it. The fills come form by form,
+   * newest first within each, so the first seen per form is its latest.
+   */
+  protected readonly latestFills = computed<TaskFill[]>(() => {
+    const seen = new Set<string>();
+    return this.fills().filter((fill) => {
+      if (seen.has(fill.formDefinitionId)) {
+        return false;
+      }
+      seen.add(fill.formDefinitionId);
+      return true;
+    });
+  });
+
+  /** Older fills, kept on the Records tab — the latest of each form sits above the tabs. */
+  protected readonly earlierFills = computed<TaskFill[]>(() => {
+    const latest = new Set(this.latestFills().map((f) => f.submissionId));
+    return this.fills().filter((f) => !latest.has(f.submissionId));
+  });
+
+  protected readonly canManage = computed(() =>
+    this.authStore.hasAnyPermission(PERMISSIONS.manageTasks) || this.authStore.roles().includes(ADMINISTRATOR_ROLE));
+
+  /** A form can be added until the task waits for review or is closed. */
+  protected readonly canAttach = computed(() => {
+    const status = this.detail()?.task.status;
+    return this.canManage()
+      && !!status
+      && status !== TaskStatus.Submitted
+      && status !== TaskStatus.Approved
+      && status !== TaskStatus.Expired;
+  });
+
+  /** Forms offered for adding: published, and not on the task already. Loaded when first asked for. */
+  protected readonly attachOptions = signal<FormOption[] | null>(null);
+  protected readonly attachChoices = computed(() => {
+    const onTask = new Set(this.forms().map((f) => f.formDefinitionId));
+    return (this.attachOptions() ?? [])
+      .filter((f) => !onTask.has(f.id))
+      .map((f) => ({ label: `${f.code} — ${this.localized(f.nameEn, f.nameAr)} (v${f.currentVersionNo})`, value: f.id }));
+  });
+  protected readonly attaching = signal(false);
+
+  /** Form ids whose action is in flight, so only that row's buttons spin. */
+  protected readonly formBusy = signal<string | null>(null);
 
   protected readonly fileCards = computed<FileCard[]>(() =>
     this.files().map((file) => ({
@@ -172,11 +237,107 @@ export class TaskDetailDialogComponent {
     return task?.taskTypeCode ? `${task.taskTypeCode} — ${name}` : name || '—';
   });
 
-  protected readonly formName = computed(() => {
-    const d = this.detail();
-    const name = this.localized(d?.formNameEn, d?.formNameAr);
-    return d?.formCode ? `${d.formCode} — ${name}` : name || '—';
-  });
+  /** A form as `CODE — name`, in the reader's language. */
+  protected formLabel(form: TaskForm | null | undefined): string {
+    if (!form) {
+      return '—';
+    }
+
+    const name = this.localized(form.nameEn, form.nameAr);
+    return form.code ? `${form.code} — ${name}` : name || '—';
+  }
+
+  /** The label of the form a fill answered, for headings when the task has several. */
+  protected fillFormLabel(fill: TaskFill): string {
+    const index = this.forms().findIndex((f) => f.formDefinitionId === fill.formDefinitionId);
+    return index < 0 ? '' : `${index + 1}. ${this.formLabel(this.forms()[index])}`;
+  }
+
+  protected canMigrateForm(form: TaskForm): boolean {
+    return this.canManage() && canMigrateFormVersion(this.detail()?.task.status, form);
+  }
+
+  /** An added form can be removed until the task is first filled. */
+  protected canDetachForm(form: TaskForm): boolean {
+    const task = this.detail()?.task;
+    return this.canManage()
+      && form.source === TASK_FORM_SOURCES.Extra
+      && !!task
+      && canReassign(task.status, task.submissionCount);
+  }
+
+  protected loadAttachOptions(): void {
+    if (this.attachOptions() !== null) {
+      return;
+    }
+
+    this.tasksApi.formOptions().subscribe({
+      next: (res) => this.attachOptions.set(res.value ?? []),
+      error: () => this.attachOptions.set([]),
+    });
+  }
+
+  protected attachForm(formId: string | null): void {
+    const task = this.detail()?.task;
+    if (!task || !formId || this.attaching()) {
+      return;
+    }
+
+    this.attaching.set(true);
+    this.tasksApi
+      .attachForm(task.id, formId)
+      .pipe(finalize(() => this.attaching.set(false)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.translate.instant('common.success'),
+            detail: this.translate.instant('tasks.forms.attached'),
+          });
+          this.load(task.id);
+        },
+        error: (error: unknown) => this.formActionFailed(error),
+      });
+  }
+
+  protected detachForm(form: TaskForm): void {
+    this.runFormAction(form, (taskId) => this.tasksApi.detachForm(taskId, form.formDefinitionId), 'tasks.forms.detached');
+  }
+
+  protected migrateForm(form: TaskForm): void {
+    this.runFormAction(form, (taskId) => this.tasksApi.migrateVersion(taskId, form.formDefinitionId), 'tasks.forms.migrated');
+  }
+
+  private runFormAction(form: TaskForm, call: (taskId: string) => ReturnType<TasksService['detachForm']>, successKey: string): void {
+    const task = this.detail()?.task;
+    if (!task || this.formBusy()) {
+      return;
+    }
+
+    this.formBusy.set(form.formDefinitionId);
+    call(task.id)
+      .pipe(finalize(() => this.formBusy.set(null)))
+      .subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'success',
+            summary: this.translate.instant('common.success'),
+            detail: this.translate.instant(successKey),
+          });
+          this.load(task.id);
+        },
+        error: (error: unknown) => this.formActionFailed(error),
+      });
+  }
+
+  private formActionFailed(error: unknown): void {
+    this.messageService.add({
+      severity: 'error',
+      summary: this.translate.instant('common.error'),
+      detail: apiErrorMessage(error, this.translate),
+      life: 8000,
+    });
+  }
 
   constructor() {
     effect(() => {
@@ -198,8 +359,9 @@ export class TaskDetailDialogComponent {
     }));
   }
 
-  protected openPreview(submissionId: string | null = null): void {
+  protected openPreview(submissionId: string | null = null, formId: string | null = null): void {
     this.previewSubmissionId.set(submissionId);
+    this.previewFormId.set(formId);
     this.previewVisible.set(true);
   }
 
@@ -340,6 +502,7 @@ export class TaskDetailDialogComponent {
     this.fills.set([]);
     this.files.set([]);
     this.c2mLogs.set([]);
+    this.attachOptions.set(null);
     this.openLogId.set(null);
     this.loadFailed.set(false);
     this.loading.set(true);

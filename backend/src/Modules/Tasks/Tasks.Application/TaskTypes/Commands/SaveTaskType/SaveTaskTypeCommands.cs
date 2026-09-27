@@ -23,7 +23,13 @@ public interface ITaskTypeInput
     string NameAr { get; }
     string? DescriptionEn { get; }
     string? DescriptionAr { get; }
-    Guid FormDefinitionId { get; }
+
+    /// <summary>The forms its tasks are filled with, in the order a crew meets them.</summary>
+    IReadOnlyList<Guid> FormDefinitionIds { get; }
+
+    /// <summary>Which of them closes the C2M field activity; the first when not given.</summary>
+    Guid? C2mClosingFormId { get; }
+
     string? DepartmentCode { get; }
     int? FillSlaHours { get; }
     int? CompletionSlaHours { get; }
@@ -37,7 +43,8 @@ public sealed record CreateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string NameAr { get; init; } = default!;
     public string? DescriptionEn { get; init; }
     public string? DescriptionAr { get; init; }
-    public Guid FormDefinitionId { get; init; }
+    public IReadOnlyList<Guid> FormDefinitionIds { get; init; } = [];
+    public Guid? C2mClosingFormId { get; init; }
     public string? DepartmentCode { get; init; }
     public int? FillSlaHours { get; init; }
     public int? CompletionSlaHours { get; init; }
@@ -47,8 +54,8 @@ public sealed record CreateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
 }
 
 /// <summary>
-/// Edits a task type. Pointing it at another form changes what new tasks are filled with; tasks
-/// already raised keep the form and version they pinned.
+/// Edits a task type. Changing its forms changes what new tasks are filled with; tasks already raised
+/// keep the forms and versions they pinned.
 /// </summary>
 [Authorize(Policy = NwfmPolicies.ManageTaskTypes)]
 public sealed record UpdateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITaskTypeInput
@@ -58,7 +65,8 @@ public sealed record UpdateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string NameAr { get; init; } = default!;
     public string? DescriptionEn { get; init; }
     public string? DescriptionAr { get; init; }
-    public Guid FormDefinitionId { get; init; }
+    public IReadOnlyList<Guid> FormDefinitionIds { get; init; } = [];
+    public Guid? C2mClosingFormId { get; init; }
     public string? DepartmentCode { get; init; }
     public int? FillSlaHours { get; init; }
     public int? CompletionSlaHours { get; init; }
@@ -83,7 +91,14 @@ public sealed class TaskTypeInputValidator : AbstractValidator<ITaskTypeInput>
         RuleFor(x => x.NameAr).NotEmpty().MaximumLength(TaskType.NameMaxLength);
         RuleFor(x => x.DescriptionEn).MaximumLength(TaskType.DescriptionMaxLength);
         RuleFor(x => x.DescriptionAr).MaximumLength(TaskType.DescriptionMaxLength);
-        RuleFor(x => x.FormDefinitionId).NotEmpty().WithMessage("Choose the form its tasks are filled with.");
+        RuleFor(x => x.FormDefinitionIds)
+            .NotEmpty().WithMessage("Choose the forms its tasks are filled with.")
+            .Must(ids => ids.Count <= TaskType.MaxForms).WithMessage($"A task type can have at most {TaskType.MaxForms} forms.")
+            .Must(ids => ids.All(id => id != Guid.Empty)).WithMessage("Every form must be chosen.")
+            .Must(ids => ids.Distinct().Count() == ids.Count).WithMessage("A form can be listed only once.");
+        RuleFor(x => x.C2mClosingFormId)
+            .Must((input, id) => id is null || input.FormDefinitionIds.Contains(id.Value))
+            .WithMessage("The C2M closing form must be one of the type's forms.");
         RuleFor(x => x.DepartmentCode).MaximumLength(TaskType.DepartmentCodeMaxLength);
         RuleFor(x => x.FillSlaHours).InclusiveBetween(1, TaskType.MaxSlaHours).When(x => x.FillSlaHours is not null);
         RuleFor(x => x.CompletionSlaHours).InclusiveBetween(1, TaskType.MaxSlaHours).When(x => x.CompletionSlaHours is not null);
@@ -127,7 +142,7 @@ public sealed class CreateTaskTypeCommandHandler(
             return Result.Failure<TaskTypeDto>(TaskErrors.Type.DuplicateCode(code));
         }
 
-        if (await TaskTypeForms.RequirePublishedAsync(forms, request.FormDefinitionId, ct) is { } formError)
+        if (await TaskTypeForms.RequirePublishedAsync(forms, request.FormDefinitionIds, ct) is { } formError)
         {
             return Result.Failure<TaskTypeDto>(formError);
         }
@@ -141,7 +156,8 @@ public sealed class CreateTaskTypeCommandHandler(
                 request.NameAr,
                 request.DescriptionEn,
                 request.DescriptionAr,
-                request.FormDefinitionId,
+                request.FormDefinitionIds,
+                request.C2mClosingFormId,
                 request.DepartmentCode,
                 request.FillSlaHours,
                 request.CompletionSlaHours,
@@ -170,16 +186,18 @@ public sealed class UpdateTaskTypeCommandHandler(
 {
     public async Task<Result<TaskTypeDto>> Handle(UpdateTaskTypeCommand request, CancellationToken ct)
     {
-        var type = await db.TaskTypes.FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
+        var type = await db.TaskTypes.Include(t => t.Forms).FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
         if (type is null)
         {
             return Result.Failure<TaskTypeDto>(TaskErrors.Type.NotFound);
         }
 
         // A form the type already uses may have been deprecated since; that must not block editing
-        // the type's names. Only a change of form has to point at one that takes fills.
-        if (request.FormDefinitionId != type.FormDefinitionId
-            && await TaskTypeForms.RequirePublishedAsync(forms, request.FormDefinitionId, ct) is { } formError)
+        // the type's names. Only a form being added has to be one that takes fills.
+        var current = type.FormIds;
+        var added = request.FormDefinitionIds.Where(id => !current.Contains(id)).ToList();
+
+        if (await TaskTypeForms.RequirePublishedAsync(forms, added, ct) is { } formError)
         {
             return Result.Failure<TaskTypeDto>(formError);
         }
@@ -191,7 +209,8 @@ public sealed class UpdateTaskTypeCommandHandler(
                 request.NameAr,
                 request.DescriptionEn,
                 request.DescriptionAr,
-                request.FormDefinitionId,
+                request.FormDefinitionIds,
+                request.C2mClosingFormId,
                 request.DepartmentCode,
                 request.FillSlaHours,
                 request.CompletionSlaHours,
@@ -223,7 +242,7 @@ public sealed class SetTaskTypeStatusCommandHandler(
 {
     public async Task<Result<TaskTypeDto>> Handle(SetTaskTypeStatusCommand request, CancellationToken ct)
     {
-        var type = await db.TaskTypes.FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
+        var type = await db.TaskTypes.Include(t => t.Forms).FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
         if (type is null)
         {
             return Result.Failure<TaskTypeDto>(TaskErrors.Type.NotFound);
@@ -249,5 +268,19 @@ internal static class TaskTypeForms
             { AcceptsSubmissions: false } => TaskErrors.Form.NotPublished,
             _ => null,
         };
+    }
+
+    /// <summary>The first of the forms that cannot take fills, as its error; null when they all can.</summary>
+    public static async Task<Error?> RequirePublishedAsync(IFormGateway forms, IEnumerable<Guid> formIds, CancellationToken ct)
+    {
+        foreach (var formId in formIds.Distinct())
+        {
+            if (await RequirePublishedAsync(forms, formId, ct) is { } error)
+            {
+                return error;
+            }
+        }
+
+        return null;
     }
 }

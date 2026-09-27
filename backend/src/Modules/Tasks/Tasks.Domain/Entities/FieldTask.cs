@@ -5,12 +5,14 @@ using Tasks.Domain.Constants;
 namespace Tasks.Domain.Entities;
 
 /// <summary>
-/// One piece of field work: a place, a territory, a deadline, and the form a crew fills there.
+/// One piece of field work: a place, a territory, a deadline, and the forms a crew fills there.
 /// Modelled on the reference app's survey. Named <c>FieldTask</c> rather than <c>Task</c> so it never
 /// competes with <see cref="System.Threading.Tasks.Task"/>. Table: <c>Task.Tasks</c>.
 ///
-/// The form is pinned by <see cref="FormDefinitionId"/> and <see cref="FormVersionNo"/> when the task
-/// is raised; its fills live in that form's own submission table, filed under this task's id.
+/// Its forms (<see cref="Forms"/>) are pinned when the task is raised — the type's, plus any added to
+/// this task — each at the version published then. One team fills them all; the task counts as filled
+/// once every required form has a fill. Each form's fills live in its own submission table, filed
+/// under this task's id.
 /// </summary>
 public sealed class FieldTask : Entity
 {
@@ -24,6 +26,10 @@ public sealed class FieldTask : Entity
     public const int ReturnReasonMaxLength = 1000;
     public const int FaIdMaxLength = 50;
 
+    /// <summary>The type's forms plus those added to the one task.</summary>
+    public const int MaxForms = 15;
+
+    private readonly List<TaskForm> _forms = [];
     private readonly List<TaskAssignment> _assignments = [];
     private readonly List<TaskStatusHistory> _history = [];
 
@@ -33,12 +39,6 @@ public sealed class FieldTask : Entity
 
     public string TaskNumber { get; private set; } = default!;
     public Guid TaskTypeId { get; private set; }
-
-    /// <summary>The form filled for this task — its type's form when the task was raised.</summary>
-    public Guid FormDefinitionId { get; private set; }
-
-    /// <summary>The version pinned to this task. A later publish never changes it; <see cref="MigrateFormVersion"/> does, while unfilled.</summary>
-    public int FormVersionNo { get; private set; }
 
     public string Source { get; private set; } = default!;
     public string Status { get; private set; } = default!;
@@ -74,11 +74,16 @@ public sealed class FieldTask : Entity
 
     public string? AssignedBy { get; private set; }
     public DateTime? AssignedDate { get; private set; }
+
+    /// <summary>When any of its forms was last filled.</summary>
     public DateTime? SubmittedDate { get; private set; }
+
     public string? LastFilledBy { get; private set; }
+
+    /// <summary>Fills across all its forms.</summary>
     public int SubmissionCount { get; private set; }
 
-    /// <summary>The newest fill, in the pinned form's submission table.</summary>
+    /// <summary>The newest fill of any of its forms.</summary>
     public Guid? LastSubmissionId { get; private set; }
 
     public string? CompletedBy { get; private set; }
@@ -116,6 +121,7 @@ public sealed class FieldTask : Entity
     public string? UpdatedBy { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
+    public IReadOnlyCollection<TaskForm> Forms => _forms.AsReadOnly();
     public IReadOnlyCollection<TaskAssignment> Assignments => _assignments.AsReadOnly();
     public IReadOnlyCollection<TaskStatusHistory> History => _history.AsReadOnly();
 
@@ -124,6 +130,25 @@ public sealed class FieldTask : Entity
 
     public bool IsUnfilled => SubmissionCount == 0 && TaskStatuses.Unfilled.Contains(Status);
 
+    /// <summary>The forms in the order a crew meets them.</summary>
+    public IReadOnlyList<TaskForm> OrderedForms => _forms.OrderBy(f => f.SortOrder).ToList();
+
+    public int RequiredFormCount => _forms.Count(f => f.IsRequired);
+
+    public int FilledFormCount => _forms.Count(f => f.IsRequired && f.IsFilled);
+
+    /// <summary>Whether every form the task waits for has a fill.</summary>
+    public bool AllRequiredFormsFilled => _forms.Count > 0 && _forms.Where(f => f.IsRequired).All(f => f.IsFilled);
+
+    /// <summary>The form whose answers close the C2M field activity: the one flagged, else the first.</summary>
+    public TaskForm? C2mClosingForm => _forms
+        .OrderByDescending(f => f.IsC2mClosingForm)
+        .ThenBy(f => f.SortOrder)
+        .FirstOrDefault();
+
+    /// <summary>One of the task's forms; null when it is not on the task.</summary>
+    public TaskForm? FormOf(Guid formDefinitionId) => _forms.FirstOrDefault(f => f.FormDefinitionId == formDefinitionId);
+
     public static FieldTask Create(FieldTaskDraft draft, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(draft.TaskNumber))
@@ -131,14 +156,29 @@ public sealed class FieldTask : Entity
             throw new DomainException("A task must have a number.");
         }
 
-        if (draft.TaskTypeId == Guid.Empty || draft.FormDefinitionId == Guid.Empty)
+        if (draft.TaskTypeId == Guid.Empty)
         {
-            throw new DomainException("A task must have a type and a form.");
+            throw new DomainException("A task must have a type.");
         }
 
-        if (draft.FormVersionNo <= 0)
+        if (draft.Forms is null || draft.Forms.Count == 0 || draft.Forms.Any(f => f.FormDefinitionId == Guid.Empty))
         {
-            throw new DomainException("A task must pin a published version of its form.");
+            throw new DomainException("A task must have at least one form.");
+        }
+
+        if (draft.Forms.Any(f => f.VersionNo <= 0))
+        {
+            throw new DomainException("A task must pin a published version of each of its forms.");
+        }
+
+        if (draft.Forms.Select(f => f.FormDefinitionId).Distinct().Count() != draft.Forms.Count)
+        {
+            throw new DomainException("A task cannot carry the same form twice.");
+        }
+
+        if (draft.Forms.Count > MaxForms)
+        {
+            throw new DomainException($"A task can carry at most {MaxForms} forms.");
         }
 
         if (!TaskSources.IsDefined(draft.Source))
@@ -150,8 +190,6 @@ public sealed class FieldTask : Entity
         {
             TaskNumber = draft.TaskNumber.Trim(),
             TaskTypeId = draft.TaskTypeId,
-            FormDefinitionId = draft.FormDefinitionId,
-            FormVersionNo = draft.FormVersionNo,
             Source = draft.Source,
             Status = TaskStatuses.Created,
             FillSlaHours = draft.FillSlaHours,
@@ -167,6 +205,11 @@ public sealed class FieldTask : Entity
         task.ApplyDetails(draft.Title, draft.Notes, draft.Priority, draft.ExternalReference, draft.DueDate, draft.CompletionDueDate);
         task.ApplyLocation(draft.Location);
         task.ApplyFieldActivity(draft.FaId, draft.WfmTicketId);
+
+        for (var i = 0; i < draft.Forms.Count; i++)
+        {
+            task._forms.Add(new TaskForm(task.Id, draft.Forms[i], i, task.CreatedBy, utcNow));
+        }
 
         task._history.Add(new TaskStatusHistory(task.Id, null, TaskStatuses.Created, task.CreatedBy, null, utcNow));
         return task;
@@ -287,43 +330,139 @@ public sealed class FieldTask : Entity
     }
 
     /// <summary>
-    /// Records a fill. Idempotent for the same submission, so a client retrying a fill whose first
-    /// attempt stored the answers but lost the reply completes the task update instead of counting
-    /// the fill twice.
+    /// Records a fill of one of the task's forms, with the computed columns it worked out. The task
+    /// is SUBMITTED once every required form has a fill, and IN_PROGRESS while some still wait.
+    /// Idempotent for the same submission, so a client retrying a fill whose first attempt stored the
+    /// answers but lost the reply completes the task update instead of counting the fill twice.
     /// </summary>
-    public void RecordFill(Guid submissionId, string? filledBy, DateTime utcNow)
+    public void RecordFill(
+        Guid formDefinitionId,
+        Guid submissionId,
+        string? filledBy,
+        DateTime utcNow,
+        IReadOnlyList<TaskComputedValueDraft>? computed = null)
     {
-        if (LastSubmissionId == submissionId)
+        var form = FormOf(formDefinitionId)
+            ?? throw new DomainException("That form is not one of this task's forms.");
+
+        if (form.LastSubmissionId == submissionId)
         {
             return;
         }
 
         EnsureNotClosed("filled");
 
+        var actor = Normalize(filledBy);
+        form.RecordFill(submissionId, actor, utcNow);
+        form.ReplaceComputed(computed ?? [], submissionId, utcNow);
+
         SubmissionCount++;
         LastSubmissionId = submissionId;
         SubmittedDate = utcNow;
-        LastFilledBy = Normalize(filledBy);
+        LastFilledBy = actor;
 
-        ActiveAssignment?.MoveTo(TaskAssignmentStatuses.Submitted, utcNow);
-
-        if (Status == TaskStatuses.Submitted)
+        if (AllRequiredFormsFilled)
         {
-            // A second fill before review: the answers changed, the status did not.
-            AppendHistory(Status, filledBy, "Filled again.", utcNow);
+            ActiveAssignment?.MoveTo(TaskAssignmentStatuses.Submitted, utcNow);
+
+            if (Status == TaskStatuses.Submitted)
+            {
+                // A fill again before review: the answers changed, the status did not.
+                AppendHistory(Status, filledBy, $"{FormLabel(form)}Filled again.", utcNow);
+            }
+            else
+            {
+                MoveTo(TaskStatuses.Submitted, filledBy, _forms.Count > 1 ? $"All {_forms.Count} forms filled." : null, utcNow);
+            }
         }
         else
         {
-            MoveTo(TaskStatuses.Submitted, filledBy, null, utcNow);
+            ActiveAssignment?.MoveTo(TaskAssignmentStatuses.InProgress, utcNow);
+            var note = $"Form {form.SortOrder + 1} filled ({FilledFormCount} of {RequiredFormCount}).";
+
+            if (Status == TaskStatuses.InProgress)
+            {
+                AppendHistory(Status, filledBy, note, utcNow);
+            }
+            else
+            {
+                MoveTo(TaskStatuses.InProgress, filledBy, note, utcNow);
+            }
         }
 
         Touch(filledBy, utcNow);
+    }
+
+    /// <summary>
+    /// Adds a form to this task alone. Not to one waiting for review — its fills were judged complete
+    /// without it; return the task first — and not to a closed one.
+    /// </summary>
+    public TaskForm AttachForm(Guid formDefinitionId, int versionNo, string? addedBy, DateTime utcNow)
+    {
+        EnsureNotClosed("given another form");
+
+        if (Status == TaskStatuses.Submitted)
+        {
+            throw new DomainException("A task waiting for review cannot take another form; return it first.");
+        }
+
+        if (formDefinitionId == Guid.Empty || versionNo <= 0)
+        {
+            throw new DomainException("A form added to a task must have a published version.");
+        }
+
+        if (FormOf(formDefinitionId) is not null)
+        {
+            throw new DomainException("The task already carries that form.");
+        }
+
+        if (_forms.Count >= MaxForms)
+        {
+            throw new DomainException($"A task can carry at most {MaxForms} forms.");
+        }
+
+        var sortOrder = _forms.Count == 0 ? 0 : _forms.Max(f => f.SortOrder) + 1;
+        var form = new TaskForm(Id, new TaskFormDraft(formDefinitionId, versionNo, TaskFormSources.Extra), sortOrder, Normalize(addedBy), utcNow);
+        _forms.Add(form);
+
+        AppendHistory(Status, addedBy, $"Form {sortOrder + 1} added.", utcNow);
+        Touch(addedBy, utcNow);
+        return form;
+    }
+
+    /// <summary>
+    /// Removes a form added to this task. The type's forms stay: they are what the type is. Only
+    /// before any fill, so nothing already recorded is left pointing at a form the task dropped.
+    /// </summary>
+    public void DetachForm(Guid formDefinitionId, string? removedBy, DateTime utcNow)
+    {
+        var form = FormOf(formDefinitionId)
+            ?? throw new DomainException("That form is not one of this task's forms.");
+
+        if (form.Source != TaskFormSources.Extra)
+        {
+            throw new DomainException("Only a form added to the task can be removed; its type's forms stay.");
+        }
+
+        if (!IsUnfilled)
+        {
+            throw new DomainException($"A form can only be removed before the task is filled (current: {Status}).");
+        }
+
+        _forms.Remove(form);
+        AppendHistory(Status, removedBy, $"Form {form.SortOrder + 1} removed.", utcNow);
+        Touch(removedBy, utcNow);
     }
 
     /// <summary>Approves a filled task.</summary>
     public void Complete(string? completedBy, string? note, DateTime utcNow)
     {
         EnsureReviewable("approved");
+
+        if (!AllRequiredFormsFilled)
+        {
+            throw new DomainException("Every form of the task must be filled before it can be approved.");
+        }
 
         CompletedBy = Normalize(completedBy);
         CompletedDate = utcNow;
@@ -387,24 +526,35 @@ public sealed class FieldTask : Entity
         MoveTo(TaskStatuses.Expired, expiredBy, note, utcNow);
     }
 
-    /// <summary>Re-pins an unfilled task to a newer published version of its form. Forward only.</summary>
-    public void MigrateFormVersion(int versionNo, string? migratedBy, DateTime utcNow)
+    /// <summary>
+    /// Re-pins one of the task's forms to a newer published version. Forward only, and only while that
+    /// form is unfilled: a fill answered the version it was taken against.
+    /// </summary>
+    public void MigrateFormVersion(Guid formDefinitionId, int versionNo, string? migratedBy, DateTime utcNow)
     {
-        if (!IsUnfilled)
+        var form = FormOf(formDefinitionId)
+            ?? throw new DomainException("That form is not one of this task's forms.");
+
+        EnsureNotClosed("moved to a newer form version");
+
+        if (form.IsFilled)
         {
-            throw new DomainException($"A task can only move to a newer form version before it is filled (current: {Status}).");
+            throw new DomainException($"A form can only move to a newer version before it is filled (current: {Status}).");
         }
 
-        if (versionNo <= FormVersionNo)
+        if (versionNo <= form.FormVersionNo)
         {
-            throw new DomainException($"The task is already on version {FormVersionNo}; it can only move forward.");
+            throw new DomainException($"The form is already on version {form.FormVersionNo}; it can only move forward.");
         }
 
-        var from = FormVersionNo;
-        FormVersionNo = versionNo;
-        AppendHistory(Status, migratedBy, $"Form version {from} → {versionNo}.", utcNow);
+        var from = form.FormVersionNo;
+        form.MigrateVersion(versionNo, utcNow);
+        AppendHistory(Status, migratedBy, $"{FormLabel(form)}Form version {from} → {versionNo}.", utcNow);
         Touch(migratedBy, utcNow);
     }
+
+    /// <summary>Names the form in a timeline note, when the task has more than one.</summary>
+    private string FormLabel(TaskForm form) => _forms.Count > 1 ? $"Form {form.SortOrder + 1}: " : string.Empty;
 
     private TaskAssignment HandTo(Guid teamId, string? assignedBy, string? note, DateTime utcNow)
     {
@@ -539,8 +689,10 @@ public sealed record FieldTaskDraft
 {
     public required string TaskNumber { get; init; }
     public required Guid TaskTypeId { get; init; }
-    public required Guid FormDefinitionId { get; init; }
-    public required int FormVersionNo { get; init; }
+
+    /// <summary>The forms to pin, in order: the type's, then any added to this task.</summary>
+    public required IReadOnlyList<TaskFormDraft> Forms { get; init; }
+
     public string Source { get; init; } = TaskSources.Manual;
     public string? Title { get; init; }
     public string? Notes { get; init; }

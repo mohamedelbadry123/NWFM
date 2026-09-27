@@ -226,12 +226,6 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.Property<int?>("FillSlaHours")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("FormDefinitionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("FormVersionNo")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -334,8 +328,6 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.HasIndex("FaId")
                         .HasFilter("[FaId] IS NOT NULL");
 
-                    b.HasIndex("FormDefinitionId");
-
                     b.HasIndex("OperationAreaCode");
 
                     b.HasIndex("Status");
@@ -404,6 +396,128 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.HasIndex("TeamId", "Status");
 
                     b.ToTable("TaskAssignments", "Task");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskComputedValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("FieldTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("FormVersionNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("OutputType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TaskFormId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("ValueNumber")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("decimal(28,8)");
+
+                    b.Property<string>("ValueText")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FieldTaskId");
+
+                    b.HasIndex("FormDefinitionId", "Key");
+
+                    b.HasIndex("TaskFormId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("TaskComputedValues", "Task");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskForm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AddedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("FieldTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("FormVersionNo")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsC2mClosingForm")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("LastFilledBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("LastSubmissionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("SubmissionCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SubmittedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormDefinitionId");
+
+                    b.HasIndex("FieldTaskId", "FormDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("TaskForms", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.TaskStatusHistory", b =>
@@ -487,9 +601,6 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.Property<int?>("FillSlaHours")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("FormDefinitionId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -521,11 +632,42 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.HasIndex("FormDefinitionId");
-
                     b.HasIndex("IsActive");
 
                     b.ToTable("TaskTypes", "Task");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskTypeForm", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsC2mClosingForm")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TaskTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormDefinitionId");
+
+                    b.HasIndex("TaskTypeId", "FormDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("TaskTypeForms", "Task");
                 });
 
             modelBuilder.Entity("Tasks.Domain.Entities.FieldTask", b =>
@@ -546,6 +688,24 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskComputedValue", b =>
+                {
+                    b.HasOne("Tasks.Domain.Entities.TaskForm", null)
+                        .WithMany("ComputedValues")
+                        .HasForeignKey("TaskFormId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskForm", b =>
+                {
+                    b.HasOne("Tasks.Domain.Entities.FieldTask", null)
+                        .WithMany("Forms")
+                        .HasForeignKey("FieldTaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Tasks.Domain.Entities.TaskStatusHistory", b =>
                 {
                     b.HasOne("Tasks.Domain.Entities.FieldTask", null)
@@ -555,11 +715,32 @@ namespace Tasks.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskTypeForm", b =>
+                {
+                    b.HasOne("Tasks.Domain.Entities.TaskType", null)
+                        .WithMany("Forms")
+                        .HasForeignKey("TaskTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Tasks.Domain.Entities.FieldTask", b =>
                 {
                     b.Navigation("Assignments");
 
+                    b.Navigation("Forms");
+
                     b.Navigation("History");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskForm", b =>
+                {
+                    b.Navigation("ComputedValues");
+                });
+
+            modelBuilder.Entity("Tasks.Domain.Entities.TaskType", b =>
+                {
+                    b.Navigation("Forms");
                 });
 #pragma warning restore 612, 618
         }

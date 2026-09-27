@@ -201,6 +201,49 @@ internal sealed class FormGateway(
         return schema is null ? [] : FormAnswerDescriber.Describe(schema, answers);
     }
 
+    public async Task<IReadOnlyList<FormComputedValue>> ComputeAsync(
+        Guid formId,
+        int versionNo,
+        IReadOnlyDictionary<string, object?> answers,
+        CancellationToken cancellationToken)
+    {
+        var schema = await SchemaAsync(formId, versionNo, cancellationToken);
+        if (schema is null || schema.ComputedColumns.Count == 0)
+        {
+            return [];
+        }
+
+        // Keyed on trimmed names, as a fill's answers are stored: a rule names the column, not the key as posted.
+        var byName = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var (key, value) in answers)
+        {
+            var trimmed = key.Trim();
+            if (trimmed.Length == key.Length || !byName.ContainsKey(trimmed))
+            {
+                byName[trimmed] = value;
+            }
+        }
+
+        return FormComputedColumnEvaluator.Evaluate(schema, byName)
+            .Select(r => new FormComputedValue(r.Key, r.OutputType, r.Number, r.Text))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<FormComputedColumnInfo>> GetComputedColumnsAsync(
+        Guid formId,
+        int versionNo,
+        CancellationToken cancellationToken)
+    {
+        var schema = await SchemaAsync(formId, versionNo, cancellationToken);
+
+        return schema is null
+            ? []
+            : schema.ComputedColumns
+                .Where(c => !string.IsNullOrWhiteSpace(c.Key))
+                .Select(c => new FormComputedColumnInfo(c.Key, c.LabelEn, c.LabelAr, c.OutputType, c.ShowInTaskGrid))
+                .ToList();
+    }
+
     private async Task<FormSchema?> SchemaAsync(Guid formId, int versionNo, CancellationToken cancellationToken)
     {
         if (!_schemas.TryGetValue((formId, versionNo), out var schema))

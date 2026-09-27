@@ -6,6 +6,30 @@ import { ELEMENT_TYPES } from './form-schema.types';
  * is brought up to the shape the builder expects.
  */
 describe('form schema import', () => {
+  it('reads computed columns, and leaves the key out when a document has none', () => {
+    const schema = deserializeSchema({
+      elements: [],
+      computed_columns: [
+        {
+          key: ' area ',
+          label_en: 'Area',
+          label_ar: 'المساحة',
+          output_type: 'number',
+          rules: [{ when: { match: 'any', conditions: [{ field: ' w ', operator: 'is_not_empty' }] }, then: 'w * 2' }],
+          default: '',
+        },
+      ],
+    });
+
+    const column = schema.computed_columns![0];
+    expect(column.key).toBe('area');
+    expect(column.output_type).toBe('number');
+    expect(column.show_in_task_grid).toBeFalse();
+    expect(column.rules[0].when.match).toBe('any');
+    expect(column.rules[0].when.conditions[0].field).toBe('w');
+    expect('computed_columns' in deserializeSchema({ elements: [] })).toBeFalse();
+  });
+
   it('fills in the defaults a document leaves out', () => {
     const schema = deserializeSchema({
       name_en: 'Leak',

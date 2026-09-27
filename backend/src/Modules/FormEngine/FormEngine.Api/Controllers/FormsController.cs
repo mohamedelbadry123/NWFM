@@ -61,6 +61,7 @@ public sealed class FormsController(ISender sender) : ControllerBase
             NameAr = request.NameAr,
             Category = request.Category,
             DepartmentCode = request.DepartmentCode,
+            FieldActivityCode = request.FieldActivityCode,
         };
 
         return (await sender.Send(command, ct)).ToCreatedResult();
@@ -78,6 +79,7 @@ public sealed class FormsController(ISender sender) : ControllerBase
             NameAr = request.NameAr,
             Category = request.Category,
             DepartmentCode = request.DepartmentCode,
+            FieldActivityCode = request.FieldActivityCode,
         };
 
         return (await sender.Send(command, ct)).ToActionResult();

@@ -21,6 +21,7 @@ public static class FormEngineErrors
         public const string FormNotPublished = "FormEngine.Form.NotPublished";
         public const string FormConcurrencyConflict = "FormEngine.Form.ConcurrencyConflict";
         public const string FormInvalid = "FormEngine.Form.Invalid";
+        public const string FormInvalidFieldActivity = "FormEngine.Form.InvalidFieldActivity";
         public const string VersionNotFound = "FormEngine.Version.NotFound";
         public const string SchemaEmpty = "FormEngine.Schema.Empty";
         public const string SchemaInvalidJson = "FormEngine.Schema.InvalidJson";
@@ -28,6 +29,7 @@ public static class FormEngineErrors
         public const string SchemaDuplicateDataName = "FormEngine.Schema.DuplicateDataName";
         public const string SchemaReservedDataName = "FormEngine.Schema.ReservedDataName";
         public const string SchemaTooManyFields = "FormEngine.Schema.TooManyFields";
+        public const string SchemaInvalidComputedColumn = "FormEngine.Schema.InvalidComputedColumn";
         public const string FieldTypeConflict = "FormEngine.Field.TypeConflict";
         public const string SubmissionNotFound = "FormEngine.Submission.NotFound";
         public const string SubmissionAnswersInvalid = "FormEngine.Submission.AnswersInvalid";
@@ -81,6 +83,11 @@ public static class FormEngineErrors
             new(Codes.FormInvalidStatusTransition, $"A {status} form cannot be {action}.");
 
         public static Error Invalid(string message) => new(Codes.FormInvalid, message);
+
+        public static Error InvalidFieldActivity(string? departmentCode, string? fieldActivityCode) =>
+            new(
+                Codes.FormInvalidFieldActivity,
+                $"Field activity '{fieldActivityCode}' is not an active activity of department '{departmentCode}'.");
     }
 
     public static class Version
@@ -111,6 +118,9 @@ public static class FormEngineErrors
         public static Error TooManyFields(int count, int max) =>
             new(Codes.SchemaTooManyFields,
                 $"The form has {count} stored fields; a form can hold at most {max}. Split it into more than one form.");
+
+        public static Error InvalidComputedColumn(IEnumerable<string> problems) =>
+            new(Codes.SchemaInvalidComputedColumn, string.Join(" ", problems));
     }
 
     public static class Field

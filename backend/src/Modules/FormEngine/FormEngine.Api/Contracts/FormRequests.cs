@@ -3,10 +3,21 @@ using Microsoft.AspNetCore.Http;
 namespace FormEngine.Api.Contracts;
 
 /// <summary>Body of a form create. The code is set once and never changes afterwards.</summary>
-public sealed record CreateFormRequest(string Code, string NameEn, string NameAr, string Category, string? DepartmentCode);
+public sealed record CreateFormRequest(
+    string Code,
+    string NameEn,
+    string NameAr,
+    string Category,
+    string? DepartmentCode,
+    string? FieldActivityCode);
 
 /// <summary>Body of a form update — main info only; the schema has its own endpoint.</summary>
-public sealed record UpdateFormRequest(string NameEn, string NameAr, string Category, string? DepartmentCode);
+public sealed record UpdateFormRequest(
+    string NameEn,
+    string NameAr,
+    string Category,
+    string? DepartmentCode,
+    string? FieldActivityCode);
 
 /// <summary>Body of a schema save: the form-builder document.</summary>
 public sealed record SaveFormSchemaRequest(string SchemaJson);

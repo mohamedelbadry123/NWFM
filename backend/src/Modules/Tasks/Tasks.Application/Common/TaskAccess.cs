@@ -33,10 +33,14 @@ public sealed class TaskAccess(ITasksDbContext db, IOrgScopeProvider scopes, ICu
             : query;
     }
 
-    /// <summary>A task to change, tracked, with its assignments; null when missing or not the caller's to see.</summary>
+    /// <summary>
+    /// A task to change, tracked, with its forms (and their computed values, which a fill replaces)
+    /// and its assignments; null when missing or not the caller's to see.
+    /// </summary>
     public async Task<FieldTask?> FindForUpdateAsync(Guid taskId, CancellationToken ct)
     {
         var task = await db.Tasks
+            .Include(t => t.Forms).ThenInclude(f => f.ComputedValues)
             .Include(t => t.Assignments)
             .FirstOrDefaultAsync(t => t.Id == taskId, ct);
 
@@ -45,11 +49,12 @@ public sealed class TaskAccess(ITasksDbContext db, IOrgScopeProvider scopes, ICu
             : null;
     }
 
-    /// <summary>A task to read, untracked, with its assignments; null when missing or not the caller's to see.</summary>
+    /// <summary>A task to read, untracked, with its forms and assignments; null when missing or not the caller's to see.</summary>
     public async Task<FieldTask?> FindAsync(Guid taskId, CancellationToken ct)
     {
         var task = await db.Tasks
             .AsNoTracking()
+            .Include(t => t.Forms)
             .Include(t => t.Assignments)
             .FirstOrDefaultAsync(t => t.Id == taskId, ct);
 

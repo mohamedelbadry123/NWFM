@@ -141,8 +141,23 @@ public sealed record FormSchemaField(
     }
 }
 
-/// <summary>The flattened form-builder schema (name + all leaf fields; sections are unwrapped).</summary>
-public sealed record FormSchema(string? NameEn, string? NameAr, IReadOnlyList<FormSchemaField> Fields);
+/// <summary>
+/// The flattened form-builder schema (name + all leaf fields; sections are unwrapped), and the
+/// computed columns declared on the form.
+/// </summary>
+public sealed record FormSchema(string? NameEn, string? NameAr, IReadOnlyList<FormSchemaField> Fields)
+{
+    public FormSchema(
+        string? nameEn,
+        string? nameAr,
+        IReadOnlyList<FormSchemaField> fields,
+        IReadOnlyList<FormComputedColumn> computedColumns)
+        : this(nameEn, nameAr, fields) =>
+        ComputedColumns = computedColumns;
+
+    /// <summary>Values worked out of a fill for the task grid, from the root <c>computed_columns</c>. Empty when none.</summary>
+    public IReadOnlyList<FormComputedColumn> ComputedColumns { get; init; } = [];
+}
 
 /// <summary>
 /// Parses the form-builder "Fulcrum-style" schema JSON (<c>name_en</c>/<c>name_ar</c>/<c>elements</c>)
@@ -184,6 +199,14 @@ public static class FormSchemaParser
     private const string ConditionsProperty = "conditions";
     private const string FieldProperty = "field";
     private const string OperatorProperty = "operator";
+    private const string ComputedColumnsProperty = "computed_columns";
+    private const string KeyProperty = "key";
+    private const string OutputTypeProperty = "output_type";
+    private const string ShowInTaskGridProperty = "show_in_task_grid";
+    private const string RulesProperty = "rules";
+    private const string WhenProperty = "when";
+    private const string ThenProperty = "then";
+    private const string DefaultProperty = "default";
 
     /// <summary>The one shape a fixed date bound is written in by the builder.</summary>
     private const string DateOnlyFormat = "yyyy-MM-dd";
@@ -210,7 +233,53 @@ public static class FormSchemaParser
             Flatten(elements, fields);
         }
 
-        return new FormSchema(nameEn, nameAr, fields);
+        return new FormSchema(nameEn, nameAr, fields, ReadComputedColumns(root));
+    }
+
+    /// <summary>
+    /// Reads the form's computed columns. A column is kept even when it is malformed — a blank key,
+    /// an unknown output type — so the validator can say what is wrong with it rather than the
+    /// column quietly vanishing on save.
+    /// </summary>
+    private static IReadOnlyList<FormComputedColumn> ReadComputedColumns(JsonElement root)
+    {
+        if (!root.TryGetProperty(ComputedColumnsProperty, out var columns) || columns.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var result = new List<FormComputedColumn>();
+
+        foreach (var column in columns.EnumerateArray())
+        {
+            if (column.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var rules = new List<FormComputedRule>();
+            if (column.TryGetProperty(RulesProperty, out var ruleArray) && ruleArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var rule in ruleArray.EnumerateArray())
+                {
+                    if (rule.ValueKind == JsonValueKind.Object)
+                    {
+                        rules.Add(new FormComputedRule(ReadRuleGroup(rule, WhenProperty), GetString(rule, ThenProperty) ?? string.Empty));
+                    }
+                }
+            }
+
+            result.Add(new FormComputedColumn(
+                Trimmed(GetString(column, KeyProperty)) ?? string.Empty,
+                Trimmed(GetString(column, LabelEnProperty)),
+                Trimmed(GetString(column, LabelArProperty)),
+                Trimmed(GetString(column, OutputTypeProperty)) ?? FormComputedOutputTypes.Text,
+                GetBoolean(column, ShowInTaskGridProperty),
+                rules,
+                Trimmed(GetString(column, DefaultProperty))));
+        }
+
+        return result;
     }
 
     /// <summary>True when the JSON parses and contains at least one element.</summary>

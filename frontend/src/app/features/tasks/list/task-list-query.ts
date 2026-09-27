@@ -1,4 +1,4 @@
-import { TaskListQuery } from '../../../core/tasks/tasks.models';
+import { COMPUTED_SORT_PREFIX, TaskListQuery } from '../../../core/tasks/tasks.models';
 import { OrgLocation } from '../../../shared/components/org-scope/org-scope.model';
 
 /** PrimeNG column fields → the API's sort fields. Anything else sorts newest first. */
@@ -32,8 +32,9 @@ export interface TaskListState {
 
 /**
  * The list request for the worklist's current state. The status picker is single-select but the API
- * takes a set; the org filter sends each level it holds and the server narrows to the finest; an
- * unknown sort column falls back to the server's newest-first default.
+ * takes a set; the org filter sends each level it holds and the server narrows to the finest; a
+ * computed column's sort field (`computed:{formId}:{key}`) goes as it is; any other unknown sort
+ * column falls back to the server's newest-first default.
  */
 export function buildTaskListQuery(state: TaskListState): TaskListQuery {
   return {
@@ -51,9 +52,17 @@ export function buildTaskListQuery(state: TaskListState): TaskListQuery {
     operationAreaCode: state.orgFilter.operationAreaCode,
     createdFrom: toDateParam(state.createdFrom),
     createdTo: toDateParam(state.createdTo),
-    sortField: state.sortField ? TASK_SORT_FIELDS[state.sortField] ?? null : null,
+    sortField: toSortField(state.sortField),
     sortDescending: state.sortOrder !== 1,
   };
+}
+
+function toSortField(field: string | null): string | null {
+  if (!field) {
+    return null;
+  }
+
+  return TASK_SORT_FIELDS[field] ?? (field.startsWith(COMPUTED_SORT_PREFIX) ? field : null);
 }
 
 /** A picked day as `yyyy-MM-dd`, local — the API treats a bare day as the whole of it. */

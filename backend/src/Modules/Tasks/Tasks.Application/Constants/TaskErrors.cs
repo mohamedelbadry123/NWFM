@@ -24,6 +24,9 @@ public static class TaskErrors
         public const string TypeInvalid = "Tasks.Type.Invalid";
         public const string FormNotFound = "Tasks.Form.NotFound";
         public const string FormNotPublished = "Tasks.Form.NotPublished";
+        public const string FormNotOnTask = "Tasks.TaskForm.NotFound";
+        public const string FormAlreadyOnTask = "Tasks.TaskForm.Duplicate";
+        public const string FormChoiceRequired = "Tasks.TaskForm.ChoiceRequired";
         public const string TeamNotFound = "Tasks.Team.NotFound";
         public const string TeamNotEligible = "Tasks.Team.NotEligible";
         public const string C2mRejected = "Tasks.C2m.Rejected";
@@ -46,6 +49,7 @@ public static class TaskErrors
         Codes.TypeInactive,
         Codes.FormNotPublished,
         Codes.FormEngineNotPublished,
+        Codes.FormAlreadyOnTask,
         Codes.TeamNotEligible,
         Codes.C2mRejected,
         Codes.C2mNotRetryable,
@@ -98,11 +102,19 @@ public static class TaskErrors
 
     public static class Form
     {
-        public static readonly Error NotFound = new(Codes.FormNotFound, "The task type's form could not be found.");
+        public static readonly Error NotFound = new(Codes.FormNotFound, "The form could not be found.");
 
         public static readonly Error NotPublished = new(
             Codes.FormNotPublished,
-            "The task type's form has no published version that accepts fills. Publish it first.");
+            "The form has no published version that accepts fills. Publish it first.");
+
+        public static readonly Error NotOnTask = new(Codes.FormNotOnTask, "That form is not one of the task's forms.");
+
+        public static readonly Error AlreadyOnTask = new(Codes.FormAlreadyOnTask, "The task already carries that form.");
+
+        public static readonly Error ChoiceRequired = new(
+            Codes.FormChoiceRequired,
+            "The task has more than one form; say which one is being filled.");
     }
 
     public static class C2m

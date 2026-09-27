@@ -1,0 +1,198 @@
+{
+  "name_en": "Leak Inspection (Computed Columns Demo)",
+  "name_ar": "فحص التسربات (نموذج الأعمدة المحسوبة)",
+  "elements": [
+    {
+      "type": "single_choice",
+      "label_en": "Pipe Material",
+      "label_ar": "مادة الأنبوب",
+      "data_name": "pipe_material",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": false,
+      "multiple": false,
+      "parent_field": null,
+      "choices": [
+        { "value": "pvc", "label_en": "PVC", "label_ar": "بلاستيك", "dependency_value": null },
+        { "value": "steel", "label_en": "Steel", "label_ar": "حديد", "dependency_value": null },
+        { "value": "cast_iron", "label_en": "Cast iron", "label_ar": "حديد زهر", "dependency_value": null }
+      ],
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Leak Rate (litres/hour)",
+      "label_ar": "معدل التسرب (لتر/ساعة)",
+      "data_name": "leak_rate_lph",
+      "description_en": "Estimated flow escaping from the pipe.",
+      "description_ar": "التدفق التقديري المتسرب من الأنبوب.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": 0,
+      "max": 100000,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Hours Leaking",
+      "label_ar": "ساعات التسرب",
+      "data_name": "hours_leaking",
+      "description_en": "How long the leak has been running.",
+      "description_ar": "مدة استمرار التسرب.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": 0,
+      "max": 10000,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Customers Affected",
+      "label_ar": "العملاء المتأثرون",
+      "data_name": "customers_affected",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "format": "integer",
+      "min": 0,
+      "max": 100000,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "yes_no",
+      "label_en": "Safety Hazard Present?",
+      "label_ar": "هل يوجد خطر على السلامة؟",
+      "data_name": "is_safety_hazard",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Meter Reading Before",
+      "label_ar": "قراءة العداد قبل",
+      "data_name": "meter_start",
+      "description_en": "Optional.",
+      "description_ar": "اختياري.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": null,
+      "max": null,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Meter Reading After",
+      "label_ar": "قراءة العداد بعد",
+      "data_name": "meter_end",
+      "description_en": "Optional.",
+      "description_ar": "اختياري.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": null,
+      "max": null,
+      "visible_conditions": { "match": "all", "conditions": [], "preserve_data": false },
+      "required_conditions": { "match": "all", "conditions": [] }
+    }
+  ],
+  "computed_columns": [
+    {
+      "key": "severity",
+      "label_en": "Severity",
+      "label_ar": "الخطورة",
+      "output_type": "text",
+      "show_in_task_grid": true,
+      "rules": [
+        {
+          "when": { "match": "all", "conditions": [{ "field": "is_safety_hazard", "operator": "equal", "value": "true" }] },
+          "then": "'Critical'"
+        },
+        {
+          "when": { "match": "all", "conditions": [{ "field": "leak_rate_lph", "operator": "greater_than", "value": "500" }] },
+          "then": "'High'"
+        },
+        {
+          "when": { "match": "all", "conditions": [{ "field": "leak_rate_lph", "operator": "greater_than", "value": "100" }] },
+          "then": "'Medium'"
+        }
+      ],
+      "default": "'Low'"
+    },
+    {
+      "key": "water_lost_m3",
+      "label_en": "Water Lost (m³)",
+      "label_ar": "المياه المهدرة (م³)",
+      "output_type": "number",
+      "show_in_task_grid": true,
+      "rules": [],
+      "default": "round(leak_rate_lph * hours_leaking / 1000, 2)"
+    },
+    {
+      "key": "response",
+      "label_en": "Response",
+      "label_ar": "الاستجابة",
+      "output_type": "text",
+      "show_in_task_grid": true,
+      "rules": [
+        {
+          "when": { "match": "any", "conditions": [
+            { "field": "is_safety_hazard", "operator": "equal", "value": "true" },
+            { "field": "customers_affected", "operator": "greater_than", "value": "50" }
+          ] },
+          "then": "'Immediate'"
+        },
+        {
+          "when": { "match": "all", "conditions": [{ "field": "leak_rate_lph", "operator": "greater_than", "value": "100" }] },
+          "then": "'Same day'"
+        }
+      ],
+      "default": "'Scheduled'"
+    },
+    {
+      "key": "metered_use_m3",
+      "label_en": "Metered Use (m³)",
+      "label_ar": "الاستهلاك حسب العداد (م³)",
+      "output_type": "number",
+      "show_in_task_grid": false,
+      "rules": [
+        {
+          "when": { "match": "all", "conditions": [
+            { "field": "meter_start", "operator": "is_not_empty", "value": "" },
+            { "field": "meter_end", "operator": "is_not_empty", "value": "" }
+          ] },
+          "then": "meter_end - meter_start"
+        }
+      ],
+      "default": ""
+    }
+  ]
+}

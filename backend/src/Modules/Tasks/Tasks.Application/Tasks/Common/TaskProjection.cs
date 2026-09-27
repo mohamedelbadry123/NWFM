@@ -8,8 +8,8 @@ using Tasks.Domain.Entities;
 namespace Tasks.Application.Tasks.Common;
 
 /// <summary>
-/// Shapes tasks for the API. Names that live in other modules — the team, the form's current version
-/// — are resolved once per page rather than once per row.
+/// Shapes tasks for the API. Names that live in other modules — the team, each form's name and
+/// current version — are resolved once per page rather than once per row.
 /// </summary>
 internal static class TaskProjection
 {
@@ -38,7 +38,7 @@ internal static class TaskProjection
             .ToList();
         var teams = await directory.GetTeamsAsync(teamIds, ct);
 
-        var currentVersions = await CurrentVersionsAsync(forms, tasks.Select(t => t.FormDefinitionId), ct);
+        var formInfo = await FormsAsync(forms, tasks.SelectMany(t => t.Forms).Select(f => f.FormDefinitionId), ct);
 
         return tasks
             .Select(task =>
@@ -46,14 +46,13 @@ internal static class TaskProjection
                 types.TryGetValue(task.TaskTypeId, out var type);
                 var teamId = task.ActiveAssignment?.TeamId;
                 var teamName = teamId is Guid id && teams.TryGetValue(id, out var team) ? team.Name : null;
-                currentVersions.TryGetValue(task.FormDefinitionId, out var current);
 
-                return ToListItem(task, type, teamName, current);
+                return ToListItem(task, type, teamName, ToFormDtos(task, formInfo));
             })
             .ToList();
     }
 
-    public static TaskListItemDto ToListItem(FieldTask task, TaskType? type, string? teamName, int? formCurrentVersionNo) =>
+    public static TaskListItemDto ToListItem(FieldTask task, TaskType? type, string? teamName, IReadOnlyList<TaskFormDto> forms) =>
         new()
         {
             Id = task.Id,
@@ -62,9 +61,9 @@ internal static class TaskProjection
             TaskTypeCode = type?.Code,
             TaskTypeNameEn = type?.NameEn,
             TaskTypeNameAr = type?.NameAr,
-            FormDefinitionId = task.FormDefinitionId,
-            FormVersionNo = task.FormVersionNo,
-            FormCurrentVersionNo = formCurrentVersionNo,
+            Forms = forms,
+            RequiredFormCount = task.RequiredFormCount,
+            FilledFormCount = task.FilledFormCount,
             Status = task.Status,
             Priority = task.Priority,
             Source = task.Source,
@@ -95,20 +94,52 @@ internal static class TaskProjection
             UpdatedAt = task.UpdatedAt,
         };
 
-    /// <summary>Each form's current published version. A page holds tasks of a handful of types, so a handful of reads.</summary>
-    public static async Task<Dictionary<Guid, int?>> CurrentVersionsAsync(
+    /// <summary>
+    /// The task's forms in order, named, with each one's current version. <paramref name="schemas"/>
+    /// carries the pinned versions' documents when a single task is read.
+    /// </summary>
+    public static IReadOnlyList<TaskFormDto> ToFormDtos(
+        FieldTask task,
+        IReadOnlyDictionary<Guid, PublishedFormInfo?> formInfo,
+        IReadOnlyDictionary<Guid, string?>? schemas = null) =>
+        task.OrderedForms
+            .Select(f =>
+            {
+                var form = formInfo.GetValueOrDefault(f.FormDefinitionId);
+
+                return new TaskFormDto
+                {
+                    FormDefinitionId = f.FormDefinitionId,
+                    Code = form?.Code,
+                    NameEn = form?.NameEn,
+                    NameAr = form?.NameAr,
+                    VersionNo = f.FormVersionNo,
+                    CurrentVersionNo = form is { AcceptsSubmissions: true } ? form.CurrentVersionNo : null,
+                    SortOrder = f.SortOrder,
+                    Source = f.Source,
+                    IsRequired = f.IsRequired,
+                    IsC2mClosingForm = f.IsC2mClosingForm,
+                    SubmissionCount = f.SubmissionCount,
+                    SubmittedDate = f.SubmittedDate,
+                    LastFilledBy = f.LastFilledBy,
+                    SchemaJson = schemas?.GetValueOrDefault(f.FormDefinitionId),
+                };
+            })
+            .ToList();
+
+    /// <summary>Each form's published info. A page holds tasks of a handful of types, so a handful of reads.</summary>
+    public static async Task<Dictionary<Guid, PublishedFormInfo?>> FormsAsync(
         IFormGateway forms,
         IEnumerable<Guid> formIds,
         CancellationToken ct)
     {
-        var versions = new Dictionary<Guid, int?>();
+        var info = new Dictionary<Guid, PublishedFormInfo?>();
 
         foreach (var formId in formIds.Distinct())
         {
-            var form = await forms.FindPublishedAsync(formId, ct);
-            versions[formId] = form is { AcceptsSubmissions: true } ? form.CurrentVersionNo : null;
+            info[formId] = await forms.FindPublishedAsync(formId, ct);
         }
 
-        return versions;
+        return info;
     }
 }

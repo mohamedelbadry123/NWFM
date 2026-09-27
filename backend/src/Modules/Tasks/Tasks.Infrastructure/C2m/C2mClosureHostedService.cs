@@ -83,7 +83,11 @@ internal sealed class C2mClosureHostedService(
         var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
         var closure = scope.ServiceProvider.GetRequiredService<TaskC2mClosure>();
 
-        var task = await db.Tasks.Include(t => t.Assignments).FirstOrDefaultAsync(t => t.Id == taskId, ct);
+        var task = await db.Tasks
+            .Include(t => t.Forms)
+            .Include(t => t.Assignments)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(t => t.Id == taskId, ct);
         if (task is null
             || task.C2mStatus != C2mClosureStatuses.Pending
             || (task.C2mLastAttemptAt is { } last && last > due))

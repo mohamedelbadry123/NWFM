@@ -34,7 +34,7 @@ public sealed class FormPublisherTests : IDisposable
 
     private async Task<FormDefinition> AddFormAsync(string schemaJson, string code = "FRM-001")
     {
-        var form = FormDefinition.Create(code, "Leak", "تسرب", FormCategories.Inspection, null, "tester", Now);
+        var form = FormDefinition.Create(code, "Leak", "تسرب", FormCategories.Inspection, null, null, "tester", Now);
         form.SetSchema(schemaJson, null, null, "tester", Now);
 
         _context.FormDefinitions.Add(form);

@@ -7,12 +7,14 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Exceptions;
+using NWFM.Shared.Integration.Organization;
 using NWFM.Shared.Results;
 
 namespace FormEngine.Application.Forms.Commands.UpdateForm;
 
 public sealed class UpdateFormCommandHandler(
     IFormEngineDbContext context,
+    IOrgDirectory directory,
     ICurrentUser user,
     TimeProvider timeProvider)
     : IRequestHandler<UpdateFormCommand, Result<FormDetailDto>>
@@ -31,13 +33,26 @@ public sealed class UpdateFormCommandHandler(
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.NotEditable(form.Status));
         }
 
+        var department = request.DepartmentCode!.Trim();
+        var activity = request.FieldActivityCode!.Trim();
+
+        // Checked only when it changes: an activity later retired must not stop the form being renamed.
+        var changed = !string.Equals(form.DepartmentCode, department, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(form.FieldActivityCode, activity, StringComparison.OrdinalIgnoreCase);
+
+        if (changed && !await directory.IsFieldActivityInDepartmentAsync(department, activity, ct))
+        {
+            return Result.Failure<FormDetailDto>(FormEngineErrors.Form.InvalidFieldActivity(department, activity));
+        }
+
         try
         {
             form.UpdateDetails(
                 request.NameEn,
                 request.NameAr,
                 request.Category,
-                request.DepartmentCode,
+                department,
+                activity,
                 user.Id,
                 timeProvider.GetUtcNow().UtcDateTime);
 

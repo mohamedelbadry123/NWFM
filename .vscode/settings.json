@@ -1,0 +1,6 @@
+{
+  // The repo holds two solutions: the app (backend/NWFM.sln) and the untracked reference app.
+  // Without a default, C# Dev Kit may load the wrong one, and every backend file is then analysed
+  // with no project references ("The type or namespace name 'NWFM' could not be found").
+  "dotnet.defaultSolution": "backend/NWFM.sln"
+}

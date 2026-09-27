@@ -155,7 +155,15 @@ internal sealed class TaskReportDocument(TaskReport report, IReadOnlyDictionary<
                 column.Item().Element(c => ComposeCallout(c, heading, report.ReturnReason ?? Missing, Colors.Red.Lighten5, Colors.Red.Darken2));
             }
 
-            column.Item().Element(ComposeAnswers);
+            if (report.Forms.Count == 0)
+            {
+                column.Item().Element(c => ComposeAnswers(c, null));
+            }
+
+            foreach (var form in report.Forms)
+            {
+                column.Item().Element(c => ComposeAnswers(c, form));
+            }
 
             var signatures = report.Files.Where(f => f.IsSignature && f.IsFromLatestFill).ToList();
             if (signatures.Count > 0)
@@ -180,7 +188,10 @@ internal sealed class TaskReportDocument(TaskReport report, IReadOnlyDictionary<
     {
         ComposeSection(container, T("Task information", "معلومات المهمة"), table =>
         {
-            FactRow(table, 0, T("Task type", "نوع المهمة"), report.TaskType, T("Form", "النموذج"), $"{report.Form} (v{report.FormVersionNo})");
+            var forms = report.Forms.Count == 0
+                ? Missing
+                : string.Join("\n", report.Forms.Select(f => $"{f.Form} (v{f.VersionNo})"));
+            FactRow(table, 0, T("Task type", "نوع المهمة"), report.TaskType, report.Forms.Count > 1 ? T("Forms", "النماذج") : T("Form", "النموذج"), forms);
             FactRow(table, 1, T("Title", "العنوان"), report.Title ?? Missing, T("External reference", "مرجع خارجي"), report.ExternalReference ?? Missing);
             FactRow(table, 2, T("Priority", "الأولوية"), TaskReportText.Priority(report.Priority, IsArabic), T("Source", "المصدر"), TaskReportText.Source(report.Source, IsArabic));
             FactRow(table, 3, T("Created", "تاريخ الإنشاء"), Date(report.CreatedAt, DateTimeFormat), T("Team", "الفريق"), report.Team ?? Missing);
@@ -206,16 +217,27 @@ internal sealed class TaskReportDocument(TaskReport report, IReadOnlyDictionary<
         });
     }
 
-    private void ComposeAnswers(IContainer container)
+    /// <summary>One form's latest fill. With several forms each gets its own section, headed by the form.</summary>
+    private void ComposeAnswers(IContainer container, TaskReportForm? form)
     {
         container.Column(column =>
         {
             column.Spacing(5);
-            column.Item().EnsureSpace(SectionLeadSpace).Text(T("Last submitted data", "آخر البيانات المقدمة")).FontSize(14).SemiBold().FontColor(Accent);
 
-            if (report.LatestFill is not { } fill)
+            var heading = T("Last submitted data", "آخر البيانات المقدمة");
+            if (form is not null && report.Forms.Count > 1)
             {
-                column.Item().Text(T("The task has not been filled yet.", "لم تتم تعبئة المهمة بعد.")).Italic().FontColor(Colors.Grey.Darken1);
+                heading = $"{heading} — {form.Form}";
+            }
+
+            column.Item().EnsureSpace(SectionLeadSpace).Text(heading).FontSize(14).SemiBold().FontColor(Accent);
+
+            if (form?.LatestFill is not { } fill)
+            {
+                var empty = report.Forms.Count > 1
+                    ? T("This form has not been filled yet.", "لم تتم تعبئة هذا النموذج بعد.")
+                    : T("The task has not been filled yet.", "لم تتم تعبئة المهمة بعد.");
+                column.Item().Text(empty).Italic().FontColor(Colors.Grey.Darken1);
                 return;
             }
 
@@ -223,7 +245,7 @@ internal sealed class TaskReportDocument(TaskReport report, IReadOnlyDictionary<
                     $"{T("Filled by", "عبأها")}: {Ltr(fill.FilledBy ?? Missing)} · {Date(fill.FilledAt?.UtcDateTime, DateTimeFormat)} · {T("Form version", "إصدار النموذج")} {Ltr(fill.VersionNo.ToString(CultureInfo.InvariantCulture))}")
                 .FontSize(9).FontColor(Colors.Grey.Darken1);
 
-            if (report.Answers.Count == 0)
+            if (form.Answers.Count == 0)
             {
                 column.Item().Text(T("No answers were recorded.", "لم تُسجل أي إجابات.")).Italic().FontColor(Colors.Grey.Darken1);
                 return;
@@ -243,7 +265,7 @@ internal sealed class TaskReportDocument(TaskReport report, IReadOnlyDictionary<
                     header.Cell().Element(HeaderCell).Text(T("Answer", "الإجابة"));
                 });
 
-                foreach (var answer in report.Answers)
+                foreach (var answer in form.Answers)
                 {
                     table.Cell().Element(PlainCell).Text(answer.Label).SemiBold();
                     table.Cell().Element(PlainCell).Text(Ltr(answer.Value));

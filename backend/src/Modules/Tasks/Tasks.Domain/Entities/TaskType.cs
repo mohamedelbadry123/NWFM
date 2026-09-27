@@ -4,9 +4,9 @@ using NWFM.Shared.Exceptions;
 namespace Tasks.Domain.Entities;
 
 /// <summary>
-/// A kind of field work, and the form its tasks are filled with. Different types collect different
-/// inputs; a task pins its type's form, at the version current when the task was raised, so changing
-/// the type's form later never changes a task already in the field. Table: <c>Task.TaskTypes</c>.
+/// A kind of field work, and the forms its tasks are filled with. Different types collect different
+/// inputs; a task pins each of its type's forms, at the version current when the task was raised, so
+/// changing the type's forms later never changes a task already in the field. Table: <c>Task.TaskTypes</c>.
 /// </summary>
 public sealed class TaskType : Entity
 {
@@ -19,6 +19,11 @@ public sealed class TaskType : Entity
     /// <summary>A year: past that an SLA is a typo, not a target.</summary>
     public const int MaxSlaHours = 24 * 366;
 
+    /// <summary>More than this is a survey, not a visit; split it into types.</summary>
+    public const int MaxForms = 10;
+
+    private readonly List<TaskTypeForm> _forms = [];
+
     private TaskType()
     {
     }
@@ -29,8 +34,6 @@ public sealed class TaskType : Entity
     public string? DescriptionEn { get; private set; }
     public string? DescriptionAr { get; private set; }
 
-    /// <summary>The form its tasks are filled with. A loose reference: Tasks never reads FormEngine's tables.</summary>
-    public Guid FormDefinitionId { get; private set; }
 
     /// <summary>The department whose work this is (<c>Auth.LKP_DEPARTMENT.Code</c>); a new task inherits it.</summary>
     public string? DepartmentCode { get; private set; }
@@ -52,13 +55,20 @@ public sealed class TaskType : Entity
     public string? UpdatedBy { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
+    /// <summary>The forms its tasks are filled with, in order. Never empty.</summary>
+    public IReadOnlyCollection<TaskTypeForm> Forms => _forms.AsReadOnly();
+
+    /// <summary>The form ids in order — what a task raised now pins.</summary>
+    public IReadOnlyList<Guid> FormIds => _forms.OrderBy(f => f.SortOrder).Select(f => f.FormDefinitionId).ToList();
+
     public static TaskType Create(
         string code,
         string nameEn,
         string nameAr,
         string? descriptionEn,
         string? descriptionAr,
-        Guid formDefinitionId,
+        IReadOnlyList<Guid> formDefinitionIds,
+        Guid? c2mClosingFormId,
         string? departmentCode,
         int? fillSlaHours,
         int? completionSlaHours,
@@ -78,7 +88,8 @@ public sealed class TaskType : Entity
             CreatedAt = utcNow,
         };
 
-        type.Apply(nameEn, nameAr, descriptionEn, descriptionAr, formDefinitionId, departmentCode, fillSlaHours, completionSlaHours);
+        type.Apply(nameEn, nameAr, descriptionEn, descriptionAr, departmentCode, fillSlaHours, completionSlaHours);
+        type.SetForms(formDefinitionIds, c2mClosingFormId, utcNow);
         type.Touch(createdBy, utcNow);
         return type;
     }
@@ -88,14 +99,16 @@ public sealed class TaskType : Entity
         string nameAr,
         string? descriptionEn,
         string? descriptionAr,
-        Guid formDefinitionId,
+        IReadOnlyList<Guid> formDefinitionIds,
+        Guid? c2mClosingFormId,
         string? departmentCode,
         int? fillSlaHours,
         int? completionSlaHours,
         string? updatedBy,
         DateTime utcNow)
     {
-        Apply(nameEn, nameAr, descriptionEn, descriptionAr, formDefinitionId, departmentCode, fillSlaHours, completionSlaHours);
+        Apply(nameEn, nameAr, descriptionEn, descriptionAr, departmentCode, fillSlaHours, completionSlaHours);
+        SetForms(formDefinitionIds, c2mClosingFormId, utcNow);
         Touch(updatedBy, utcNow);
     }
 
@@ -111,12 +124,57 @@ public sealed class TaskType : Entity
         Touch(updatedBy, utcNow);
     }
 
+    /// <summary>
+    /// Replaces the type's forms, in the order given. Forms kept keep their rows; the closing form is
+    /// the one named, or the first when none is.
+    /// </summary>
+    private void SetForms(IReadOnlyList<Guid> formDefinitionIds, Guid? c2mClosingFormId, DateTime utcNow)
+    {
+        if (formDefinitionIds is null || formDefinitionIds.Count == 0 || formDefinitionIds.Any(id => id == Guid.Empty))
+        {
+            throw new DomainException("A task type must name the forms its tasks are filled with.");
+        }
+
+        if (formDefinitionIds.Distinct().Count() != formDefinitionIds.Count)
+        {
+            throw new DomainException("A task type cannot list the same form twice.");
+        }
+
+        if (formDefinitionIds.Count > MaxForms)
+        {
+            throw new DomainException($"A task type can have at most {MaxForms} forms.");
+        }
+
+        if (c2mClosingFormId is Guid closing && !formDefinitionIds.Contains(closing))
+        {
+            throw new DomainException("The C2M closing form must be one of the type's forms.");
+        }
+
+        var closingFormId = c2mClosingFormId ?? formDefinitionIds[0];
+
+        _forms.RemoveAll(f => !formDefinitionIds.Contains(f.FormDefinitionId));
+
+        for (var i = 0; i < formDefinitionIds.Count; i++)
+        {
+            var formId = formDefinitionIds[i];
+            var existing = _forms.FirstOrDefault(f => f.FormDefinitionId == formId);
+
+            if (existing is null)
+            {
+                _forms.Add(new TaskTypeForm(Id, formId, i, formId == closingFormId, utcNow));
+            }
+            else
+            {
+                existing.Place(i, formId == closingFormId, utcNow);
+            }
+        }
+    }
+
     private void Apply(
         string nameEn,
         string nameAr,
         string? descriptionEn,
         string? descriptionAr,
-        Guid formDefinitionId,
         string? departmentCode,
         int? fillSlaHours,
         int? completionSlaHours)
@@ -126,10 +184,6 @@ public sealed class TaskType : Entity
             throw new DomainException("A task type must have an English and an Arabic name.");
         }
 
-        if (formDefinitionId == Guid.Empty)
-        {
-            throw new DomainException("A task type must name the form its tasks are filled with.");
-        }
 
         EnsureSla(fillSlaHours, "fill");
         EnsureSla(completionSlaHours, "completion");
@@ -138,7 +192,6 @@ public sealed class TaskType : Entity
         NameAr = nameAr.Trim();
         DescriptionEn = Normalize(descriptionEn);
         DescriptionAr = Normalize(descriptionAr);
-        FormDefinitionId = formDefinitionId;
         DepartmentCode = Normalize(departmentCode);
         FillSlaHours = fillSlaHours;
         CompletionSlaHours = completionSlaHours;

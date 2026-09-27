@@ -54,13 +54,39 @@
         formControlName="departmentCode"
         [options]="departments()"
         optionValue="code"
-        [showClear]="true"
-        [placeholder]="'forms.noDepartment' | translate"
+        [filter]="true"
+        [filterBy]="'code,nameEn,nameAr'"
+        [placeholder]="'forms.departmentPlaceholder' | translate"
         appendTo="body"
       >
         <ng-template let-item pTemplate="item">{{ departmentLabel(item) }}</ng-template>
         <ng-template let-item pTemplate="selectedItem">{{ departmentLabel(item) }}</ng-template>
       </p-select>
+      @if (model.controls.departmentCode.touched && model.controls.departmentCode.invalid) {
+        <small class="text-red-500">{{ 'common.required' | translate }}</small>
+      }
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="form-field-activity" class="text-sm font-medium">{{ 'forms.fieldActivity' | translate }}</label>
+      <p-select
+        inputId="form-field-activity"
+        formControlName="fieldActivityCode"
+        [options]="fieldActivities()"
+        optionValue="code"
+        [filter]="true"
+        [filterBy]="'code,nameEn,nameAr'"
+        [loading]="loadingActivities()"
+        [placeholder]="(model.controls.departmentCode.value ? 'forms.fieldActivityPlaceholder' : 'forms.selectDepartmentFirst') | translate"
+        [emptyMessage]="'forms.noFieldActivities' | translate"
+        appendTo="body"
+      >
+        <ng-template let-item pTemplate="item">{{ departmentLabel(item) }} <span class="opacity-60">({{ item.code }})</span></ng-template>
+        <ng-template let-item pTemplate="selectedItem">{{ departmentLabel(item) }}</ng-template>
+      </p-select>
+      @if (model.controls.fieldActivityCode.touched && model.controls.fieldActivityCode.invalid) {
+        <small class="text-red-500">{{ 'common.required' | translate }}</small>
+      }
     </div>
   </form>
 

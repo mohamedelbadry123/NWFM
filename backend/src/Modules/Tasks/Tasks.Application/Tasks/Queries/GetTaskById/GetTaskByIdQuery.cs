@@ -13,7 +13,7 @@ using Tasks.Application.Tasks.Models;
 
 namespace Tasks.Application.Tasks.Queries.GetTaskById;
 
-/// <summary>One task, with its assignments and the pinned form it is filled with.</summary>
+/// <summary>One task, with its assignments and the pinned forms it is filled with.</summary>
 [Authorize(Policy = NwfmPolicies.ViewTasks)]
 public sealed record GetTaskByIdQuery(Guid TaskId) : IRequest<Result<TaskDetailDto>>;
 
@@ -37,8 +37,13 @@ public sealed class GetTaskByIdQueryHandler(
         var teamIds = task.Assignments.Select(a => a.TeamId).Distinct().ToList();
         var teams = await directory.GetTeamsAsync(teamIds, ct);
 
-        var form = await forms.FindPublishedAsync(task.FormDefinitionId, ct);
-        var schemaJson = await forms.GetVersionSchemaAsync(task.FormDefinitionId, task.FormVersionNo, ct);
+        var formInfo = await TaskProjection.FormsAsync(forms, task.Forms.Select(f => f.FormDefinitionId), ct);
+
+        var schemas = new Dictionary<Guid, string?>();
+        foreach (var form in task.Forms)
+        {
+            schemas[form.FormDefinitionId] = await forms.GetVersionSchemaAsync(form.FormDefinitionId, form.FormVersionNo, ct);
+        }
 
         var teamName = task.ActiveAssignment is { } active && teams.TryGetValue(active.TeamId, out var activeTeam)
             ? activeTeam.Name
@@ -46,11 +51,7 @@ public sealed class GetTaskByIdQueryHandler(
 
         return Result.Success(new TaskDetailDto
         {
-            Task = TaskProjection.ToListItem(
-                task,
-                type,
-                teamName,
-                form is { AcceptsSubmissions: true } ? form.CurrentVersionNo : null),
+            Task = TaskProjection.ToListItem(task, type, teamName, TaskProjection.ToFormDtos(task, formInfo, schemas)),
             Notes = task.Notes,
             FillSlaHours = task.FillSlaHours,
             CompletionSlaHours = task.CompletionSlaHours,
@@ -65,10 +66,6 @@ public sealed class GetTaskByIdQueryHandler(
             C2mAttempts = task.C2mAttempts,
             C2mLastAttemptAt = task.C2mLastAttemptAt,
             TypeClosesC2mActivity = type?.ClosesC2mActivity ?? false,
-            FormCode = form?.Code,
-            FormNameEn = form?.NameEn,
-            FormNameAr = form?.NameAr,
-            SchemaJson = schemaJson,
             Assignments = task.Assignments
                 .OrderByDescending(a => a.AssignedDate)
                 .Select(a => new TaskAssignmentDto

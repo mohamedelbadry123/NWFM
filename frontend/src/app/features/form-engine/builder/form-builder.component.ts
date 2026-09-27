@@ -16,6 +16,8 @@ import { BuilderCanvasComponent } from './components/builder-canvas.component';
 import { FieldEditorDialogComponent } from './components/field-editor-dialog.component';
 import { FormPreviewDialogComponent } from './components/form-preview-dialog.component';
 import { JsonOutputComponent } from './components/json-output.component';
+import { ComputedColumnsDialogComponent } from './components/computed-columns-dialog.component';
+import type { RuleFieldOption } from './components/rules-dialog.component';
 import { FORM_BUILDER_SAMPLE_FILES, formBuilderSampleUrl } from './data/form-builder-samples';
 import { DROP_IDS, ELEMENT_TYPES, type ElementType } from '../../../shared/form-schema/form-schema.types';
 import { FormsService } from '../../../core/form-engine/forms.service';
@@ -42,6 +44,7 @@ import { formEngineErrorMessage } from '../../../core/form-engine/form-engine-ap
     FieldEditorDialogComponent,
     FormPreviewDialogComponent,
     JsonOutputComponent,
+    ComputedColumnsDialogComponent,
   ],
   templateUrl: './form-builder.component.html',
   styleUrl: './form-builder.component.css',
@@ -65,6 +68,18 @@ export class FormBuilderComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly saving = signal(false);
   protected readonly publishing = signal(false);
+  protected readonly computedVisible = signal(false);
+
+  /** The answerable fields, for computed columns' conditions and expressions. */
+  protected readonly computedFields = computed<RuleFieldOption[]>(() =>
+    this.store
+      .allElements()
+      .filter((el) => el.type !== ELEMENT_TYPES.Section && el.data_name?.trim())
+      .map((el) => ({
+        data_name: el.data_name.trim(),
+        label: (this.translate.currentLang === 'ar' ? el.label_ar : el.label_en) || el.label_en || el.data_name,
+      })),
+  );
 
   protected readonly isDesigner = computed(() => this.formId() !== null);
 
@@ -189,6 +204,10 @@ export class FormBuilderComponent implements OnInit {
 
   protected openPreview(): void {
     this.previewVisible.set(true);
+  }
+
+  protected openComputed(): void {
+    this.computedVisible.set(true);
   }
 
   protected openEditor(key: string): void {

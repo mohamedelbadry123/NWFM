@@ -10,10 +10,11 @@ export interface TaskListItem {
   taskTypeCode: string | null;
   taskTypeNameEn: string | null;
   taskTypeNameAr: string | null;
-  formDefinitionId: string;
-  formVersionNo: number;
-  /** Ahead of `formVersionNo` when a newer version was published since the task was raised. */
-  formCurrentVersionNo: number | null;
+  /** The forms the task is filled with, in order: its type's, then any added to it. */
+  forms: TaskForm[];
+  /** How many forms the task waits for, and how many of them have a fill. */
+  requiredFormCount: number;
+  filledFormCount: number;
   status: string;
   priority: string;
   source: string;
@@ -45,6 +46,64 @@ export interface TaskListItem {
   c2mStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Its forms' computed columns, as their latest fills worked them out; a column its forms lack is absent. */
+  computedValues: TaskComputedCell[];
+}
+
+/** One task's value of one computed column. */
+export interface TaskComputedCell {
+  /** `TaskComputedColumn.id`. */
+  columnId: string;
+  text: string | null;
+  number: number | null;
+}
+
+/** The prefix a computed column's sort field carries: `computed:{id}`. */
+export const COMPUTED_SORT_PREFIX = 'computed:';
+
+/** A computed column the worklist can show — one form's key. */
+export interface TaskComputedColumn {
+  /** `{formId}:{key}` — what a cell names and what the grid sorts by. */
+  id: string;
+  formDefinitionId: string;
+  formCode: string | null;
+  formNameEn: string | null;
+  formNameAr: string | null;
+  key: string;
+  labelEn: string | null;
+  labelAr: string | null;
+  /** `text` or `number`. */
+  outputType: string;
+  /** Shown without being asked for when the worklist is filtered to the form's type. */
+  showInTaskGrid: boolean;
+}
+
+/** Why a form is on a task — the server's `TaskFormSources`. */
+export const TASK_FORM_SOURCES = {
+  Type: 'TYPE',
+  Extra: 'EXTRA',
+} as const;
+
+/** One form pinned to a task. */
+export interface TaskForm {
+  formDefinitionId: string;
+  code: string | null;
+  nameEn: string | null;
+  nameAr: string | null;
+  /** The version pinned. */
+  versionNo: number;
+  /** Ahead of `versionNo` when a newer version was published since it was pinned. */
+  currentVersionNo: number | null;
+  sortOrder: number;
+  /** `TASK_FORM_SOURCES`: from the type, or added to this task alone. */
+  source: string;
+  isRequired: boolean;
+  isC2mClosingForm: boolean;
+  submissionCount: number;
+  submittedDate: string | null;
+  lastFilledBy: string | null;
+  /** The pinned version's form-builder document; sent only when a single task is read. */
+  schemaJson: string | null;
 }
 
 export interface TaskAssignment {
@@ -77,11 +136,6 @@ export interface TaskDetail {
   c2mLastAttemptAt: string | null;
   /** The task's type closes C2M field activities — with an FA id, approving it will. */
   typeClosesC2mActivity: boolean;
-  formCode: string | null;
-  formNameEn: string | null;
-  formNameAr: string | null;
-  /** The pinned version's form-builder document. */
-  schemaJson: string | null;
   assignments: TaskAssignment[];
 }
 
@@ -95,6 +149,8 @@ export interface TaskHistoryEntry {
 }
 
 export interface TaskFill {
+  /** Which of the task's forms the fill answered. */
+  formDefinitionId: string;
   submissionId: string;
   versionNo: number;
   submittedBy: string | null;
@@ -119,6 +175,7 @@ export interface TaskAnswerView {
 }
 
 export interface TaskFile {
+  formDefinitionId: string;
   fileId: string;
   submissionId: string | null;
   dataName: string;
@@ -138,9 +195,12 @@ export interface EligibleTeam {
 
 export interface TaskFillResult {
   submissionId: string;
+  formDefinitionId: string;
   versionNo: number;
   isReplay: boolean;
   status: string;
+  filledFormCount: number;
+  requiredFormCount: number;
 }
 
 export interface TaskListQuery {
@@ -189,6 +249,8 @@ export interface TaskDetailsPayload extends TaskLocationPayload {
 export interface CreateTaskPayload extends TaskDetailsPayload {
   taskTypeId: string;
   taskNumber: string | null;
+  /** Forms this task needs on top of its type's, in order. */
+  extraFormDefinitionIds: string[];
 }
 
 export interface AssignTaskPayload {
@@ -199,6 +261,8 @@ export interface AssignTaskPayload {
 }
 
 export interface FillTaskPayload {
+  /** Which of the task's forms is filled. */
+  formDefinitionId: string;
   clientSubmissionId: string;
   clientFilledAt: string;
   answers: Record<string, unknown>;
@@ -217,12 +281,8 @@ export interface TaskType {
   nameAr: string;
   descriptionEn: string | null;
   descriptionAr: string | null;
-  formDefinitionId: string;
-  formCode: string | null;
-  formNameEn: string | null;
-  formNameAr: string | null;
-  /** Null when the bound form has no version that takes fills — new tasks of this type are refused. */
-  formCurrentVersionNo: number | null;
+  /** The forms its tasks are filled with, in order. */
+  forms: TaskTypeForm[];
   departmentCode: string | null;
   fillSlaHours: number | null;
   completionSlaHours: number | null;
@@ -233,12 +293,27 @@ export interface TaskType {
   updatedAt: string;
 }
 
+/** One of a task type's forms. */
+export interface TaskTypeForm {
+  formDefinitionId: string;
+  code: string | null;
+  nameEn: string | null;
+  nameAr: string | null;
+  /** Null when the form has no version that takes fills — new tasks of the type are refused. */
+  currentVersionNo: number | null;
+  sortOrder: number;
+  isC2mClosingForm: boolean;
+}
+
 export interface TaskTypePayload {
   nameEn: string;
   nameAr: string;
   descriptionEn: string | null;
   descriptionAr: string | null;
-  formDefinitionId: string;
+  /** In the order a crew meets them. */
+  formDefinitionIds: string[];
+  /** Which of them closes the C2M field activity; the first when null. */
+  c2mClosingFormId: string | null;
   departmentCode: string | null;
   fillSlaHours: number | null;
   completionSlaHours: number | null;

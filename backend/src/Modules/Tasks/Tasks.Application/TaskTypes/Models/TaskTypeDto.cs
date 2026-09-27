@@ -9,13 +9,8 @@ public sealed class TaskTypeDto
     public string? DescriptionEn { get; init; }
     public string? DescriptionAr { get; init; }
 
-    public Guid FormDefinitionId { get; init; }
-    public string? FormCode { get; init; }
-    public string? FormNameEn { get; init; }
-    public string? FormNameAr { get; init; }
-
-    /// <summary>The version a task raised now would pin; null when the form has none that accepts fills.</summary>
-    public int? FormCurrentVersionNo { get; init; }
+    /// <summary>The forms its tasks are filled with, in order.</summary>
+    public IReadOnlyList<TaskTypeFormDto> Forms { get; init; } = [];
 
     public string? DepartmentCode { get; init; }
     public int? FillSlaHours { get; init; }
@@ -26,5 +21,18 @@ public sealed class TaskTypeDto
     public DateTime UpdatedAt { get; init; }
 }
 
-/// <summary>A published form a task type can be bound to.</summary>
+/// <summary>
+/// One of a type's forms. <see cref="CurrentVersionNo"/> is the version a task raised now would pin;
+/// null when the form has none that accepts fills.
+/// </summary>
+public sealed record TaskTypeFormDto(
+    Guid FormDefinitionId,
+    string? Code,
+    string? NameEn,
+    string? NameAr,
+    int? CurrentVersionNo,
+    int SortOrder,
+    bool IsC2mClosingForm);
+
+/// <summary>A published form a task type — or a single task — can be bound to.</summary>
 public sealed record FormOptionDto(Guid Id, string Code, string NameEn, string NameAr, int CurrentVersionNo);

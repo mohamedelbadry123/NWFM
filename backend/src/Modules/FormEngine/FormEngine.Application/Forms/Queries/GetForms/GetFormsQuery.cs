@@ -15,6 +15,7 @@ public sealed record GetFormsQuery : IRequest<Result<PaginatedResult<FormListIte
     public string? Category { get; init; }
     public string? Status { get; init; }
     public string? DepartmentCode { get; init; }
+    public string? FieldActivityCode { get; init; }
 
     /// <summary>
     /// Hides archived forms when no <see cref="Status"/> is given, so the grid opens on the working

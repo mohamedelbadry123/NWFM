@@ -4,6 +4,7 @@ import {
   TASK_STATUSES,
   TaskStatus,
   canMigrateVersion,
+  formsProgress,
   canReassign,
   canRunTaskAction,
   isOverdue,
@@ -66,19 +67,34 @@ describe('task-status', () => {
   });
 
   describe('canMigrateVersion', () => {
-    const task = { status: TaskStatus.Assigned, submissionCount: 0, formVersionNo: 2, formCurrentVersionNo: 3 };
+    const form = { versionNo: 2, currentVersionNo: 3 as number | null, submissionCount: 0 };
+    const task = { status: TaskStatus.Assigned, forms: [form] };
+    const withForm = (changes: Partial<typeof form>) => ({ status: task.status, forms: [{ ...form, ...changes }] });
 
     it('offers a newer version to an unfilled task', () => {
       expect(canMigrateVersion(task)).toBeTrue();
     });
 
     it('offers nothing when the pinned version is current, or the form is gone', () => {
-      expect(canMigrateVersion({ ...task, formCurrentVersionNo: 2 })).toBeFalse();
-      expect(canMigrateVersion({ ...task, formCurrentVersionNo: null })).toBeFalse();
+      expect(canMigrateVersion(withForm({ currentVersionNo: 2 }))).toBeFalse();
+      expect(canMigrateVersion(withForm({ currentVersionNo: null }))).toBeFalse();
     });
 
     it('keeps a filled task on the version its answers were given against', () => {
-      expect(canMigrateVersion({ ...task, submissionCount: 1 })).toBeFalse();
+      expect(canMigrateVersion(withForm({ submissionCount: 1 }))).toBeFalse();
+    });
+
+    it('still moves an unfilled form of a task whose other form is filled', () => {
+      const filled = { versionNo: 1, currentVersionNo: 1, submissionCount: 1 };
+      expect(canMigrateVersion({ status: TaskStatus.InProgress, forms: [filled, form] })).toBeTrue();
+      expect(canMigrateVersion({ status: TaskStatus.Approved, forms: [filled, form] })).toBeFalse();
+    });
+  });
+
+  describe('formsProgress', () => {
+    it('counts filled forms only when there is more than one', () => {
+      expect(formsProgress({ forms: [{}, {}, {}], filledFormCount: 1, requiredFormCount: 3 })).toBe('1/3');
+      expect(formsProgress({ forms: [{}], filledFormCount: 1, requiredFormCount: 1 })).toBeNull();
     });
   });
 
