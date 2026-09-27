@@ -11,6 +11,7 @@ public sealed class UpdateFormCommandValidator : AbstractValidator<UpdateFormCom
         RuleFor(x => x.NameEn).ValidFormName("English");
         RuleFor(x => x.NameAr).ValidFormName("Arabic");
         RuleFor(x => x.Category).ValidFormCategory();
-        RuleFor(x => x.DepartmentCode).ValidDepartmentCode();
+        RuleFor(x => x.DepartmentCode).RequiredDepartmentCode();
+        RuleFor(x => x.FieldActivityCode).RequiredFieldActivityCode();
     }
 }

@@ -502,21 +502,27 @@ same `data_name` used in two forms is therefore **two columns in two tables**, e
 
 ## 12. Forms inside tasks
 
-A **task type** names a published form. The whole flow:
+A **task type** lists one or more published forms, in order (`Task.TaskTypeForms`, at most 10). A
+task can also carry **extra forms** added to it alone, at creation or later while it is not waiting
+for review (`Task.TaskForms`, source `EXTRA`; at most 15 forms per task). One team fills every form,
+and the task counts as filled only once each one is. The whole flow:
 
-1. **Create.** When a task is created, it **pins** the form's current version (`FormVersionNo`). A
-   later republish does not change the form for tasks already in flight. An unfilled task can be
-   moved to the newer version explicitly ("move to newer form version").
-2. **Fill.** The Tasks module calls `IFormGateway.SubmitAsync` with the pinned version,
-   `ContextType = "Task"`, `ContextId` = the task id, and the client's retry key. The row lands in
-   **that form's own table**. Then the task records the fill (`RecordFill` — idempotent for the same
-   submission).
+1. **Create.** When a task is created, it **pins** each form's current version (`TaskForms.FormVersionNo`).
+   A later republish does not change a form for tasks already in flight. A form that is still
+   unfilled can be moved to its newer version explicitly ("move to newer form version") — per form,
+   or every unfilled form at once.
+2. **Fill.** A fill names the form it answers (`formDefinitionId`; it may be left out only when the
+   task has one form). The Tasks module calls `IFormGateway.SubmitAsync` with that form's pinned
+   version, `ContextType = "Task"`, `ContextId` = the task id, and the client's retry key. The row
+   lands in **that form's own table**. Then the task records the fill (`RecordFill` — idempotent for
+   the same submission). While some forms are still unfilled the task is `IN_PROGRESS`; once all are,
+   it is `SUBMITTED`. After a return, refilling any form brings it back to `SUBMITTED`.
 
    The form row and the task row are written by two modules, so there are two saves. If the second
    fails, the client retries with the same key: the form engine replays the stored submission and
    the task update completes. No duplicate row is written.
-3. **Read.** The task's fills are `ListByContextAsync(formId, "Task", taskId)`; its files are the
-   `SubmissionFiles` stamped with the same context.
+3. **Read.** The task's fills are `ListByContextAsync(formId, "Task", taskId)` for each of its forms;
+   its files are the `SubmissionFiles` stamped with the same context.
 4. **Details screen.** It shows:
    - the latest fill as labelled answers, with a map button for location answers;
    - earlier fills on the Records tab;
@@ -528,11 +534,46 @@ A **task type** names a published form. The whole flow:
    - its signatures and photos embedded;
    - a list of every file.
 
-   Only the latest fill's images are embedded: a photo from a returned fill would read as evidence
-   for answers it does not belong to. An image that is missing, larger than 10 MB, or will not decode
-   (a HEIC photo, a truncated upload) is listed as not embedded rather than breaking the report.
-   Arabic reports run right to left, with Noto fonts embedded in the assembly so every host renders
-   Arabic the same way.
+   Only each form's latest fill's images are embedded: a photo from a returned fill would read as
+   evidence for answers it does not belong to. An image that is missing, larger than 10 MB, or will
+   not decode (a HEIC photo, a truncated upload) is listed as not embedded rather than breaking the
+   report. Arabic reports run right to left, with Noto fonts embedded in the assembly so every host
+   renders Arabic the same way. A task with several forms prints one answers section per form.
+6. **C2M closing form.** A type that closes C2M field activities flags one of its forms as the closing
+   form (the first, unless another is chosen); its answers decide how the activity closes.
+7. **Field activity.** Every form names its department and one of that department's field activities
+   (`FormDefinitions.FieldActivityCode`, from `LKP_FIELD_ACTIVITY_TYPE`). Both are required when a form
+   is created or edited; forms made before this have none until they are next edited.
+
+### Computed columns
+
+A form can declare **computed columns** — values worked out of each fill and shown beside the task in
+the task grid. They live in the schema document under a root `computed_columns` array, so they are
+versioned with the form:
+
+```json
+"computed_columns": [{
+  "key": "severity", "label_en": "Severity", "label_ar": "الخطورة",
+  "output_type": "text", "show_in_task_grid": true,
+  "rules": [{ "when": { "match": "all", "conditions": [{ "field": "leak_size", "operator": "greater_than", "value": "10" }] },
+              "then": "'High'" }],
+  "default": "'Low'"
+}]
+```
+
+- The rules are tried in order; the first whose conditions hold (the same rule engine as visibility)
+  supplies the value, else `default`. A value is an expression: a quoted text, a number, a field's
+  data name, `+ - * /` with parentheses, and `sum`, `min`, `max`, `round`, `abs`, `coalesce`,
+  `concat`. A blank operand makes arithmetic blank; nothing an expression does can fail a fill.
+- Save and publish refuse a bad column (`FormEngine.Schema.InvalidComputedColumn`): a malformed or
+  repeated key, a missing label, a rule without conditions, an expression that does not parse, or a
+  field the form does not have.
+- When a task's form is filled, the values are worked out through the version the fill answered
+  (`IFormGateway.ComputeAsync`) and stored in `Task.TaskComputedValues`; the next fill of that form
+  replaces them. A republish never recomputes them.
+- The grid lists the columns from `GET /api/v1/tasks/computed-columns?taskTypeId=`. Filtered by type,
+  it shows the columns marked `show_in_task_grid`; unfiltered, the reader picks from every type's.
+  A column sorts with `sortField=computed:{formId}:{key}`.
 
 ---
 

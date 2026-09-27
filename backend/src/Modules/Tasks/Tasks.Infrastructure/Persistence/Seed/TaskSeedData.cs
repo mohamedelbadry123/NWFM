@@ -93,7 +93,7 @@ internal static class TaskSeedData
 
         foreach (var seed in Types)
         {
-            var type = await context.TaskTypes.FirstOrDefaultAsync(t => t.Code == seed.Code, ct);
+            var type = await context.TaskTypes.Include(t => t.Forms).FirstOrDefaultAsync(t => t.Code == seed.Code, ct);
 
             if (type is null)
             {
@@ -106,7 +106,7 @@ internal static class TaskSeedData
 
                 type = TaskType.Create(
                     seed.Code, seed.NameEn, seed.NameAr, null, null,
-                    form.Id, null, seed.FillSlaHours, seed.CompletionSlaHours, SeedActor, utcNow);
+                    [form.Id], null, null, seed.FillSlaHours, seed.CompletionSlaHours, SeedActor, utcNow);
 
                 context.TaskTypes.Add(type);
                 logger.LogInformation("Seeded task type {Code}.", seed.Code);
@@ -125,8 +125,16 @@ internal static class TaskSeedData
                 continue;
             }
 
-            var form = await forms.FindPublishedAsync(type.FormDefinitionId, ct);
-            if (form is null)
+            var drafts = new List<TaskFormDraft>();
+            foreach (var typeForm in type.Forms.OrderBy(f => f.SortOrder))
+            {
+                if (await forms.FindPublishedAsync(typeForm.FormDefinitionId, ct) is { } form)
+                {
+                    drafts.Add(new TaskFormDraft(form.Id, form.CurrentVersionNo, TaskFormSources.Type, typeForm.IsC2mClosingForm));
+                }
+            }
+
+            if (drafts.Count == 0)
             {
                 continue;
             }
@@ -136,8 +144,7 @@ internal static class TaskSeedData
                 {
                     TaskNumber = seed.TaskNumber,
                     TaskTypeId = type.Id,
-                    FormDefinitionId = form.Id,
-                    FormVersionNo = form.CurrentVersionNo,
+                    Forms = drafts,
                     Title = seed.Title,
                     Priority = seed.Priority,
                     Location = new TaskLocation(seed.Latitude, seed.Longitude, seed.Address, RiyadhCbu, seed.BranchCode, null, null),

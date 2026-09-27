@@ -170,6 +170,15 @@ internal sealed class OrgScopeProvider(
         return byCode;
     }
 
+    public Task<bool> IsFieldActivityInDepartmentAsync(
+        string departmentCode,
+        string fieldActivityCode,
+        CancellationToken cancellationToken) =>
+        db.Departments.AsNoTracking().AnyAsync(
+            d => d.Code == departmentCode && d.IsActive
+                && db.FieldActivityTypes.Any(f => f.DepartmentCode == d.Code && f.Code == fieldActivityCode && f.IsActive),
+            cancellationToken);
+
     private async Task<OrgScopeSet> ScopeOfAsync(string ownerType, string ownerId, CancellationToken cancellationToken)
     {
         var rows = await db.OrgScopes

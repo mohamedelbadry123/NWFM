@@ -25,7 +25,7 @@
       (onContextMenuSelect)="onContextMenu($event)"
       styleClass="app-table p-datatable-sm p-datatable-striped"
       [scrollable]="true"
-      [tableStyle]="{ 'min-width': '96rem' }"
+      [tableStyle]="tableStyle()"
       [rowHover]="true"
       [showCurrentPageReport]="true"
       [currentPageReportTemplate]="t('common.pageReport')"
@@ -70,6 +70,29 @@
             class="w-full sm:w-52 shrink-0"
             styleClass="w-full"
           />
+
+          @if (computedColumns().length > 0) {
+            <!-- Values worked out of each form's latest fill; pick which show. -->
+            <p-multiselect
+              [options]="computedOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="visibleComputedIds()"
+              (ngModelChange)="onComputedChoice($event)"
+              [filter]="computedOptions().length > 8"
+              [showToggleAll]="true"
+              [placeholder]="t('tasks.columns.computed')"
+              [selectedItemsLabel]="t('tasks.columns.computedCount', { count: visibleComputedIds().length })"
+              [maxSelectedLabels]="0"
+              appendTo="body"
+              class="w-full sm:w-52 shrink-0"
+              styleClass="w-full"
+            >
+              <ng-template #dropdownicon>
+                <i class="pi pi-table"></i>
+              </ng-template>
+            </p-multiselect>
+          }
 
           <p-select
             [(ngModel)]="priority"
@@ -218,6 +241,14 @@
               <p-sortIcon field="submissionCount" />
             </div>
           </th>
+          @for (column of visibleComputed(); track column.id) {
+            <th [pSortableColumn]="sortPrefix + column.id" class="cursor-pointer select-none">
+              <div class="flex items-center justify-between gap-2" [pTooltip]="column.formCode ?? ''" tooltipPosition="top">
+                <span>{{ computedLabel(column) }}</span>
+                <p-sortIcon [field]="sortPrefix + column.id" />
+              </div>
+            </th>
+          }
           <th class="w-[6rem] text-end">{{ t('common.actions') }}</th>
         </tr>
       </ng-template>
@@ -232,19 +263,34 @@
           <td>
             <div class="flex items-center gap-1.5">
               <span>{{ taskTypeLabel(task) }}</span>
-              <span class="app-badge app-badge--code">v{{ task.formVersionNo }}</span>
+              @if (formsProgress(task); as progress) {
+                <!-- Several forms: how many of them the crew has filled. -->
+                <p-tag
+                  icon="pi pi-copy"
+                  [value]="progress"
+                  [severity]="task.filledFormCount >= task.requiredFormCount ? 'success' : 'secondary'"
+                  [pTooltip]="t('tasks.forms.progress', { filled: task.filledFormCount, total: task.requiredFormCount })"
+                  tooltipPosition="top"
+                />
+              } @else if (task.forms.length === 1) {
+                <span class="app-badge app-badge--code">v{{ task.forms[0].versionNo }}</span>
+              }
             </div>
-            <!-- Pinned to an older form than its form now publishes; offer the move forward. -->
+            <!-- A form pinned to an older version than it now publishes; offer the move forward. -->
             @if (canMigrate(task)) {
               <p-button
                 icon="pi pi-arrow-up-right"
                 size="small"
                 severity="warn"
                 [text]="true"
-                [label]="'v' + task.formCurrentVersionNo"
+                [label]="task.forms.length === 1 ? 'v' + task.forms[0].currentVersionNo : ''"
                 [loading]="migratingTaskId() === task.id"
                 [disabled]="migratingTaskId() !== null"
-                [pTooltip]="t('tasks.migrateVersion.tooltip', { version: task.formCurrentVersionNo })"
+                [pTooltip]="
+                  task.forms.length === 1
+                    ? t('tasks.migrateVersion.tooltip', { version: task.forms[0].currentVersionNo })
+                    : t('tasks.migrateVersion.tooltipMany')
+                "
                 tooltipPosition="top"
                 (onClick)="migrateVersion(task)"
               />
@@ -301,6 +347,15 @@
           <td>{{ task.createdAt | date: 'yyyy-MM-dd HH:mm' }}</td>
           <td>{{ task.dueDate ? (task.dueDate | date: 'yyyy-MM-dd') : '—' }}</td>
           <td>{{ task.submissionCount ?? 0 }}</td>
+          @for (column of visibleComputed(); track column.id) {
+            <td [class.text-end]="column.outputType === 'number'">
+              @if (computedCell(task, column.id); as value) {
+                {{ value }}
+              } @else {
+                <span class="text-surface-400">—</span>
+              }
+            </td>
+          }
           <td class="text-end">
             <p-button
               icon="pi pi-ellipsis-v"
@@ -317,7 +372,7 @@
 
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="12" class="p-8 text-center">
+          <td [attr.colspan]="columnCount()" class="p-8 text-center">
             <div class="flex flex-col items-center justify-center gap-2 text-surface-500">
               <i class="pi pi-inbox text-4xl"></i>
               <span class="font-medium text-base">{{ t('tasks.noTasks') }}</span>

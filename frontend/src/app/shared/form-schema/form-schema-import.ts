@@ -1,6 +1,7 @@
 import { createElement } from './form-schema-element';
 import {
   BARCODE_FORMATS,
+  COMPUTED_OUTPUT_TYPES,
   DATE_ONLY_PATTERN,
   DATE_RULES,
   DEFAULT_VALUE_MODES,
@@ -13,6 +14,7 @@ import {
   normalizeExtensions,
   type BarcodeFormat,
   type Choice,
+  type ComputedColumn,
   type DateRule,
   type DefaultValueMode,
   type ElementType,
@@ -252,12 +254,38 @@ export function deserializeSchemaElement(raw: Record<string, unknown>): FormElem
   return element;
 }
 
+/** A form's computed columns; malformed entries are kept so the server can say what is wrong with them. */
+function asComputedColumns(value: unknown): ComputedColumn[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((raw) => ({
+      key: asString(raw['key']).trim(),
+      label_en: asString(raw['label_en']),
+      label_ar: asString(raw['label_ar']),
+      output_type: raw['output_type'] === COMPUTED_OUTPUT_TYPES.Number ? COMPUTED_OUTPUT_TYPES.Number : COMPUTED_OUTPUT_TYPES.Text,
+      show_in_task_grid: !!raw['show_in_task_grid'],
+      rules: Array.isArray(raw['rules'])
+        ? raw['rules']
+            .filter((rule): rule is Record<string, unknown> => !!rule && typeof rule === 'object')
+            .map((rule) => ({ when: asRuleGroup(rule['when']), then: asString(rule['then']) }))
+        : [],
+      default: asString(raw['default']),
+    }));
+}
+
 export function deserializeSchema(raw: Record<string, unknown>): FormSchema {
+  const computed = asComputedColumns(raw['computed_columns']);
+
   return {
     name_en: asString(raw['name_en'], 'Untitled Form'),
     name_ar: asString(raw['name_ar'], 'نموذج بدون عنوان'),
     elements: Array.isArray(raw['elements'])
       ? raw['elements'].map((el) => deserializeSchemaElement(el as Record<string, unknown>))
       : [],
+    ...(computed.length > 0 ? { computed_columns: computed } : {}),
   };
 }

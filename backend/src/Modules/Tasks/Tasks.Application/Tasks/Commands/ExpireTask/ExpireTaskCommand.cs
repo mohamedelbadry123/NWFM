@@ -51,9 +51,13 @@ public sealed class ExpireTaskCommandHandler(
     }
 }
 
-/// <summary>Moves an unfilled task to its form's current published version.</summary>
+/// <summary>
+/// Moves the task's unfilled forms to their current published versions — one form when
+/// <see cref="FormDefinitionId"/> names it, else every unfilled form a newer version has overtaken.
+/// Answers how many forms moved.
+/// </summary>
 [Authorize(Policy = NwfmPolicies.ManageTasks)]
-public sealed record MigrateTaskFormVersionCommand(Guid TaskId) : IRequest<Result<int>>;
+public sealed record MigrateTaskFormVersionCommand(Guid TaskId, Guid? FormDefinitionId = null) : IRequest<Result<int>>;
 
 public sealed class MigrateTaskFormVersionCommandHandler(
     ITasksDbContext db,
@@ -71,17 +75,54 @@ public sealed class MigrateTaskFormVersionCommandHandler(
             return Result.Failure<int>(TaskErrors.Task.NotFound);
         }
 
-        var form = await forms.FindPublishedAsync(task.FormDefinitionId, ct);
-        if (form is not { AcceptsSubmissions: true })
+        if (request.FormDefinitionId is Guid formId)
         {
-            return Result.Failure<int>(TaskErrors.Form.NotPublished);
+            if (task.FormOf(formId) is null)
+            {
+                return Result.Failure<int>(TaskErrors.Form.NotOnTask);
+            }
+
+            var form = await forms.FindPublishedAsync(formId, ct);
+            if (form is not { AcceptsSubmissions: true })
+            {
+                return Result.Failure<int>(TaskErrors.Form.NotPublished);
+            }
+
+            var one = await TaskWrites.ApplyAsync(
+                db,
+                () => task.MigrateFormVersion(formId, form.CurrentVersionNo, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime),
+                ct);
+
+            return one.IsFailure ? Result.Failure<int>(one.Error) : Result.Success(1);
+        }
+
+        // Every unfilled form a newer version has overtaken; forms already filled stay on what they answered.
+        var moves = new List<(Guid FormId, int VersionNo)>();
+        foreach (var taskForm in task.OrderedForms.Where(f => !f.IsFilled))
+        {
+            var form = await forms.FindPublishedAsync(taskForm.FormDefinitionId, ct);
+            if (form is { AcceptsSubmissions: true } && form.CurrentVersionNo > taskForm.FormVersionNo)
+            {
+                moves.Add((taskForm.FormDefinitionId, form.CurrentVersionNo));
+            }
+        }
+
+        if (moves.Count == 0)
+        {
+            return Result.Failure<int>(TaskErrors.Task.Invalid("None of the task's unfilled forms has a newer version to move to."));
         }
 
         var applied = await TaskWrites.ApplyAsync(
             db,
-            () => task.MigrateFormVersion(form.CurrentVersionNo, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime),
+            () =>
+            {
+                foreach (var (formId, versionNo) in moves)
+                {
+                    task.MigrateFormVersion(formId, versionNo, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime);
+                }
+            },
             ct);
 
-        return applied.IsFailure ? Result.Failure<int>(applied.Error) : Result.Success(task.FormVersionNo);
+        return applied.IsFailure ? Result.Failure<int>(applied.Error) : Result.Success(moves.Count);
     }
 }

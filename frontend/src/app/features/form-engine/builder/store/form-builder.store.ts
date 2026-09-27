@@ -9,6 +9,7 @@ import {
   isChoiceType,
   isDateRuleType,
   isTextLikeType,
+  type ComputedColumn,
   type ElementType,
   type FormSchema,
   type FormElement,
@@ -23,6 +24,8 @@ export type SerializedForm = {
   name_en: string;
   name_ar: string;
   elements: Record<string, unknown>[];
+  /** Written only when the form declares any, so a form without them exports exactly as before. */
+  computed_columns?: Record<string, unknown>[];
 };
 
 /**
@@ -40,8 +43,10 @@ export class FormBuilderStore {
   private readonly _nameEn = signal('Untitled Form');
   private readonly _nameAr = signal('نموذج بدون عنوان');
   private readonly _selectedKey = signal<string | null>(null);
+  private readonly _computedColumns = signal<ComputedColumn[]>([]);
 
   readonly elements = this._elements.asReadonly();
+  readonly computedColumns = this._computedColumns.asReadonly();
   readonly nameEn = this._nameEn.asReadonly();
   readonly nameAr = this._nameAr.asReadonly();
   readonly selectedKey = this._selectedKey.asReadonly();
@@ -55,16 +60,28 @@ export class FormBuilderStore {
   );
 
   /** The exported Fulcrum-style definition. */
-  readonly definition = computed<SerializedForm>(() => ({
-    name_en: this._nameEn(),
-    name_ar: this._nameAr(),
-    elements: this._elements().map((el) => this.serialize(el)),
-  }));
+  readonly definition = computed<SerializedForm>(() => {
+    const computedColumns = this._computedColumns();
+
+    return {
+      name_en: this._nameEn(),
+      name_ar: this._nameAr(),
+      elements: this._elements().map((el) => this.serialize(el)),
+      ...(computedColumns.length > 0
+        ? { computed_columns: computedColumns.map((column) => this.serializeComputed(column)) }
+        : {}),
+    };
+  });
 
   readonly json = computed(() => JSON.stringify(this.definition(), null, 2));
 
   setNameEn(value: string): void {
     this._nameEn.set(value);
+  }
+
+  /** Replaces the form's computed columns, in the order given. */
+  setComputedColumns(columns: ComputedColumn[]): void {
+    this._computedColumns.set(structuredClone(columns));
   }
 
   setNameAr(value: string): void {
@@ -175,6 +192,7 @@ export class FormBuilderStore {
     this._nameEn.set(definition.name_en);
     this._nameAr.set(definition.name_ar);
     this._elements.set(definition.elements);
+    this._computedColumns.set(definition.computed_columns ?? []);
     this._selectedKey.set(null);
   }
 
@@ -186,7 +204,27 @@ export class FormBuilderStore {
   resetForm(): void {
     this._nameEn.set('Untitled Form');
     this._nameAr.set('نموذج بدون عنوان');
+    this._computedColumns.set([]);
     this.clear();
+  }
+
+  /** A computed column as the schema stores it; a rule's `preserve_data` means nothing here and is left out. */
+  private serializeComputed(column: ComputedColumn): Record<string, unknown> {
+    return {
+      key: column.key.trim(),
+      label_en: column.label_en.trim(),
+      label_ar: column.label_ar.trim(),
+      output_type: column.output_type,
+      show_in_task_grid: column.show_in_task_grid,
+      rules: column.rules.map((rule) => ({
+        when: {
+          match: rule.when.match,
+          conditions: rule.when.conditions.filter((c) => c.field.trim() !== ''),
+        },
+        then: rule.then.trim(),
+      })),
+      default: column.default.trim(),
+    };
   }
 
   // ── Private immutable helpers ─────────────────────────────────────────────

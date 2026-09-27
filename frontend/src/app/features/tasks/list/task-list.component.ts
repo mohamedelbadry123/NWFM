@@ -13,6 +13,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { MenuModule } from 'primeng/menu';
 import { ContextMenuModule } from 'primeng/contextmenu';
 import { MenuItem, MessageService } from 'primeng/api';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 import { TableModule, TableLazyLoadEvent } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -27,7 +28,7 @@ import { apiErrorMessage } from '../../../core/api/api-error-message';
 import { OrgNamesService } from '../../../core/lookups/org-names.service';
 import { TasksService } from '../../../core/tasks/tasks.service';
 import { TaskTypesService } from '../../../core/tasks/task-types.service';
-import { TaskListItem, TaskType } from '../../../core/tasks/tasks.models';
+import { COMPUTED_SORT_PREFIX, TaskComputedColumn, TaskListItem, TaskType } from '../../../core/tasks/tasks.models';
 import { EMPTY_ORG_LOCATION, OrgLocation } from '../../../shared/components/org-scope/org-scope.model';
 import { OrgFilterDialogComponent } from '../../../shared/components/org-scope/org-filter-dialog.component';
 import {
@@ -37,6 +38,7 @@ import {
   TASK_STATUSES,
   c2mStatusSeverity,
   canMigrateVersion,
+  formsProgress,
   canReassign,
   canRunTaskAction,
   isOverdue,
@@ -80,6 +82,7 @@ interface FilterOption {
     InputTextModule,
     MenuModule,
     ContextMenuModule,
+    MultiSelectModule,
     SelectModule,
     TableModule,
     TagModule,
@@ -165,6 +168,33 @@ export class TaskListComponent implements OnInit {
     this.taskTypes().map((type) => ({ label: `${type.code} — ${this.typeName(type)}`, value: type.id })),
   );
 
+  /**
+   * Computed columns the grid can show: the filtered type's forms', or every type's when unfiltered.
+   * Which of them are on screen is the reader's choice, remembered per type in this browser.
+   */
+  protected readonly computedColumns = signal<TaskComputedColumn[]>([]);
+  protected readonly visibleComputedIds = signal<string[]>([]);
+  private computedFor: string | null | undefined = undefined;
+
+  protected readonly visibleComputed = computed<TaskComputedColumn[]>(() => {
+    const ids = new Set(this.visibleComputedIds());
+    return this.computedColumns().filter((column) => ids.has(column.id));
+  });
+
+  protected readonly computedOptions = computed<FilterOption[]>(() =>
+    this.computedColumns().map((column) => ({
+      label: `${column.formCode ?? ''} · ${this.computedLabel(column)}`,
+      value: column.id,
+    })),
+  );
+
+  protected readonly sortPrefix = COMPUTED_SORT_PREFIX;
+
+  /** The fixed columns plus the computed ones on screen — the empty row spans them all. */
+  protected readonly columnCount = computed(() => 12 + this.visibleComputed().length);
+
+  protected readonly tableStyle = computed(() => ({ 'min-width': `${96 + 10 * this.visibleComputed().length}rem` }));
+
   // Dialog state — each dialog is its own component; the page owns visibility and the subject.
   protected readonly createVisible = signal(false);
   protected readonly editVisible = signal(false);
@@ -196,6 +226,78 @@ export class TaskListComponent implements OnInit {
       .active()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ next: (res) => this.taskTypes.set(res.value ?? []) });
+
+    this.loadComputedColumns();
+  }
+
+  /** The type's (or every type's) computed columns, and which of them this reader shows. */
+  private loadComputedColumns(): void {
+    const typeId = this.taskTypeId;
+    if (this.computedFor === typeId) {
+      return;
+    }
+    this.computedFor = typeId;
+
+    this.tasksApi
+      .computedColumns(typeId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (this.computedFor !== typeId) {
+            return;
+          }
+
+          const columns = res.value ?? [];
+          this.computedColumns.set(columns);
+
+          // A remembered choice wins; otherwise a type opens on the columns its forms mark for the
+          // grid, and the unfiltered list on none — it may span many types' columns.
+          const known = new Set(columns.map((c) => c.id));
+          const stored = this.readComputedChoice(typeId);
+          this.visibleComputedIds.set(
+            stored
+              ? stored.filter((id) => known.has(id))
+              : typeId ? columns.filter((c) => c.showInTaskGrid).map((c) => c.id) : [],
+          );
+        },
+        error: () => {
+          this.computedColumns.set([]);
+          this.visibleComputedIds.set([]);
+        },
+      });
+  }
+
+  protected onComputedChoice(ids: string[]): void {
+    this.visibleComputedIds.set(ids ?? []);
+    try {
+      localStorage.setItem(this.computedChoiceKey(this.taskTypeId), JSON.stringify(ids ?? []));
+    } catch {
+      // Storage is a convenience; the choice still applies for this visit.
+    }
+  }
+
+  private readComputedChoice(typeId: string | null): string[] | null {
+    try {
+      const raw = localStorage.getItem(this.computedChoiceKey(typeId));
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private computedChoiceKey(typeId: string | null): string {
+    return `nwfm.tasks.computed.${typeId ?? 'all'}`;
+  }
+
+  protected computedLabel(column: TaskComputedColumn): string {
+    const label = this.locale.locale() === 'ar' ? column.labelAr || column.labelEn : column.labelEn || column.labelAr;
+    return label || column.key;
+  }
+
+  /** A task's value for a computed column; blank when its forms do not declare it or it worked out to nothing. */
+  protected computedCell(task: TaskListItem, columnId: string): string | null {
+    return task.computedValues?.find((cell) => cell.columnId === columnId)?.text ?? null;
   }
 
   protected loadTasks(event?: TableLazyLoadEvent): void {
@@ -246,6 +348,13 @@ export class TaskListComponent implements OnInit {
 
   protected applyFilters(): void {
     this.page = 1;
+    this.loadComputedColumns();
+
+    // A sort on a column the new type does not have would order by blanks; fall back to the default.
+    if (this.sortField?.startsWith(COMPUTED_SORT_PREFIX)) {
+      this.sortField = null;
+    }
+
     this.loadTasks();
   }
 
@@ -340,11 +449,13 @@ export class TaskListComponent implements OnInit {
     this.returnVisible.set(true);
   }
 
+  protected readonly formsProgress = formsProgress;
+
   protected canMigrate(task: TaskListItem): boolean {
     return canMigrateVersion(task) && this.may(PERMISSIONS.manageTasks);
   }
 
-  /** Moves the task onto its form's newest published version. */
+  /** Moves the task's unfilled forms onto their newest published versions. */
   protected migrateVersion(task: TaskListItem): void {
     if (this.migratingTaskId() !== null) {
       return;
@@ -359,7 +470,9 @@ export class TaskListComponent implements OnInit {
           this.messageService.add({
             severity: 'success',
             summary: this.translate.instant('common.success'),
-            detail: this.translate.instant('tasks.migrateVersion.success', { version: res.value ?? '' }),
+            detail: task.forms.length === 1
+              ? this.translate.instant('tasks.migrateVersion.success', { version: task.forms[0].currentVersionNo ?? '' })
+              : this.translate.instant('tasks.migrateVersion.successMany', { count: res.value ?? 0 }),
           });
           this.loadTasks();
         },

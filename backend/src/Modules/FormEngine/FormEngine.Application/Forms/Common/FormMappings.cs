@@ -15,6 +15,7 @@ internal static class FormMappings
         Category = form.Category,
         Status = form.Status,
         DepartmentCode = form.DepartmentCode,
+        FieldActivityCode = form.FieldActivityCode,
         CurrentVersionNo = form.CurrentVersionNo,
         IsActive = form.IsActive,
         CreatedBy = form.CreatedBy,

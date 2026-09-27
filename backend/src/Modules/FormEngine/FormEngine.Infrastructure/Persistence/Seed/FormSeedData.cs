@@ -82,7 +82,7 @@ internal static class FormSeedData
         {
             var schemaJson = await ReadResourceAsync(seed.ResourceFile, ct);
 
-            form = FormDefinition.Create(seed.Code, seed.NameEn, seed.NameAr, seed.Category, null, SeedActor, utcNow);
+            form = FormDefinition.Create(seed.Code, seed.NameEn, seed.NameAr, seed.Category, null, null, SeedActor, utcNow);
             form.SetSchema(schemaJson, seed.NameEn, seed.NameAr, SeedActor, utcNow);
 
             context.FormDefinitions.Add(form);

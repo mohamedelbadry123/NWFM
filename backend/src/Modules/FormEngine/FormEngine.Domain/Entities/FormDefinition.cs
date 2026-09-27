@@ -16,6 +16,7 @@ public sealed class FormDefinition : Entity
     public const int CodeMaxLength = 50;
     public const int NameMaxLength = 250;
     public const int DepartmentCodeMaxLength = 50;
+    public const int FieldActivityCodeMaxLength = 50;
     public const int ActorMaxLength = 256;
 
     /// <summary>SQL Server's identifier limit.</summary>
@@ -35,6 +36,7 @@ public sealed class FormDefinition : Entity
         string nameAr,
         string category,
         string? departmentCode,
+        string? fieldActivityCode,
         string? createdBy,
         DateTime utcNow)
     {
@@ -43,6 +45,7 @@ public sealed class FormDefinition : Entity
         NameAr = nameAr;
         Category = category;
         DepartmentCode = departmentCode;
+        FieldActivityCode = fieldActivityCode;
         Status = FormStatuses.Draft;
         SchemaJson = EmptySchema;
         IsActive = true;
@@ -62,6 +65,13 @@ public sealed class FormDefinition : Entity
     /// reads Auth tables, so this is informational and a filter, not a foreign key.
     /// </summary>
     public string? DepartmentCode { get; private set; }
+
+    /// <summary>
+    /// The field activity the form records (<c>Auth.LKP_FIELD_ACTIVITY_TYPE.Code</c>, within
+    /// <see cref="DepartmentCode"/>). Loose like the department; required for new forms by the
+    /// commands, null only on forms made before it existed.
+    /// </summary>
+    public string? FieldActivityCode { get; private set; }
 
     public string Status { get; private set; } = default!;
 
@@ -105,6 +115,7 @@ public sealed class FormDefinition : Entity
         string nameAr,
         string category,
         string? departmentCode,
+        string? fieldActivityCode,
         string? createdBy,
         DateTime utcNow)
     {
@@ -115,6 +126,7 @@ public sealed class FormDefinition : Entity
 
         EnsureNames(nameEn, nameAr);
         EnsureCategory(category);
+        EnsureFieldActivity(departmentCode, fieldActivityCode);
 
         return new FormDefinition(
             code.Trim(),
@@ -122,12 +134,13 @@ public sealed class FormDefinition : Entity
             nameAr.Trim(),
             category,
             NormalizeOptional(departmentCode),
+            NormalizeOptional(fieldActivityCode),
             NormalizeOptional(createdBy),
             utcNow);
     }
 
     /// <summary>
-    /// Updates names, category and department. Deliberately not routed through
+    /// Updates names, category, department and field activity. Deliberately not routed through
     /// <see cref="EnsureEditable"/>: main info is not a schema change, so a Published form keeps its
     /// status. Deprecated and archived forms stay blocked.
     /// </summary>
@@ -136,17 +149,20 @@ public sealed class FormDefinition : Entity
         string nameAr,
         string category,
         string? departmentCode,
+        string? fieldActivityCode,
         string? updatedBy,
         DateTime utcNow)
     {
         EnsureNotFrozen();
         EnsureNames(nameEn, nameAr);
         EnsureCategory(category);
+        EnsureFieldActivity(departmentCode, fieldActivityCode);
 
         NameEn = nameEn.Trim();
         NameAr = nameAr.Trim();
         Category = category;
         DepartmentCode = NormalizeOptional(departmentCode);
+        FieldActivityCode = NormalizeOptional(fieldActivityCode);
         Touch(updatedBy, utcNow);
     }
 
@@ -282,7 +298,7 @@ public sealed class FormDefinition : Entity
     /// </summary>
     public FormDefinition Clone(string newCode, string newNameEn, string newNameAr, string? createdBy, DateTime utcNow)
     {
-        var clone = Create(newCode, newNameEn, newNameAr, Category, DepartmentCode, createdBy, utcNow);
+        var clone = Create(newCode, newNameEn, newNameAr, Category, DepartmentCode, FieldActivityCode, createdBy, utcNow);
         clone.SchemaJson = SchemaJson;
         return clone;
     }
@@ -314,6 +330,15 @@ public sealed class FormDefinition : Entity
     {
         UpdatedBy = NormalizeOptional(actor) ?? UpdatedBy;
         SetUpdated(utcNow);
+    }
+
+    /// <summary>A field activity is a department's; naming one with no department says nothing.</summary>
+    private static void EnsureFieldActivity(string? departmentCode, string? fieldActivityCode)
+    {
+        if (!string.IsNullOrWhiteSpace(fieldActivityCode) && string.IsNullOrWhiteSpace(departmentCode))
+        {
+            throw new DomainException("A field activity belongs to a department; choose the department first.");
+        }
     }
 
     private static void EnsureNames(string nameEn, string nameAr)

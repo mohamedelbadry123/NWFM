@@ -1,5 +1,6 @@
 namespace NWFM.Tests.Modules.Tasks;
 
+using global::Tasks.Domain.Constants;
 using global::Tasks.Domain.Entities;
 using global::Tasks.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -20,18 +21,22 @@ internal static class TaskTestData
         return new TasksDbContext(options);
     }
 
-    public static TaskType Type(Guid? formId = null) =>
-        TaskType.Create("SURVEY", "Survey", "مسح", null, null, formId ?? FormId, null, 48, 24, "tester", Now);
+    /// <summary>A type filled with <see cref="FormId"/>, or with the forms given, in order.</summary>
+    public static TaskType Type(params Guid[] formIds) =>
+        TaskType.Create(
+            "SURVEY", "Survey", "مسح", null, null, formIds.Length == 0 ? [FormId] : formIds, null, null, 48, 24, "tester", Now);
 
-    /// <summary>A task in Riyadh city, branch R-16, department 10.</summary>
+    /// <summary>A task in Riyadh city, branch R-16, department 10, pinning each of its type's forms at version 1.</summary>
     public static FieldTask Task(TaskType type, string number = "TSK-1", string branch = "R-16", string? department = "10") =>
         FieldTask.Create(
             new FieldTaskDraft
             {
                 TaskNumber = number,
                 TaskTypeId = type.Id,
-                FormDefinitionId = type.FormDefinitionId,
-                FormVersionNo = 1,
+                Forms = type.Forms
+                    .OrderBy(f => f.SortOrder)
+                    .Select(f => new TaskFormDraft(f.FormDefinitionId, 1, TaskFormSources.Type, f.IsC2mClosingForm))
+                    .ToList(),
                 Title = "Meter survey",
                 Location = new TaskLocation(24.66, 46.71, "Al Moraba", "RCBU", branch, null, department),
                 FillSlaHours = type.FillSlaHours,

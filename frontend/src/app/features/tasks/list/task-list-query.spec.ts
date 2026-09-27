@@ -91,6 +91,8 @@ describe('buildTaskListQuery', () => {
 
   it('drops a column the API cannot sort by', () => {
     expect(buildTaskListQuery({ ...blank, sortField: 'teamName', sortOrder: 1 }).sortField).toBeNull();
+    expect(buildTaskListQuery({ ...blank, sortField: 'computed:f1:severity', sortOrder: 1 }).sortField)
+      .toBe('computed:f1:severity');
   });
 });
 

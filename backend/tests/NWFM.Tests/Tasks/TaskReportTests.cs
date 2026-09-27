@@ -106,11 +106,12 @@ public sealed class TaskReportTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value.FileName.Should().Be("Task_TSK-1_20260921.pdf");
         _rendered!.Language.Should().Be("ar");
-        _rendered.Answers.Should().ContainSingle().Which.Should().Be(new TaskReportAnswer("المادة", "بلاستيك"));
-        _rendered.LatestFill!.FilledBy.Should().Be("Sara");
+        var form = _rendered.Forms.Should().ContainSingle().Subject;
+        form.Answers.Should().ContainSingle().Which.Should().Be(new TaskReportAnswer("المادة", "بلاستيك"));
+        form.LatestFill!.FilledBy.Should().Be("Sara");
         _rendered.Branch.Should().Be("R-16 — المربع");
         _rendered.Cluster.Should().Be("CC");
-        _rendered.Form.Should().Be("FRM — نموذج المسح");
+        form.Form.Should().Be("FRM — نموذج المسح");
     }
 
     [Fact]
@@ -156,8 +157,11 @@ public sealed class TaskReportTests : IDisposable
             Source = "MANUAL",
             Notes = "افحص العداد",
             TaskType = "SURVEY — مسح",
-            Form = "FRM — نموذج",
-            FormVersionNo = 1,
+            Forms =
+            [
+                new TaskReportForm("FRM — نموذج", 1, new TaskReportFill("Sara", TaskTestData.Now, 1), [new TaskReportAnswer("المادة", "بلاستيك")]),
+                new TaskReportForm("FRM-2 — نموذج آخر", 2, null, []),
+            ],
             Cluster = "CC",
             Cbu = "RCBU",
             Branch = "R-16 — المربع",
@@ -169,8 +173,6 @@ public sealed class TaskReportTests : IDisposable
             ReturnReasonCode = "POOR_MEDIA",
             ReturnReason = "الصورة غير واضحة",
             ReturnCount = 1,
-            LatestFill = new TaskReportFill("Sara", TaskTestData.Now, 1),
-            Answers = [new TaskReportAnswer("المادة", "بلاستيك")],
             Files =
             [
                 new TaskReportFile("now.png", "صورة الموقع", "image/png", 70, TaskTestData.Now, false, true, Png),

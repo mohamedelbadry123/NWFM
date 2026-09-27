@@ -106,12 +106,44 @@ describe('form builder store', () => {
     expect((section['elements'] as Array<Record<string, unknown>>)[0]['data_name']).toBe('depth_m');
   });
 
+  it('keeps computed columns through a load and a save, and leaves the key out when there are none', () => {
+    const column = {
+      key: 'severity',
+      label_en: 'Severity',
+      label_ar: 'الخطورة',
+      output_type: 'text',
+      show_in_task_grid: true,
+      rules: [
+        {
+          when: { match: 'all', conditions: [{ field: 'leak_size', operator: 'greater_than', value: '10' }] },
+          then: "'High'",
+        },
+      ],
+      default: "'Low'",
+    };
+
+    store.loadFromJson({ name_en: 'Leak', name_ar: 'تسرب', elements: [], computed_columns: [column] });
+    const saved = JSON.parse(store.json()) as Record<string, unknown>;
+
+    expect(saved['computed_columns']).toEqual([column]);
+
+    store.setComputedColumns([]);
+    expect('computed_columns' in (JSON.parse(store.json()) as Record<string, unknown>)).toBeFalse();
+  });
+
   it('clears everything when a new form is started', () => {
     store.addFromType(ELEMENT_TYPES.Text);
     store.setNameEn('Leak report');
+    store.loadFromJson({
+      name_en: 'x',
+      name_ar: 'x',
+      elements: [],
+      computed_columns: [{ key: 'a', label_en: 'A', label_ar: 'A', output_type: 'text', rules: [], default: "'a'" }],
+    });
     store.resetForm();
 
     expect(store.elements().length).toBe(0);
+    expect(store.computedColumns().length).toBe(0);
     // A blank form still has a name, so the designer never opens on an empty title.
     expect(store.nameEn()).toBe('Untitled Form');
   });

@@ -43,6 +43,9 @@ export class FormDetailsDialogComponent {
 
   protected readonly saving = signal(false);
   protected readonly departments = signal<LookupItem[]>([]);
+  /** The chosen department's field activities; empty until a department is chosen. */
+  protected readonly fieldActivities = signal<LookupItem[]>([]);
+  protected readonly loadingActivities = signal(false);
   /** Copied into a mutable array: PrimeNG's `options` input does not accept a readonly one. */
   protected readonly categories: string[] = [...FORM_CATEGORIES];
 
@@ -51,8 +54,17 @@ export class FormDetailsDialogComponent {
     nameEn: ['', [Validators.required, Validators.maxLength(250)]],
     nameAr: ['', [Validators.required, Validators.maxLength(250)]],
     category: ['GENERAL', [Validators.required]],
-    departmentCode: [null as string | null],
+    departmentCode: [null as string | null, [Validators.required]],
+    fieldActivityCode: [{ value: null as string | null, disabled: true }, [Validators.required]],
   });
+
+  constructor() {
+    // A field activity is a department's, so the list follows the department and a choice the new
+    // department does not have is dropped rather than saved against the wrong one.
+    this.model.controls.departmentCode.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((code) => this.loadFieldActivities(code, this.model.controls.fieldActivityCode.value));
+  }
 
   protected get isEdit(): boolean {
     return this.form() !== null;
@@ -67,7 +79,10 @@ export class FormDetailsDialogComponent {
       nameAr: form?.nameAr ?? '',
       category: form?.category ?? 'GENERAL',
       departmentCode: form?.departmentCode ?? null,
-    });
+      fieldActivityCode: form?.fieldActivityCode ?? null,
+    }, { emitEvent: false });
+
+    this.loadFieldActivities(form?.departmentCode ?? null, form?.fieldActivityCode ?? null);
 
     // The code identifies published versions, so it is set once and then read-only.
     if (this.isEdit) {
@@ -88,6 +103,34 @@ export class FormDetailsDialogComponent {
     return this.locale.locale() === 'ar' ? item.nameAr : item.nameEn;
   }
 
+  private loadFieldActivities(departmentCode: string | null, keep: string | null): void {
+    const control = this.model.controls.fieldActivityCode;
+
+    if (!departmentCode) {
+      this.fieldActivities.set([]);
+      control.reset(null);
+      control.disable({ emitEvent: false });
+      return;
+    }
+
+    this.loadingActivities.set(true);
+    this.lookups
+      .listAll('FieldActivityType', { parentCode: departmentCode, isActive: true })
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loadingActivities.set(false)))
+      .subscribe({
+        next: (items) => {
+          // A stale reply for a department no longer chosen is ignored.
+          if (this.model.controls.departmentCode.value !== departmentCode) {
+            return;
+          }
+
+          this.fieldActivities.set(items);
+          control.enable({ emitEvent: false });
+          control.setValue(items.some((i) => i.code === keep) ? keep : null, { emitEvent: false });
+        },
+      });
+  }
+
   protected save(): void {
     if (this.model.invalid || this.saving()) {
       this.model.markAllAsTouched();
@@ -102,14 +145,16 @@ export class FormDetailsDialogComponent {
           nameEn: value.nameEn!,
           nameAr: value.nameAr!,
           category: value.category!,
-          departmentCode: value.departmentCode ?? null,
+          departmentCode: value.departmentCode!,
+          fieldActivityCode: value.fieldActivityCode!,
         })
       : this.formsApi.create({
           code: value.code!,
           nameEn: value.nameEn!,
           nameAr: value.nameAr!,
           category: value.category!,
-          departmentCode: value.departmentCode ?? null,
+          departmentCode: value.departmentCode!,
+          fieldActivityCode: value.fieldActivityCode!,
         });
 
     this.saving.set(true);

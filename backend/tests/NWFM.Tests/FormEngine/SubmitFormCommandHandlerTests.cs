@@ -61,7 +61,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
 
     private async Task<FormDefinition> AddPublishedFormAsync(string? schemaJson = null, string code = "FRM-001")
     {
-        var form = FormDefinition.Create(code, "Leak", "تسرب", FormCategories.Inspection, null, "tester", Now);
+        var form = FormDefinition.Create(code, "Leak", "تسرب", FormCategories.Inspection, null, null, "tester", Now);
         form.SetSchema(schemaJson ?? FormEngineTestData.SimpleSchema(), null, null, "tester", Now);
 
         _context.FormDefinitions.Add(form);
@@ -129,7 +129,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     {
         // Published the way an older build did: a version, but no table and no field registry.
         var json = FormEngineTestData.SimpleSchema();
-        var form = FormDefinition.Create("FRM-OLD", "Old", "قديم", FormCategories.General, null, "tester", Now);
+        var form = FormDefinition.Create("FRM-OLD", "Old", "قديم", FormCategories.General, null, null, "tester", Now);
         form.SetSchema(json, null, null, "tester", Now);
         form.Publish("tester", [new FormVersionSnapshot(FormTargetClients.Formly, json, "{}")], Now);
         _context.FormDefinitions.Add(form);
@@ -147,7 +147,7 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     [Fact]
     public async Task Submit_AFormThatWasNeverPublishedIsRefused()
     {
-        var form = FormDefinition.Create("FRM-002", "Draft", "مسودة", FormCategories.General, null, "tester", Now);
+        var form = FormDefinition.Create("FRM-002", "Draft", "مسودة", FormCategories.General, null, null, "tester", Now);
         form.SetSchema(FormEngineTestData.SimpleSchema(), null, null, "tester", Now);
         _context.FormDefinitions.Add(form);
         await _context.SaveChangesAsync();

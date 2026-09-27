@@ -6,7 +6,10 @@ namespace Tasks.Application.Common.Interfaces;
 public interface ITasksDbContext
 {
     DbSet<TaskType> TaskTypes { get; }
+    DbSet<TaskTypeForm> TaskTypeForms { get; }
     DbSet<FieldTask> Tasks { get; }
+    DbSet<TaskForm> TaskForms { get; }
+    DbSet<TaskComputedValue> TaskComputedValues { get; }
     DbSet<TaskAssignment> TaskAssignments { get; }
     DbSet<TaskStatusHistory> TaskStatusHistory { get; }
     DbSet<C2mActionMapping> C2mActionMappings { get; }

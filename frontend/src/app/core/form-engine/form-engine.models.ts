@@ -27,6 +27,8 @@ export interface FormListItem {
   category: string;
   status: FormStatus;
   departmentCode: string | null;
+  /** One of the department's field activities; null only on forms made before it was required. */
+  fieldActivityCode: string | null;
   currentVersionNo: number | null;
   isActive: boolean;
   createdAt: string;
@@ -84,7 +86,8 @@ export interface CreateFormPayload {
   nameEn: string;
   nameAr: string;
   category: string;
-  departmentCode: string | null;
+  departmentCode: string;
+  fieldActivityCode: string;
 }
 
 export type UpdateFormPayload = Omit<CreateFormPayload, 'code'>;
@@ -102,5 +105,6 @@ export interface FormListQuery {
   category?: string | null;
   status?: string | null;
   departmentCode?: string | null;
+  fieldActivityCode?: string | null;
   excludeArchived?: boolean;
 }

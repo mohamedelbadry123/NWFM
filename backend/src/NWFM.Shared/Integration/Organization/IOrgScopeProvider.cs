@@ -40,6 +40,12 @@ public interface IOrgDirectory
         string level,
         IReadOnlyCollection<string> codes,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether a field activity type is active and belongs to an active department. For modules that
+    /// file work under an activity (a form, a task) and must not name one the department does not have.
+    /// </summary>
+    Task<bool> IsFieldActivityInDepartmentAsync(string departmentCode, string fieldActivityCode, CancellationToken cancellationToken);
 }
 
 /// <summary>The unit levels <see cref="IOrgDirectory.GetUnitNamesAsync"/> names beyond the territory ones.</summary>

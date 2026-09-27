@@ -25,8 +25,79 @@ public sealed class TaskTypeConfiguration : IEntityTypeConfiguration<TaskType>
         builder.Property(x => x.RowVersion).IsRowVersion();
 
         builder.HasIndex(x => x.Code).IsUnique();
-        builder.HasIndex(x => x.FormDefinitionId);
         builder.HasIndex(x => x.IsActive);
+
+        builder.HasMany(x => x.Forms)
+            .WithOne()
+            .HasForeignKey(x => x.TaskTypeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(x => x.Forms).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Ignore(x => x.FormIds);
+    }
+}
+
+public sealed class TaskTypeFormConfiguration : IEntityTypeConfiguration<TaskTypeForm>
+{
+    public void Configure(EntityTypeBuilder<TaskTypeForm> builder)
+    {
+        builder.ToTable(TasksSchema.TaskTypeForms, TasksSchema.Name);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.HasIndex(x => new { x.TaskTypeId, x.FormDefinitionId }).IsUnique();
+
+        // "Which types use this form" — asked before a form is retired.
+        builder.HasIndex(x => x.FormDefinitionId);
+    }
+}
+
+public sealed class TaskFormConfiguration : IEntityTypeConfiguration<TaskForm>
+{
+    public void Configure(EntityTypeBuilder<TaskForm> builder)
+    {
+        builder.ToTable(TasksSchema.TaskForms, TasksSchema.Name);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.Source).HasMaxLength(TaskFormSources.MaxLength).IsRequired();
+        builder.Property(x => x.IsRequired).HasDefaultValue(true);
+        builder.Property(x => x.LastFilledBy).HasMaxLength(FieldTask.ActorMaxLength);
+        builder.Property(x => x.AddedBy).HasMaxLength(FieldTask.ActorMaxLength);
+
+        builder.HasIndex(x => new { x.FieldTaskId, x.FormDefinitionId }).IsUnique();
+        builder.HasIndex(x => x.FormDefinitionId);
+
+        builder.HasMany(x => x.ComputedValues)
+            .WithOne()
+            .HasForeignKey(x => x.TaskFormId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(x => x.ComputedValues).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Ignore(x => x.IsFilled);
+    }
+}
+
+public sealed class TaskComputedValueConfiguration : IEntityTypeConfiguration<TaskComputedValue>
+{
+    public void Configure(EntityTypeBuilder<TaskComputedValue> builder)
+    {
+        builder.ToTable(TasksSchema.TaskComputedValues, TasksSchema.Name);
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.Key).HasMaxLength(TaskComputedValue.KeyMaxLength).IsRequired();
+        builder.Property(x => x.OutputType).HasMaxLength(TaskComputedValue.OutputTypeMaxLength).IsRequired();
+        builder.Property(x => x.ValueText).HasMaxLength(TaskComputedValue.TextMaxLength);
+        builder.Property(x => x.ValueNumber).HasPrecision(28, 8);
+
+        builder.HasIndex(x => new { x.TaskFormId, x.Key }).IsUnique();
+
+        // A page of the grid reads its tasks' values; sorting by a column reads one form's key.
+        builder.HasIndex(x => x.FieldTaskId);
+        builder.HasIndex(x => new { x.FormDefinitionId, x.Key });
     }
 }
 
@@ -74,7 +145,6 @@ public sealed class FieldTaskConfiguration : IEntityTypeConfiguration<FieldTask>
         builder.HasIndex(x => x.OperationAreaCode);
         builder.HasIndex(x => x.DepartmentCode);
         builder.HasIndex(x => x.TaskTypeId);
-        builder.HasIndex(x => x.FormDefinitionId);
         builder.HasIndex(x => x.CreatedAt);
         builder.HasIndex(x => x.DueDate);
         builder.HasIndex(x => x.FaId).HasFilter("[FaId] IS NOT NULL");
@@ -87,6 +157,11 @@ public sealed class FieldTaskConfiguration : IEntityTypeConfiguration<FieldTask>
             .HasForeignKey(x => x.TaskTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(x => x.Forms)
+            .WithOne()
+            .HasForeignKey(x => x.FieldTaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(x => x.Assignments)
             .WithOne()
             .HasForeignKey(x => x.FieldTaskId)
@@ -97,11 +172,17 @@ public sealed class FieldTaskConfiguration : IEntityTypeConfiguration<FieldTask>
             .HasForeignKey(x => x.FieldTaskId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Navigation(x => x.Forms).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(x => x.Assignments).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(x => x.History).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(x => x.ActiveAssignment);
         builder.Ignore(x => x.IsUnfilled);
+        builder.Ignore(x => x.OrderedForms);
+        builder.Ignore(x => x.RequiredFormCount);
+        builder.Ignore(x => x.FilledFormCount);
+        builder.Ignore(x => x.AllRequiredFormsFilled);
+        builder.Ignore(x => x.C2mClosingForm);
     }
 }
 

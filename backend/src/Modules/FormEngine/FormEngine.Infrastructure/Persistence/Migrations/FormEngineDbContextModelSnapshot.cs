@@ -52,6 +52,10 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("FieldActivityCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -107,6 +111,8 @@ namespace FormEngine.Infrastructure.Persistence.Migrations
                     b.HasIndex("SubmissionTable")
                         .IsUnique()
                         .HasFilter("[SubmissionTable] IS NOT NULL");
+
+                    b.HasIndex("DepartmentCode", "FieldActivityCode");
 
                     b.HasIndex("Status", "Category");
 

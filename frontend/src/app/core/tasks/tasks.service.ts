@@ -7,6 +7,7 @@ import {
   CreateTaskPayload,
   EligibleTeam,
   FillTaskPayload,
+  FormOption,
   ReturnTaskPayload,
   TASKS_PATH,
   C2mDispatchLog,
@@ -17,6 +18,7 @@ import {
   TaskFill,
   TaskFillResult,
   TaskHistoryEntry,
+  TaskComputedColumn,
   TaskListItem,
   TaskListQuery,
 } from './tasks.models';
@@ -96,8 +98,10 @@ export class TasksService {
     return this.http.get<ApiResult<TaskHistoryEntry[]>>(`${TASKS_PATH}/${id}/timeline`);
   }
 
-  fills(id: string): Observable<ApiResult<TaskFill[]>> {
-    return this.http.get<ApiResult<TaskFill[]>>(`${TASKS_PATH}/${id}/fills`);
+  /** Every fill, form by form in the task's order and newest first within each; `formId` narrows it to one form. */
+  fills(id: string, formId?: string | null): Observable<ApiResult<TaskFill[]>> {
+    const params = formId ? new HttpParams().set('formId', formId) : undefined;
+    return this.http.get<ApiResult<TaskFill[]>>(`${TASKS_PATH}/${id}/fills`, { params });
   }
 
   files(id: string): Observable<ApiResult<TaskFile[]>> {
@@ -136,7 +140,31 @@ export class TasksService {
     return this.http.post<ApiResult<unknown>>(`${TASKS_PATH}/${id}/expire`, { note });
   }
 
-  migrateVersion(id: string): Observable<ApiResult<number>> {
-    return this.http.post<ApiResult<number>>(`${TASKS_PATH}/${id}/migrate-version`, {});
+  /** Moves one unfilled form — or, with no `formId`, every unfilled form a newer version has overtaken. Answers how many moved. */
+  migrateVersion(id: string, formId?: string | null): Observable<ApiResult<number>> {
+    const url = formId
+      ? `${TASKS_PATH}/${id}/forms/${formId}/migrate-version`
+      : `${TASKS_PATH}/${id}/migrate-version`;
+    return this.http.post<ApiResult<number>>(url, {});
+  }
+
+  /** The computed columns the worklist can show — a type's forms' when `taskTypeId` is given, else every type's. */
+  computedColumns(taskTypeId?: string | null): Observable<ApiResult<TaskComputedColumn[]>> {
+    const params = taskTypeId ? new HttpParams().set('taskTypeId', taskTypeId) : undefined;
+    return this.http.get<ApiResult<TaskComputedColumn[]>>(`${TASKS_PATH}/computed-columns`, { params });
+  }
+
+  /** Published forms that can be added to a task on top of its type's. */
+  formOptions(search?: string | null): Observable<ApiResult<FormOption[]>> {
+    const params = search ? new HttpParams().set('search', search) : undefined;
+    return this.http.get<ApiResult<FormOption[]>>(`${TASKS_PATH}/form-options`, { params });
+  }
+
+  attachForm(id: string, formDefinitionId: string): Observable<ApiResult<unknown>> {
+    return this.http.post<ApiResult<unknown>>(`${TASKS_PATH}/${id}/forms`, { formDefinitionId });
+  }
+
+  detachForm(id: string, formDefinitionId: string): Observable<ApiResult<unknown>> {
+    return this.http.delete<ApiResult<unknown>>(`${TASKS_PATH}/${id}/forms/${formDefinitionId}`);
   }
 }

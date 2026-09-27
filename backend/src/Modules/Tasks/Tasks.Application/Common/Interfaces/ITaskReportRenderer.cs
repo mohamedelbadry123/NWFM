@@ -29,8 +29,9 @@ public sealed record TaskReport
     public string? Notes { get; init; }
 
     public required string TaskType { get; init; }
-    public required string Form { get; init; }
-    public required int FormVersionNo { get; init; }
+
+    /// <summary>Each of the task's forms, in order, with its latest fill's answers.</summary>
+    public IReadOnlyList<TaskReportForm> Forms { get; init; } = [];
 
     public required string Cluster { get; init; }
     public required string Cbu { get; init; }
@@ -55,21 +56,26 @@ public sealed record TaskReport
     public DateTime? ReturnedDate { get; init; }
     public int ReturnCount { get; init; }
 
-    /// <summary>Who filled the answers below and when; null when the task was never filled.</summary>
-    public TaskReportFill? LatestFill { get; init; }
-
-    public IReadOnlyList<TaskReportAnswer> Answers { get; init; } = [];
-
-    /// <summary>Every file the task's fills carry; only the latest fill's images have bytes.</summary>
+    /// <summary>Every file the task's fills carry; only each form's latest fill's images have bytes.</summary>
     public IReadOnlyList<TaskReportFile> Files { get; init; } = [];
 }
+
+/// <summary>
+/// One of the task's forms as printed: its name, the version pinned, and its latest fill — who filled
+/// it and when (<see cref="LatestFill"/>, null when the form was never filled) and the answers.
+/// </summary>
+public sealed record TaskReportForm(
+    string Form,
+    int VersionNo,
+    TaskReportFill? LatestFill,
+    IReadOnlyList<TaskReportAnswer> Answers);
 
 public sealed record TaskReportFill(string? FilledBy, DateTimeOffset? FilledAt, int VersionNo);
 
 public sealed record TaskReportAnswer(string Label, string Value);
 
 /// <summary>
-/// One uploaded file. <see cref="Bytes"/> is read only for images of the latest fill, and stays null
+/// One uploaded file. <see cref="Bytes"/> is read only for images of a form's latest fill, and stays null
 /// when the bytes are gone or too large — the report then lists the file as not embedded rather than
 /// leaving it out, which would read as "nothing was uploaded".
 /// </summary>

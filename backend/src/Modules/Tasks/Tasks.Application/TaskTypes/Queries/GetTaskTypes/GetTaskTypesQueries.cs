@@ -42,12 +42,16 @@ public sealed record GetTaskTypeByIdQuery(Guid TaskTypeId) : IRequest<Result<Tas
 [Authorize(Policy = NwfmPolicies.ManageTaskTypes)]
 public sealed record GetTaskTypeFormOptionsQuery(string? Search) : IRequest<Result<IReadOnlyList<FormOptionDto>>>;
 
+/// <summary>Published forms that can be added to a single task, on top of its type's.</summary>
+[Authorize(Policy = NwfmPolicies.ManageTasks)]
+public sealed record GetTaskFormOptionsQuery(string? Search) : IRequest<Result<IReadOnlyList<FormOptionDto>>>;
+
 public sealed class GetTaskTypesQueryHandler(ITasksDbContext db, IFormGateway forms)
     : IRequestHandler<GetTaskTypesQuery, Result<PaginatedResult<TaskTypeDto>>>
 {
     public async Task<Result<PaginatedResult<TaskTypeDto>>> Handle(GetTaskTypesQuery request, CancellationToken ct)
     {
-        var query = db.TaskTypes.AsNoTracking();
+        var query = db.TaskTypes.AsNoTracking().Include(t => t.Forms).AsQueryable();
 
         if (request.IsActive is bool isActive)
         {
@@ -81,6 +85,7 @@ public sealed class GetActiveTaskTypesQueryHandler(ITasksDbContext db, IFormGate
     {
         var types = await db.TaskTypes
             .AsNoTracking()
+            .Include(t => t.Forms)
             .Where(t => t.IsActive)
             .OrderBy(t => t.Code)
             .ToListAsync(ct);
@@ -94,7 +99,7 @@ public sealed class GetTaskTypeByIdQueryHandler(ITasksDbContext db, IFormGateway
 {
     public async Task<Result<TaskTypeDto>> Handle(GetTaskTypeByIdQuery request, CancellationToken ct)
     {
-        var type = await db.TaskTypes.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
+        var type = await db.TaskTypes.AsNoTracking().Include(t => t.Forms).FirstOrDefaultAsync(t => t.Id == request.TaskTypeId, ct);
 
         return type is null
             ? Result.Failure<TaskTypeDto>(TaskErrors.Type.NotFound)
@@ -105,17 +110,29 @@ public sealed class GetTaskTypeByIdQueryHandler(ITasksDbContext db, IFormGateway
 public sealed class GetTaskTypeFormOptionsQueryHandler(IFormGateway forms)
     : IRequestHandler<GetTaskTypeFormOptionsQuery, Result<IReadOnlyList<FormOptionDto>>>
 {
+    public async Task<Result<IReadOnlyList<FormOptionDto>>> Handle(GetTaskTypeFormOptionsQuery request, CancellationToken ct) =>
+        Result.Success(await FormOptions.ListAsync(forms, request.Search, ct));
+}
+
+public sealed class GetTaskFormOptionsQueryHandler(IFormGateway forms)
+    : IRequestHandler<GetTaskFormOptionsQuery, Result<IReadOnlyList<FormOptionDto>>>
+{
+    public async Task<Result<IReadOnlyList<FormOptionDto>>> Handle(GetTaskFormOptionsQuery request, CancellationToken ct) =>
+        Result.Success(await FormOptions.ListAsync(forms, request.Search, ct));
+}
+
+internal static class FormOptions
+{
     private const int MaxOptions = 200;
 
-    public async Task<Result<IReadOnlyList<FormOptionDto>>> Handle(GetTaskTypeFormOptionsQuery request, CancellationToken ct)
+    /// <summary>Forms a task can be filled with: published, and taking fills.</summary>
+    public static async Task<IReadOnlyList<FormOptionDto>> ListAsync(IFormGateway forms, string? search, CancellationToken ct)
     {
-        var published = await forms.ListPublishedAsync(request.Search, MaxOptions, ct);
+        var published = await forms.ListPublishedAsync(search, MaxOptions, ct);
 
-        IReadOnlyList<FormOptionDto> options = published
+        return published
             .Where(f => f.AcceptsSubmissions)
             .Select(f => new FormOptionDto(f.Id, f.Code, f.NameEn, f.NameAr, f.CurrentVersionNo))
             .ToList();
-
-        return Result.Success(options);
     }
 }
