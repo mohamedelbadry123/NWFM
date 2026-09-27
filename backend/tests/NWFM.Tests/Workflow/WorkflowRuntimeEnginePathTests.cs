@@ -23,7 +23,7 @@ using global::Workflow.Infrastructure.Services;
 /// Case C: Start → ParallelGateway → {ServiceTask1, ServiceTask2} → JoinGateway → End
 ///         → instance Completed after both branches complete
 /// </summary>
-public sealed class WorkflowRuntimeEnginePathTests : IDisposable
+public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
 {
     private readonly Guid _orgId = Guid.NewGuid();
     private readonly WorkflowDbContext _db;
@@ -466,7 +466,7 @@ public sealed class WorkflowRuntimeEnginePathTests : IDisposable
     // Engine factory: real repos + real services + mocked external services
     // ═══════════════════════════════════════════════════════════════════════
 
-    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db)
+    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db, global::Workflow.Application.Integrations.IWorkflowIntegrationRuntime? integrations = null)
     {
         // Real DB-backed repositories
         var bindingRepo     = new WorkflowBindingRepository(db);
@@ -515,7 +515,7 @@ public sealed class WorkflowRuntimeEnginePathTests : IDisposable
             _notifPublisher.Object,
             tokenRepo,
             _outcomeDispatcher.Object,
-            _requestProjector.Object);
+            _requestProjector.Object, integrations, integrations is null ? null : new WorkflowActivityEvents(db, integrations));
     }
 
     private sealed class StubTenant(Guid orgId) : ICurrentTenant

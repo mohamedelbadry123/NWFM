@@ -1,0 +1,71 @@
+<p-toast />
+
+<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+  <p class="text-sm" style="color: var(--p-text-muted-color)">{{ 'admin.rolePermissions.hint' | translate }}</p>
+  <div class="flex items-center gap-2">
+    @if (hasChanges()) {
+      <p-button [label]="'common.cancel' | translate" severity="secondary" [text]="true"
+        [disabled]="saving()" (onClick)="reset()" />
+    }
+    <ng-container *hasPermission="PERMISSIONS.manageRolePermissions">
+      <p-button [label]="'common.save' | translate" icon="pi pi-check"
+        [loading]="saving()" [disabled]="saving() || !hasChanges()" (onClick)="save()" />
+    </ng-container>
+  </div>
+</div>
+
+<div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+  <p-table
+    [value]="rows()"
+    [loading]="loading()"
+    dataKey="code"
+    rowGroupMode="subheader"
+    groupRowsBy="module"
+    sortField="module"
+    [sortOrder]="1"
+    styleClass="p-datatable-sm p-datatable-striped"
+    [scrollable]="true"
+    [rowHover]="true"
+  >
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'admin.rolePermissions.columns.permission' | translate }}</th>
+        @for (role of roles(); track role.name) {
+          <th class="text-center whitespace-nowrap">
+            <div class="flex flex-col items-center gap-1">
+              <span>{{ role.name }}</span>
+              @if (isSystem(role)) {
+                <p-tag severity="warn" [value]="'admin.rolePermissions.fullAccess' | translate" />
+              }
+            </div>
+          </th>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="groupheader" let-row>
+      <tr>
+        <td [attr.colspan]="roles().length + 1" class="font-semibold">{{ row.module }}</td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-row>
+      <tr>
+        <td>
+          <div class="flex flex-col">
+            <span class="font-medium">{{ label(row) }}</span>
+            <span class="text-xs" style="color: var(--p-text-muted-color)">{{ row.code }}</span>
+          </div>
+        </td>
+        @for (role of roles(); track role.name) {
+          <td class="text-center">
+            <p-checkbox
+              [binary]="true"
+              [ngModel]="isGranted(role.name, row.code)"
+              (ngModelChange)="toggle(role.name, row.code, $event)"
+              [disabled]="isSystem(role) || saving()"
+            />
+          </td>
+        }
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

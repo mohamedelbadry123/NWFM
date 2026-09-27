@@ -36,6 +36,8 @@ public sealed class StartWorkflowInstanceCommandHandler
         var binding = await _bindingRepo.GetByIdAsync(request.WorkflowBindingId, cancellationToken);
         if (binding is null || binding.OrganizationId != request.OrganizationId)
             return Result.Failure<WorkflowInstanceDto>(WorkflowErrors.Binding.NotFound);
+        if (binding.IsDemo)
+            return Result.Failure<WorkflowInstanceDto>(new Error("Workflow.Demo.WorkspaceRequired", "Start demo instances through the authorized workflow workspace."));
 
         var duplicate = await _instanceRepo.ExistsByIdempotencyKeyAsync(
             request.OrganizationId, request.IdempotencyKey, cancellationToken);

@@ -73,6 +73,17 @@ public sealed class CompleteWorkItemCommandHandler
         if (item.ClaimedByUserId != request.UserId)
             return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotClaimedByUser);
 
+        var workspaceInstance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
+        var workspaceVersion = workspaceInstance is null ? null : await _versions.GetByIdWithProjectionAsync(workspaceInstance.PinnedWorkflowVersionId, cancellationToken);
+        if (workspaceVersion?.WorkspaceJson is not null)
+        {
+            if (!await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken))
+                return Result.Failure<WorkItemDto>(new Error("Workflow.Assignment.Membership", "The user no longer belongs to the assigned group."));
+            var execution = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+            if (execution?.ActivityType == ActivityType.MainActivity && execution.Phase != "AwaitingApproval")
+                return Result.Failure<WorkItemDto>(new Error("Workflow.Main.ChildPending", "Complete the child workflow before approving its parent."));
+        }
+
         var (outcomeError, outcome) = await LoadOutcomeAsync(item, request.ActionTaken, request.Comment, cancellationToken);
         if (outcomeError is not null)
             return Result.Failure<WorkItemDto>(outcomeError);
@@ -80,6 +91,21 @@ public sealed class CompleteWorkItemCommandHandler
         var isRedirect = WorkflowOutcomeKeys.IsRedirect(request.ActionTaken, outcome?.ResultValue);
         if (isRedirect)
             return await RedirectAsync(item, request, cancellationToken);
+
+        var formInstance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
+        if (formInstance is not null && formInstance.Status != WorkflowInstanceStatus.Running)
+            return Result.Failure<WorkItemDto>(WorkflowErrors.Instance.NotRunning);
+        var formActivity = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
+        var formVersion = formInstance is null ? null : await _versions.GetByIdWithProjectionAsync(formInstance.PinnedWorkflowVersionId, cancellationToken);
+        var formDefinition = formVersion?.Activities.FirstOrDefault(a => a.NodeKey == formActivity?.ActivityNodeKey);
+        try
+        {
+            var formConfig = WorkflowTaskForm.Parse(formDefinition?.ConfigurationJson);
+            var formError = WorkflowTaskForm.Validate(formConfig, request.FormValues ?? []);
+            if (formError is not null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", formError));
+            item.SetFormData(System.Text.Json.JsonSerializer.Serialize(request.FormValues ?? []));
+        }
+        catch (System.Text.Json.JsonException) { return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The task form configuration is invalid.")); }
 
         var now = DateTime.UtcNow;
         item.Complete(request.UserId, request.ActionTaken, now, request.Comment);

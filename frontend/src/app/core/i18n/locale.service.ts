@@ -16,6 +16,10 @@ export class LocaleService {
   readonly locale = this._locale.asReadonly();
   readonly isRtl = computed(() => this._locale() === 'ar');
 
+  toggle(): void {
+    this.setLocale(this._locale() === 'ar' ? 'en' : 'ar');
+  }
+
   setLocale(lang: Locale): void {
     this._locale.set(lang);
     this.translate.use(lang);

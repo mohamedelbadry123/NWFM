@@ -1,0 +1,910 @@
+{
+  "name_en": "All Input Types (Demo)",
+  "name_ar": "جميع أنواع الحقول (نموذج تجريبي)",
+  "elements": [
+    {
+      "type": "text",
+      "label_en": "Reporter Name",
+      "label_ar": "اسم المبلغ",
+      "data_name": "reporter_name",
+      "description_en": "Enter the name of the person reporting (letters and spaces only).",
+      "description_ar": "أدخل اسم الشخص الذي أبلغ (حروف ومسافات فقط).",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "min_length": 2,
+      "max_length": 100,
+      "pattern": {
+        "regex": "^[A-Za-z\\s]{2,100}$",
+        "description": "Letters and spaces only (2 to 100 characters)"
+      },
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "text",
+      "label_en": "Building / Asset Code",
+      "label_ar": "رمز المبنى / الأصل",
+      "data_name": "building_code",
+      "description_en": "Format example: NWC-1042",
+      "description_ar": "مثال الصيغة: NWC-1042",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "min_length": 8,
+      "max_length": 8,
+      "pattern": {
+        "regex": "^[A-Z]{3}-\\d{4}$",
+        "description": "Format: ABC-1234 (3 uppercase letters, dash, 4 digits)"
+      },
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "reporter_name",
+            "operator": "is_not_empty",
+            "value": ""
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "text",
+      "label_en": "Contact Phone Number",
+      "label_ar": "رقم هاتف التواصل",
+      "data_name": "contact_phone",
+      "description_en": "Enter phone number in international format.",
+      "description_ar": "أدخل رقم الهاتف بالتنسيق الدولي.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "min_length": null,
+      "max_length": 15,
+      "pattern": {
+        "regex": "^\\+?[0-9]{9,15}$",
+        "description": "Valid phone number (9 to 15 digits with optional leading +)"
+      },
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "building_code",
+            "operator": "starts_with",
+            "value": "NWC"
+          }
+        ],
+        "preserve_data": true
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "single_choice",
+      "label_en": "Leak Severity Level",
+      "label_ar": "مستوى شدة التسرب",
+      "data_name": "leak_severity",
+      "description_en": "Select severity classification.",
+      "description_ar": "اختر تصنيف الشدة.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": false,
+      "multiple": false,
+      "parent_field": null,
+      "choices": [
+        {
+          "value": "minor",
+          "label_en": "Minor",
+          "label_ar": "طفيف",
+          "dependency_value": null
+        },
+        {
+          "value": "major",
+          "label_en": "Major",
+          "label_ar": "كبير",
+          "dependency_value": null
+        },
+        {
+          "value": "critical",
+          "label_en": "Critical",
+          "label_ar": "حرج",
+          "dependency_value": null
+        }
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Estimated Water Loss (Liters/hour)",
+      "label_ar": "فقدان المياه التقديري (لتر/ساعة)",
+      "data_name": "leak_volume",
+      "description_en": "Enter estimated flow rate decimal number.",
+      "description_ar": "أدخل معدل التدفق التقديري كعدد عشري.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": 0.1,
+      "max": 10000,
+      "visible_conditions": {
+        "match": "any",
+        "conditions": [
+          {
+            "field": "leak_severity",
+            "operator": "equal",
+            "value": "major"
+          },
+          {
+            "field": "leak_severity",
+            "operator": "equal",
+            "value": "critical"
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Repair Urgency Scale (1-5)",
+      "label_ar": "مقياس استعجال الإصلاح (1-5)",
+      "data_name": "repair_priority",
+      "description_en": "Enter priority integer scale from 1 (Low) to 5 (Immediate).",
+      "description_ar": "أدخل مقياس الأولوية الصحيح من 1 (منخفض) إلى 5 (فوري).",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "format": "integer",
+      "min": 1,
+      "max": 5,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "leak_volume",
+            "operator": "greater_than",
+            "value": "100"
+          }
+        ]
+      }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Estimated Repair Cost (SAR)",
+      "label_ar": "تكلفة الإصلاح التقديرية (ريال سعودي)",
+      "data_name": "estimated_cost",
+      "description_en": "Estimated cost in SAR.",
+      "description_ar": "التكلفة التقديرية بالريال السعودي.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "format": "decimal",
+      "min": 0,
+      "max": 50000,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "repair_priority",
+            "operator": "less_than",
+            "value": "5"
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "yes_no",
+      "label_en": "Is Safety Hazard Present?",
+      "label_ar": "هل يوجد خطر على السلامة؟",
+      "data_name": "is_safety_hazard",
+      "description_en": "Select yes if immediate physical danger is observed.",
+      "description_ar": "اختر نعم إذا كان هناك خطر جسدي مباشر.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "leak_severity",
+            "operator": "not_equal",
+            "value": "minor"
+          }
+        ]
+      }
+    },
+    {
+      "type": "date",
+      "label_en": "Incident Start Date",
+      "label_ar": "تاريخ بدء الحادثة",
+      "data_name": "incident_date",
+      "description_en": "Select date when leak was first noticed.",
+      "description_ar": "اختر التاريخ الذي لوحظ فيه التسرب لأول مرة.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "is_safety_hazard",
+            "operator": "equal",
+            "value": "yes"
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "time",
+      "label_en": "Incident Discovery Time",
+      "label_ar": "وقت اكتشاف الحادثة",
+      "data_name": "incident_time",
+      "description_en": "Time when the leak was discovered.",
+      "description_ar": "الوقت الذي تم فيه اكتشاف التسرب.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "incident_date",
+            "operator": "is_not_empty",
+            "value": ""
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "single_choice",
+      "label_en": "Leak Main Infrastructure Source",
+      "label_ar": "مصدر البنية التحتية الرئيسية للتسرب",
+      "data_name": "leak_source",
+      "description_en": "Select primary source component.",
+      "description_ar": "اختر عنصر المصدر الرئيسي.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": true,
+      "multiple": false,
+      "parent_field": null,
+      "choices": [
+        {
+          "value": "pipe",
+          "label_en": "Pipeline System",
+          "label_ar": "شبكة الأنابيب",
+          "dependency_value": null
+        },
+        {
+          "value": "valve",
+          "label_en": "Control Valve",
+          "label_ar": "صمام التحكم",
+          "dependency_value": null
+        },
+        {
+          "value": "meter",
+          "label_en": "Water Meter Assembly",
+          "label_ar": "مجموعة عداد المياه",
+          "dependency_value": null
+        }
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "single_choice",
+      "label_en": "Sub-Component Detail (Cascading)",
+      "label_ar": "تفاصيل المكون الفرعي (متتابع)",
+      "data_name": "leak_subsource",
+      "description_en": "Cascading choices filtered dynamically by selected Main Source.",
+      "description_ar": "خيارات متتابعة يتم تصفيتها ديناميكيًا حسب المصدر الرئيسي المحدد.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": false,
+      "multiple": false,
+      "parent_field": "leak_source",
+      "choices": [
+        {
+          "value": "main_distribution_line",
+          "label_en": "Main Distribution Line",
+          "label_ar": "خط التوزيع الرئيسي",
+          "dependency_value": "pipe"
+        },
+        {
+          "value": "customer_service_connection",
+          "label_en": "Customer Service Connection",
+          "label_ar": "وصلة خدمة العميل",
+          "dependency_value": "pipe"
+        },
+        {
+          "value": "isolation_gate_valve",
+          "label_en": "Isolation Gate Valve",
+          "label_ar": "صمام بوابة العزل",
+          "dependency_value": "valve"
+        },
+        {
+          "value": "pressure_reducing_valve",
+          "label_en": "Pressure Reducing Valve (PRV)",
+          "label_ar": "صمام تخفيض الضغط",
+          "dependency_value": "valve"
+        },
+        {
+          "value": "digital_smart_meter",
+          "label_en": "Digital Smart Meter",
+          "label_ar": "عداد ذكي رقمي",
+          "dependency_value": "meter"
+        }
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "leak_source",
+            "operator": "is_not_empty",
+            "value": ""
+          }
+        ],
+        "preserve_data": true
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "label_en": "Observed Environmental Impacts",
+      "label_ar": "الآثار البيئية الملاحظة",
+      "data_name": "environmental_impacts",
+      "description_en": "Select multiple options that apply.",
+      "description_ar": "حدد خيارات متعددة تنطبق.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": true,
+      "multiple": true,
+      "parent_field": null,
+      "choices": [
+        {
+          "value": "road_flooding",
+          "label_en": "Roadway Flooding",
+          "label_ar": "طفح بالطريق",
+          "dependency_value": null
+        },
+        {
+          "value": "property_damage",
+          "label_en": "Private Property Erosion/Damage",
+          "label_ar": "تأكل/أضرار بالممتلكات الخاصة",
+          "dependency_value": null
+        },
+        {
+          "value": "water_contamination",
+          "label_en": "Water Discoloration / Odor",
+          "label_ar": "تغير لون / رائحة المياه",
+          "dependency_value": null
+        }
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "leak_source",
+            "operator": "contains",
+            "value": "pipe"
+          }
+        ],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "text",
+      "label_en": "Unlisted Observations / Remarks",
+      "label_ar": "ملاحظات / تعليقات غير مدرجة",
+      "data_name": "additional_remarks",
+      "description_en": "Mandatory if no environmental impacts selected.",
+      "description_ar": "إلزامي إذا لم يتم تحديد أي آثار بيئية.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "min_length": 5,
+      "max_length": 500,
+      "pattern": null,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "environmental_impacts",
+            "operator": "is_empty",
+            "value": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "photo",
+      "label_en": "Site Evidentiary Photos",
+      "label_ar": "صور إثبات الموقع",
+      "data_name": "site_photos",
+      "description_en": "Attach up to 5 photos (JPEG, PNG, HEIC, WEBP). Max 10MB each.",
+      "description_ar": "أرفق حتى 5 صور (JPEG, PNG, HEIC, WEBP). بحد أقصى 10 ميجابايت لكل صورة.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "max_files": 5,
+      "max_file_size_mb": 10,
+      "allowed_extensions": [
+        "jpg",
+        "jpeg",
+        "png",
+        "heic",
+        "webp"
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "video",
+      "label_en": "Site Inspection Video",
+      "label_ar": "فيديو معاينة الموقع",
+      "data_name": "site_video",
+      "description_en": "Attach max 1 video recording (MP4, MOV, WEBM). Max 50MB.",
+      "description_ar": "أرفق تسجيل فيديو واحد كحد أقصى (MP4, MOV, WEBM). بحد أقصى 50 ميجابايت.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "max_files": 1,
+      "max_file_size_mb": 50,
+      "allowed_extensions": [
+        "mp4",
+        "mov",
+        "webm"
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "audio",
+      "label_en": "Inspector Audio Voice Note",
+      "label_ar": "تسجيل الملاحظات الصوتية للمفتش",
+      "data_name": "voice_note",
+      "description_en": "Attach optional audio voice note (MP3, WAV, M4A, OGG). Max 20MB.",
+      "description_ar": "أرفق تسجيل صوتي اختياري (MP3, WAV, M4A, OGG). بحد أقصى 20 ميجابايت.",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "max_files": 1,
+      "max_file_size_mb": 20,
+      "allowed_extensions": [
+        "mp3",
+        "wav",
+        "m4a",
+        "ogg"
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "signature",
+      "label_en": "Field Inspector Signature",
+      "label_ar": "توقيع المفتش الميداني",
+      "data_name": "inspector_signature",
+      "description_en": "Sign on screen to confirm field inspection accuracy.",
+      "description_ar": "وقع على الشاشة لتأكيد دقة المعاينة الميدانية.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": [
+          {
+            "field": "reporter_name",
+            "operator": "is_not_empty",
+            "value": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "geolocation",
+      "label_en": "Exact GPS Location",
+      "label_ar": "الموقع الجغرافي الدقيق (GPS)",
+      "data_name": "gps_location",
+      "description_en": "Captures lat,lng coordinates from map / GPS device.",
+      "description_ar": "التقاط إحداثيات خط العرض وخط الطول من الخريطة / جهاز GPS.",
+      "default_value": "24.7136,46.6753",
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "map_zoom": 12,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "section",
+      "label_en": "Section 1: Inline Remediation Summary",
+      "label_ar": "القسم 1: ملخص الإجراءات العلاجية الضمنية",
+      "data_name": "remediation_section",
+      "description_en": "Inline section container grouping elements visually on the main form.",
+      "description_ar": "حاوية قسم ضمني تجمّع العناصر بصريًا في النموذج الرئيسي.",
+      "hidden": false,
+      "display": "inline",
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "elements": [
+        {
+          "type": "text",
+          "label_en": "Work Order Reference",
+          "label_ar": "مرجع أمر العمل",
+          "data_name": "work_order_ref",
+          "description_en": "Internal work order number.",
+          "description_ar": "رقم أمر العمل الداخلي.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "min_length": null,
+          "max_length": 50,
+          "pattern": null,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          }
+        },
+        {
+          "type": "numeric",
+          "label_en": "Estimated Repair Time (Hours)",
+          "label_ar": "وقت الإصلاح التقديري (بالساعات)",
+          "data_name": "repair_hours",
+          "description_en": "Decimal hours estimated for fix.",
+          "description_ar": "الساعات التقديرية للإصلاح.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "format": "decimal",
+          "min": 0.5,
+          "max": 168,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "label_en": "Section 2: Paged Audit & Verification",
+      "label_ar": "القسم 2: تدقيق والتحقق مفصول كصفحة",
+      "data_name": "paged_audit_section",
+      "description_en": "Paged section container rendering fields in a step/page flow.",
+      "description_ar": "حاوية قسم مفصل كصفحة تعرض الحقول في تدفق خطوات/صفحات.",
+      "hidden": false,
+      "display": "page",
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "elements": [
+        {
+          "type": "text",
+          "label_en": "Auditor Badge Number",
+          "label_ar": "رقم شارة المدقق",
+          "data_name": "auditor_badge",
+          "description_en": "Enter badge identifier.",
+          "description_ar": "أدخل معرف الشارة.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "min_length": 3,
+          "max_length": 20,
+          "pattern": {
+            "regex": "^[0-9]+$",
+            "description": "Digits only"
+          },
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "label_en": "Inspection Details",
+      "label_ar": "تفاصيل الفحص",
+      "data_name": "inspection_details",
+      "description_en": "",
+      "description_ar": "",
+      "hidden": false,
+      "display": "inline",
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "elements": [
+        {
+          "type": "memo",
+          "label_en": "Inspection Notes",
+          "label_ar": "ملاحظات الفحص",
+          "data_name": "inspection_notes",
+          "description_en": "Shown only when the leak severity is critical.",
+          "description_ar": "يظهر فقط عندما تكون شدة التسرب حرجة.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [
+              {
+                "field": "leak_severity",
+                "operator": "equal",
+                "value": "critical"
+              }
+            ],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          },
+          "min_length": null,
+          "max_length": 2000,
+          "pattern": null
+        },
+        {
+          "type": "date_time",
+          "label_en": "Inspection Started At",
+          "label_ar": "بداية الفحص",
+          "data_name": "inspection_started_at",
+          "description_en": "Defaults to now; cannot be in the future.",
+          "description_ar": "يبدأ بالوقت الحالي ولا يمكن أن يكون في المستقبل.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          },
+          "default_value_mode": "now",
+          "date_rule": "on_or_before",
+          "min_date": null,
+          "max_date": null
+        },
+        {
+          "type": "calendar_with_hours",
+          "label_en": "Site Working Hours",
+          "label_ar": "ساعات العمل بالموقع",
+          "data_name": "site_working_hours",
+          "description_en": "From/to times for each working day.",
+          "description_ar": "أوقات العمل لكل يوم.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          }
+        },
+        {
+          "type": "file",
+          "label_en": "Supporting Documents",
+          "label_ar": "المستندات المساندة",
+          "data_name": "supporting_documents",
+          "description_en": "",
+          "description_ar": "",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": []
+          },
+          "max_files": 3,
+          "max_file_size_mb": 10,
+          "allowed_extensions": [
+            "pdf",
+            "doc",
+            "docx",
+            "xls",
+            "xlsx",
+            "csv",
+            "txt"
+          ]
+        },
+        {
+          "type": "barcode",
+          "label_en": "Asset Tag",
+          "label_ar": "رقم الأصل",
+          "data_name": "asset_tag",
+          "description_en": "Required when the leak is a safety hazard.",
+          "description_ar": "مطلوب عندما يشكل التسرب خطرًا على السلامة.",
+          "default_value": null,
+          "required": false,
+          "hidden": false,
+          "disabled": false,
+          "visible_conditions": {
+            "match": "all",
+            "conditions": [],
+            "preserve_data": false
+          },
+          "required_conditions": {
+            "match": "all",
+            "conditions": [
+              {
+                "field": "is_safety_hazard",
+                "operator": "equal",
+                "value": "yes"
+              }
+            ]
+          },
+          "barcode_formats": [
+            "qr_code",
+            "code_128",
+            "code_39",
+            "ean_13",
+            "ean_8",
+            "upc_a"
+          ]
+        }
+      ]
+    }
+  ]
+}

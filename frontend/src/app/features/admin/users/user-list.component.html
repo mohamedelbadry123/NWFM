@@ -1,0 +1,99 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="mb-4 flex justify-end">
+  <ng-container *hasPermission="PERMISSIONS.manageUsers">
+    <p-button [label]="'users.newUser' | translate" icon="pi pi-plus" (onClick)="openNew()" />
+  </ng-container>
+</div>
+
+<div class="card p-4" style="background: var(--app-surface); border-radius: 0.75rem;">
+  <p-table
+    [value]="users()"
+    [lazy]="true"
+    (onLazyLoad)="load($event)"
+    [rows]="10"
+    [paginator]="true"
+    [totalRecords]="totalRecords()"
+    [loading]="loading()"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [rowHover]="true"
+    styleClass="p-datatable-sm p-datatable-striped"
+  >
+    <ng-template pTemplate="caption">
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <p-select
+          [(ngModel)]="statusFilter"
+          [options]="statusOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [placeholder]="'users.status' | translate"
+          [showClear]="true"
+          (onChange)="onSearch()"
+          appendTo="body"
+          styleClass="w-full sm:w-48"
+        />
+        <input pInputText [(ngModel)]="searchTerm" (keyup.enter)="onSearch()"
+          [placeholder]="'users.searchPlaceholder' | translate" />
+        @if (searchTerm) {
+          <p-button icon="pi pi-times" [text]="true" severity="secondary" (onClick)="clearSearch()" />
+        }
+      </div>
+    </ng-template>
+    <ng-template pTemplate="header">
+      <tr>
+        <th>{{ 'users.userName' | translate }}</th>
+        <th>{{ 'users.email' | translate }}</th>
+        <th>{{ 'users.roles' | translate }}</th>
+        <th>{{ 'users.status' | translate }}</th>
+        <th class="text-right">{{ 'common.actions' | translate }}</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-user>
+      <tr>
+        <td>{{ user.userName }}</td>
+        <td>{{ user.email || '—' }}</td>
+        <td>
+          <div class="flex flex-wrap gap-1">
+            @for (role of user.roles ?? []; track role) {
+              <p-tag [value]="role" severity="info" />
+            } @empty {
+              <span>—</span>
+            }
+          </div>
+        </td>
+        <td>
+          <p-tag
+            [value]="user.isEnabled ? ('users.enabled' | translate) : ('users.disabled' | translate)"
+            [severity]="user.isEnabled ? 'success' : 'danger'"
+          />
+        </td>
+        <td class="text-right">
+          <ng-container *hasPermission="PERMISSIONS.manageUsers">
+            <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="secondary"
+              [pTooltip]="'common.edit' | translate" (onClick)="openEdit(user)" />
+            <p-button icon="pi pi-key" [rounded]="true" [text]="true" severity="secondary"
+              [pTooltip]="'users.resetPassword' | translate" (onClick)="openReset(user)" />
+            <p-button
+              [icon]="user.isEnabled ? 'pi pi-ban' : 'pi pi-check-circle'"
+              [rounded]="true" [text]="true"
+              [severity]="user.isEnabled ? 'danger' : 'success'"
+              [pTooltip]="user.isEnabled ? ('users.disable' | translate) : ('users.enable' | translate)"
+              [loading]="busyUserId() === user.id"
+              [disabled]="busyUserId() !== null"
+              (onClick)="toggleStatus(user)"
+            />
+          </ng-container>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="5" class="py-6 text-center">{{ 'users.noUsers' | translate }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<app-user-form-dialog [(visible)]="formVisible" [user]="selectedUser()" (saved)="load()" />
+<app-user-reset-password-dialog [(visible)]="resetVisible" [user]="selectedUser()" />

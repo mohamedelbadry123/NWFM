@@ -43,9 +43,7 @@ public sealed class RetryFailedActivityCommandHandler
             return Result.Failure<bool>(WorkflowErrors.Instance.NotRunning);
 
         var now = DateTime.UtcNow;
-        instance.Resume(now); // Re-enter Running state before retrying
-
-        // Re-advance from the current (failed) node with no completed work item
+        // The engine validates the failed activity before changing instance status.
         var advanceResult = await _engine.AdvanceAsync(
             instance.Id, Guid.Empty, now, cancellationToken);
 

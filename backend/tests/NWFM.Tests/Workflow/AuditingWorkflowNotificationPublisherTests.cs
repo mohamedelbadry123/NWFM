@@ -1,4 +1,4 @@
-﻿namespace NWFM.Tests.Modules.Workflow;
+namespace NWFM.Tests.Modules.Workflow;
 
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -46,7 +46,7 @@ public sealed class AuditingWorkflowNotificationPublisherTests
         var request = new WorkflowNotificationRequest(
             Guid.NewGuid(),
             "workflow.task.assigned",
-            WorkflowNotificationChannel.Email | WorkflowNotificationChannel.InApp,
+            WorkflowNotificationChannel.InApp,
             new Dictionary<string, object?> { ["TaskId"] = "abc" },
             "corr-1",
             new List<Guid> { Guid.NewGuid() });
@@ -63,7 +63,7 @@ public sealed class AuditingWorkflowNotificationPublisherTests
     }
 
     [Fact]
-    public async Task PublishAsync_WithSmtpConfigured_AttemptsSmtpSend()
+    public async Task PublishAsync_LegacyEmailRejectsDiagnosticDelivery()
     {
         var repo = new Mock<IWorkflowNotificationLogRepository>();
         repo.Setup(r => r.AddAsync(It.IsAny<WorkflowNotificationLog>(), It.IsAny<CancellationToken>()))
@@ -90,19 +90,20 @@ public sealed class AuditingWorkflowNotificationPublisherTests
             "corr-smtp",
             new List<Guid> { Guid.NewGuid() });
 
-        await publisher.PublishAsync(request);
+        var publish = () => publisher.PublishAsync(request);
+        await publish.Should().ThrowAsync<InvalidOperationException>();
 
         smtpSender.Verify(s => s.TrySendAsync(
             It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
     [InlineData(true, false, false, false, WorkflowNotificationLogStatus.Delivered)]
-    [InlineData(false, true, false, false, WorkflowNotificationLogStatus.Queued)]
+    [InlineData(false, true, false, false, WorkflowNotificationLogStatus.Failed)]
     [InlineData(false, true, true, true,  WorkflowNotificationLogStatus.Delivered)]
-    [InlineData(true, true, false, false, WorkflowNotificationLogStatus.Delivered)]
-    [InlineData(true, true, true, false, WorkflowNotificationLogStatus.Queued)]
+    [InlineData(true, true, false, false, WorkflowNotificationLogStatus.Failed)]
+    [InlineData(true, true, true, false, WorkflowNotificationLogStatus.Failed)]
     [InlineData(true, true, true, true,  WorkflowNotificationLogStatus.Delivered)]
     public void ResolveStatus_MatchesChannelAndSmtp(
         bool inApp, bool email, bool smtp, bool emailDelivered, WorkflowNotificationLogStatus expected)

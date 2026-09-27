@@ -1,0 +1,334 @@
+:host {
+  display: block;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.login-page {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  height: 100%;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hero-pane {
+  position: relative;
+  overflow: hidden;
+  color: #ecfeff;
+  background: linear-gradient(135deg, #164e63 0%, #0e7490 40%, #0891b2 75%, #06b6d4 100%);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  @media (max-width: 900px) {
+    display: none;
+  }
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.16), transparent 45%),
+    radial-gradient(circle at 80% 70%, rgba(8, 51, 68, 0.35), transparent 50%);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 30rem;
+}
+
+.hero-title {
+  font-size: clamp(1.8rem, 3vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 1rem;
+}
+
+.hero-subtitle {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: rgba(236, 254, 255, 0.85);
+  margin: 0 0 2rem;
+}
+
+.hero-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+
+    i {
+      display: grid;
+      place-items: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0.6rem;
+      background: rgba(255, 255, 255, 0.14);
+    }
+  }
+}
+
+.droplet {
+  position: absolute;
+  border-radius: 50% 50% 50% 0;
+  background: rgba(255, 255, 255, 0.12);
+  transform: rotate(45deg);
+  z-index: 1;
+  animation: float 6s ease-in-out infinite;
+}
+
+.droplet-1 { width: 90px; height: 90px; top: 12%; inset-inline-end: 12%; }
+.droplet-2 { width: 42px; height: 42px; top: 30%; inset-inline-end: 30%; animation-delay: 1.4s; }
+.droplet-3 { width: 60px; height: 60px; bottom: 28%; inset-inline-start: 14%; animation-delay: 0.8s; }
+.droplet-4 { width: 28px; height: 28px; top: 55%; inset-inline-end: 20%; animation-delay: 2.1s; }
+
+@keyframes float {
+  0%, 100% { transform: rotate(45deg) translateY(0); }
+  50% { transform: rotate(45deg) translateY(-18px); }
+}
+
+.waves {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 130px;
+  z-index: 1;
+}
+
+.wave {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+
+  path { fill: rgba(236, 254, 255, 0.18); }
+}
+
+.wave-back { animation: wave 14s linear infinite; }
+.wave-front {
+  animation: wave 8s linear infinite;
+  path { fill: rgba(236, 254, 255, 0.28); }
+}
+
+@keyframes wave {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.form-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-surface);
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.form-topbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--p-text-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--app-hover);
+    border-color: var(--p-primary-color);
+  }
+}
+
+.form-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 26rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.login-wordmark,
+.brand-wordmark {
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--water-deep);
+  margin-bottom: 0.5rem;
+}
+
+.form-heading {
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+
+  h2 {
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+    color: var(--p-text-color);
+  }
+
+  p {
+    margin: 0;
+    color: var(--p-text-muted-color);
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+
+  label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--p-text-color);
+  }
+
+  input { width: 100%; }
+}
+
+.field-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  label {
+    font-size: 0.9rem;
+    color: var(--p-text-color);
+    cursor: pointer;
+  }
+}
+
+.error {
+  color: var(--p-red-500);
+  font-size: 0.8rem;
+}
+
+.submit-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  justify-content: center;
+}
+
+.form-footer {
+  margin-top: 2.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.handover-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--p-surface-50);
+}
+
+.handover-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  max-width: 26rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+  }
+
+  p {
+    margin: 0;
+    color: var(--p-text-muted-color);
+  }
+}
+
+:host-context([data-theme='dark']) .handover-page {
+  background: var(--p-surface-900);
+}
+
+.sso-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sso-btn { margin-top: 0; }
+
+.sso-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--p-content-border-color);
+  }
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--p-primary-color);
+  text-decoration: underline;
+
+  &:hover { color: var(--p-primary-600); }
+}
+
+:host ::ng-deep .p-password { width: 100%; }
+:host ::ng-deep .p-password input { width: 100%; }

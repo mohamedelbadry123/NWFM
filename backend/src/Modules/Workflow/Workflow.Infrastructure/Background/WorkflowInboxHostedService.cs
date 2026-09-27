@@ -5,6 +5,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Workflow.Application.Abstractions;
 using Workflow.Domain.Repositories;
+using Workflow.Infrastructure.Persistence;
+using Workflow.Infrastructure.Services;
+using Workflow.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Crash-recovery processor for leftover Pending inbox trigger messages.
@@ -69,6 +73,26 @@ internal sealed class WorkflowInboxHostedService : BackgroundService
             try
             {
                 var now = DateTime.UtcNow;
+
+                if (message.Operation == "Signal")
+                {
+                    if (message.WorkflowInstanceId is not Guid target || message.TargetActivityInstanceId is not Guid activityId)
+                    { message.MarkDeadLetter(now, "Signal has no unique target activity. It cannot be replayed as a new workflow."); await inbox.SaveChangesAsync(cancellationToken); continue; }
+                    var db = scope.ServiceProvider.GetRequiredService<WorkflowDbContext>();
+                    await WorkflowExecutionLock.RunAsync(db, "instance:" + target, async () =>
+                    {
+                        var activity = await db.ActivityInstances.FindAsync([activityId], cancellationToken);
+                        if (activity?.Status == ActivityInstanceStatus.Completed) message.MarkProcessed(target, now);
+                        else if (activity?.Status == ActivityInstanceStatus.Active)
+                        {
+                            var signal = await engine.ResumeFromExternalSignalAsync(target, message.TriggerEvent, now, cancellationToken);
+                            if (signal.IsSuccess) message.MarkProcessed(target, now); else message.MarkFailed(signal.Error.Message, now);
+                        }
+                        else message.MarkDeadLetter(now, "The signal target is no longer active.");
+                        await inbox.SaveChangesAsync(cancellationToken); return true;
+                    }, cancellationToken);
+                    continue;
+                }
 
                 if (message.BindingId is null)
                 {

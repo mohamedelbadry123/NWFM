@@ -29,6 +29,9 @@ public sealed class AddBusinessCalendarPeriodCommandHandler
         var calendar = await _repo.GetByIdWithDetailsAsync(request.CalendarId, cancellationToken);
         if (calendar is null)
             return Result.Failure<BusinessCalendarPeriodDto>(WorkflowErrors.Calendar.NotFound);
+        if (!Enum.IsDefined(request.DayOfWeek) || request.StartTime < TimeSpan.Zero || request.EndTime > TimeSpan.FromDays(1) || request.EndTime <= request.StartTime
+            || calendar.Periods.Any(p => p.DayOfWeek == request.DayOfWeek && p.StartTime < request.EndTime && p.EndTime > request.StartTime))
+            return Result.Failure<BusinessCalendarPeriodDto>(new Error("Calendar.InvalidPeriod", "Working periods must be positive, within one day, and must not overlap."));
 
         var period = calendar.AddPeriod(
             request.DayOfWeek, request.StartTime, request.EndTime,

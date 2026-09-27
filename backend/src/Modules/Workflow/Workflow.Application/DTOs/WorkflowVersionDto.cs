@@ -14,7 +14,7 @@ public sealed record WorkflowVersionDto(
     Guid? PublishedByUserId,
     DateTime? PublishedAt,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt, string? WorkspaceJson = null, string? PinnedChildVersionsJson = null);
 
 public sealed record WorkflowVersionDetailDto(
     Guid Id,
@@ -33,4 +33,4 @@ public sealed record WorkflowVersionDetailDto(
     IReadOnlyList<WorkflowTransitionDto> Transitions,
     IReadOnlyList<WorkflowVariableDefinitionDto> Variables,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt, string? WorkspaceJson = null, string? PinnedChildVersionsJson = null);

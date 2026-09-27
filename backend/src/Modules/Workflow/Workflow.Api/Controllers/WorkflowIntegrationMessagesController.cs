@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.Commands.ReplayInboxMessage;
@@ -16,6 +18,7 @@ using NWFM.Shared.Results;
 [ApiController]
 [Route("api/workflow/integration-messages")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ViewInstances)]
 public sealed class WorkflowIntegrationMessagesController : WorkflowControllerBase
 {
     private readonly ISender _sender;

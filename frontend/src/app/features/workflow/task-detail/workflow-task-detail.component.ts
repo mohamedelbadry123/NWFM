@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
 import { WorkflowWorkItemsService, type WorkflowWorkItemView } from '../workflow-work-items.service';
@@ -40,6 +40,7 @@ type TaskDetailTab = 'action' | 'details' | 'steps';
   imports: [
     DatePipe,
     ReactiveFormsModule,
+    FormsModule,
     TranslatePipe,
     PrvStatusPillComponent,
     WorkflowPageHeaderComponent,
@@ -58,7 +59,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   protected readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
-  private readonly locale = inject(LocaleService);
+  protected readonly locale = inject(LocaleService);
 
   protected readonly item = signal<WorkflowWorkItemView | null>(null);
   protected readonly isLoading = signal(true);
@@ -73,6 +74,8 @@ export class WorkflowTaskDetailComponent implements OnInit {
   protected readonly request = signal<WorkflowRequestView | null>(null);
   protected readonly timeline = signal<WorkflowHistoryEvent[]>([]);
   protected readonly liveGraphOpen = signal(false);
+  protected formValues: Record<string, any> = {};
+  protected formLabel(field: { labelEn: string; labelAr: string; key: string }) { return (this.locale.isRtl() ? field.labelAr : field.labelEn) || field.labelEn || field.key; }
 
   protected readonly isOverdue = isOverdue;
   protected readonly dueRelativeLabel = dueRelativeLabel;
@@ -103,6 +106,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.workItemsService.getById(id).subscribe({
       next: item => {
         this.item.set(item);
+        this.formValues = { ...(item.formValues ?? {}) };
         this.isLoading.set(false);
         this.tab.set(item.status === 'Claimed' ? 'details' : 'action');
         this.loadWorkflowContext(item.workflowInstanceId);
@@ -194,6 +198,10 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.submitError.set(null);
     this.workItemsService.complete(id, {
       actionTaken: actionTaken!,
+      formValues: Object.fromEntries(Object.entries(this.formValues).map(([key, value]) => {
+        const field = this.item()?.formFields?.find(f => f.key === key);
+        return [key, field?.type === 'number' && value !== '' && value != null ? Number(value) : value];
+      })),
       comment,
       redirectAssignmentGroupId: this.isRedirectSelected() ? (redirectGroupId || null) : null,
       redirectDepartmentId: this.isRedirectSelected() ? (redirectDepartmentId || null) : null,

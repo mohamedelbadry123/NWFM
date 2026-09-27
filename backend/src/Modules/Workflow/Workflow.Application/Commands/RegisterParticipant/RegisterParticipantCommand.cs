@@ -9,4 +9,5 @@ public sealed record RegisterParticipantCommand(
     string DisplayName,
     string Email,
     string? DisplayNameAr,
-    string? EmployeeNumber) : IRequest<Result<WorkflowParticipantDto>>;
+    string? EmployeeNumber,
+    Guid? UserId = null) : IRequest<Result<WorkflowParticipantDto>>;

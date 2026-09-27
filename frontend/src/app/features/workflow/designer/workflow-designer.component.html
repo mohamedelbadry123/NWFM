@@ -24,6 +24,11 @@
 
   @if (!isLoading() && !loadError() && version()) {
 
+    @if (workspace(); as settings) {
+      <details class="shrink-0 border-b p-3"><summary class="cursor-pointer font-medium">{{ locale.locale() === 'ar' ? 'إعدادات سير العمل والموقع' : 'Workflow settings and geography' }}</summary>
+        <app-workflow-geography [settings]="settings" [readonly]="isReadonly()" (settingsChange)="updateWorkspace($event)" />
+      </details>
+    }
     <!-- ── Top bar ── -->
     <div class="designer-topbar flex items-center justify-between px-3 py-2 shrink-0 gap-3">
 
@@ -193,10 +198,10 @@
                 class="designer-icon-btn"
                 [attr.title]="'workflow.designer.palette_title' | translate"
                 [attr.aria-label]="'workflow.designer.palette_title' | translate">›</button>
-              @for (p of paletteNodes; track p.type) {
+              @for (p of paletteNodes; track p.labelKey) {
                 <div draggable="true"
                   [attr.title]="p.labelKey | translate"
-                  (dragstart)="onPaletteDragStart($event, p.type)"
+                  (dragstart)="onPaletteDragStart($event, p.type, p.protocol)"
                   class="palette-item-icon w-9 h-9 cursor-grab hover:border-primary/50 transition-colors"
                   [class.opacity-40]="isReadonly()">
                   <span class="w-3 h-3 shrink-0" [style.background]="nodeColor(p.type)"
@@ -247,10 +252,10 @@
                   <div class="palette-cat px-1 mb-2">
                     <p class="palette-cat-label">{{ cat.labelKey | translate }}</p>
                     <div class="space-y-1.5">
-                      @for (p of catNodes; track p.type) {
+                      @for (p of catNodes; track p.labelKey) {
                         <div draggable="true"
                           [attr.title]="p.descKey | translate"
-                          (dragstart)="onPaletteDragStart($event, p.type)"
+                          (dragstart)="onPaletteDragStart($event, p.type, p.protocol)"
                           [class]="isReadonly() ? 'palette-item palette-item-disabled' : 'palette-item'">
                           <span class="palette-item-icon">
                             <span class="w-3 h-3 shrink-0" [style.background]="nodeColor(p.type)"
@@ -309,7 +314,7 @@
             </div>
           }
 
-          <div #canvasScroll class="designer-canvas-scroll">
+          <div #canvasScroll class="designer-canvas-scroll" dir="ltr">
           <svg #canvasSvg
             class="select-none block"
             [attr.width]="canvasWorld().width"
@@ -358,6 +363,7 @@
 
             <g [attr.transform]="'translate(' + panX() + ',' + panY() + ') scale(' + zoom() + ')'">
 
+              @for(link of visualLinks();track link.id){<g (click)="onNodeClick($event,link.target)"><path [attr.d]="link.path" fill="none" stroke="#c084fc" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow)"/><text [attr.x]="link.x" [attr.y]="link.y" fill="#9333ea" font-size="12">{{ link.label }}</text></g>}
               <!-- Edges -->
               @for (e of edges(); track e.id) {
                 <g class="edge-group" (click)="onEdgeClick($event, e.id)" (contextmenu)="onEdgeContextMenu($event, e.id)">
@@ -707,9 +713,9 @@
                   class="designer-icon-btn" style="width:1.5rem;height:1.5rem">✕</button>
               </div>
               <div class="space-y-0.5">
-                @for (p of paletteNodes; track p.type) {
+                @for (p of paletteNodes; track p.labelKey) {
                   @if (p.type !== 'Start') {
-                    <button type="button" (click)="quickAddNode(p.type)"
+                    <button type="button" (click)="quickAddNode(p.type, p.protocol)"
                       class="designer-menu-item w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-start">
                       <span class="w-2.5 h-2.5 rounded-sm shrink-0" [style.background]="nodeColor(p.type)"></span>
                       {{ p.labelKey | translate }}
@@ -1256,26 +1262,14 @@
             </div>
           </div>
 
-          <!-- Tab bar (UserTask only) — 2-row 4-column grid, no horizontal scroll -->
-          @if (selectedNode()!.type === 'UserTask') {
+          <!-- Business activity settings -->
+          @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
             <div class="sticky top-0 z-10 border-b shrink-0 designer-panel-header">
-              <!-- Row 1: General · Assignment · Outcomes · Actions -->
-              <div class="grid grid-cols-4 border-b border-dark-700/60">
-                @for (tab of userTaskTabs.slice(0, 4); track tab.id) {
+
+              <div class="grid grid-cols-4 border-b border-dark-700/60" role="tablist" aria-label="Activity settings">
+                @for (tab of userTaskTabs; track tab.id; let i=$index) {
                   <button
-                    (click)="inspectorTab.set(tab.id)"
-                    [class]="inspectorTab() === tab.id
-                      ? 'py-2 text-xs text-primary border-b-2 border-primary font-semibold bg-primary/5 transition-colors'
-                      : 'py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
-                    {{ tab.labelKey | translate }}
-                  </button>
-                }
-              </div>
-              <!-- Row 2: SLA · Data · Form · Advanced -->
-              <div class="grid grid-cols-4">
-                @for (tab of userTaskTabs.slice(4); track tab.id) {
-                  <button
-                    (click)="inspectorTab.set(tab.id)"
+                    role="tab" [attr.aria-selected]="inspectorTab()===tab.id" [attr.tabindex]="inspectorTab()===tab.id?0:-1" (keydown)="activityTabKey($event,i)" (click)="inspectorTab.set(tab.id)"
                     [class]="inspectorTab() === tab.id
                       ? 'py-2 text-xs text-primary border-b-2 border-primary font-semibold bg-primary/5 transition-colors'
                       : 'py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
@@ -1293,8 +1287,11 @@
           <div class="flex-1 overflow-y-auto">
 
             <!-- ─── General tab (all types) / non-UserTask single panel ─── -->
-            @if (selectedNode()!.type !== 'UserTask' || inspectorTab() === 'general') {
+            @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || inspectorTab() === 'general') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
+                @if (workspace() && (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
+                  <app-workflow-business-activity [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
                 <!-- Name EN -->
                 <div>
                   <label class="block text-xs font-medium text-dark-300 mb-1">
@@ -1313,7 +1310,7 @@
                 </div>
 
                 <!-- UserTask: description, instructions, priority -->
-                @if (selectedNode()!.type === 'UserTask') {
+                @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_description' | translate }}
@@ -1348,11 +1345,12 @@
                     </label>
                     <input formControlName="nodePriority" type="number" min="0" [readonly]="isReadonly()"
                       class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
+                    <p class="text-xs mt-1">{{ locale.isRtl() ? 'استخدم القيمة صفر. أولوية قائمة المهام غير مدعومة؛ أولوية التوجيه تُحدد على الأسهم.' : 'Use zero. Task queue priority is not supported; routing priority is configured on arrows.' }}</p>
                   </div>
                 }
 
                 <!-- ServiceTask: action key + config JSON -->
-                @if (selectedNode()!.type === 'ServiceTask') {
+                @if (selectedNode()!.type === 'ServiceTask' && selectedNode()!.actionKey && selectedNode()!.actionKey !== 'http.request') {
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_action_key' | translate }}
@@ -1390,7 +1388,7 @@
                       <label class="block text-xs font-medium text-dark-300 mb-1">
                         {{ 'workflow.designer.props_due_at' | translate }}
                       </label>
-                      <input formControlName="dueAt" type="datetime-local" [readonly]="isReadonly()"
+                      <input formControlName="dueAt" type="datetime-local" step="any" [readonly]="isReadonly()"
                         class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
                     </div>
                   }
@@ -1497,33 +1495,14 @@
                     {{ 'workflow.designer.props_wait_for_completion' | translate }}
                   </label>
                   <p class="text-xs text-dark-500">{{ 'workflow.designer.props_call_activity_help' | translate }}</p>
-                }
-
-                <!-- NotificationTask -->
-                @if (selectedNode()!.type === 'NotificationTask') {
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_template_key' | translate }}
-                    </label>
-                    <input formControlName="templateKey" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_template_key_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_failure_policy' | translate }}
-                    </label>
-                    <select formControlName="failurePolicy" [attr.disabled]="isReadonly() ? true : null"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                      @for (opt of notifFailurePolicyOptions; track opt) {
-                        <option [value]="opt">{{ ('workflow.designer.failure_policy.' + opt) | translate }}</option>
-                      }
-                    </select>
-                  </div>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'معرف الإصدار المنشور (فارغ = الأحدث)' : 'Published version ID (blank = latest)' }}<input formControlName="callVersionId" [readonly]="isReadonly()" class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white" /></label>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'مدخلات الطفل: متغير الطفل ← مسار متغير الأب' : 'Child inputs: child variable → parent variable path' }}<textarea formControlName="callInputMappingsJson" [readonly]="isReadonly()" rows="3" placeholder='{"amount":"amount"}' class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white"></textarea></label>
+                  <label class="block text-xs text-dark-300">{{ locale.isRtl() ? 'مخرجات الطفل: متغير الأب ← مسار متغير الطفل' : 'Child outputs: parent variable → child variable path' }}<textarea formControlName="callOutputMappingsJson" [readonly]="isReadonly()" rows="3" placeholder='{"result":"childResult"}' class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-white"></textarea></label>
                 }
 
                 <!-- ScriptTask: set variables (safe script) -->
                 @if (selectedNode()!.type === 'ScriptTask') {
+                  <app-workflow-variable-editor [value]="propsForm.value.setVariablesJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" (valueChange)="applyTypedVariables($event)" />
                   <div>
                     <label class="block text-xs font-medium text-dark-300 mb-1">
                       {{ 'workflow.designer.props_set_variables' | translate }}
@@ -1535,27 +1514,15 @@
                   </div>
                 }
 
-                <!-- WaitEvent -->
-                @if (selectedNode()!.type === 'WaitEvent') {
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_event_key' | translate }}
-                    </label>
-                    <input formControlName="eventKey" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_event_key_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-dark-300 mb-1">
-                      {{ 'workflow.designer.props_correlation_variable' | translate }}
-                    </label>
-                    <input formControlName="correlationVariable" type="text" [readonly]="isReadonly()"
-                      [placeholder]="'workflow.designer.props_correlation_variable_placeholder' | translate"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                    <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_wait_event_hint' | translate }}</p>
-                  </div>
+                @if (selectedNode()!.type === 'ServiceTask' && (!selectedNode()!.actionKey || selectedNode()!.actionKey === 'http.request')) {
+                  <app-workflow-integration-editor kind="ServiceTask" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" [nodes]="businessNodes()" (configurationChange)="applyIntegrationConfiguration($event)" />
                 }
-
+                @if (selectedNode()!.type === 'NotificationTask') {
+                  <app-workflow-integration-editor kind="NotificationTask" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" [nodes]="businessNodes()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
+                @if (selectedNode()!.type === 'WaitEvent') {
+                  <app-workflow-integration-editor kind="WaitEvent" [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [variables]="variables()" [nodes]="businessNodes()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                }
                 @if (!isReadonly()) {
                   <button type="button" (click)="applyProps()"
                     class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
@@ -1566,7 +1533,7 @@
             }
 
             <!-- ─── Assignment tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'assignment') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'assignment') {
               <div class="p-4 space-y-4">
                 <p class="text-xs leading-relaxed rounded-xl px-3 py-2.5"
                   style="background: color-mix(in srgb, var(--ds-primary, #6d28d9) 12%, transparent); color: var(--ds-text-2)">
@@ -1614,497 +1581,17 @@
               </div>
             }
 
-            <!-- ─── Outcomes tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'outcomes') {
-              <div class="p-4 space-y-3">
-                <p class="text-xs leading-relaxed rounded-lg px-3 py-2" style="background: var(--ds-primary-soft); color: var(--ds-text-2)">
-                  {{ 'workflow.designer.props_outcomes_help' | translate }}
-                </p>
-                <p class="text-xs leading-relaxed rounded-lg px-3 py-2" style="background: var(--ds-surface-2); color: var(--ds-text-2)">
-                  {{ 'workflow.designer.props_redirect_help' | translate }}
-                </p>
-                @if (selectedNode()!.outcomes.length === 0) {
-                  <p class="text-xs text-dark-500 text-center py-4">
-                    {{ 'workflow.designer.props_outcomes_empty' | translate }}
-                  </p>
-                }
-                @for (outcome of selectedNode()!.outcomes; track outcome.id; let i = $index; let last = $last) {
-                  <div class="bg-dark-700 rounded-lg border border-dark-600 overflow-hidden">
-                    <!-- Outcome header row -->
-                    <div class="flex items-center gap-1.5 px-3 py-2 border-b border-dark-600 bg-dark-700/80">
-                      @if (!isReadonly()) {
-                        <div class="flex flex-col gap-0.5 shrink-0">
-                          <button type="button" (click)="moveOutcome(selectedNode()!.id, outcome.id, 'up')"
-                            [disabled]="i === 0"
-                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▲</button>
-                          <button type="button" (click)="moveOutcome(selectedNode()!.id, outcome.id, 'down')"
-                            [disabled]="last"
-                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▼</button>
-                        </div>
-                      }
-                      <span class="text-xs font-mono text-primary flex-1 truncate min-w-0">
-                        {{ outcome.key || '(no key)' }}
-                      </span>
-                      @if (outcome.isDefault) {
-                        <span class="text-xs text-amber-400 shrink-0">★</span>
-                      }
-                      @if (!isReadonly()) {
-                        <button type="button" (click)="removeOutcome(selectedNode()!.id, outcome.id)"
-                          class="text-dark-500 hover:text-red-400 text-xs shrink-0 transition-colors">✕</button>
-                      }
-                    </div>
-
-                    <!-- Outcome fields -->
-                    <div class="p-3 space-y-2">
-                      <!-- Key -->
-                      <input [value]="outcome.key" [readonly]="isReadonly()"
-                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'key', $any($event.target).value)"
-                        [placeholder]="'workflow.designer.props_outcome_key' | translate"
-                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      <!-- Label EN -->
-                      <input [value]="outcome.label" [readonly]="isReadonly()"
-                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'label', $any($event.target).value)"
-                        [placeholder]="'workflow.designer.props_outcome_label' | translate"
-                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      <!-- Label AR -->
-                      <input [value]="outcome.labelAr" [readonly]="isReadonly()" dir="rtl"
-                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'labelAr', $any($event.target).value)"
-                        [placeholder]="'workflow.designer.props_outcome_label_ar' | translate"
-                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      <!-- Result value -->
-                      <input [value]="outcome.resultValue" [readonly]="isReadonly()"
-                        (input)="updateOutcomeField(selectedNode()!.id, outcome.id, 'resultValue', $any($event.target).value)"
-                        [placeholder]="'workflow.designer.props_outcome_result_value' | translate"
-                        class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      <!-- Checkboxes -->
-                      <div class="flex flex-wrap gap-x-3 gap-y-1.5 pt-1">
-                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
-                          <input type="checkbox" [checked]="outcome.isDefault"
-                            [attr.disabled]="isReadonly() ? true : null"
-                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'isDefault', $any($event.target).checked)"
-                            class="rounded border-dark-500 bg-dark-600 text-primary" />
-                          {{ 'workflow.designer.props_is_default' | translate }}
-                        </label>
-                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
-                          <input type="checkbox" [checked]="outcome.requiresComment"
-                            [attr.disabled]="isReadonly() ? true : null"
-                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'requiresComment', $any($event.target).checked)"
-                            class="rounded border-dark-500 bg-dark-600 text-primary" />
-                          {{ 'workflow.designer.props_outcome_requires_comment' | translate }}
-                        </label>
-                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
-                          <input type="checkbox" [checked]="outcome.requiresAttachment"
-                            [attr.disabled]="isReadonly() ? true : null"
-                            (change)="updateOutcomeField(selectedNode()!.id, outcome.id, 'requiresAttachment', $any($event.target).checked)"
-                            class="rounded border-dark-500 bg-dark-600 text-primary" />
-                          {{ 'workflow.designer.props_outcome_requires_attachment' | translate }}
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                }
-                @if (!isReadonly()) {
-                  <div class="flex flex-col gap-1.5">
-                    <button type="button" (click)="addStandardOutcomes(selectedNode()!.id)"
-                      class="w-full py-2 border border-dashed border-primary/40 text-primary hover:bg-primary/10 rounded text-xs transition-colors">
-                      {{ 'workflow.designer.props_add_standard_outcomes' | translate }}
-                    </button>
-                    <button type="button" (click)="addRedirectOutcome(selectedNode()!.id)"
-                      class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-primary/60 rounded text-xs transition-colors">
-                      + {{ 'workflow.designer.props_add_redirect' | translate }}
-                    </button>
-                    <button type="button" (click)="addOutcome(selectedNode()!.id)"
-                      class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-primary/60 rounded text-xs transition-colors">
-                      + {{ 'workflow.designer.props_add_outcome' | translate }}
-                    </button>
-                  </div>
-                }
-              </div>
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'actions') {
+              <section class="p-4 space-y-4"><div class="border rounded-lg p-3"><strong>{{ locale.isRtl() ? 'قبول' : 'Accept' }}</strong><p>{{ locale.isRtl() ? 'الانتقال عبر السهم الأمامي بعد اكتمال المتطلبات.' : 'Move along the forward arrow after required work finishes.' }}</p></div>
+              <div class="border rounded-lg p-3"><strong>{{ locale.isRtl() ? 'رفض' : 'Reject' }}</strong><p>{{ locale.isRtl() ? 'يتطلب تعليقاً ويبدأ محاولة جديدة في النشاط السابق.' : 'Requires a comment and starts a fresh attempt at the earlier activity.' }}</p>
+              <label>{{ locale.isRtl() ? 'العودة إلى' : 'Return to' }}<select class="wf-input" [ngModel]="selectedConfig().rejectTargetNodeKey || ''" [ngModelOptions]="{standalone:true}" [disabled]="isReadonly()" (ngModelChange)="rejectTarget($event)"><option value="">—</option>@for(n of rejectionDestinations();track n.id){<option [value]="n.nodeKey">{{ n.name }}</option>}</select></label></div>
+              @if(selectedNode()!.actions.length || selectedNode()!.outcomes.length !== 2){<p role="status">{{ locale.isRtl() ? 'توجد إعدادات قديمة. انقل الإجراءات الآلية إلى عقد أحداث قبل استبدالها.' : 'Legacy actions are present. Move automated actions to event nodes before replacing them.' }}</p><button class="wf-btn-secondary" [disabled]="isReadonly()" (click)="resetSimpleActions()">{{ locale.isRtl() ? 'استبدال بقبول ورفض' : 'Replace with Accept and Reject' }}</button>}
+              </section>
+            }
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'sla') {
+              <app-workflow-activity-sla [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" />
             }
 
-            <!-- ─── Actions tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'actions') {
-              <div class="p-4 space-y-3">
-                @if (selectedNode()!.actions.length === 0) {
-                  <p class="text-xs text-dark-500 text-center py-4">
-                    {{ 'workflow.designer.props_actions_title' | translate }}: no actions defined.
-                  </p>
-                }
-                @for (action of selectedNode()!.actions; track action.id; let i = $index; let last = $last) {
-                  <div class="bg-dark-700 rounded-lg border border-dark-600 overflow-hidden">
-                    <!-- Action header row -->
-                    <div class="flex items-center gap-1.5 px-3 py-2 border-b border-dark-600 bg-dark-700/80">
-                      @if (!isReadonly()) {
-                        <div class="flex flex-col gap-0.5 shrink-0">
-                          <button type="button" (click)="moveAction(selectedNode()!.id, action.id, 'up')"
-                            [disabled]="i === 0"
-                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▲</button>
-                          <button type="button" (click)="moveAction(selectedNode()!.id, action.id, 'down')"
-                            [disabled]="last"
-                            class="text-dark-400 hover:text-white disabled:opacity-20 leading-none text-xs px-0.5">▼</button>
-                        </div>
-                      }
-                      <span class="text-xs font-mono text-cyan-400 flex-1 truncate min-w-0">
-                        {{ action.actionKey || '(no key)' }}
-                      </span>
-                      <span class="text-xs text-dark-500 shrink-0">{{ action.executionTrigger }}</span>
-                      @if (!isReadonly()) {
-                        <button type="button" (click)="removeAction(selectedNode()!.id, action.id)"
-                          class="text-dark-500 hover:text-red-400 text-xs shrink-0 transition-colors ms-1">✕</button>
-                      }
-                    </div>
-
-                    <!-- Action fields -->
-                    <div class="p-3 space-y-2">
-                      <!-- Active toggle + Sequence -->
-                      <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-1.5 text-xs text-dark-300 cursor-pointer">
-                          <input type="checkbox" [checked]="action.isActive"
-                            [attr.disabled]="isReadonly() ? true : null"
-                            (change)="updateActionField(selectedNode()!.id, action.id, 'isActive', $any($event.target).checked)"
-                            class="rounded border-dark-500 bg-dark-600 text-primary" />
-                          {{ 'workflow.designer.props_action_is_active' | translate }}
-                        </label>
-                        <span class="text-xs text-dark-500">
-                          {{ 'workflow.designer.props_action_sequence' | translate }}: {{ action.sequence }}
-                        </span>
-                      </div>
-                      <!-- Action key — catalog dropdown -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_action_key' | translate }}
-                        </label>
-                        @if (catalogLoading()) {
-                          <p class="text-xs text-dark-500">Loading catalog…</p>
-                        } @else if (actionCatalog().length > 0) {
-                          <select [value]="action.actionKey"
-                            [attr.disabled]="isReadonly() ? true : null"
-                            (change)="updateActionField(selectedNode()!.id, action.id, 'actionKey', $any($event.target).value)"
-                            class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                            <option value="">-- Select Action --</option>
-                            @for (entry of actionCatalog(); track entry.actionKey) {
-                              <option [value]="entry.actionKey">{{ entry.nameEn }} ({{ entry.actionKey }})</option>
-                            }
-                          </select>
-                        } @else {
-                          <input [value]="action.actionKey" [readonly]="isReadonly()"
-                            (input)="updateActionField(selectedNode()!.id, action.id, 'actionKey', $any($event.target).value)"
-                            [placeholder]="'workflow.designer.props_action_action_key' | translate"
-                            class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                        }
-                      </div>
-                      <!-- Execution trigger -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_trigger' | translate }}
-                        </label>
-                        <select [value]="action.executionTrigger"
-                          [attr.disabled]="isReadonly() ? true : null"
-                          (change)="updateActionField(selectedNode()!.id, action.id, 'executionTrigger', $any($event.target).value)"
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                          @for (t of executionTriggerOptions; track t) {
-                            <option [value]="t">{{ ('workflow.designer.execution_trigger.' + t) | translate }}</option>
-                          }
-                        </select>
-                      </div>
-                      <!-- Outcome key (shown for OnOutcome trigger) -->
-                      @if (action.executionTrigger === 'OnOutcome') {
-                        <input [value]="action.outcomeKey" [readonly]="isReadonly()"
-                          (input)="updateActionField(selectedNode()!.id, action.id, 'outcomeKey', $any($event.target).value)"
-                          [placeholder]="'workflow.designer.props_action_outcome_key' | translate"
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      }
-                      <!-- Condition expression -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_condition' | translate }}
-                        </label>
-                        <input [value]="action.conditionExpression" [readonly]="isReadonly()"
-                          (input)="updateActionField(selectedNode()!.id, action.id, 'conditionExpression', $any($event.target).value)"
-                          placeholder="e.g. $outcome == 'APPROVED'"
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      </div>
-                      <!-- Failure policy -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_failure_policy' | translate }}
-                        </label>
-                        <select [value]="action.failurePolicy"
-                          [attr.disabled]="isReadonly() ? true : null"
-                          (change)="updateActionField(selectedNode()!.id, action.id, 'failurePolicy', $any($event.target).value)"
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                          @for (p of actionFailurePolicyOptions; track p) {
-                            <option [value]="p">{{ ('workflow.designer.action_failure_policy.' + p) | translate }}</option>
-                          }
-                        </select>
-                      </div>
-                      <!-- Retry count (shown for Retry policy) -->
-                      @if (action.failurePolicy === 'Retry') {
-                        <div class="grid grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">
-                              {{ 'workflow.designer.props_action_retry_count' | translate }}
-                            </label>
-                            <input type="number" [value]="action.retryCount" [readonly]="isReadonly()"
-                              (input)="updateActionField(selectedNode()!.id, action.id, 'retryCount', +$any($event.target).value)"
-                              min="0" max="10"
-                              class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                          </div>
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">
-                              {{ 'workflow.designer.props_action_retry_delay' | translate }}
-                            </label>
-                            <input type="number" [value]="action.retryDelaySeconds" [readonly]="isReadonly()"
-                              (input)="updateActionField(selectedNode()!.id, action.id, 'retryDelaySeconds', +$any($event.target).value)"
-                              min="0"
-                              class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                          </div>
-                        </div>
-                      }
-                      <!-- Timeout -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_timeout' | translate }} (s)
-                        </label>
-                        <input type="number" [value]="action.timeoutSeconds" [readonly]="isReadonly()"
-                          (input)="updateActionField(selectedNode()!.id, action.id, 'timeoutSeconds', +$any($event.target).value)"
-                          min="0"
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                      </div>
-                      <!-- Input Mapping JSON -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_input_mapping' | translate }}
-                        </label>
-                        <textarea [value]="action.inputMappingJson" rows="3" [readonly]="isReadonly()"
-                          (blur)="updateActionField(selectedNode()!.id, action.id, 'inputMappingJson', $any($event.target).value)"
-                          placeholder='{}'
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                      </div>
-                      <!-- Output Mapping JSON -->
-                      <div>
-                        <label class="block text-xs text-dark-400 mb-1">
-                          {{ 'workflow.designer.props_action_output_mapping' | translate }}
-                        </label>
-                        <textarea [value]="action.outputMappingJson" rows="3" [readonly]="isReadonly()"
-                          (blur)="updateActionField(selectedNode()!.id, action.id, 'outputMappingJson', $any($event.target).value)"
-                          placeholder='{}'
-                          class="w-full bg-dark-600 border border-dark-500 rounded px-2 py-1 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                      </div>
-                    </div>
-                  </div>
-                }
-                @if (!isReadonly()) {
-                  <button type="button" (click)="addAction(selectedNode()!.id)"
-                    class="w-full py-2 border border-dashed border-dark-500 text-dark-400 hover:text-white hover:border-cyan-600/60 rounded text-xs transition-colors">
-                    + {{ 'workflow.designer.props_add_action' | translate }}
-                  </button>
-                }
-              </div>
-            }
-
-            <!-- ─── SLA tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'sla') {
-              <form [formGroup]="propsForm" class="p-4 space-y-4">
-                <!-- SLA Policy dropdown -->
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_sla_policy' | translate }}
-                  </label>
-                  @if (slaPoliciesLoading()) {
-                    <p class="text-xs text-dark-500">{{ 'common.loading' | translate }}</p>
-                  } @else {
-                    <select formControlName="slaPolicyId"
-                      [attr.disabled]="isReadonly() ? true : null"
-                      class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                      <option value="">{{ 'workflow.designer.sla_policy_placeholder' | translate }}</option>
-                      @for (p of slaPolicies(); track p.id) {
-                        <option [value]="p.id">{{ p.name }} ({{ p.policyCode }})</option>
-                      }
-                    </select>
-                  }
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_sla_duration_hours' | translate }}
-                  </label>
-                  <input formControlName="slaDurationHours" type="number" min="0" [readonly]="isReadonly()"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  <p class="text-xs text-dark-500 mt-1">Set to 0 to disable SLA enforcement.</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_sla_escalation_key' | translate }}
-                  </label>
-                  <input formControlName="slaEscalationKey" type="text" [readonly]="isReadonly()"
-                    placeholder="e.g. SUPERVISOR_REVIEW"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white uppercase placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_sla_escalation_hint' | translate }}</p>
-                </div>
-                @if (!isReadonly()) {
-                  <button type="button" (click)="applyProps()"
-                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
-                    {{ 'workflow.designer.transition_apply' | translate }}
-                  </button>
-                }
-              </form>
-            }
-
-            <!-- ─── Data tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'data') {
-              <form [formGroup]="propsForm" class="p-4 space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_input_mapping' | translate }}
-                  </label>
-                  <textarea formControlName="inputMappingJson" rows="5" [readonly]="isReadonly()"
-                    placeholder='{&#10;  "requestId": "$.variables.requestId"&#10;}'
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_output_mapping' | translate }}
-                  </label>
-                  <textarea formControlName="outputMappingJson" rows="5" [readonly]="isReadonly()"
-                    placeholder='{&#10;  "reviewOutcome": "$.output.outcome"&#10;}'
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                </div>
-                @if (!isReadonly()) {
-                  <button type="button" (click)="applyProps()"
-                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
-                    {{ 'workflow.designer.transition_apply' | translate }}
-                  </button>
-                }
-              </form>
-            }
-
-            <!-- ─── Form tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'form') {
-              <form [formGroup]="propsForm" class="p-4 space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_form_key' | translate }}
-                  </label>
-                  <input formControlName="formKey" type="text" [readonly]="isReadonly()"
-                    [placeholder]="'workflow.designer.props_form_key_placeholder' | translate"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                  <p class="text-xs text-dark-500 mt-1">{{ 'workflow.designer.props_form_key_hint' | translate }}</p>
-                </div>
-
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between gap-2">
-                    <label class="block text-xs font-medium text-dark-300">
-                      {{ 'workflow.designer.props_form_fields' | translate }}
-                    </label>
-                    @if (!isReadonly()) {
-                      <button type="button" (click)="addFormField()"
-                        class="text-xs text-primary hover:text-primary-300 transition-colors">
-                        + {{ 'workflow.designer.props_form_field_add' | translate }}
-                      </button>
-                    }
-                  </div>
-                  <p class="text-xs text-dark-500">{{ 'workflow.designer.props_form_fields_hint' | translate }}</p>
-
-                  @if (formFields().length === 0) {
-                    <p class="text-xs text-dark-500 italic">{{ 'workflow.designer.props_form_fields_empty' | translate }}</p>
-                  }
-
-                  <div class="space-y-3">
-                    @for (field of formFields(); track field.id) {
-                      <div class="rounded-lg border border-dark-600 bg-dark-900/50 p-3 space-y-2">
-                        <div class="grid grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_key' | translate }}</label>
-                            <input type="text" [value]="field.key" [readonly]="isReadonly()"
-                              (input)="updateFormField(field.id, 'key', $any($event.target).value)"
-                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                          </div>
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_type' | translate }}</label>
-                            <select [value]="field.type" [attr.disabled]="isReadonly() ? true : null"
-                              (change)="updateFormField(field.id, 'type', $any($event.target).value)"
-                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60">
-                              @for (t of formFieldTypes; track t) {
-                                <option [value]="t">{{ ('workflow.designer.form_field_type.' + t) | translate }}</option>
-                              }
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_label_en' | translate }}</label>
-                            <input type="text" [value]="field.labelEn" [readonly]="isReadonly()"
-                              (input)="updateFormField(field.id, 'labelEn', $any($event.target).value)"
-                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                          </div>
-                          <div>
-                            <label class="block text-xs text-dark-400 mb-1">{{ 'workflow.designer.props_form_field_label_ar' | translate }}</label>
-                            <input type="text" [value]="field.labelAr" [readonly]="isReadonly()" dir="rtl"
-                              (input)="updateFormField(field.id, 'labelAr', $any($event.target).value)"
-                              class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60" />
-                          </div>
-                        </div>
-                        <div class="flex items-center justify-between">
-                          <label class="flex items-center gap-2 text-xs text-dark-200">
-                            <input type="checkbox" [checked]="field.required" [attr.disabled]="isReadonly() ? true : null"
-                              (change)="updateFormField(field.id, 'required', $any($event.target).checked)"
-                              class="rounded border-dark-500 bg-dark-700 text-primary focus:ring-primary" />
-                            {{ 'workflow.designer.props_form_field_required' | translate }}
-                          </label>
-                          @if (!isReadonly()) {
-                            <button type="button" (click)="removeFormField(field.id)"
-                              class="text-xs text-red-400 hover:text-red-300 transition-colors">
-                              {{ 'workflow.designer.props_form_field_remove' | translate }}
-                            </button>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_instructions_en' | translate }}
-                  </label>
-                  <textarea formControlName="instructionsEn" rows="2" [readonly]="isReadonly()"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_instructions_ar' | translate }}
-                  </label>
-                  <textarea formControlName="instructionsAr" rows="2" [readonly]="isReadonly()" dir="rtl"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                </div>
-                @if (!isReadonly()) {
-                  <button type="button" (click)="applyProps()"
-                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
-                    {{ 'workflow.designer.transition_apply' | translate }}
-                  </button>
-                }
-              </form>
-            }
-
-            <!-- ─── Advanced tab (UserTask) ─── -->
-            @if (selectedNode()!.type === 'UserTask' && inspectorTab() === 'advanced') {
-              <form [formGroup]="propsForm" class="p-4 space-y-4">
-                <div>
-                  <label class="block text-xs font-medium text-dark-300 mb-1">
-                    {{ 'workflow.designer.props_config_json' | translate }}
-                    <span class="text-dark-500">({{ 'common.optional' | translate }})</span>
-                  </label>
-                  <textarea formControlName="configJson" rows="8" [readonly]="isReadonly()"
-                    [placeholder]="'workflow.designer.props_config_json_placeholder' | translate"
-                    class="w-full bg-dark-700 border border-dark-600 rounded px-2 py-1.5 text-xs text-white font-mono placeholder-dark-500 focus:outline-none focus:ring-1 focus:ring-primary read-only:opacity-60 resize-y"></textarea>
-                  <p class="text-xs text-dark-500 mt-1">Raw configuration JSON. Merged with SLA and Data mapping settings.</p>
-                </div>
-                @if (!isReadonly()) {
-                  <button type="button" (click)="applyProps()"
-                    class="w-full py-1.5 text-xs font-medium bg-primary text-white rounded hover:bg-primary-400 transition-colors">
-                    {{ 'workflow.designer.transition_apply' | translate }}
-                  </button>
-                }
-              </form>
-            }
 
           </div><!-- end flex-1 overflow-y-auto -->
         }<!-- end @if selectedNode() -->

@@ -7,6 +7,9 @@ using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
+using Workflow.Application.Helpers;
+using NWFM.Shared.Integration.Workflow;
+using Workflow.Application.Integrations;
 
 public sealed class GetWorkflowPublishPreviewQueryHandler
     : IRequestHandler<GetWorkflowPublishPreviewQuery, Result<WorkflowPublishPreviewDto>>
@@ -15,17 +18,24 @@ public sealed class GetWorkflowPublishPreviewQueryHandler
     private readonly IWorkflowDefinitionRepository _definitions;
     private readonly IWorkflowVersionRepository _versions;
     private readonly IWorkflowXmlCompiler _compiler;
+    private readonly IWorkflowActionRegistry? _actionRegistry;
+    private readonly IWorkflowIntegrations? _integrations;
+    private readonly Workflow.Application.Workspace.IWorkflowWorkspacePublisher? _workspace;
 
     public GetWorkflowPublishPreviewQueryHandler(
         IWorkflowFeatureGate gate,
         IWorkflowDefinitionRepository definitions,
         IWorkflowVersionRepository versions,
-        IWorkflowXmlCompiler compiler)
+        IWorkflowXmlCompiler compiler,
+        IWorkflowActionRegistry? actionRegistry = null, IWorkflowIntegrations? integrations = null, Workflow.Application.Workspace.IWorkflowWorkspacePublisher? workspace = null)
     {
         _gate = gate;
         _definitions = definitions;
         _versions = versions;
         _compiler = compiler;
+        _actionRegistry = actionRegistry;
+        _integrations = integrations;
+        _workspace = workspace;
     }
 
     public async Task<Result<WorkflowPublishPreviewDto>> Handle(
@@ -88,14 +98,13 @@ public sealed class GetWorkflowPublishPreviewQueryHandler
                         .ToList()!;
                 }
 
-                var startCount = doc.Activities.Count(a =>
-                    string.Equals(a.ActivityTypeName, "Start", StringComparison.OrdinalIgnoreCase));
-                var endCount = doc.Activities.Count(a =>
-                    string.Equals(a.ActivityTypeName, "End", StringComparison.OrdinalIgnoreCase));
-                if (startCount != 1)
-                    blocking.Add("Workflow must have exactly one Start node.");
-                if (endCount == 0)
-                    blocking.Add("Workflow must have at least one End node.");
+                var validationErrors = new List<WorkflowValidationIssueDto>();
+                var validationWarnings = new List<WorkflowValidationIssueDto>();
+                WorkflowGraphValidator.Validate(doc, validationErrors, validationWarnings, _actionRegistry);
+                if (_integrations is not null) validationErrors.AddRange(await _integrations.ValidateConnectionsAsync(doc, cancellationToken));
+                if (_workspace is not null) validationErrors.AddRange(await _workspace.ValidateAsync(version, cancellationToken));
+                blocking.AddRange(validationErrors.Select(e => e.Message));
+                warnings.AddRange(validationWarnings.Select(w => w.Message));
             }
         }
 

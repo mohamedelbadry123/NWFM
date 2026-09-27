@@ -64,6 +64,7 @@ public sealed class CloneWorkflowVersionCommandHandler
 
         if (!string.IsNullOrEmpty(source.XmlContent))
             draft.UpdateXml(source.XmlContent, source.XmlHash ?? string.Empty, now);
+            draft.SetWorkspace(source.WorkspaceJson);
 
         if (!string.IsNullOrEmpty(source.DesignerJson))
             draft.UpdateDesignerJson(source.DesignerJson, now);

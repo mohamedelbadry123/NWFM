@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -18,6 +20,7 @@ using Workflow.Application.Queries.ListAllWorkflowBindings;
 [ApiController]
 [Route("api/workflow/bindings")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageBindings)]
 public sealed class WorkflowBindingsCatalogController : WorkflowControllerBase
 {
     private readonly ISender _sender;

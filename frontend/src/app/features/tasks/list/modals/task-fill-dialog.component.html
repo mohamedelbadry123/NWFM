@@ -1,0 +1,93 @@
+<ng-container *translateContext="let t">
+  <p-dialog
+    [visible]="visible()"
+    (visibleChange)="visible.set($event)"
+    [header]="t('tasks.fill.title')"
+    [modal]="true"
+    [draggable]="true"
+    [maximizable]="true"
+    [style]="{ width: '68rem' }"
+    [contentStyle]="{ overflow: 'auto' }"
+    [breakpoints]="{ '960px': '95vw' }"
+  >
+    @if (loading()) {
+      <div class="flex justify-center py-10">
+        <p-progressSpinner styleClass="w-10 h-10" strokeWidth="4" />
+      </div>
+    } @else if (loadFailed()) {
+      <p-message severity="error" [text]="t('tasks.fill.loadFailed')" styleClass="w-full" />
+    } @else if (detail(); as current) {
+      <div class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+        <span class="font-medium">{{ current.task.taskNumber }}</span>
+        <p-tag [value]="t('tasks.status.' + current.task.status)" [severity]="statusSeverity(current.task.status)" />
+        @if (formName()) {
+          <span class="text-surface-500">{{ formName() }} <span>v{{ current.task.formVersionNo }}</span></span>
+        }
+        @if (current.task.assignedTeamName) {
+          <span class="text-surface-500"><i class="pi pi-users me-1"></i>{{ current.task.assignedTeamName }}</span>
+        }
+      </div>
+
+      @if (current.task.returnReason) {
+        <!-- A return says what to fix; show it where the rework is done. -->
+        <p-message
+          severity="warn"
+          [text]="t('tasks.fill.returnedBecause', { reason: current.task.returnReason })"
+          styleClass="w-full mb-3"
+        />
+      }
+
+      @if (previousFill(); as fill) {
+        <!-- The form opens on the last fill, so this pass edits rather than re-enters. -->
+        <p-message
+          severity="info"
+          [text]="
+            t('tasks.fill.editingPrevious', {
+              by: fill.submittedByName || fill.submittedBy || '',
+              date: (fill.submittedDate | date: 'yyyy-MM-dd HH:mm') || '',
+            })
+          "
+          styleClass="w-full mb-3"
+        />
+      }
+
+      <div class="mb-4 flex flex-wrap items-center gap-3">
+        <p class="flex-1 min-w-[16rem] m-0 text-sm text-[var(--p-text-muted-color)]">
+          <i class="pi pi-info-circle me-1.5 text-[var(--p-primary-color)]"></i>
+          {{ t('tasks.fill.subtitle') }}
+        </p>
+        @if (renderer.fields().length > 0) {
+          <!-- Live validity, so a long form does not hide its errors below the fold. -->
+          <p-tag
+            [severity]="renderer.form().valid ? 'success' : 'warn'"
+            [icon]="renderer.form().valid ? 'pi pi-check-circle' : 'pi pi-exclamation-circle'"
+            [value]="renderer.form().valid ? t('tasks.fill.valid') : t('tasks.fill.invalidCount', { count: renderer.invalidCount() })"
+          />
+        }
+      </div>
+
+      <app-dynamic-form-renderer
+        #renderer
+        [definition]="definition()"
+        [answers]="seedAnswers()"
+        [formId]="current.task.formDefinitionId"
+        [versionNo]="current.task.formVersionNo"
+        [contextType]="contextType"
+        [contextId]="current.task.id"
+        [emptyMessage]="t('tasks.fill.empty')"
+        (submitted)="submit()"
+      />
+    }
+
+    <ng-template pTemplate="footer">
+      <p-button [label]="t('common.cancel')" severity="secondary" [text]="true" [disabled]="saving()" (onClick)="cancel()" />
+      <p-button
+        [label]="t('tasks.actions.submitFill')"
+        icon="pi pi-send"
+        [loading]="saving()"
+        [disabled]="saving() || loading() || loadFailed()"
+        (onClick)="submit()"
+      />
+    </ng-template>
+  </p-dialog>
+</ng-container>

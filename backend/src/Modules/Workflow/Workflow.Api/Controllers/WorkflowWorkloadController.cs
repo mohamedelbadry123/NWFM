@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.DTOs;
@@ -12,6 +14,7 @@ using Workflow.Application.Queries.GetWorkloadDashboard;
 [ApiController]
 [Route("api/workflow/workload")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ViewWorkload)]
 public sealed class WorkflowWorkloadController : WorkflowControllerBase
 {
     private readonly ISender _sender;

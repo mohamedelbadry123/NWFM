@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -19,6 +21,7 @@ using Workflow.Application.Queries.ListWorkflowDefinitions;
 [ApiController]
 [Route("api/workflow/definitions")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageDefinitions)]
 public sealed class WorkflowDefinitionsController : WorkflowControllerBase
 {
     private readonly ISender _sender;

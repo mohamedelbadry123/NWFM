@@ -14,6 +14,10 @@ public sealed class WorkflowVersion : Entity
     public string? XmlHash { get; private set; }
     public string SchemaVersion { get; private set; } = CurrentSchemaVersion;
     public string? DesignerJson { get; private set; }
+    public string? WorkspaceJson { get; private set; }
+    public string? PinnedChildVersionsJson { get; private set; }
+    public void SetWorkspace(string? json) => WorkspaceJson = json;
+    public void PinChildVersions(string json) => PinnedChildVersionsJson = json;
     public WorkflowValidationStatus ValidationStatus { get; private set; }
     public string? ValidationResultJson { get; private set; }
     public string? ChangeSummary { get; private set; }

@@ -1,6 +1,7 @@
 export type LayoutNodeType =
   | 'Start'
   | 'UserTask'
+  | 'MainActivity'
   | 'ExclusiveGateway'
   | 'InclusiveGateway'
   | 'ServiceTask'

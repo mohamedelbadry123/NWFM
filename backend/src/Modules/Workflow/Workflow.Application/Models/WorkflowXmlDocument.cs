@@ -4,6 +4,7 @@ namespace Workflow.Application.Models;
 public sealed class WorkflowXmlDocument
 {
     public string SchemaVersion { get; init; } = "1.0";
+    public string? WorkspaceJson { get; init; }
     public IReadOnlyList<ActivityXmlNode> Activities { get; init; } = [];
     public IReadOnlyList<TransitionXmlNode> Transitions { get; init; } = [];
     public IReadOnlyList<VariableXmlNode> Variables { get; init; } = [];

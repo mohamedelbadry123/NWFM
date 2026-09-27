@@ -203,7 +203,21 @@
             </div>
           }
 
+          @if (item()!.instructionsEn || item()!.instructionsAr) {
+            <p class="mb-4 whitespace-pre-wrap">{{ locale.isRtl() ? (item()!.instructionsAr || item()!.instructionsEn) : (item()!.instructionsEn || item()!.instructionsAr) }}</p>
+          }
           <form [formGroup]="completeForm" (ngSubmit)="complete()" class="space-y-4">
+            @for (field of item()!.formFields || []; track field.key) {
+              <label class="block text-sm" style="color:var(--ds-text)">{{ formLabel(field) }} {{ field.required ? '*' : '' }}
+                @if (field.type === 'select') {
+                  <select [(ngModel)]="formValues[field.key]" [ngModelOptions]="{standalone:true}" [required]="field.required" class="w-full rounded border p-2" style="background:var(--ds-surface);color:var(--ds-text)"><option value=""></option>@for (option of field.options || []; track option) { <option>{{ option }}</option> }</select>
+                } @else if (field.type === 'textarea') {
+                  <textarea [(ngModel)]="formValues[field.key]" [ngModelOptions]="{standalone:true}" [required]="field.required" class="w-full rounded border p-2" style="background:var(--ds-surface);color:var(--ds-text)"></textarea>
+                } @else {
+                  <input [type]="field.type" [(ngModel)]="formValues[field.key]" [ngModelOptions]="{standalone:true}" [required]="field.required" class="w-full rounded border p-2" style="background:var(--ds-surface);color:var(--ds-text)" />
+                }
+              </label>
+            }
             @if (hasDefinedOutcomes()) {
               <div>
                 <p class="mb-2 text-sm text-ink-700 dark:text-dark-200">{{ 'workflow.runtime.task_detail.outcomes' | translate }}</p>

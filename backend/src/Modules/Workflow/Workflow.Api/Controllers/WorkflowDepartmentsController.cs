@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Workflow.Application.Commands.AddDepartmentMember;
@@ -15,6 +17,7 @@ using NWFM.Shared.Results;
 [ApiController]
 [Route("api/workflow/departments")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ManageLookups)]
 public sealed class WorkflowDepartmentsController : WorkflowControllerBase
 {
     private readonly ISender _sender;

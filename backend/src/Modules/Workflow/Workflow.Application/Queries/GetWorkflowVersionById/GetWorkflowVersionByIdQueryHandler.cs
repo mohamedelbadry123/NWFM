@@ -43,7 +43,7 @@ public sealed class GetWorkflowVersionByIdQueryHandler
             v.Activities.Select(MapActivity).ToList(),
             v.Transitions.Select(MapTransition).ToList(),
             v.Variables.Select(MapVariable).ToList(),
-            v.CreatedAt, v.UpdatedAt);
+            v.CreatedAt, v.UpdatedAt, v.WorkspaceJson, v.PinnedChildVersionsJson);
 
     private static ActivityDefinitionDto MapActivity(ActivityDefinition a) =>
         new(a.Id, a.WorkflowVersionId, a.NodeKey, a.ActivityType, a.Name, a.NameAr,

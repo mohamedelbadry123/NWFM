@@ -51,6 +51,7 @@ internal sealed class WorkflowXmlCompiler : IWorkflowXmlCompiler
             var activities = new List<ActivityXmlNode>();
             var transitions = new List<TransitionXmlNode>();
             var variables = new List<VariableXmlNode>();
+            string? workspaceJson = null;
 
             using var stringReader = new System.IO.StringReader(xmlContent);
             using var reader = XmlReader.Create(stringReader, settings);
@@ -83,6 +84,10 @@ internal sealed class WorkflowXmlCompiler : IWorkflowXmlCompiler
 
                     switch (localName)
                     {
+                        case "Workflow":
+                        case "WorkflowDefinition":
+                            workspaceJson = reader.GetAttribute("workspaceJson");
+                            break;
                         case "Activity":
                         {
                             if (activities.Count >= MaxActivities)
@@ -268,12 +273,14 @@ internal sealed class WorkflowXmlCompiler : IWorkflowXmlCompiler
 
             var result = new WorkflowXmlDocument
             {
+                WorkspaceJson = workspaceJson,
                 Activities = activities.AsReadOnly(),
                 Transitions = transitions.AsReadOnly(),
                 Variables = variables.AsReadOnly(),
             };
 
             canonicalHash = ComputeHash(activities, transitions, variables);
+            if (workspaceJson is not null) canonicalHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalHash + workspaceJson)));
             return Result.Success(result);
         }
         catch (XmlException ex)

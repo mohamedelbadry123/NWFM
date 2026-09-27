@@ -1,5 +1,6 @@
 namespace Workflow.Api.Controllers;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Workflow.Application.Settings;
@@ -8,6 +9,7 @@ using Workflow.Application.Settings;
 [ApiController]
 [Route("api/workflow")]
 [Produces("application/json")]
+[Authorize]
 public sealed class WorkflowHealthController : WorkflowControllerBase
 {
     private readonly WorkflowSettings _settings;

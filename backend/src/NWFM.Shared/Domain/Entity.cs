@@ -15,7 +15,12 @@ public abstract class Entity
     /// Required by EF Core to materialise entities from the database.
     /// Must not be used in application code.
     /// </summary>
-    protected Entity() { }
+    protected Entity()
+    {
+        Id = Guid.NewGuid();
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = CreatedAt;
+    }
 
     protected void SetUpdated(DateTime utcNow) => UpdatedAt = utcNow;
 }

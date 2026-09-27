@@ -1,0 +1,58 @@
+<div class="integration-panel request-editor" [class.request-expanded]="expanded()" [attr.role]="expanded()?'dialog':null" [attr.aria-modal]="expanded()?true:null" aria-label="Request editor" (keydown)="editorKey($event)">
+  <header class="integration-toolbar"><h2>{{ kind === 'WaitEvent' ? t('Wait for callback','انتظار حدث وارد') : kind === 'NotificationTask' ? t('Email','بريد إلكتروني') : form.protocol === 'Sms' ? 'SMS' : t('API Request','طلب API') }}</h2><button type="button" (click)="expanded.set(!expanded())">{{ expanded()?t('Close expanded editor','إغلاق المحرر الموسع'):t('Expand editor','توسيع المحرر') }}</button></header>
+  <fieldset [disabled]="readonly || busy()" class="space-y-4">
+    @if(kind !== 'WaitEvent' && nodes.length){
+      <div class="integration-grid">
+        <label>{{ t('Run','التشغيل') }}<select [(ngModel)]="invocation" [ngModelOptions]="standalone"><option value="flow">{{ t('In the workflow sequence','ضمن تسلسل سير العمل') }}</option><option value="trigger">{{ t('When an activity event occurs','عند حدوث حدث في نشاط') }}</option></select></label>
+        @if(invocation === 'trigger'){
+          <label>{{ t('Source activity','النشاط المصدر') }}<select [(ngModel)]="sourceNodeKey" [ngModelOptions]="standalone"><option value="">—</option>@for(node of nodes;track node.nodeKey){<option [value]="node.nodeKey">{{ node.name }}</option>}</select></label>
+          <label>{{ t('Trigger','الحدث') }}<select [(ngModel)]="trigger" [ngModelOptions]="standalone">@for(value of triggers;track value){<option [value]="value">{{ triggerLabel(value) }}</option>}</select></label>
+          <p class="integration-help">{{ t('A dashed trigger link appears after applying. Remove any sequence arrows from this node.','يظهر رابط حدث متقطع بعد التطبيق. أزل أسهم التسلسل من هذه العقدة.') }}</p>
+        }
+      </div>
+    }
+    <label>{{ t('Connection','الاتصال') }}<select [(ngModel)]="form.connectionId" [ngModelOptions]="standalone"><option value="">{{ t('Select connection','اختر الاتصال') }}</option>@for(connection of availableConnections();track connection.id){<option [value]="connection.id">{{ connection.name }} · {{ connection.authentication }}</option>}</select></label>
+    @if(kind === 'ServiceTask'){
+      <div class="request-bar"><label>{{ t('Protocol','البروتوكول') }}<select [(ngModel)]="form.protocol" [ngModelOptions]="standalone"><option value="Rest">REST</option><option value="Soap">SOAP</option><option value="Sms">SMS</option></select></label><label>{{ t('Method','الطريقة') }}<select [(ngModel)]="form.method" [ngModelOptions]="standalone" [disabled]="form.protocol === 'Soap'">@for(method of ['GET','POST','PUT','PATCH','DELETE','HEAD'];track method){<option>{{ method }}</option>}</select></label><label class="request-url">{{ t('URL or path on connection host','الرابط أو المسار على خادم الاتصال') }}<input [(ngModel)]="form.path" [ngModelOptions]="standalone" placeholder="/api/requests" /></label><button type="button" (click)="test()" [disabled]="busy()">{{ t('Send Test','إرسال اختبار') }}</button></div>
+    }
+    <nav class="request-tabs" role="tablist" [attr.aria-label]="t('Request settings','إعدادات الطلب')">@for(item of tabs;track item;let i=$index){<button type="button" role="tab" [attr.aria-selected]="tab()===item" [attr.tabindex]="tab()===item?0:-1" (keydown)="tabKey($event,i)" (click)="tab.set(item)" [class.active]="tab()===item">{{ tabLabel(item) }}</button>}</nav>
+    <section class="integration-grid request-content" role="tabpanel" [attr.aria-label]="tabLabel(tab())">
+      @if(tab() === 'Authorization'){
+        <p class="full">{{ t('Authentication is stored securely with the selected connection. Saved credentials are never included in the workflow.','تُحفظ المصادقة بأمان مع الاتصال المحدد ولا تُضمن بيانات الاعتماد في سير العمل.') }}</p><div class="integration-toolbar full"><button type="button" (click)="managing.set(!managing())">{{ t('Configure connection','إعداد الاتصال') }}</button><button type="button" (click)="refresh()">{{ t('Refresh connections','تحديث الاتصالات') }}</button></div>
+      }
+      @if(tab() === 'Body'){
+        @if(kind === 'ServiceTask'){
+          @if(form.protocol === 'Soap'){<label>{{ t('SOAP version','إصدار SOAP') }}<select [(ngModel)]="form.soapVersion" [ngModelOptions]="standalone"><option>1.1</option><option>1.2</option></select></label><label>{{ t('SOAP action','إجراء SOAP') }}<input [(ngModel)]="form.soapAction" [ngModelOptions]="standalone" /></label>}
+          @if(form.protocol === 'Sms'){<label>{{ t('Recipient','المستلم') }}<input [(ngModel)]="form.smsTo" [ngModelOptions]="standalone" /></label><label>{{ t('Message','الرسالة') }}<textarea [(ngModel)]="form.smsMessage" [ngModelOptions]="standalone"></textarea></label><p class="full integration-help">{{ t('Use {{smsTo}} and {{smsMessage}} in the provider request body.','استخدم {{smsTo}} و {{smsMessage}} في محتوى طلب المزود.') }}</p>}
+          @if(form.protocol !== 'Soap'){<label class="full">{{ t('Content type','نوع المحتوى') }}<select [(ngModel)]="form.contentType" [ngModelOptions]="standalone"><option>application/json</option><option>text/plain</option><option>application/x-www-form-urlencoded</option></select></label>}
+          <label class="full">{{ form.protocol==='Soap'?t('XML envelope','رسالة XML'):t('Request body','محتوى الطلب') }}<textarea class="request-code" rows="10" [(ngModel)]="form.body" [ngModelOptions]="standalone" spellcheck="false"></textarea></label>
+        }
+        @if(kind === 'NotificationTask'){
+          <label class="full">{{ t('To','إلى') }}<input [(ngModel)]="form.to" [ngModelOptions]="standalone" /></label><label>Cc<input [(ngModel)]="form.cc" [ngModelOptions]="standalone" /></label><label>Bcc<input [(ngModel)]="form.bcc" [ngModelOptions]="standalone" /></label><label class="full">{{ t('Subject','الموضوع') }}<input [(ngModel)]="form.subject" [ngModelOptions]="standalone" /></label><label class="full">{{ t('Message','الرسالة') }}<textarea rows="8" [(ngModel)]="form.body" [ngModelOptions]="standalone"></textarea></label><label class="check"><input type="checkbox" [(ngModel)]="form.isHtml" [ngModelOptions]="standalone" />HTML</label>
+        }
+        @if(kind === 'WaitEvent'){
+          <label class="full">{{ t('Event key','مفتاح الحدث') }}<input [(ngModel)]="form.eventKey" [ngModelOptions]="standalone" /></label><label class="full">{{ t('Correlation variable','متغير المطابقة') }}<input [(ngModel)]="form.correlationVariable" [ngModelOptions]="standalone" /></label>
+          @if(form.connectionId){<div class="full"><code>{{ api.webhookUrl(form.connectionId) }}</code><button type="button" (click)="copyCallback()">{{ t('Copy endpoint','نسخ الرابط') }}</button><pre>{{ eventExample() }}</pre><p>{{ t('API key: X-Workflow-Key. HMAC: X-Workflow-Timestamp and X-Workflow-Signature. Reuse eventId when retrying delivery.','مفتاح API: X-Workflow-Key. توقيع HMAC: X-Workflow-Timestamp و X-Workflow-Signature. أعد استخدام eventId عند إعادة الإرسال.') }}</p></div>}
+        }
+        <p class="full integration-help">{{ t('Variables','المتغيرات') }}: @for(variable of variableNames();track variable){<code>{{ '{{'+variable+'}} ' }}</code>}</p>
+      }
+      @for(group of visibleGroups();track group.key){<div class="full"><strong>{{ group.label }}</strong>@for(row of rows[group.key];track $index){<div class="integration-rows"><input [(ngModel)]="row.key" [ngModelOptions]="standalone" [attr.aria-label]="t('Name or variable','الاسم أو المتغير')" placeholder="Name" /><input [(ngModel)]="row.value" [ngModelOptions]="standalone" [attr.aria-label]="t('Value or response path','القيمة أو مسار الاستجابة')" placeholder="Value" /><button type="button" (click)="rows[group.key].splice($index,1)" [attr.aria-label]="t('Remove row','حذف الصف')">×</button></div>}<button type="button" (click)="rows[group.key].push({key:'',value:''})">{{ t('Add field','إضافة حقل') }}</button></div>}
+      @if(tab() === 'Response Mapping' && kind !== 'NotificationTask'){
+        <label class="full">{{ t('Sample response','نموذج الاستجابة') }}<textarea rows="7" [(ngModel)]="sampleResponse" [ngModelOptions]="standalone" class="request-code"></textarea></label><button type="button" (click)="preview()">{{ t('Validate mappings with sample','فحص الربط بالنموذج') }}</button>
+      }
+      @if(tab() === 'Delivery'){
+        @if(kind !== 'WaitEvent'){<label class="check full"><input type="checkbox" [(ngModel)]="required" [ngModelOptions]="standalone" [disabled]="backgroundOnly()" />{{ backgroundOnly()?t('This alert always runs in the background','يعمل هذا التنبيه دائماً في الخلفية'):t('Must succeed before advancing','يجب نجاحه قبل الانتقال') }}</label>}
+        <label>{{ t('Timeout (seconds)','المهلة بالثواني') }}<input type="number" min="1" [(ngModel)]="form.timeoutSeconds" [ngModelOptions]="standalone" /></label>
+        @if(kind !== 'WaitEvent'){<label>{{ t('Maximum attempts','أقصى عدد محاولات') }}<input type="number" min="1" max="10" [(ngModel)]="form.maxAttempts" [ngModelOptions]="standalone" /></label><label>{{ t('Retry delay (seconds)','تأخير المحاولة بالثواني') }}<input type="number" min="1" [(ngModel)]="form.retryDelaySeconds" [ngModelOptions]="standalone" /></label>}
+        @if(kind === 'ServiceTask'){
+          <label>{{ t('Idempotency header','ترويسة منع التكرار') }}<input [(ngModel)]="form.idempotencyHeader" [ngModelOptions]="standalone" /></label><label class="full">{{ t('Success codes (blank = 2xx)','رموز النجاح (فارغ = 2xx)') }}<input [(ngModel)]="statusCodes" [ngModelOptions]="standalone" placeholder="200, 201" /></label>
+          <div class="full"><strong>{{ t('Sample variable values for Send Test','قيم المتغيرات التجريبية') }}</strong>@for(row of rows.testVariables;track $index){<div class="integration-rows"><input [(ngModel)]="row.key" [ngModelOptions]="standalone" aria-label="Variable" /><input [(ngModel)]="row.value" [ngModelOptions]="standalone" aria-label="Value" /><button type="button" (click)="rows.testVariables.splice($index,1)">×</button></div>}<button type="button" (click)="rows.testVariables.push({key:'',value:''})">{{ t('Add test value','إضافة قيمة اختبار') }}</button></div><p class="full integration-help">{{ t('Send Test contacts the selected service using these sample values. Use a test connection.','يرسل الاختبار طلباً إلى الخدمة باستخدام القيم التجريبية. استخدم اتصالاً تجريبياً.') }}</p>
+        }
+      }
+    </section>
+    <button type="button" class="request-apply" (click)="apply()">{{ t('Apply settings','تطبيق الإعدادات') }}</button>
+  </fieldset>
+  @if(managing() && !readonly){<app-workflow-connections [embedded]="true" />}
+  @if(error()){<p role="alert" class="integration-error">{{ error() }}</p>}
+  <section class="response-pane" aria-live="polite"><h3>{{ t('Response','الاستجابة') }}</h3>@if(response();as r){<p>{{ r.statusCode || '—' }} · {{ r.elapsedMilliseconds }} ms · {{ r.success?t('Success','نجاح'):t('Failed','فشل') }}</p><details><summary>{{ t('Headers','الترويسات') }}</summary><pre>{{ formatResponse(r.headers) }}</pre></details><pre class="request-code">{{ formatResponse(parseBody(r.body)) }}</pre>}@if(result()){<details open><summary>{{ t('Result / mapped values','النتيجة / القيم المرتبطة') }}</summary><pre role="status">{{ result() }}</pre></details>}</section>
+</div>

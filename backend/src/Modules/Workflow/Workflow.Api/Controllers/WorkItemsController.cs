@@ -1,6 +1,8 @@
 namespace Workflow.Api.Controllers;
 
+using NWFM.Shared.Constants;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Results;
@@ -23,6 +25,7 @@ using Workflow.Application.Queries.ListOverdueWorkItems;
 [ApiController]
 [Route("api/workflow/work-items")]
 [Produces("application/json")]
+[Authorize(Policy = NwfmPolicies.ClaimTasks)]
 public sealed class WorkItemsController : WorkflowControllerBase
 {
     private readonly ISender _sender;
@@ -127,7 +130,7 @@ public sealed class WorkItemsController : WorkflowControllerBase
             new CompleteWorkItemCommand(
                 workItemId, GetUserId(), GetOrgId(),
                 body.ActionTaken, body.Comment,
-                body.RedirectAssignmentGroupId, body.RedirectDepartmentId),
+                body.RedirectAssignmentGroupId, body.RedirectDepartmentId, body.FormValues),
             cancellationToken);
         if (result.IsFailure) return BadRequest(new { result.Error.Code, result.Error.Message });
         return Ok(result.Value);
@@ -168,6 +171,7 @@ public sealed record CompleteWorkItemRequest(
     string ActionTaken,
     string? Comment = null,
     Guid? RedirectAssignmentGroupId = null,
-    Guid? RedirectDepartmentId = null);
+    Guid? RedirectDepartmentId = null,
+    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null);
 public sealed record ReassignWorkItemRequest(Guid NewAssignmentGroupId);
 public sealed record DelegateWorkItemRequest(Guid DelegateToUserId, string? Comment = null);

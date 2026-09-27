@@ -7,6 +7,8 @@ import { WorkflowVariableDefinitionDto as WorkflowApplicationDtOsWorkflowVariabl
 import { WorkflowValidationStatus as WorkflowDomainEnumsWorkflowValidationStatus } from '../../../../models/Workflow/Domain/Enums/workflow-validation-status';
 import { WorkflowVersionStatus as WorkflowDomainEnumsWorkflowVersionStatus } from '../../../../models/Workflow/Domain/Enums/workflow-version-status';
 export interface WorkflowVersionDetailDto {
+  workspaceJson?: string | null;
+  pinnedChildVersionsJson?: string | null;
   activities?: Array<WorkflowApplicationDtOsActivityDefinitionDto> | null;
   changeSummary?: string | null;
   createdAt?: string;

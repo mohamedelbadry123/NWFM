@@ -31,6 +31,8 @@ public sealed class WorkItem : Entity, ITenantAware
     /// <summary>The action key the user selected to complete the task (e.g. "Approve", "Reject").</summary>
     public string? ActionTaken { get; private set; }
     public string? CommentText { get; private set; }
+    public string? FormDataJson { get; private set; }
+    public void SetFormData(string json) => FormDataJson = json;
 
     /// <summary>Optimistic concurrency token — only one claimant wins a concurrent race.</summary>
     public byte[] RowVersion { get; private set; } = [];

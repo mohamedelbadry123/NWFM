@@ -11,8 +11,8 @@ using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 
 /// <summary>
-/// Persists a durable notification outbox row, marks InApp as delivered, and attempts
-/// SMTP delivery when Email channel + Smtp.Host are both configured.
+/// Persists in-app notifications. External email requires the durable integration
+/// worker and a configured SMTP connection; legacy email calls fail explicitly.
 /// </summary>
 internal sealed class AuditingWorkflowNotificationPublisher : IWorkflowNotificationPublisher
 {
@@ -52,52 +52,18 @@ internal sealed class AuditingWorkflowNotificationPublisher : IWorkflowNotificat
             request.CorrelationId,
             smtpConfigured);
 
-        var emailDelivered = false;
-        if (wantsEmail && smtpConfigured)
+        // External email is delivered only by the durable integration worker. A
+        // legacy publisher call must never send diagnostic mail to the sender.
+        if (wantsInApp)
+            await _logRepo.AddAsync(WorkflowNotificationLog.Create(request.OrganizationId, request.TemplateKey, "InApp",
+                recipientsJson, variablesJson, DateTime.UtcNow, request.CorrelationId, WorkflowNotificationLogStatus.Delivered), cancellationToken);
+        if (wantsEmail)
         {
-            // No user-email resolver is wired yet — log and queue for ops to drain.
-            // When an IUserEmailLookup service is available, resolve addresses here.
-            _logger.LogInformation(
-                "Workflow email SMTP send attempted. TemplateKey={TemplateKey} Host={Host}",
-                request.TemplateKey,
-                _settings.Value.Smtp!.Host);
-
-            var subject = $"Workflow Notification: {request.TemplateKey}";
-            var body    = $"Correlation: {request.CorrelationId}\n{variablesJson}";
-
-            // Without real email addresses for recipient user ids, send diagnostic to FromAddress.
-            var fromAddress = _settings.Value.Smtp.FromAddress;
-            var toAddresses = string.IsNullOrWhiteSpace(fromAddress)
-                ? []
-                : new List<string> { fromAddress };
-
-            emailDelivered = await _smtp.TrySendAsync(toAddresses, subject, body, cancellationToken);
-
-            if (!emailDelivered)
-                _logger.LogInformation(
-                    "No recipient emails resolved or SMTP failed — notification stays Queued. TemplateKey={TemplateKey}",
-                    request.TemplateKey);
+            await _logRepo.AddAsync(WorkflowNotificationLog.Create(request.OrganizationId, request.TemplateKey, "Email",
+                recipientsJson, "{}", DateTime.UtcNow, request.CorrelationId, WorkflowNotificationLogStatus.Failed), cancellationToken);
+            throw new InvalidOperationException("Email delivery requires a Notification activity with a configured SMTP connection.");
         }
-
-        var status = ResolveStatus(wantsEmail, wantsInApp, smtpConfigured, emailDelivered);
-
-        _logger.LogInformation(
-            "Workflow notification persisted. Status={Status} TemplateKey={TemplateKey}",
-            status, request.TemplateKey);
-
-        var log = WorkflowNotificationLog.Create(
-            request.OrganizationId,
-            request.TemplateKey,
-            channels,
-            recipientsJson,
-            variablesJson,
-            DateTime.UtcNow,
-            request.CorrelationId,
-            status);
-
-        await _logRepo.AddAsync(log, cancellationToken);
     }
-
     internal static WorkflowNotificationLogStatus ResolveStatus(
         bool wantsEmail,
         bool wantsInApp,
@@ -110,16 +76,16 @@ internal sealed class AuditingWorkflowNotificationPublisher : IWorkflowNotificat
 
         if (wantsInApp && wantsEmail)
         {
-            if (!smtpConfigured) return WorkflowNotificationLogStatus.Delivered;
+            if (!smtpConfigured) return WorkflowNotificationLogStatus.Failed;
             return emailDelivered
                 ? WorkflowNotificationLogStatus.Delivered
-                : WorkflowNotificationLogStatus.Queued;
+                : WorkflowNotificationLogStatus.Failed;
         }
 
         if (wantsEmail)
             return emailDelivered
                 ? WorkflowNotificationLogStatus.Delivered
-                : WorkflowNotificationLogStatus.Queued;
+                : WorkflowNotificationLogStatus.Failed;
 
         return WorkflowNotificationLogStatus.Logged;
     }

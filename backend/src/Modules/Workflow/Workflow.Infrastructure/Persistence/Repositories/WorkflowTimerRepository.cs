@@ -18,7 +18,8 @@ internal sealed class WorkflowTimerRepository : IWorkflowTimerRepository
         DateTime asOfUtc, int take, CancellationToken cancellationToken = default)
     {
         return await _db.WorkflowTimers
-            .Where(t => t.Status == WorkflowTimerStatus.Pending && t.DueAt <= asOfUtc)
+            .Where(t => t.Status == WorkflowTimerStatus.Pending
+                && t.TimerType != WorkflowTimerType.ExternalSignal && t.DueAt <= asOfUtc)
             .OrderBy(t => t.DueAt)
             .Take(take)
             .ToListAsync(cancellationToken);
