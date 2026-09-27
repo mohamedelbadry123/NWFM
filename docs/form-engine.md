@@ -547,6 +547,8 @@ and the task counts as filled only once each one is. The whole flow:
 
 ### Computed columns
 
+> The how-to guide, with the seeded demo and recipes, is [computed-columns.md](computed-columns.md).
+
 A form can declare **computed columns** — values worked out of each fill and shown beside the task in
 the task grid. They live in the schema document under a root `computed_columns` array, so they are
 versioned with the form:
