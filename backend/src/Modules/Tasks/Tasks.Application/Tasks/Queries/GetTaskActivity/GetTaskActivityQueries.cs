@@ -16,9 +16,13 @@ namespace Tasks.Application.Tasks.Queries.GetTaskActivity;
 [Authorize(Policy = NwfmPolicies.ViewTasks)]
 public sealed record GetTaskTimelineQuery(Guid TaskId) : IRequest<Result<IReadOnlyList<TaskHistoryDto>>>;
 
-/// <summary>Every fill recorded for a task, newest first — the first is what the task currently holds.</summary>
+/// <summary>
+/// Every fill recorded for a task, form by form in the task's order and newest first within a form —
+/// so each form's first is what the task currently holds for it. <see cref="FormDefinitionId"/>
+/// narrows it to one form.
+/// </summary>
 [Authorize(Policy = NwfmPolicies.ViewTasks)]
-public sealed record GetTaskFillsQuery(Guid TaskId) : IRequest<Result<IReadOnlyList<TaskFillDto>>>;
+public sealed record GetTaskFillsQuery(Guid TaskId, Guid? FormDefinitionId = null) : IRequest<Result<IReadOnlyList<TaskFillDto>>>;
 
 /// <summary>The media the task's fills carry.</summary>
 [Authorize(Policy = NwfmPolicies.ViewTasks)]
@@ -57,19 +61,40 @@ public sealed class GetTaskFillsQueryHandler(TaskAccess access, IFormGateway for
             return Result.Failure<IReadOnlyList<TaskFillDto>>(TaskErrors.Task.NotFound);
         }
 
-        // The fills live in the pinned form's own table, filed under this task's id.
-        var records = await forms.ListByContextAsync(
-            task.FormDefinitionId,
-            TasksSchema.FormContextType,
-            task.Id.ToString("D"),
-            ct);
+        var taskForms = task.OrderedForms
+            .Where(f => request.FormDefinitionId is null || f.FormDefinitionId == request.FormDefinitionId)
+            .ToList();
 
-        var fills = new List<TaskFillDto>(records.Count);
-        foreach (var r in records)
+        if (request.FormDefinitionId is not null && taskForms.Count == 0)
         {
-            // Each fill is described through the version it answered, not the task's current pin.
-            var display = await forms.DescribeAnswersAsync(task.FormDefinitionId, r.VersionNo, r.Answers, ct);
-            fills.Add(new TaskFillDto(r.SubmissionId, r.VersionNo, r.SubmittedBy, r.SubmittedByName, r.SubmittedDate, r.Answers, display));
+            return Result.Failure<IReadOnlyList<TaskFillDto>>(TaskErrors.Form.NotOnTask);
+        }
+
+        var fills = new List<TaskFillDto>();
+
+        foreach (var form in taskForms)
+        {
+            // Each form's fills live in its own table, filed under this task's id.
+            var records = await forms.ListByContextAsync(
+                form.FormDefinitionId,
+                TasksSchema.FormContextType,
+                task.Id.ToString("D"),
+                ct);
+
+            foreach (var r in records)
+            {
+                // Each fill is described through the version it answered, not the form's current pin.
+                var display = await forms.DescribeAnswersAsync(form.FormDefinitionId, r.VersionNo, r.Answers, ct);
+                fills.Add(new TaskFillDto(
+                    form.FormDefinitionId,
+                    r.SubmissionId,
+                    r.VersionNo,
+                    r.SubmittedBy,
+                    r.SubmittedByName,
+                    r.SubmittedDate,
+                    r.Answers,
+                    display));
+            }
         }
 
         return Result.Success<IReadOnlyList<TaskFillDto>>(fills);
@@ -90,7 +115,7 @@ public sealed class GetTaskFilesQueryHandler(TaskAccess access, IFormGateway for
         var files = await forms.ListFilesByContextAsync(TasksSchema.FormContextType, task.Id.ToString("D"), ct);
 
         IReadOnlyList<TaskFileDto> result = files
-            .Select(f => new TaskFileDto(f.FileId, f.SubmissionId, f.DataName, f.FileName, f.ContentType, f.SizeBytes, f.Status, f.CreatedAt))
+            .Select(f => new TaskFileDto(f.FormId, f.FileId, f.SubmissionId, f.DataName, f.FileName, f.ContentType, f.SizeBytes, f.Status, f.CreatedAt))
             .ToList();
 
         return Result.Success(result);

@@ -102,13 +102,22 @@
               <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.taskType') }}</span>
               <span class="text-end font-medium">{{ typeName() }}</span>
             </div>
-            <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
-              <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.form') }}</span>
-              <span class="text-end font-medium">
-                {{ formName() }}
-                <span class="app-badge app-badge--code ms-1">v{{ d.task.formVersionNo }}</span>
-              </span>
-            </div>
+            @if (!multiForm()) {
+              <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+                <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.form') }}</span>
+                <span class="text-end font-medium">
+                  {{ formLabel(forms()[0]) }}
+                  <span class="app-badge app-badge--code ms-1">v{{ forms()[0]?.versionNo }}</span>
+                </span>
+              </div>
+            } @else {
+              <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
+                <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.forms.title') }}</span>
+                <span class="text-end font-medium">
+                  {{ t('tasks.forms.progress', { filled: d.task.filledFormCount, total: d.task.requiredFormCount }) }}
+                </span>
+              </div>
+            }
             <div class="flex items-baseline justify-between gap-4 border-b border-dashed border-[var(--app-border)] py-1.5">
               <span class="shrink-0 text-[var(--p-text-muted-color)]">{{ t('tasks.fields.title') }}</span>
               <span class="text-end font-medium">{{ d.task.title || '-' }}</span>
@@ -273,10 +282,100 @@
           </div>
         }
 
-        @if (latestFill(); as latest) {
+        @if (multiForm() || canAttach()) {
+          <!-- One team fills every form; the task counts as filled once each one is. -->
+          <section class="flex flex-col gap-2">
+            <h3 class="text-sm font-semibold">{{ t('tasks.forms.title') }}</h3>
+            <div class="flex flex-col gap-1.5">
+              @for (form of forms(); track form.formDefinitionId; let i = $index) {
+                <div class="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm">
+                  <span class="app-badge app-badge--code">{{ i + 1 }}</span>
+                  <span class="min-w-0 flex-1 truncate font-medium">{{ formLabel(form) }}</span>
+                  <span class="app-badge app-badge--code">v{{ form.versionNo }}</span>
+                  @if (form.source === 'EXTRA') {
+                    <p-tag [value]="t('tasks.forms.source.EXTRA')" severity="secondary" />
+                  }
+                  @if (form.isC2mClosingForm && d.typeClosesC2mActivity && multiForm()) {
+                    <i class="pi pi-flag-fill text-xs text-amber-500" [pTooltip]="t('taskTypes.closingForm')"></i>
+                  }
+                  @if (form.submissionCount > 0) {
+                    <p-tag
+                      icon="pi pi-check"
+                      [value]="t('tasks.forms.filledTimes', { count: form.submissionCount })"
+                      severity="success"
+                      [pTooltip]="(form.lastFilledBy || '') + ' · ' + (form.submittedDate | date: 'yyyy-MM-dd HH:mm')"
+                    />
+                  } @else {
+                    <p-tag [value]="t('tasks.forms.notFilled')" severity="warn" />
+                  }
+                  <p-button
+                    icon="pi pi-eye"
+                    severity="secondary"
+                    size="small"
+                    [text]="true"
+                    [rounded]="true"
+                    [ariaLabel]="t('tasks.actions.previewForm')"
+                    [pTooltip]="t('tasks.actions.previewForm')"
+                    (onClick)="openPreview(null, form.formDefinitionId)"
+                  />
+                  @if (canMigrateForm(form)) {
+                    <p-button
+                      icon="pi pi-arrow-circle-up"
+                      severity="info"
+                      size="small"
+                      [text]="true"
+                      [rounded]="true"
+                      [loading]="formBusy() === form.formDefinitionId"
+                      [ariaLabel]="t('tasks.forms.migrate', { version: form.currentVersionNo })"
+                      [pTooltip]="t('tasks.forms.migrate', { version: form.currentVersionNo })"
+                      (onClick)="migrateForm(form)"
+                    />
+                  }
+                  @if (canDetachForm(form)) {
+                    <p-button
+                      icon="pi pi-times"
+                      severity="danger"
+                      size="small"
+                      [text]="true"
+                      [rounded]="true"
+                      [loading]="formBusy() === form.formDefinitionId"
+                      [ariaLabel]="t('tasks.forms.detach')"
+                      [pTooltip]="t('tasks.forms.detach')"
+                      (onClick)="detachForm(form)"
+                    />
+                  }
+                </div>
+              }
+            </div>
+            @if (canAttach()) {
+              <p-select
+                [options]="attachChoices()"
+                optionLabel="label"
+                optionValue="value"
+                [filter]="true"
+                filterBy="label"
+                [loading]="attaching() || attachOptions() === null"
+                [placeholder]="t('tasks.forms.attach')"
+                [ngModel]="null"
+                (onShow)="loadAttachOptions()"
+                (onFocus)="loadAttachOptions()"
+                (onChange)="attachForm($event.value)"
+                appendTo="body"
+                styleClass="w-full sm:w-96"
+              />
+            }
+          </section>
+        }
+
+        @for (latest of latestFills(); track latest.submissionId) {
           <section class="flex flex-col gap-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold">{{ t('tasks.detail.latestFill') }}</h3>
+              <h3 class="text-sm font-semibold">
+                {{ t('tasks.detail.latestFill') }}
+                @if (multiForm()) {
+                  <span class="font-normal text-[var(--p-text-muted-color)]">— {{ fillFormLabel(latest) }}</span>
+                }
+              </h3>
             </div>
             <ng-container *ngTemplateOutlet="fillCard; context: { $implicit: latest }" />
           </section>
@@ -531,6 +630,9 @@
           <div class="rounded border border-surface-200 p-3 dark:border-surface-700">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span class="text-xs text-surface-500">
+                @if (multiForm()) {
+                  <span class="font-medium">{{ fillFormLabel(fill) }}</span> ·
+                }
                 {{ fill.submittedDate | date: 'yyyy-MM-dd HH:mm' }}
                 · {{ fill.submittedByName || fill.submittedBy || '-' }}
                 · <span class="app-badge app-badge--code">v{{ fill.versionNo }}</span>
@@ -574,7 +676,12 @@
   </p-dialog>
 
   <!-- Outside the details dialog, so a long form or a map is not clipped by its scroll container. -->
-  <app-task-preview-dialog [(visible)]="previewVisible" [taskId]="taskId()" [submissionId]="previewSubmissionId()" />
+  <app-task-preview-dialog
+    [(visible)]="previewVisible"
+    [taskId]="taskId()"
+    [submissionId]="previewSubmissionId()"
+    [formId]="previewFormId()"
+  />
 
   <app-task-answer-map-dialog [(visible)]="answerMapVisible" [point]="answerMapPoint()" [label]="answerMapLabel()" />
 </ng-container>

@@ -37,7 +37,9 @@
     "reset": "Reset",
     "apply": "Apply",
     "download": "Download",
-    "warning": "Warning"
+    "warning": "Warning",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "error": {
     "ProcessingPurpose.NotFound": "Processing purpose not found.",
@@ -101,7 +103,11 @@
     "Auth.TeamLoginNotFound": "This team has no login yet.",
     "Tasks.C2m.NotRetryable": "Only an approved task whose C2M closure was refused or failed can be sent again.",
     "Tasks.C2mMapping.NotFound": "The C2M action mapping could not be found.",
-    "Tasks.C2mMapping.DuplicateCode": "A mapping for this action code already exists."
+    "Tasks.C2mMapping.DuplicateCode": "A mapping for this action code already exists.",
+    "FormEngine.Form.InvalidFieldActivity": "The field activity is not an active activity of the chosen department.",
+    "Tasks.TaskForm.NotFound": "That form is not one of the task's forms.",
+    "Tasks.TaskForm.Duplicate": "The task already carries that form.",
+    "Tasks.TaskForm.ChoiceRequired": "Choose which of the task's forms is being filled."
   },
   "workflow": {
     "common": {
@@ -2322,7 +2328,9 @@
       "value": "Value",
       "addCondition": "Add Condition",
       "preserveData": "Preserve data in this field even when it's invisible.",
-      "preserveDataHint": "Enabling this preserves the value even when the field is conditionally hidden."
+      "preserveDataHint": "Enabling this preserves the value even when the field is conditionally hidden.",
+      "conditionTitle": "When this rule applies",
+      "conditionHint": "The computed column takes this rule's value when these conditions hold."
     },
     "match": {
       "all": "All",
@@ -2366,7 +2374,57 @@
     "actionsHeading": "Actions",
     "backToForms": "Back to forms",
     "sandboxTitle": "Form builder sandbox",
-    "sandboxSubtitle": "Try the field palette out. Nothing here is saved."
+    "sandboxSubtitle": "Try the field palette out. Nothing here is saved.",
+    "computed": {
+      "open": "Computed columns ({{count}})",
+      "title": "Computed columns",
+      "hint": "Values worked out of each fill and shown beside the task in the task grid. Each column tries its rules in order and falls back to its default. Save the form to keep changes.",
+      "untitled": "(untitled)",
+      "empty": "No computed columns yet.",
+      "addColumn": "Add column",
+      "key": "Key",
+      "keyHint": "Lower-case letters, digits and _, starting with a letter.",
+      "outputType": "Output",
+      "outputTypes": {
+        "text": "Text",
+        "number": "Number"
+      },
+      "labelEn": "Column title (English)",
+      "labelAr": "Column title (Arabic)",
+      "showInGrid": "Show in the task grid by default",
+      "rules": "Rules",
+      "if": "If",
+      "elseIf": "Else if",
+      "then": "then",
+      "expressionPlaceholder": "e.g. 'High' or round(width * height, 2)",
+      "addRule": "Add rule",
+      "otherwise": "Otherwise",
+      "value": "Value",
+      "setConditions": "Set conditions",
+      "conditionCount": "{{count}} condition(s)",
+      "unknownFields": "Not a field of the form: {{fields}}",
+      "helpTitle": "Writing a value",
+      "helpText": "Text goes in quotes: 'High'. A quote inside is doubled: 'it''s'.",
+      "helpFields": "A field's answer is its data name: leak_size.",
+      "helpMath": "Numbers combine with + - * / and parentheses. A blank answer makes the result blank.",
+      "helpFunctions": "Functions: sum, min, max (skip blanks), round(x, digits), abs, coalesce (first non-blank), concat.",
+      "apply": "Apply",
+      "problems": {
+        "key": "the key must start with a lower-case letter and hold only lower-case letters, digits and _.",
+        "duplicate": "another column has the same key.",
+        "labels": "needs an English and an Arabic title.",
+        "noValue": "needs a rule or a value.",
+        "noConditions": "rule {{rule}} needs at least one condition.",
+        "expression": "rule {{rule}}'s value does not read correctly.",
+        "defaultExpression": "the default value does not read correctly."
+      },
+      "keyAuto": "Made from the English title as you type. You rarely need to change it.",
+      "keyStable": "Saved with the form. Avoid changing it once published: the task grid sorts and remembers columns by it.",
+      "changeKey": "Change",
+      "labelEnPlaceholder": "e.g. Leak severity",
+      "insertField": "Insert a field into the value you last clicked",
+      "helpExamples": "Examples: 'High' · leak_rate_lph * hours_leaking / 1000 · round(sum(a, b) / 2, 1) · concat(pipe_material, ' pipe')"
+    }
   },
   "formly": {
     "moreSelected": "+{{count}} more",
@@ -2575,7 +2633,12 @@
       "view": "View submission",
       "renderedWithVersion": "Shown with the version it was answered on.",
       "empty": "Nothing has been submitted yet."
-    }
+    },
+    "fieldActivity": "Field activity",
+    "fieldActivityPlaceholder": "Choose the field activity",
+    "selectDepartmentFirst": "Choose a department first",
+    "departmentPlaceholder": "Choose the department",
+    "noFieldActivities": "This department has no active field activities."
   },
   "tasks": {
     "title": "Field tasks",
@@ -2695,10 +2758,14 @@
     "create": {
       "title": "New task",
       "typePlaceholder": "Choose a task type",
-      "publishedOnlyHint": "Only types whose form has a published version are listed.",
+      "publishedOnlyHint": "Only types whose forms all have a published version are listed.",
       "formHint": "Filled with {{form}} v{{version}}",
       "slaHint": "{{hours}}h to fill once assigned",
-      "numberPlaceholder": "Leave blank to generate"
+      "numberPlaceholder": "Leave blank to generate",
+      "formsHint": "Filled with {{forms}}",
+      "extraForms": "Additional forms",
+      "extraFormsPlaceholder": "Add forms for this task only",
+      "extraFormsHint": "Filled by the same team, after the type's forms. The task is filled once every form is."
     },
     "edit": {
       "title": "Edit task {{number}}",
@@ -2731,7 +2798,9 @@
       "valid": "Ready to submit",
       "invalidCount": "{{count}} field(s) need attention",
       "editingPrevious": "Editing the fill by {{by}} on {{date}}.",
-      "returnedBecause": "Returned: {{reason}}"
+      "returnedBecause": "Returned: {{reason}}",
+      "formsProgress": "{{filled}} of {{total}} forms filled",
+      "formSaved": "Form saved — {{filled}} of {{total}} forms filled."
     },
     "detail": {
       "title": "Task details",
@@ -2767,7 +2836,9 @@
     "migrateVersion": {
       "tooltip": "Move to form version {{version}}",
       "success": "The task now uses form version {{version}}.",
-      "failed": "The task could not be moved to the newer form version."
+      "failed": "The task could not be moved to the newer form version.",
+      "tooltipMany": "Move unfilled forms to their newest versions",
+      "successMany": "{{count}} form(s) moved to their newest versions."
     },
     "messages": {
       "loadFailed": "Tasks could not be loaded.",
@@ -2829,11 +2900,31 @@
         "FAILED": "Failed",
         "SKIPPED": "Skipped"
       }
+    },
+    "forms": {
+      "title": "Forms",
+      "progress": "{{filled}} of {{total}} forms filled",
+      "source": {
+        "TYPE": "From type",
+        "EXTRA": "Added"
+      },
+      "filledTimes": "Filled ×{{count}}",
+      "notFilled": "Not filled",
+      "migrate": "Move to version {{version}}",
+      "detach": "Remove this form",
+      "attach": "Add a form to this task",
+      "attached": "The form was added to the task.",
+      "detached": "The form was removed from the task.",
+      "migrated": "The form now uses its newest version."
+    },
+    "columns": {
+      "computed": "Computed columns",
+      "computedCount": "{{count}} computed column(s)"
     }
   },
   "taskTypes": {
     "title": "Task types",
-    "subtitle": "Each kind of field work, and the form its tasks are filled with.",
+    "subtitle": "Each kind of field work, and the forms its tasks are filled with.",
     "new": "New task type",
     "edit": "Edit task type",
     "empty": "No task types yet.",
@@ -2847,7 +2938,7 @@
     "form": "Form",
     "formPlaceholder": "Choose a published form",
     "formHint": "New tasks of this type pin this form's current version.",
-    "formChangeHint": "Tasks already raised keep the form they were raised with; only new tasks use the new one.",
+    "formChangeHint": "Tasks already raised keep the forms they were raised with; only new tasks use the new list.",
     "formNotPublished": "Not published",
     "formMissing": "Form not found",
     "sla": "SLA (fill / review)",
@@ -2862,7 +2953,12 @@
     "created": "Task type created.",
     "updated": "Task type updated.",
     "closesC2mActivity": "Closes the C2M field activity",
-    "closesC2mActivityHint": "This type's form is the closing form: approving one of its tasks that carries an FA id closes that activity in C2M, with the outcome its Action Taken answer maps to."
+    "closesC2mActivityHint": "This type's form is the closing form: approving one of its tasks that carries an FA id closes that activity in C2M, with the outcome its Action Taken answer maps to.",
+    "forms": "Forms",
+    "addForm": "Add a published form",
+    "formsRequired": "Add at least one form.",
+    "formsHint": "Tasks of this type pin each form's current version, in this order. One team fills them all; a task is filled once every form is.",
+    "closingForm": "C2M closing form"
   },
   "teams": {
     "title": "Field teams",

@@ -10,6 +10,7 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { MessageService } from 'primeng/api';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 
 import { TranslateContextDirective } from '../../../../core/i18n/translate-context.directive';
@@ -18,7 +19,7 @@ import { apiErrorMessage } from '../../../../core/api/api-error-message';
 import { LookupsService } from '../../../../core/lookups/lookups.service';
 import { TasksService } from '../../../../core/tasks/tasks.service';
 import { TaskTypesService } from '../../../../core/tasks/task-types.service';
-import { TaskType } from '../../../../core/tasks/tasks.models';
+import { FormOption, TaskType } from '../../../../core/tasks/tasks.models';
 import { OrgScopeSelectorComponent } from '../../../../shared/components/org-scope/org-scope-selector.component';
 import { EMPTY_ORG_LOCATION, OrgLocation } from '../../../../shared/components/org-scope/org-scope.model';
 import { GeoMapComponent } from '../../../../shared/components/geo-map/geo-map.component';
@@ -30,9 +31,13 @@ interface SelectOption {
   readonly value: string;
 }
 
+/** A max the server enforces too (`FieldTask.MaxForms`). */
+const MAX_TASK_FORMS = 15;
+
 /**
- * Raises a task by hand. Only active types whose form has a published version are offered — the
- * API refuses anything else, because a task pins a published version of its type's form.
+ * Raises a task by hand. Only active types whose forms all have a published version are offered —
+ * the API refuses anything else, because a task pins a published version of each of its type's
+ * forms. Forms can be added to the one task on top of its type's; the same team fills them all.
  */
 @Component({
   selector: 'app-task-create-dialog',
@@ -47,6 +52,7 @@ interface SelectOption {
     InputTextModule,
     TextareaModule,
     SelectModule,
+    MultiSelectModule,
     OrgScopeSelectorComponent,
     GeoMapComponent,
   ],
@@ -68,13 +74,24 @@ export class TaskCreateDialogComponent {
   protected readonly loadingOptions = signal(false);
   protected readonly types = signal<TaskType[]>([]);
   protected readonly departments = signal<SelectOption[]>([]);
+  protected readonly extraForms = signal<FormOption[]>([]);
 
   protected readonly typeOptions = computed<SelectOption[]>(() =>
     this.types()
-      // A type whose form has nothing published cannot raise a task; offering it only to be refused helps nobody.
-      .filter((type) => type.formCurrentVersionNo !== null)
+      // A type with a form that has nothing published cannot raise a task; offering it only to be refused helps nobody.
+      .filter((type) => type.forms.length > 0 && type.forms.every((f) => f.currentVersionNo !== null))
       .map((type) => ({ label: `${type.code} — ${this.name(type)}`, value: type.id })),
   );
+
+  /** Published forms that can be added: any not already the chosen type's. */
+  protected readonly extraFormOptions = computed<SelectOption[]>(() => {
+    const typeForms = new Set((this.selectedType()?.forms ?? []).map((f) => f.formDefinitionId));
+    return this.extraForms()
+      .filter((f) => !typeForms.has(f.id))
+      .map((f) => ({ label: `${f.code} — ${this.name(f)} (v${f.currentVersionNo})`, value: f.id }));
+  });
+
+  protected readonly maxExtraForms = computed(() => Math.max(0, MAX_TASK_FORMS - (this.selectedType()?.forms.length ?? 0)));
 
   protected readonly priorityOptions = computed<SelectOption[]>(() =>
     TASK_PRIORITIES.map((value) => ({ label: this.translate.instant(`tasks.priority.${value}`), value })),
@@ -95,6 +112,7 @@ export class TaskCreateDialogComponent {
     wfmTicketId: this.fb.control<string>('', Validators.pattern(/^d{1,15}$/)),
     priority: this.fb.control<string>(TaskPriority.Normal, Validators.required),
     departmentCode: this.fb.control<string | null>(null),
+    extraFormDefinitionIds: this.fb.control<string[]>([]),
     notes: this.fb.control<string>('', Validators.maxLength(1000)),
     dueDate: this.fb.control<Date | null>(null),
     completionDueDate: this.fb.control<Date | null>(null),
@@ -104,7 +122,7 @@ export class TaskCreateDialogComponent {
   protected readonly selectedType = signal<TaskType | null>(null);
 
   protected onShow(): void {
-    this.form.reset({ priority: TaskPriority.Normal });
+    this.form.reset({ priority: TaskPriority.Normal, extraFormDefinitionIds: [] });
     this.selectedType.set(null);
     this.location.set({ ...EMPTY_ORG_LOCATION });
     // A fresh identity is what tells the picker to clear its cascade for the new task.
@@ -117,6 +135,13 @@ export class TaskCreateDialogComponent {
   protected onTypeChange(typeId: string | null): void {
     const type = this.types().find((t) => t.id === typeId) ?? null;
     this.selectedType.set(type);
+
+    // An extra form the new type already lists would be pinned twice; drop it.
+    const typeForms = new Set((type?.forms ?? []).map((f) => f.formDefinitionId));
+    const extras = this.form.controls.extraFormDefinitionIds.value ?? [];
+    if (extras.some((id) => typeForms.has(id))) {
+      this.form.controls.extraFormDefinitionIds.setValue(extras.filter((id) => !typeForms.has(id)));
+    }
 
     // The type names the department its work belongs to; start there, and let the operator change it.
     if (type?.departmentCode && !this.form.controls.departmentCode.value) {
@@ -152,6 +177,7 @@ export class TaskCreateDialogComponent {
     this.tasksApi
       .create({
         taskTypeId: value.taskTypeId!,
+        extraFormDefinitionIds: value.extraFormDefinitionIds ?? [],
         taskNumber: value.taskNumber?.trim() || null,
         title: value.title?.trim() || null,
         externalReference: value.externalReference?.trim() || null,
@@ -195,9 +221,16 @@ export class TaskCreateDialogComponent {
     this.visible.set(false);
   }
 
+  /** The type's forms, in order, as a crew meets them. */
+  protected typeForms(type: TaskType): string[] {
+    return [...type.forms]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((f) => `${f.code ?? '?'} (v${f.currentVersionNo ?? '?'})`);
+  }
+
   private loadOptions(): void {
     this.loadingOptions.set(true);
-    let pending = 2;
+    let pending = 3;
     const done = () => {
       pending -= 1;
       if (pending === 0) {
@@ -208,6 +241,12 @@ export class TaskCreateDialogComponent {
     this.taskTypesApi.active().subscribe({
       next: (res) => this.types.set(res.value ?? []),
       error: () => this.types.set([]),
+      complete: done,
+    });
+
+    this.tasksApi.formOptions().subscribe({
+      next: (res) => this.extraForms.set(res.value ?? []),
+      error: () => this.extraForms.set([]),
       complete: done,
     });
 

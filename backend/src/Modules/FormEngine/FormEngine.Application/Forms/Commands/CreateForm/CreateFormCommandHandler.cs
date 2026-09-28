@@ -7,12 +7,14 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Exceptions;
+using NWFM.Shared.Integration.Organization;
 using NWFM.Shared.Results;
 
 namespace FormEngine.Application.Forms.Commands.CreateForm;
 
 public sealed class CreateFormCommandHandler(
     IFormEngineDbContext context,
+    IOrgDirectory directory,
     ICurrentUser user,
     TimeProvider timeProvider)
     : IRequestHandler<CreateFormCommand, Result<FormDetailDto>>
@@ -26,6 +28,14 @@ public sealed class CreateFormCommandHandler(
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.DuplicateCode(code));
         }
 
+        var department = request.DepartmentCode!.Trim();
+        var activity = request.FieldActivityCode!.Trim();
+
+        if (!await directory.IsFieldActivityInDepartmentAsync(department, activity, ct))
+        {
+            return Result.Failure<FormDetailDto>(FormEngineErrors.Form.InvalidFieldActivity(department, activity));
+        }
+
         try
         {
             var form = FormDefinition.Create(
@@ -33,7 +43,8 @@ public sealed class CreateFormCommandHandler(
                 request.NameEn,
                 request.NameAr,
                 request.Category,
-                request.DepartmentCode,
+                department,
+                activity,
                 user.Id,
                 timeProvider.GetUtcNow().UtcDateTime);
 

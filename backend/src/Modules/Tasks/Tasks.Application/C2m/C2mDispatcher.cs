@@ -82,10 +82,24 @@ public sealed class C2mDispatcher(
             return C2mDispatchOutcome.AlreadyAcknowledged(settled.ResponseCode);
         }
 
+        // The closing form's answers say how the activity closes; the task's other forms are its own
+        // record. Read from the table when the caller loaded the task without its forms.
+        var closingForm = task.C2mClosingForm ?? await db.TaskForms
+            .AsNoTracking()
+            .Where(f => f.FieldTaskId == task.Id)
+            .OrderByDescending(f => f.IsC2mClosingForm)
+            .ThenBy(f => f.SortOrder)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (closingForm is null)
+        {
+            return C2mDispatchOutcome.Skipped("The task carries no form to close the activity with.");
+        }
+
         var contextId = task.Id.ToString("D");
-        var fill = await forms.GetLatestByContextAsync(task.FormDefinitionId, TasksSchema.FormContextType, contextId, cancellationToken);
+        var fill = await forms.GetLatestByContextAsync(closingForm.FormDefinitionId, TasksSchema.FormContextType, contextId, cancellationToken);
         var answers = fill?.Answers ?? new Dictionary<string, object?>();
-        var fields = await forms.GetFieldsAsync(task.FormDefinitionId, fill?.VersionNo ?? task.FormVersionNo, cancellationToken);
+        var fields = await forms.GetFieldsAsync(closingForm.FormDefinitionId, fill?.VersionNo ?? closingForm.FormVersionNo, cancellationToken);
         var byName = new Dictionary<string, object?>(answers, StringComparer.OrdinalIgnoreCase);
 
         var actionCode = AsText(byName.GetValueOrDefault(C2mFieldNames.ActionTaken));

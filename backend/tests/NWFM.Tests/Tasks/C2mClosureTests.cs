@@ -99,7 +99,7 @@ public sealed class C2mClosureTests : IDisposable
         var task = TaskTestData.Task(type);
         task.SetFieldActivity(faId, 77, "admin", Now);
         task.Assign(Guid.NewGuid(), "supervisor", null, null, null, Now);
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
         _db.TaskTypes.Add(type);
         _db.Tasks.Add(task);

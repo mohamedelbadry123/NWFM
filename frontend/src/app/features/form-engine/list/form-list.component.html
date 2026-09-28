@@ -33,6 +33,7 @@
         <th>{{ 'forms.code' | translate }}</th>
         <th>{{ 'forms.name' | translate }}</th>
         <th>{{ 'forms.category' | translate }}</th>
+        <th>{{ 'forms.fieldActivity' | translate }}</th>
         <th>{{ 'forms.status' | translate }}</th>
         <th class="text-center">{{ 'forms.version' | translate }}</th>
         <th class="w-56 text-center">{{ 'common.actions' | translate }}</th>
@@ -62,6 +63,7 @@
             <ng-template let-option pTemplate="selectedItem">{{ option.labelKey | translate }}</ng-template>
           </p-select>
         </th>
+        <th></th>
         <th>
           <!-- Opens on "Active", so archived forms stay out until they are asked for. -->
           <p-select
@@ -87,6 +89,14 @@
         <td class="font-mono text-sm">{{ form.code }}</td>
         <td>{{ nameOf()(form) }}</td>
         <td>{{ 'forms.categories.' + form.category | translate }}</td>
+        <td>
+          @if (form.fieldActivityCode) {
+            <div>{{ activityName()(form) }}</div>
+            <small class="opacity-60">{{ departmentName()(form) }}</small>
+          } @else {
+            <span class="opacity-50">—</span>
+          }
+        </td>
         <td>
           <p-tag [value]="statusLabelKey(form.status) | translate" [severity]="statusSeverity(form.status)" />
         </td>
@@ -158,7 +168,7 @@
 
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="6" class="text-center py-4">{{ 'forms.empty' | translate }}</td>
+        <td colspan="7" class="text-center py-4">{{ 'forms.empty' | translate }}</td>
       </tr>
     </ng-template>
   </p-table>

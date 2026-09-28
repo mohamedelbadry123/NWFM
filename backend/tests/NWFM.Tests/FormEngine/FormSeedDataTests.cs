@@ -28,6 +28,7 @@ public sealed class FormSeedDataTests
     [Theory]
     [InlineData("fulcrum-field-survey-import.json")]
     [InlineData("all-input-types.json")]
+    [InlineData("leak-inspection-computed.json")]
     public void EverySeed_IsValidAndPublishable(string fileName)
     {
         var json = ReadResource(fileName);
@@ -43,6 +44,47 @@ public sealed class FormSeedDataTests
         var writable = FormWritableFields.Of(schema).Select(f => f.Name).ToList();
         writable.Should().OnlyHaveUniqueItems();
         writable.Should().NotContain(name => FormSubmissionColumns.IsBase(name));
+
+        // A seed whose computed columns the designer would refuse would also refuse to publish.
+        FormComputedColumnValidator.Validate(schema).Should().BeEmpty();
+    }
+
+    /// <summary>The demo's computed columns, against the answers the task seed fills its tasks with.</summary>
+    [Theory]
+    [InlineData(1200, 6, 180, true, null, null, "Critical", 7.2, "Immediate", null)]
+    [InlineData(650, 12, 20, false, 10450.0, 10458.4, "High", 7.8, "Same day", 8.4)]
+    [InlineData(150, 48, 4, false, null, null, "Medium", 7.2, "Same day", null)]
+    [InlineData(12.5, 72, 1, false, 2210.0, 2210.9, "Low", 0.9, "Scheduled", 0.9)]
+    public void LeakInspectionSeed_WorksOutItsComputedColumns(
+        double rate,
+        double hours,
+        int customers,
+        bool hazard,
+        double? meterStart,
+        double? meterEnd,
+        string severity,
+        double waterLost,
+        string response,
+        double? meteredUse)
+    {
+        var schema = FormSchemaParser.Parse(ReadResource("leak-inspection-computed.json"));
+        var answers = new Dictionary<string, object?>
+        {
+            ["pipe_material"] = "pvc",
+            ["leak_rate_lph"] = (decimal)rate,
+            ["hours_leaking"] = (decimal)hours,
+            ["customers_affected"] = customers,
+            ["is_safety_hazard"] = hazard,
+            ["meter_start"] = (decimal?)meterStart,
+            ["meter_end"] = (decimal?)meterEnd,
+        };
+
+        var values = FormComputedColumnEvaluator.Evaluate(schema, answers).ToDictionary(v => v.Key);
+
+        values["severity"].Text.Should().Be(severity);
+        values["water_lost_m3"].Number.Should().Be((decimal)waterLost);
+        values["response"].Text.Should().Be(response);
+        values["metered_use_m3"].Number.Should().Be((decimal?)meteredUse);
     }
 
     [Fact]

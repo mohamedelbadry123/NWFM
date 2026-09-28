@@ -36,6 +36,12 @@ public sealed class GetFormsQueryHandler(IFormEngineDbContext context)
             query = query.Where(x => x.DepartmentCode == department);
         }
 
+        if (!string.IsNullOrWhiteSpace(request.FieldActivityCode))
+        {
+            var activity = request.FieldActivityCode.Trim();
+            query = query.Where(x => x.FieldActivityCode == activity);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
             var term = request.SearchTerm.Trim();
@@ -61,6 +67,7 @@ public sealed class GetFormsQueryHandler(IFormEngineDbContext context)
                 Category = x.Category,
                 Status = x.Status,
                 DepartmentCode = x.DepartmentCode,
+                FieldActivityCode = x.FieldActivityCode,
                 CurrentVersionNo = x.CurrentVersionNo,
                 IsActive = x.IsActive,
                 CreatedAt = x.CreatedAt,

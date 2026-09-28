@@ -12,7 +12,10 @@ public static class TasksSchema
     public const string PreviousName = "TK";
 
     public const string TaskTypes = "TaskTypes";
+    public const string TaskTypeForms = "TaskTypeForms";
     public const string Tasks = "Tasks";
+    public const string TaskForms = "TaskForms";
+    public const string TaskComputedValues = "TaskComputedValues";
     public const string TaskAssignments = "TaskAssignments";
     public const string TaskStatusHistory = "TaskStatusHistory";
     public const string C2mActionMappings = "C2mActionMappings";

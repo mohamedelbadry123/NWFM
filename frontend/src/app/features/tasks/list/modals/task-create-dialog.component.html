@@ -35,7 +35,7 @@
         }
         @if (selectedType(); as type) {
           <small class="text-surface-500">
-            {{ t('tasks.create.formHint', { form: type.formCode, version: type.formCurrentVersionNo }) }}
+            {{ t('tasks.create.formsHint', { forms: typeForms(type).join(', ') }) }}
             @if (type.fillSlaHours) {
               · {{ t('tasks.create.slaHint', { hours: type.fillSlaHours }) }}
             }
@@ -44,6 +44,27 @@
           <small class="text-surface-500">{{ t('tasks.create.publishedOnlyHint') }}</small>
         }
       </div>
+
+      @if (selectedType() && extraForms().length > 0) {
+        <div class="flex flex-col gap-2">
+          <label for="task-extra-forms" class="text-sm font-medium">{{ t('tasks.create.extraForms') }}</label>
+          <p-multiselect
+            inputId="task-extra-forms"
+            formControlName="extraFormDefinitionIds"
+            [options]="extraFormOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [filter]="true"
+            filterBy="label"
+            [selectionLimit]="maxExtraForms()"
+            display="chip"
+            [placeholder]="t('tasks.create.extraFormsPlaceholder')"
+            appendTo="body"
+            styleClass="w-full"
+          />
+          <small class="text-surface-500">{{ t('tasks.create.extraFormsHint') }}</small>
+        </div>
+      }
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="flex flex-col gap-2 sm:col-span-2">

@@ -165,16 +165,34 @@ export function canReassign(status?: string | null, submissionCount?: number | n
   return canRunTaskAction('assign', status) && (submissionCount ?? 0) === 0;
 }
 
-/** A newer form version can be pinned only while nothing has been filled against the current one. */
-export function canMigrateVersion(task: {
-  status?: string | null;
-  submissionCount?: number | null;
-  formVersionNo: number;
-  formCurrentVersionNo: number | null;
-}): boolean {
-  return canReassign(task.status, task.submissionCount)
-    && task.formCurrentVersionNo !== null
-    && task.formCurrentVersionNo > task.formVersionNo;
+/** The version facts of one of a task's forms. */
+export interface TaskFormVersionFacts {
+  versionNo: number;
+  currentVersionNo: number | null;
+  submissionCount: number;
+}
+
+/**
+ * One form can move to a newer version only while nothing has been filled against it, and only on a
+ * task still open — the answers already taken elsewhere on the task do not bind this form.
+ */
+export function canMigrateFormVersion(status: string | null | undefined, form: TaskFormVersionFacts): boolean {
+  return !!status
+    && status !== TaskStatus.Approved
+    && status !== TaskStatus.Expired
+    && form.submissionCount === 0
+    && form.currentVersionNo !== null
+    && form.currentVersionNo > form.versionNo;
+}
+
+/** Whether any of the task's forms has a newer version it can still move to. */
+export function canMigrateVersion(task: { status?: string | null; forms: TaskFormVersionFacts[] }): boolean {
+  return task.forms.some((form) => canMigrateFormVersion(task.status, form));
+}
+
+/** "filled/required" for a task with more than one form; null for a single-form task, where the status says it all. */
+export function formsProgress(task: { forms: unknown[]; filledFormCount: number; requiredFormCount: number }): string | null {
+  return task.forms.length > 1 ? `${task.filledFormCount}/${task.requiredFormCount}` : null;
 }
 
 /**

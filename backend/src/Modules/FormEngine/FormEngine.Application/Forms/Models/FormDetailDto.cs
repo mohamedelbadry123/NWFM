@@ -9,6 +9,7 @@ public sealed class FormDetailDto
     public string Category { get; init; } = default!;
     public string Status { get; init; } = default!;
     public string? DepartmentCode { get; init; }
+    public string? FieldActivityCode { get; init; }
     public int? CurrentVersionNo { get; init; }
     public bool IsActive { get; init; }
     public string? CreatedBy { get; init; }

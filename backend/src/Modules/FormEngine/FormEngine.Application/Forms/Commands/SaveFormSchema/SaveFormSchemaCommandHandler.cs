@@ -38,6 +38,13 @@ public sealed class SaveFormSchemaCommandHandler(
             // the grid and the designer never disagree about what a form is called.
             var schema = FormSchemaParser.Parse(request.SchemaJson);
 
+            // Computed columns are checked on every save, not just at publish: a column naming a
+            // field that has since been renamed is caught while the author is still in the designer.
+            if (FormComputedColumnValidator.Validate(schema) is { Count: > 0 } problems)
+            {
+                return Result.Failure<FormDetailDto>(FormEngineErrors.Schema.InvalidComputedColumn(problems));
+            }
+
             form.SetSchema(
                 request.SchemaJson,
                 schema.NameEn,

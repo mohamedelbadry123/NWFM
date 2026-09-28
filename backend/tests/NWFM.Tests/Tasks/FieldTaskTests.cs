@@ -36,8 +36,7 @@ public sealed class FieldTaskTests
             {
                 TaskNumber = "TSK-X",
                 TaskTypeId = type.Id,
-                FormDefinitionId = type.FormDefinitionId,
-                FormVersionNo = 1,
+                Forms = [new TaskFormDraft(TaskTestData.FormId, 1, TaskFormSources.Type)],
                 Location = new TaskLocation(latitude, longitude, null, null, null, null, null),
             },
             Now);
@@ -76,7 +75,7 @@ public sealed class FieldTaskTests
     {
         var task = NewTask();
         task.Assign(TeamA, "supervisor", null, null, null, Now);
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
         var act = () => task.Assign(TeamB, "supervisor", null, null, null, Now);
 
@@ -90,7 +89,7 @@ public sealed class FieldTaskTests
         task.Assign(TeamA, "supervisor", null, null, null, Now);
         var submissionId = Guid.NewGuid();
 
-        task.RecordFill(submissionId, "crew", Now);
+        task.RecordFill(TaskTestData.FormId, submissionId, "crew", Now);
 
         task.Status.Should().Be(TaskStatuses.Submitted);
         task.SubmissionCount.Should().Be(1);
@@ -105,8 +104,8 @@ public sealed class FieldTaskTests
         var task = NewTask();
         var submissionId = Guid.NewGuid();
 
-        task.RecordFill(submissionId, "crew", Now);
-        task.RecordFill(submissionId, "crew", Now);
+        task.RecordFill(TaskTestData.FormId, submissionId, "crew", Now);
+        task.RecordFill(TaskTestData.FormId, submissionId, "crew", Now);
 
         task.SubmissionCount.Should().Be(1);
         task.History.Count(h => h.ToStatus == TaskStatuses.Submitted).Should().Be(1);
@@ -116,9 +115,9 @@ public sealed class FieldTaskTests
     public void RecordFill_ASecondFillBeforeReview_KeepsTheStatusAndLogsIt()
     {
         var task = NewTask();
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
-        task.RecordFill(Guid.NewGuid(), "crew", Now.AddMinutes(5));
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now.AddMinutes(5));
 
         task.Status.Should().Be(TaskStatuses.Submitted);
         task.SubmissionCount.Should().Be(2);
@@ -133,7 +132,7 @@ public sealed class FieldTaskTests
         var early = () => task.Complete("reviewer", null, Now);
         early.Should().Throw<DomainException>();
 
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
         task.Complete("reviewer", "ok", Now);
 
         task.Status.Should().Be(TaskStatuses.Approved);
@@ -145,7 +144,7 @@ public sealed class FieldTaskTests
     {
         var task = NewTask();
         task.Assign(TeamA, "supervisor", null, null, null, Now);
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
         task.Return(TaskReturnReasons.WrongLocation, "Wrong street", "reviewer", TeamB, Now);
 
@@ -159,10 +158,10 @@ public sealed class FieldTaskTests
     public void Return_ThenRefill_GoesBackToSubmitted()
     {
         var task = NewTask();
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
         task.Return(TaskReturnReasons.IncompleteData, "Missing photos", "reviewer", null, Now);
 
-        task.RecordFill(Guid.NewGuid(), "crew", Now.AddHours(1));
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now.AddHours(1));
 
         task.Status.Should().Be(TaskStatuses.Submitted);
     }
@@ -171,7 +170,7 @@ public sealed class FieldTaskTests
     public void Return_RefusesAnUnknownReason()
     {
         var task = NewTask();
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
         var act = () => task.Return("BECAUSE", "no", "reviewer", null, Now);
 
@@ -187,7 +186,7 @@ public sealed class FieldTaskTests
         task.Status.Should().Be(TaskStatuses.Expired);
         task.IsActive.Should().BeFalse();
 
-        var fill = () => task.RecordFill(Guid.NewGuid(), "crew", Now);
+        var fill = () => task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
         fill.Should().Throw<DomainException>();
     }
 
@@ -195,7 +194,7 @@ public sealed class FieldTaskTests
     public void Relocate_IsRefusedOnceTheTaskIsFilled()
     {
         var task = NewTask();
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
 
         var act = () => task.Relocate(new TaskLocation(24.7, 46.7, null, "RCBU", "R-21", null, null), "admin", Now);
 
@@ -207,14 +206,14 @@ public sealed class FieldTaskTests
     {
         var task = NewTask();
 
-        task.MigrateFormVersion(3, "admin", Now);
-        task.FormVersionNo.Should().Be(3);
+        task.MigrateFormVersion(TaskTestData.FormId, 3, "admin", Now);
+        task.FormOf(TaskTestData.FormId)!.FormVersionNo.Should().Be(3);
 
-        var backwards = () => task.MigrateFormVersion(2, "admin", Now);
+        var backwards = () => task.MigrateFormVersion(TaskTestData.FormId, 2, "admin", Now);
         backwards.Should().Throw<DomainException>();
 
-        task.RecordFill(Guid.NewGuid(), "crew", Now);
-        var afterFill = () => task.MigrateFormVersion(4, "admin", Now);
+        task.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew", Now);
+        var afterFill = () => task.MigrateFormVersion(TaskTestData.FormId, 4, "admin", Now);
         afterFill.Should().Throw<DomainException>();
     }
 

@@ -72,6 +72,11 @@ public sealed class FormPublisher(
             return Result.Failure<FormDefinition>(nameError);
         }
 
+        if (FormComputedColumnValidator.Validate(schema) is { Count: > 0 } computedProblems)
+        {
+            return Result.Failure<FormDefinition>(FormEngineErrors.Schema.InvalidComputedColumn(computedProblems));
+        }
+
         var candidates = FieldCandidates(schema).ToList();
 
         await using var transaction = await context.BeginTransactionIfNoneAsync(cancellationToken);

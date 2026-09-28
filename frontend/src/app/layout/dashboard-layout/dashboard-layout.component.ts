@@ -10,6 +10,7 @@ import { MenuItem } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
 import { AuthStore } from '../../core/auth/auth.store';
 import { ADMINISTRATOR_ROLE, PERMISSIONS } from '../../core/auth/permissions';
+import { WORKSPACE_SHARED_ROUTES } from '../../core/guards/workflow-workspace.guard';
 import { LocaleService } from '../../core/i18n/locale.service';
 import { PageHeaderService } from '../../core/layout/page-header.service';
 import { ThemeService } from '../../core/theme/theme.service';
@@ -142,7 +143,8 @@ export class DashboardLayoutComponent {
       {labelKey:'workspace.newInstance',icon:'pi pi-plus',route:'/workflow/start',permissions:[PERMISSIONS.startWorkflows]},
       {labelKey:'workspace.instances',icon:'pi pi-list',route:'/admin/workflow/instances',permissions:[PERMISSIONS.viewInstances]},
       {labelKey:'workspace.sla',icon:'pi pi-clock',route:'/admin/workflow/sla-policies',permissions:[PERMISSIONS.manageSlaPolicies]},
-      ...this.fullNavItems.filter(item => ['/lookups','/admin/users','/admin/roles'].includes(item.route || ''))
+      // Field tasks, forms and the shared admin pages — the same list the workspace guard lets through.
+      ...this.fullNavItems.filter(item => WORKSPACE_SHARED_ROUTES.includes(item.route || ''))
     ];
   }
 

@@ -69,6 +69,20 @@ public interface IFormGateway
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// The form's computed columns worked out for one fill, through the version the fill answered —
+    /// each column's first rule whose conditions hold, else its default. Empty when the version is
+    /// unknown or declares none. Never fails: a column that cannot be worked out is blank.
+    /// </summary>
+    Task<IReadOnlyList<FormComputedValue>> ComputeAsync(
+        Guid formId,
+        int versionNo,
+        IReadOnlyDictionary<string, object?> answers,
+        CancellationToken cancellationToken);
+
+    /// <summary>The computed columns one published version declares, in the form's order. Empty when the version is unknown.</summary>
+    Task<IReadOnlyList<FormComputedColumnInfo>> GetComputedColumnsAsync(Guid formId, int versionNo, CancellationToken cancellationToken);
+
+    /// <summary>
     /// The bytes of one file a context's fills claimed — for embedding in a report. Null when the
     /// file is not the context's, has been removed, is larger than <paramref name="maxBytes"/>, or
     /// its bytes are gone from storage.
@@ -119,6 +133,16 @@ public sealed record FormChoiceInfo(
     string? LabelAr,
     string? C2mFaStatus,
     string? C2mReason);
+
+/// <summary>
+/// One computed column's value for a fill. <see cref="OutputType"/> is <c>text</c> or <c>number</c>;
+/// a number carries both <see cref="Number"/> and its <see cref="Text"/> rendering. Both are null when
+/// the column worked out to nothing.
+/// </summary>
+public sealed record FormComputedValue(string Key, string OutputType, decimal? Number, string? Text);
+
+/// <summary>A computed column a form declares: its key, labels, what it yields, and whether the task grid shows it unasked.</summary>
+public sealed record FormComputedColumnInfo(string Key, string? LabelEn, string? LabelAr, string OutputType, bool ShowInTaskGrid);
 
 /// <summary>A form that can be filled, at its current published version.</summary>
 public sealed record PublishedFormInfo(

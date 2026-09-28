@@ -22,6 +22,7 @@ public sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<FormD
         builder.Property(x => x.Category).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(20).IsRequired();
         builder.Property(x => x.DepartmentCode).HasMaxLength(FormDefinition.DepartmentCodeMaxLength);
+        builder.Property(x => x.FieldActivityCode).HasMaxLength(FormDefinition.FieldActivityCodeMaxLength);
         builder.Property(x => x.SchemaJson).IsRequired().HasDefaultValue("{}");
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(FormDefinition.ActorMaxLength);
@@ -35,6 +36,7 @@ public sealed class FormDefinitionConfiguration : IEntityTypeConfiguration<FormD
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.Category);
         builder.HasIndex(x => x.DepartmentCode);
+        builder.HasIndex(x => new { x.DepartmentCode, x.FieldActivityCode });
         builder.HasIndex(x => new { x.Status, x.Category });
 
         // Two forms writing to one table would mix their rows, so a name is held by one form at most.

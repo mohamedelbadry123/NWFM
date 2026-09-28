@@ -21,12 +21,37 @@
         <span class="font-medium">{{ current.task.taskNumber }}</span>
         <p-tag [value]="t('tasks.status.' + current.task.status)" [severity]="statusSeverity(current.task.status)" />
         @if (formName()) {
-          <span class="text-surface-500">{{ formName() }} <span>v{{ current.task.formVersionNo }}</span></span>
+          <span class="text-surface-500">{{ formName() }} <span>v{{ selectedForm()?.versionNo }}</span></span>
         }
         @if (current.task.assignedTeamName) {
           <span class="text-surface-500"><i class="pi pi-users me-1"></i>{{ current.task.assignedTeamName }}</span>
         }
       </div>
+
+      @if (formTabs().length > 1) {
+        <!-- One team fills every form; the task counts as filled once each one is. -->
+        <div class="mb-3 flex flex-col gap-1.5">
+          <span class="text-xs text-surface-500">
+            {{ t('tasks.fill.formsProgress', { filled: current.task.filledFormCount, total: current.task.requiredFormCount }) }}
+          </span>
+          <p-selectbutton
+            [options]="formTabs()"
+            optionLabel="label"
+            optionValue="value"
+            [allowEmpty]="false"
+            [ngModel]="selectedFormId()"
+            (ngModelChange)="selectForm($event)"
+            [disabled]="saving()"
+          >
+            <ng-template let-tab #item>
+              <span class="flex items-center gap-1.5">
+                <i [class]="tab.filled ? 'pi pi-check-circle text-green-600' : 'pi pi-circle'"></i>
+                {{ tab.label }}
+              </span>
+            </ng-template>
+          </p-selectbutton>
+        </div>
+      }
 
       @if (current.task.returnReason) {
         <!-- A return says what to fix; show it where the rework is done. -->
@@ -56,27 +81,35 @@
           <i class="pi pi-info-circle me-1.5 text-[var(--p-primary-color)]"></i>
           {{ t('tasks.fill.subtitle') }}
         </p>
-        @if (renderer.fields().length > 0) {
-          <!-- Live validity, so a long form does not hide its errors below the fold. -->
-          <p-tag
-            [severity]="renderer.form().valid ? 'success' : 'warn'"
-            [icon]="renderer.form().valid ? 'pi pi-check-circle' : 'pi pi-exclamation-circle'"
-            [value]="renderer.form().valid ? t('tasks.fill.valid') : t('tasks.fill.invalidCount', { count: renderer.invalidCount() })"
-          />
+        @if (renderer(); as live) {
+          @if (live.fields().length > 0) {
+            <!-- Live validity, so a long form does not hide its errors below the fold. -->
+            <p-tag
+              [severity]="live.form().valid ? 'success' : 'warn'"
+              [icon]="live.form().valid ? 'pi pi-check-circle' : 'pi pi-exclamation-circle'"
+              [value]="live.form().valid ? t('tasks.fill.valid') : t('tasks.fill.invalidCount', { count: live.invalidCount() })"
+            />
+          }
         }
       </div>
 
-      <app-dynamic-form-renderer
-        #renderer
-        [definition]="definition()"
-        [answers]="seedAnswers()"
-        [formId]="current.task.formDefinitionId"
-        [versionNo]="current.task.formVersionNo"
-        [contextType]="contextType"
-        [contextId]="current.task.id"
-        [emptyMessage]="t('tasks.fill.empty')"
-        (submitted)="submit()"
-      />
+      @if (definitionFailed()) {
+        <p-message severity="error" [text]="t('tasks.fill.loadFailed')" styleClass="w-full" />
+      } @else if (selectedForm(); as form) {
+        @for (key of [form.formDefinitionId]; track key) {
+          <!-- Keyed on the form, so switching forms builds a fresh renderer rather than reseeding one. -->
+          <app-dynamic-form-renderer
+            [definition]="definition()"
+            [answers]="seedAnswers()"
+            [formId]="form.formDefinitionId"
+            [versionNo]="form.versionNo"
+            [contextType]="contextType"
+            [contextId]="current.task.id"
+            [emptyMessage]="t('tasks.fill.empty')"
+            (submitted)="submit()"
+          />
+        }
+      }
     }
 
     <ng-template pTemplate="footer">
@@ -85,7 +118,7 @@
         [label]="t('tasks.actions.submitFill')"
         icon="pi pi-send"
         [loading]="saving()"
-        [disabled]="saving() || loading() || loadFailed()"
+        [disabled]="saving() || loading() || loadFailed() || definitionFailed()"
         (onClick)="submit()"
       />
     </ng-template>

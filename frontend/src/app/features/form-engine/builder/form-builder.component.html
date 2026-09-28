@@ -57,6 +57,15 @@
               [disabled]="loading() || loadingSample() || saving() || publishing()"
               (onClick)="openPreview()"
             />
+            <p-button
+              styleClass="w-full"
+              [label]="t('formBuilder.computed.open', { count: store.computedColumns().length })"
+              icon="pi pi-calculator"
+              [outlined]="true"
+              severity="secondary"
+              [disabled]="loading() || loadingSample() || saving() || publishing()"
+              (onClick)="openComputed()"
+            />
             @if (isDesigner()) {
               <p-button
                 styleClass="w-full"
@@ -119,4 +128,12 @@
 
   <!-- Live Formly preview -->
   <app-form-preview-dialog [(visible)]="previewVisible" [definition]="store.definition()" />
+
+  <!-- Computed columns for the task grid -->
+  <app-computed-columns-dialog
+    [(visible)]="computedVisible"
+    [value]="store.computedColumns()"
+    [fields]="computedFields()"
+    (applied)="store.setComputedColumns($event)"
+  />
 </ng-container>

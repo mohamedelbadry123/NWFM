@@ -51,6 +51,10 @@ public sealed class TaskHandlerTests : IDisposable
             .ReturnsAsync(new Dictionary<Guid, OrgTeamInfo>());
 
         PublishedForm(versionNo: 1);
+
+        _forms.Setup(f => f.ComputeAsync(
+                It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<IReadOnlyDictionary<string, object?>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     public void Dispose() => _db.Dispose();
@@ -159,7 +163,7 @@ public sealed class TaskHandlerTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         var created = await _db.Tasks.SingleAsync();
-        created.FormVersionNo.Should().Be(4);
+        created.Forms.Should().ContainSingle().Which.FormVersionNo.Should().Be(4);
         created.FillSlaHours.Should().Be(48);
         created.TaskNumber.Should().StartWith("TSK-260921-");
     }
@@ -244,7 +248,7 @@ public sealed class TaskHandlerTests : IDisposable
 
         result.Value.Status.Should().Be(TaskStatuses.Submitted);
         sent!.FormId.Should().Be(TaskTestData.FormId);
-        sent.VersionNo.Should().Be(task.FormVersionNo);
+        sent.VersionNo.Should().Be(task.Forms.Single().FormVersionNo);
         sent.ContextType.Should().Be(TasksSchema.FormContextType);
         sent.ContextId.Should().Be(task.Id.ToString("D"));
 
@@ -312,9 +316,9 @@ public sealed class TaskHandlerTests : IDisposable
         var crewB = Guid.NewGuid();
         var (_, task) = await SeedAsync("R-16");
 
-        var tracked = await _db.Tasks.Include(t => t.Assignments).FirstAsync(t => t.Id == task.Id);
+        var tracked = await _db.Tasks.Include(t => t.Forms).Include(t => t.Assignments).FirstAsync(t => t.Id == task.Id);
         tracked.Assign(crewA, "supervisor", null, null, null, Now);
-        tracked.RecordFill(Guid.NewGuid(), "crew A", Now);
+        tracked.RecordFill(TaskTestData.FormId, Guid.NewGuid(), "crew A", Now);
         tracked.Return(TaskReturnReasons.NeedsRevisit, "Revisit", "reviewer", crewB, Now);
         await _db.SaveChangesAsync();
         _db.ChangeTracker.Clear();

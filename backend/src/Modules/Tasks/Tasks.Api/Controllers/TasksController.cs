@@ -12,13 +12,17 @@ using Tasks.Application.Tasks.Commands.CreateTask;
 using Tasks.Application.Tasks.Commands.ExpireTask;
 using Tasks.Application.Tasks.Commands.ReturnTask;
 using Tasks.Application.Tasks.Commands.SubmitTaskFill;
+using Tasks.Application.Tasks.Commands.TaskForms;
 using Tasks.Application.Tasks.Commands.UpdateTask;
 using Tasks.Application.Tasks.Models;
 using Tasks.Application.Tasks.Queries.ExportTaskPdf;
 using Tasks.Application.Tasks.Queries.GetEligibleTeams;
 using Tasks.Application.Tasks.Queries.GetTaskActivity;
 using Tasks.Application.Tasks.Queries.GetTaskById;
+using Tasks.Application.Tasks.Queries.GetTaskComputedColumns;
 using Tasks.Application.Tasks.Queries.GetTasks;
+using Tasks.Application.TaskTypes.Models;
+using Tasks.Application.TaskTypes.Queries.GetTaskTypes;
 
 namespace Tasks.Api.Controllers;
 
@@ -33,6 +37,23 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Result<PaginatedResult<TaskListItemDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTasks([FromQuery] GetTasksQuery query, CancellationToken ct) =>
         (await sender.Send(query, ct)).ToActionResult();
+
+    /// <summary>
+    /// The computed columns the worklist can show — a type's forms' columns with <c>?taskTypeId=</c>,
+    /// otherwise every active type's and every added form's.
+    /// </summary>
+    [HttpGet("computed-columns")]
+    [Authorize(Policy = NwfmPolicies.ViewTasks)]
+    [ProducesResponseType(typeof(Result<IReadOnlyList<TaskComputedColumnDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetComputedColumns([FromQuery] Guid? taskTypeId, CancellationToken ct) =>
+        (await sender.Send(new GetTaskComputedColumnsQuery(taskTypeId), ct)).ToActionResult();
+
+    /// <summary>Published forms that can be added to a task on top of its type's.</summary>
+    [HttpGet("form-options")]
+    [Authorize(Policy = NwfmPolicies.ManageTasks)]
+    [ProducesResponseType(typeof(Result<IReadOnlyList<FormOptionDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFormOptions([FromQuery] string? search, CancellationToken ct) =>
+        (await sender.Send(new GetTaskFormOptionsQuery(search), ct)).ToActionResult();
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = NwfmPolicies.ViewTasks)]
@@ -49,8 +70,8 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpGet("{id:guid}/fills")]
     [Authorize(Policy = NwfmPolicies.ViewTasks)]
     [ProducesResponseType(typeof(Result<IReadOnlyList<TaskFillDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetFills(Guid id, CancellationToken ct) =>
-        (await sender.Send(new GetTaskFillsQuery(id), ct)).ToActionResult();
+    public async Task<IActionResult> GetFills(Guid id, [FromQuery] Guid? formId, CancellationToken ct) =>
+        (await sender.Send(new GetTaskFillsQuery(id, formId), ct)).ToActionResult();
 
     [HttpGet("{id:guid}/files")]
     [Authorize(Policy = NwfmPolicies.ViewTasks)]
@@ -144,9 +165,31 @@ public sealed class TasksController(ISender sender) : ControllerBase
     public async Task<IActionResult> Expire(Guid id, [FromBody] ExpireTaskCommand command, CancellationToken ct) =>
         (await sender.Send(command with { TaskId = id }, ct)).ToActionResult();
 
+    /// <summary>Moves every unfilled form a newer version has overtaken; answers how many moved.</summary>
     [HttpPost("{id:guid}/migrate-version")]
     [Authorize(Policy = NwfmPolicies.ManageTasks)]
     [ProducesResponseType(typeof(Result<int>), StatusCodes.Status200OK)]
     public async Task<IActionResult> MigrateVersion(Guid id, CancellationToken ct) =>
         (await sender.Send(new MigrateTaskFormVersionCommand(id), ct)).ToActionResult();
+
+    /// <summary>Adds a form to this task alone, pinned at its version published now.</summary>
+    [HttpPost("{id:guid}/forms")]
+    [Authorize(Policy = NwfmPolicies.ManageTasks)]
+    [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+    public async Task<IActionResult> AttachForm(Guid id, [FromBody] AttachTaskFormCommand command, CancellationToken ct) =>
+        (await sender.Send(command with { TaskId = id }, ct)).ToActionResult();
+
+    /// <summary>Removes a form that was added to this task, before it is filled.</summary>
+    [HttpDelete("{id:guid}/forms/{formId:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageTasks)]
+    [ProducesResponseType(typeof(Result), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DetachForm(Guid id, Guid formId, CancellationToken ct) =>
+        (await sender.Send(new DetachTaskFormCommand(id, formId), ct)).ToActionResult();
+
+    /// <summary>Moves one unfilled form of the task to its current published version.</summary>
+    [HttpPost("{id:guid}/forms/{formId:guid}/migrate-version")]
+    [Authorize(Policy = NwfmPolicies.ManageTasks)]
+    [ProducesResponseType(typeof(Result<int>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MigrateFormVersion(Guid id, Guid formId, CancellationToken ct) =>
+        (await sender.Send(new MigrateTaskFormVersionCommand(id, formId), ct)).ToActionResult();
 }

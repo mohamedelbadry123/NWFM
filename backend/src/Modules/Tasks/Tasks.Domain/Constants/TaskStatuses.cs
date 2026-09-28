@@ -65,6 +65,18 @@ public static class TaskPriorities
         priority is not null && All.Contains(priority, StringComparer.Ordinal);
 }
 
+/// <summary>Why a form is on a task.</summary>
+public static class TaskFormSources
+{
+    /// <summary>One of the task type's forms, pinned when the task was raised.</summary>
+    public const string Type = "TYPE";
+
+    /// <summary>Added to this task alone, on top of its type's forms.</summary>
+    public const string Extra = "EXTRA";
+
+    public const int MaxLength = 10;
+}
+
 /// <summary>Where a task came from.</summary>
 public static class TaskSources
 {

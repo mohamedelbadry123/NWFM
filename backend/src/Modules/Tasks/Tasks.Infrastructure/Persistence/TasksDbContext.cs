@@ -14,7 +14,10 @@ namespace Tasks.Infrastructure.Persistence;
 public sealed class TasksDbContext(DbContextOptions<TasksDbContext> options) : DbContext(options), ITasksDbContext
 {
     public DbSet<TaskType> TaskTypes => Set<TaskType>();
+    public DbSet<TaskTypeForm> TaskTypeForms => Set<TaskTypeForm>();
     public DbSet<FieldTask> Tasks => Set<FieldTask>();
+    public DbSet<TaskForm> TaskForms => Set<TaskForm>();
+    public DbSet<TaskComputedValue> TaskComputedValues => Set<TaskComputedValue>();
     public DbSet<TaskAssignment> TaskAssignments => Set<TaskAssignment>();
     public DbSet<TaskStatusHistory> TaskStatusHistory => Set<TaskStatusHistory>();
     public DbSet<C2mActionMapping> C2mActionMappings => Set<C2mActionMapping>();

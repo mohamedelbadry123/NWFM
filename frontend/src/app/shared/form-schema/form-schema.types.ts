@@ -174,10 +174,12 @@ export const BARCODE_MAX_LENGTH = 400;
  */
 export const DATA_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 
-/** Rule mode reused by the visibility and requirement dialogs. */
+/** Rule mode reused by the visibility and requirement dialogs, and by a computed column's rules. */
 export const RULE_MODES = {
   Visibility: 'visibility',
   Requirement: 'requirement',
+  /** The conditions under which a computed column takes a rule's value. */
+  Condition: 'condition',
 } as const;
 
 export type RuleMode = (typeof RULE_MODES)[keyof typeof RULE_MODES];
@@ -300,10 +302,50 @@ export interface FormElement {
   required_conditions: RuleGroup;
 }
 
+/** What a computed column yields. Mirrors `FormComputedOutputTypes` in the API. */
+export const COMPUTED_OUTPUT_TYPES = {
+  Text: 'text',
+  Number: 'number',
+} as const;
+
+export type ComputedOutputType = (typeof COMPUTED_OUTPUT_TYPES)[keyof typeof COMPUTED_OUTPUT_TYPES];
+
+/** A computed column's key — the server's rule (`FormComputedColumnValidator`). */
+export const COMPUTED_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+/** Limits the server enforces too. */
+export const COMPUTED_MAX_COLUMNS = 20;
+export const COMPUTED_MAX_RULES = 20;
+
+/** When `when` holds, the column is `then` — an expression (see `form-computed-expression.ts`). */
+export interface ComputedRule {
+  when: RuleGroup;
+  then: string;
+}
+
+/**
+ * A value worked out of a fill's answers and shown beside the task in the task grid. Declared on the
+ * form under the schema's root `computed_columns`, so it is versioned with the form.
+ */
+export interface ComputedColumn {
+  key: string;
+  label_en: string;
+  label_ar: string;
+  output_type: ComputedOutputType;
+  /** Shown in the task grid without being asked for. */
+  show_in_task_grid: boolean;
+  /** Tried in order; the first whose conditions hold supplies the value. */
+  rules: ComputedRule[];
+  /** The value when no rule holds; blank for none. */
+  default: string;
+}
+
 export interface FormSchema {
   name_en: string;
   name_ar: string;
   elements: FormElement[];
+  /** Absent in a document that declares none. */
+  computed_columns?: ComputedColumn[];
 }
 
 /** Stable CDK drop-list ids shared between the palette and the canvas. */

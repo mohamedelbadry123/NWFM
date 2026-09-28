@@ -45,7 +45,13 @@ const VALUELESS_OPERATORS: readonly RuleOperator[] = [
   template: `
     <ng-container *translateContext="let t">
       <p-dialog
-        [header]="mode() === requirementMode ? t('formBuilder.rules.requirementTitle') : t('formBuilder.rules.visibilityTitle')"
+        [header]="
+          mode() === requirementMode
+            ? t('formBuilder.rules.requirementTitle')
+            : mode() === conditionMode
+              ? t('formBuilder.rules.conditionTitle')
+              : t('formBuilder.rules.visibilityTitle')
+        "
         [visible]="visible()"
         (visibleChange)="visible.set($event)"
         [modal]="true"
@@ -55,7 +61,13 @@ const VALUELESS_OPERATORS: readonly RuleOperator[] = [
         [maximizable]="true"
       >
         <p class="text-sm text-[var(--p-text-muted-color)] mb-4">
-          {{ mode() === requirementMode ? t('formBuilder.rules.requirementHint') : t('formBuilder.rules.visibilityHint') }}
+          {{
+            mode() === requirementMode
+              ? t('formBuilder.rules.requirementHint')
+              : mode() === conditionMode
+                ? t('formBuilder.rules.conditionHint')
+                : t('formBuilder.rules.visibilityHint')
+          }}
         </p>
 
         <div class="flex items-center gap-2 mb-4">
@@ -99,7 +111,7 @@ const VALUELESS_OPERATORS: readonly RuleOperator[] = [
 
         <p-button class="mt-3 inline-block" [label]="t('formBuilder.rules.addCondition')" icon="pi pi-plus" size="small" [outlined]="true" (onClick)="addCondition()" />
 
-        @if (mode() !== requirementMode) {
+        @if (mode() === visibilityMode) {
           <div class="mt-5 pt-4 border-t border-[var(--app-border)] flex items-start gap-2">
             <p-checkbox [(ngModel)]="group().preserve_data" [binary]="true" inputId="preserveData" />
             <label for="preserveData" class="text-sm">
@@ -125,6 +137,8 @@ export class RulesDialogComponent {
   readonly rulesChange = output<RuleGroup>();
 
   protected readonly requirementMode = RULE_MODES.Requirement;
+  protected readonly conditionMode = RULE_MODES.Condition;
+  protected readonly visibilityMode = RULE_MODES.Visibility;
 
   private readonly translate = inject(TranslateService);
 

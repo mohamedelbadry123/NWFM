@@ -95,7 +95,7 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
             <tr>
               <th>{{ t('taskTypes.code') }}</th>
               <th>{{ t('taskTypes.name') }}</th>
-              <th>{{ t('taskTypes.form') }}</th>
+              <th>{{ t('taskTypes.forms') }}</th>
               <th>{{ t('tasks.fields.department') }}</th>
               <th>{{ t('taskTypes.sla') }}</th>
               <th>{{ t('taskTypes.status') }}</th>
@@ -108,17 +108,26 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
               <td class="font-mono text-sm">{{ type.code }}</td>
               <td>{{ name(type) }}</td>
               <td>
-                @if (type.formCode) {
-                  <span>{{ type.formCode }}</span>
-                  @if (type.formCurrentVersionNo) {
-                    <span class="app-badge app-badge--code ms-1.5">v{{ type.formCurrentVersionNo }}</span>
-                  } @else {
-                    <!-- New tasks of this type are refused until its form has a version that takes fills. -->
-                    <p-tag class="ms-1.5" [value]="t('taskTypes.formNotPublished')" severity="warn" />
+                <div class="flex flex-col gap-1">
+                  @for (form of type.forms; track form.formDefinitionId) {
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      @if (form.code) {
+                        <span>{{ form.code }}</span>
+                        @if (form.currentVersionNo) {
+                          <span class="app-badge app-badge--code">v{{ form.currentVersionNo }}</span>
+                        } @else {
+                          <!-- New tasks of this type are refused until each of its forms has a version that takes fills. -->
+                          <p-tag [value]="t('taskTypes.formNotPublished')" severity="warn" />
+                        }
+                        @if (type.closesC2mActivity && form.isC2mClosingForm && type.forms.length > 1) {
+                          <i class="pi pi-flag-fill text-xs text-amber-500" [title]="t('taskTypes.closingForm')"></i>
+                        }
+                      } @else {
+                        <p-tag [value]="t('taskTypes.formMissing')" severity="danger" />
+                      }
+                    </div>
                   }
-                } @else {
-                  <p-tag [value]="t('taskTypes.formMissing')" severity="danger" />
-                }
+                </div>
               </td>
               <td>{{ orgNames.label('Department', type.departmentCode) }}</td>
               <td>{{ type.fillSlaHours ?? '—' }} / {{ type.completionSlaHours ?? '—' }} {{ t('tasks.detail.hours') }}</td>

@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, model, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { Observable, finalize } from 'rxjs';
 
@@ -13,6 +13,7 @@ import { MessageService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
+import { TooltipModule } from 'primeng/tooltip';
 
 import { TranslateContextDirective } from '../../../core/i18n/translate-context.directive';
 import { LocaleService } from '../../../core/i18n/locale.service';
@@ -27,9 +28,13 @@ interface SelectOption {
   readonly value: string;
 }
 
+/** A max the server enforces too (`TaskType.MaxForms`). */
+const MAX_FORMS = 10;
+
 /**
- * Creates or edits a task type. Pointing a type at another form changes what new tasks are filled
- * with; tasks already raised keep the form and version they pinned.
+ * Creates or edits a task type. A type lists the forms its tasks are filled with, in the order a
+ * crew meets them; changing them changes what new tasks are filled with, while tasks already raised
+ * keep the forms and versions they pinned.
  */
 @Component({
   selector: 'app-task-type-dialog',
@@ -46,6 +51,8 @@ interface SelectOption {
     SelectModule,
     TextareaModule,
     ToggleSwitchModule,
+    TooltipModule,
+    FormsModule,
   ],
   template: `
     <ng-container *translateContext="let t">
@@ -95,21 +102,56 @@ interface SelectOption {
           </div>
 
           <div class="flex flex-col gap-2 sm:col-span-2">
-            <label for="type-form" class="text-sm font-medium">{{ t('taskTypes.form') }} <span class="text-red-500">*</span></label>
-            <p-select
-              inputId="type-form"
-              formControlName="formDefinitionId"
-              [options]="formOptions()"
-              optionLabel="label"
-              optionValue="value"
-              [filter]="true"
-              filterBy="label"
-              [loading]="loadingForms()"
-              [placeholder]="t('taskTypes.formPlaceholder')"
-              appendTo="body"
-              styleClass="w-full"
-            />
-            <small class="text-surface-500">{{ t('taskTypes.formHint') }}</small>
+            <label for="type-form" class="text-sm font-medium">{{ t('taskTypes.forms') }} <span class="text-red-500">*</span></label>
+
+            @if (selectedForms().length > 0) {
+              <ol class="flex flex-col gap-1.5">
+                @for (entry of selectedForms(); track entry.value; let i = $index; let first = $first; let last = $last) {
+                  <li class="flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5">
+                    <span class="app-badge app-badge--code">{{ i + 1 }}</span>
+                    <span class="min-w-0 flex-1 truncate text-sm">{{ entry.label }}</span>
+                    @if (closesC2m()) {
+                      <p-button
+                        [icon]="closingFormId() === entry.value ? 'pi pi-flag-fill' : 'pi pi-flag'"
+                        [severity]="closingFormId() === entry.value ? 'warn' : 'secondary'"
+                        size="small"
+                        [text]="true"
+                        [rounded]="true"
+                        [ariaLabel]="t('taskTypes.closingForm')"
+                        [pTooltip]="t('taskTypes.closingForm')"
+                        (onClick)="closingFormId.set(entry.value)"
+                      />
+                    }
+                    <p-button icon="pi pi-arrow-up" severity="secondary" size="small" [text]="true" [rounded]="true" [disabled]="first" [ariaLabel]="t('common.moveUp')" (onClick)="moveForm(i, -1)" />
+                    <p-button icon="pi pi-arrow-down" severity="secondary" size="small" [text]="true" [rounded]="true" [disabled]="last" [ariaLabel]="t('common.moveDown')" (onClick)="moveForm(i, 1)" />
+                    <p-button icon="pi pi-times" severity="danger" size="small" [text]="true" [rounded]="true" [ariaLabel]="t('common.remove')" (onClick)="removeForm(entry.value)" />
+                  </li>
+                }
+              </ol>
+            }
+
+            @if (selectedForms().length < maxForms) {
+              <p-select
+                inputId="type-form"
+                [options]="addableForms()"
+                optionLabel="label"
+                optionValue="value"
+                [filter]="true"
+                filterBy="label"
+                [loading]="loadingForms()"
+                [placeholder]="t('taskTypes.addForm')"
+                [ngModel]="null"
+                [ngModelOptions]="{ standalone: true }"
+                (onChange)="addForm($event.value)"
+                appendTo="body"
+                styleClass="w-full"
+              />
+            }
+
+            @if (formsTouched() && selectedForms().length === 0) {
+              <small class="text-red-500">{{ t('taskTypes.formsRequired') }}</small>
+            }
+            <small class="text-surface-500">{{ t('taskTypes.formsHint') }}</small>
             @if (isEdit() && formChanged()) {
               <p-message severity="info" [text]="t('taskTypes.formChangeHint')" styleClass="w-full" />
             }
@@ -168,24 +210,36 @@ export class TaskTypeDialogComponent {
   protected readonly loadingForms = signal(false);
   protected readonly forms = signal<FormOption[]>([]);
   protected readonly departments = signal<SelectOption[]>([]);
-  protected readonly selectedFormId = signal<string | null>(null);
+  protected readonly maxForms = MAX_FORMS;
+
+  /** The type's forms, in order. Labels are kept with them so a form no longer offered (deprecated since) still reads. */
+  protected readonly selectedForms = signal<SelectOption[]>([]);
+  protected readonly closingFormId = signal<string | null>(null);
+  protected readonly closesC2m = signal(false);
+  protected readonly formsTouched = signal(false);
 
   protected readonly isEdit = computed(() => this.taskType() !== null);
-  protected readonly formChanged = computed(() => !!this.taskType() && this.selectedFormId() !== this.taskType()!.formDefinitionId);
-
-  protected readonly formOptions = computed<SelectOption[]>(() => {
-    const options = this.forms().map((form) => ({
-      label: `${form.code} — ${this.locale.locale() === 'ar' ? form.nameAr : form.nameEn} (v${form.currentVersionNo})`,
-      value: form.id,
-    }));
-
-    // The form a type already uses may no longer be offered (deprecated since); keep it selectable.
-    const current = this.taskType();
-    if (current && !options.some((o) => o.value === current.formDefinitionId)) {
-      options.unshift({ label: current.formCode ?? current.formDefinitionId, value: current.formDefinitionId });
+  protected readonly formChanged = computed(() => {
+    const type = this.taskType();
+    if (!type) {
+      return false;
     }
 
-    return options;
+    const before = [...type.forms].sort((a, b) => a.sortOrder - b.sortOrder).map((f) => f.formDefinitionId);
+    const after = this.selectedForms().map((f) => f.value);
+    return before.length !== after.length || before.some((id, i) => id !== after[i]);
+  });
+
+  private readonly formOptions = computed<SelectOption[]>(() =>
+    this.forms().map((form) => ({
+      label: `${form.code} — ${this.locale.locale() === 'ar' ? form.nameAr : form.nameEn} (v${form.currentVersionNo})`,
+      value: form.id,
+    })));
+
+  /** Published forms not on the type yet. */
+  protected readonly addableForms = computed<SelectOption[]>(() => {
+    const chosen = new Set(this.selectedForms().map((f) => f.value));
+    return this.formOptions().filter((o) => !chosen.has(o.value));
   });
 
   protected readonly form = this.fb.group({
@@ -194,7 +248,6 @@ export class TaskTypeDialogComponent {
     nameAr: this.fb.control('', [Validators.required, Validators.maxLength(250)]),
     descriptionEn: this.fb.control<string>('', Validators.maxLength(1000)),
     descriptionAr: this.fb.control<string>('', Validators.maxLength(1000)),
-    formDefinitionId: this.fb.control<string | null>(null, Validators.required),
     departmentCode: this.fb.control<string | null>(null),
     fillSlaHours: this.fb.control<number | null>(null),
     completionSlaHours: this.fb.control<number | null>(null),
@@ -202,7 +255,37 @@ export class TaskTypeDialogComponent {
   });
 
   constructor() {
-    this.form.controls.formDefinitionId.valueChanges.subscribe((value) => this.selectedFormId.set(value));
+    this.form.controls.closesC2mActivity.valueChanges.subscribe((value) => this.closesC2m.set(!!value));
+  }
+
+  protected addForm(formId: string | null): void {
+    const option = this.formOptions().find((o) => o.value === formId);
+    if (!option || this.selectedForms().some((f) => f.value === formId) || this.selectedForms().length >= MAX_FORMS) {
+      return;
+    }
+
+    this.selectedForms.update((forms) => [...forms, option]);
+    this.formsTouched.set(true);
+  }
+
+  protected removeForm(formId: string): void {
+    this.selectedForms.update((forms) => forms.filter((f) => f.value !== formId));
+    if (this.closingFormId() === formId) {
+      this.closingFormId.set(null);
+    }
+    this.formsTouched.set(true);
+  }
+
+  protected moveForm(index: number, by: -1 | 1): void {
+    this.selectedForms.update((forms) => {
+      const next = [...forms];
+      const target = index + by;
+      if (target < 0 || target >= next.length) {
+        return forms;
+      }
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   protected onShow(): void {
@@ -214,12 +297,22 @@ export class TaskTypeDialogComponent {
       nameAr: type?.nameAr ?? '',
       descriptionEn: type?.descriptionEn ?? '',
       descriptionAr: type?.descriptionAr ?? '',
-      formDefinitionId: type?.formDefinitionId ?? null,
       departmentCode: type?.departmentCode ?? null,
       fillSlaHours: type?.fillSlaHours ?? null,
       completionSlaHours: type?.completionSlaHours ?? null,
       closesC2mActivity: type?.closesC2mActivity ?? false,
     });
+
+    const typeForms = [...(type?.forms ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    this.selectedForms.set(typeForms.map((f) => ({
+      label: f.code
+        ? `${f.code} — ${(this.locale.locale() === 'ar' ? f.nameAr : f.nameEn) ?? ''}${f.currentVersionNo ? ` (v${f.currentVersionNo})` : ''}`
+        : f.formDefinitionId,
+      value: f.formDefinitionId,
+    })));
+    this.closingFormId.set(typeForms.find((f) => f.isC2mClosingForm)?.formDefinitionId ?? null);
+    this.closesC2m.set(type?.closesC2mActivity ?? false);
+    this.formsTouched.set(false);
 
     this.loadingForms.set(true);
     this.api
@@ -236,18 +329,22 @@ export class TaskTypeDialogComponent {
   }
 
   protected save(): void {
-    if (this.form.invalid || this.saving()) {
+    if (this.form.invalid || this.selectedForms().length === 0 || this.saving()) {
       this.form.markAllAsTouched();
+      this.formsTouched.set(true);
       return;
     }
 
     const value = this.form.getRawValue();
+    const formIds = this.selectedForms().map((f) => f.value);
+    const closing = this.closingFormId();
     const payload = {
       nameEn: value.nameEn!.trim(),
       nameAr: value.nameAr!.trim(),
       descriptionEn: value.descriptionEn?.trim() || null,
       descriptionAr: value.descriptionAr?.trim() || null,
-      formDefinitionId: value.formDefinitionId!,
+      formDefinitionIds: formIds,
+      c2mClosingFormId: closing && formIds.includes(closing) ? closing : null,
       departmentCode: value.departmentCode,
       fillSlaHours: value.fillSlaHours,
       completionSlaHours: value.completionSlaHours,

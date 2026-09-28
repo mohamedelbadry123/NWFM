@@ -10,7 +10,7 @@ public sealed class FormDefinitionTests
     private static readonly DateTime Now = new(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc);
 
     private static FormDefinition NewForm(string code = "FRM-001") =>
-        FormDefinition.Create(code, "Leak Report", "تقرير تسرب", FormCategories.Inspection, "D-1", "tester", Now);
+        FormDefinition.Create(code, "Leak Report", "تقرير تسرب", FormCategories.Inspection, "D-1", "FA-1", "tester", Now);
 
     private static FormVersionSnapshot[] Snapshot(FormDefinition form) =>
         [new(FormTargetClients.Formly, form.SchemaJson, "{}")];
@@ -35,7 +35,7 @@ public sealed class FormDefinitionTests
     [Fact]
     public void Create_RefusesAnUnknownCategory() =>
         FluentActions
-            .Invoking(() => FormDefinition.Create("C", "En", "Ar", "NOT_A_CATEGORY", null, null, Now))
+            .Invoking(() => FormDefinition.Create("C", "En", "Ar", "NOT_A_CATEGORY", null, null, null, Now))
             .Should().Throw<DomainException>();
 
     [Fact]
@@ -134,7 +134,7 @@ public sealed class FormDefinitionTests
         form.IsActive.Should().BeFalse();
 
         FluentActions.Invoking(() => form.SetSchema("{}", null, null, "tester", Now)).Should().Throw<DomainException>();
-        FluentActions.Invoking(() => form.UpdateDetails("a", "b", FormCategories.General, null, "tester", Now))
+        FluentActions.Invoking(() => form.UpdateDetails("a", "b", FormCategories.General, null, null, "tester", Now))
             .Should().Throw<DomainException>();
         FluentActions.Invoking(() => form.Archive("tester", Now)).Should().Throw<DomainException>();
     }
@@ -153,5 +153,39 @@ public sealed class FormDefinitionTests
         clone.Status.Should().Be(FormStatuses.Draft);
         clone.CurrentVersionNo.Should().BeNull();
         clone.Versions.Should().BeEmpty();
+        clone.DepartmentCode.Should().Be("D-1");
+        clone.FieldActivityCode.Should().Be("FA-1");
     }
+
+    [Fact]
+    public void Create_KeepsTheDepartmentsFieldActivity()
+    {
+        var form = NewForm();
+
+        form.DepartmentCode.Should().Be("D-1");
+        form.FieldActivityCode.Should().Be("FA-1");
+    }
+
+    [Fact]
+    public void Create_RefusesAFieldActivityWithoutADepartment() =>
+        FluentActions
+            .Invoking(() => FormDefinition.Create("C", "En", "Ar", FormCategories.General, null, "FA-1", null, Now))
+            .Should().Throw<DomainException>();
+
+    [Fact]
+    public void UpdateDetails_ReplacesTheFieldActivity()
+    {
+        var form = NewForm();
+
+        form.UpdateDetails("Leak Report", "تقرير تسرب", FormCategories.Inspection, "D-2", "FA-9", "tester", Now);
+
+        form.DepartmentCode.Should().Be("D-2");
+        form.FieldActivityCode.Should().Be("FA-9");
+    }
+
+    [Fact]
+    public void UpdateDetails_RefusesAFieldActivityWithoutADepartment() =>
+        FluentActions
+            .Invoking(() => NewForm().UpdateDetails("a", "b", FormCategories.General, " ", "FA-1", "tester", Now))
+            .Should().Throw<DomainException>();
 }

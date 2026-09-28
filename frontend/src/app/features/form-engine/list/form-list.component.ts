@@ -18,6 +18,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { MenuItem } from 'primeng/api';
 import { HasPermissionDirective, PERMISSIONS } from '../../../core/auth/permissions';
 import { LocaleService } from '../../../core/i18n/locale.service';
+import { LookupItem, LookupsService } from '../../../core/lookups/lookups.service';
 import { FormsService } from '../../../core/form-engine/forms.service';
 import { formEngineErrorMessage } from '../../../core/form-engine/form-engine-api-error';
 import { FORM_CATEGORIES, FormListItem } from '../../../core/form-engine/form-engine.models';
@@ -76,6 +77,7 @@ export class FormListComponent {
   private readonly confirm = inject(ConfirmationService);
   private readonly translate = inject(TranslateService);
   private readonly locale = inject(LocaleService);
+  private readonly lookups = inject(LookupsService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -130,6 +132,41 @@ export class FormListComponent {
   /** Rows show the name in the reader's own language. */
   protected readonly nameOf = computed(() => (form: FormListItem) =>
     this.locale.locale() === 'ar' ? form.nameAr : form.nameEn);
+
+  /** Departments by code, and field activities by department and code — an activity code is only unique within its department. */
+  private readonly departmentsByCode = signal(new Map<string, LookupItem>());
+  private readonly activitiesByKey = signal(new Map<string, LookupItem>());
+
+  protected readonly departmentName = computed(() => {
+    const ar = this.locale.locale() === 'ar';
+    const byCode = this.departmentsByCode();
+    return (form: FormListItem) => {
+      const item = form.departmentCode ? byCode.get(form.departmentCode.toUpperCase()) : undefined;
+      return item ? (ar ? item.nameAr : item.nameEn) : (form.departmentCode ?? '');
+    };
+  });
+
+  protected readonly activityName = computed(() => {
+    const ar = this.locale.locale() === 'ar';
+    const byKey = this.activitiesByKey();
+    return (form: FormListItem) => {
+      const item = byKey.get(`${form.departmentCode ?? ''}|${form.fieldActivityCode ?? ''}`.toUpperCase());
+      return item ? (ar ? item.nameAr : item.nameEn) : (form.fieldActivityCode ?? '');
+    };
+  });
+
+  constructor() {
+    this.lookups
+      .listAll('Department')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((items) => this.departmentsByCode.set(new Map(items.map((i) => [i.code.toUpperCase(), i]))));
+
+    this.lookups
+      .listAll('FieldActivityType')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((items) =>
+        this.activitiesByKey.set(new Map(items.map((i) => [`${i.parentCode ?? ''}|${i.code}`.toUpperCase(), i]))));
+  }
 
   protected load(event?: TableLazyLoadEvent): void {
     if (event) {

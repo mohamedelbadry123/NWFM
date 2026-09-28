@@ -50,7 +50,10 @@ public sealed record GetTasksQuery : IRequest<Result<PaginatedResult<TaskListIte
     /// <summary>Only open tasks whose fill deadline has passed.</summary>
     public bool OverdueOnly { get; init; }
 
-    /// <summary>One of <see cref="GetTasksQueryValidator.SortFields"/>; newest first by default.</summary>
+    /// <summary>
+    /// One of <see cref="GetTasksQueryValidator.SortFields"/>, or a computed column as
+    /// <c>computed:{formId}:{key}</c>; newest first by default.
+    /// </summary>
     public string? SortField { get; init; }
 
     public bool SortDescending { get; init; } = true;
@@ -81,9 +84,11 @@ public sealed class GetTasksQueryValidator : AbstractValidator<GetTasksQuery>
             .WithMessage("Unknown task priority.");
 
         RuleFor(x => x.SortField)
-            .Must(field => SortFields.Contains(field!, StringComparer.OrdinalIgnoreCase))
+            .Must(field => SortFields.Contains(field!, StringComparer.OrdinalIgnoreCase)
+                || (field!.StartsWith(TaskComputedColumnIds.SortPrefix, StringComparison.OrdinalIgnoreCase)
+                    && TaskComputedColumnIds.TryParse(field, out _, out _)))
             .When(x => !string.IsNullOrWhiteSpace(x.SortField))
-            .WithMessage($"Sort by one of: {string.Join(", ", SortFields)}.");
+            .WithMessage($"Sort by one of: {string.Join(", ", SortFields)}, or computed:{{formId}}:{{key}}.");
     }
 }
 
@@ -104,6 +109,7 @@ public sealed class GetTasksQueryHandler(
         var total = await query.CountAsync(ct);
 
         var page = await Sort(query, request)
+            .Include(t => t.Forms)
             .Include(t => t.Assignments)
             .AsNoTracking()
             .Skip((request.PageNumber - 1) * request.PageSize)
@@ -111,8 +117,41 @@ public sealed class GetTasksQueryHandler(
             .ToListAsync(ct);
 
         var items = await TaskProjection.ToListItemsAsync(db, directory, forms, page, ct);
+        items = await WithComputedValuesAsync(items, ct);
 
         return Result.Success(new PaginatedResult<TaskListItemDto>(items, total, request.PageNumber, request.PageSize));
+    }
+
+    /// <summary>The page's computed values, in one read, handed to each row as cells.</summary>
+    private async Task<IReadOnlyList<TaskListItemDto>> WithComputedValuesAsync(IReadOnlyList<TaskListItemDto> items, CancellationToken ct)
+    {
+        if (items.Count == 0)
+        {
+            return items;
+        }
+
+        var ids = items.Select(i => i.Id).ToList();
+        var values = await db.TaskComputedValues
+            .AsNoTracking()
+            .Where(v => ids.Contains(v.FieldTaskId))
+            .Select(v => new { v.FieldTaskId, v.FormDefinitionId, v.Key, v.ValueText, v.ValueNumber })
+            .ToListAsync(ct);
+
+        if (values.Count == 0)
+        {
+            return items;
+        }
+
+        var byTask = values.ToLookup(v => v.FieldTaskId);
+
+        foreach (var item in items)
+        {
+            item.ComputedValues = byTask[item.Id]
+                .Select(v => new TaskComputedCellDto(TaskComputedColumnIds.Of(v.FormDefinitionId, v.Key), v.ValueText, v.ValueNumber))
+                .ToList();
+        }
+
+        return items;
     }
 
     private async Task<IQueryable<FieldTask>> ApplyFiltersAsync(
@@ -232,9 +271,26 @@ public sealed class GetTasksQueryHandler(
         : t.Priority == TaskPriorities.Normal ? 2
         : 1;
 
-    private static IQueryable<FieldTask> Sort(IQueryable<FieldTask> query, GetTasksQuery request)
+    private IQueryable<FieldTask> Sort(IQueryable<FieldTask> query, GetTasksQuery request)
     {
         var descending = request.SortDescending;
+
+        if (request.SortField?.StartsWith(TaskComputedColumnIds.SortPrefix, StringComparison.OrdinalIgnoreCase) == true
+            && TaskComputedColumnIds.TryParse(request.SortField, out var formId, out var key))
+        {
+            // By the number when the column is one, then by its text; a task without the value sorts as blank.
+            var values = db.TaskComputedValues.Where(v => v.FormDefinitionId == formId && v.Key == key);
+
+            var byComputed = descending
+                ? query
+                    .OrderByDescending(t => values.Where(v => v.FieldTaskId == t.Id).Select(v => v.ValueNumber).FirstOrDefault())
+                    .ThenByDescending(t => values.Where(v => v.FieldTaskId == t.Id).Select(v => v.ValueText).FirstOrDefault())
+                : query
+                    .OrderBy(t => values.Where(v => v.FieldTaskId == t.Id).Select(v => v.ValueNumber).FirstOrDefault())
+                    .ThenBy(t => values.Where(v => v.FieldTaskId == t.Id).Select(v => v.ValueText).FirstOrDefault());
+
+            return byComputed.ThenBy(t => t.Id);
+        }
 
         // Id breaks ties, so a page boundary never falls between two rows the database may return in
         // either order — which would show one row twice and skip another.

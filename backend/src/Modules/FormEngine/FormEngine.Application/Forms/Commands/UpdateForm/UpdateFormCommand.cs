@@ -18,4 +18,7 @@ public sealed record UpdateFormCommand : IRequest<Result<FormDetailDto>>
     public string NameAr { get; init; } = default!;
     public string Category { get; init; } = default!;
     public string? DepartmentCode { get; init; }
+
+    /// <summary>The field activity the form records, one of the department's.</summary>
+    public string? FieldActivityCode { get; init; }
 }
