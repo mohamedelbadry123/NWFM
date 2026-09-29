@@ -23,6 +23,10 @@ internal static class FormSeedData
     /// <param name="ResourceFile">An embedded form-builder document; see the Forms folder.</param>
     /// <param name="DepartmentCode">The owning department (Auth's lookup seed); null for none.</param>
     /// <param name="FieldActivityCode">One of that department's field activities; null for none.</param>
+    /// <param name="Publish">
+    /// False for a form deliberately left as a never-published draft — it shows how a draft filed under a field
+    /// activity is listed but not offered as usable. It is created once and never published by the seed.
+    /// </param>
     private sealed record FormSeed(
         string Code,
         string NameEn,
@@ -30,10 +34,17 @@ internal static class FormSeedData
         string Category,
         string ResourceFile,
         string? DepartmentCode = null,
-        string? FieldActivityCode = null);
+        string? FieldActivityCode = null,
+        bool Publish = true);
 
     /// <summary>The computed-columns demo; see <c>docs/computed-columns.md</c>.</summary>
     public const string LeakInspectionCode = "DEMO-LEAK-INSPECTION";
+
+    /// <summary>A second published form for Water Network / Leak repair, so an activity with that context lists several.</summary>
+    public const string LeakRepairCompletionCode = "DEMO-LEAK-REPAIR-COMPLETION";
+
+    /// <summary>A never-published draft for the same context: discoverable, but not usable until someone publishes it.</summary>
+    public const string LeakRepairChecklistDraftCode = "DEMO-LEAK-REPAIR-CHECKLIST";
 
     private static readonly FormSeed[] Forms =
     [
@@ -57,6 +68,23 @@ internal static class FormSeedData
             "leak-inspection-computed.json",
             "10",
             "LEAK_REPAIR"),
+        new(
+            LeakRepairCompletionCode,
+            "Leak Repair Completion Report",
+            "تقرير إنجاز إصلاح التسرب",
+            FormCategories.Inspection,
+            "leak-repair-completion.json",
+            "10",
+            "LEAK_REPAIR"),
+        new(
+            LeakRepairChecklistDraftCode,
+            "Leak Repair Safety Checklist (Draft)",
+            "قائمة التحقق من سلامة إصلاح التسرب (مسودة)",
+            FormCategories.Checklist,
+            "leak-repair-safety-checklist.json",
+            "10",
+            "LEAK_REPAIR",
+            Publish: false),
     ];
 
     /// <summary>
@@ -91,7 +119,9 @@ internal static class FormSeedData
 
         var form = await context.FormDefinitions.FirstOrDefaultAsync(x => x.Code == seed.Code, ct);
 
-        if (form is { CurrentVersionNo: not null })
+        // Anything already published is left alone, and so is an existing draft the seed never publishes — both may
+        // have been edited since.
+        if (form is { CurrentVersionNo: not null } || (form is not null && !seed.Publish))
         {
             return;
         }
@@ -110,6 +140,11 @@ internal static class FormSeedData
             await context.SaveChangesAsync(ct);
 
             logger.LogInformation("Seeded form {Code}.", seed.Code);
+        }
+
+        if (!seed.Publish)
+        {
+            return;
         }
 
         var published = await publisher.PublishAsync(form.Id, SeedActor, ct);

@@ -170,13 +170,16 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             var parentContext = await _instanceRepo.GetByIdAsync(parentId, cancellationToken);
             if (parentContext is null || !await WorkflowTreeGuard.CanRunAsync(_db, parentId, cancellationToken))
                 return Result.Failure<WorkflowInstance>(WorkflowErrors.Instance.NotRunning);
-            instance.SetExecutionContext(parentContext.GeographyJson, parentContext.IsDemo);
+            // A child has no location of its own: the whole tree answers to the main workflow's place.
+            instance.SetExecutionContext(parentContext.Location, parentContext.IsDemo);
         }
         else if (version.WorkspaceJson is not null)
         {
-            var scope = JsonSerializer.Deserialize<WorkflowWorkspaceDefinition>(version.WorkspaceJson, IntegrationJson.Options)!;
-            if (scope.Kind != "Main") return Result.Failure<WorkflowInstance>(new Error("Workflow.Child.Start", "Child workflows must be started by their parent."));
-            instance.SetExecutionContext(JsonSerializer.Serialize(new WorkflowGeography(scope.ClusterCode!, scope.RegionCode!, scope.CityCode!), IntegrationJson.Options), binding.IsDemo);
+            var scope = WorkflowWorkspaceDefinition.Read(version.WorkspaceJson)!;
+            if (scope.Kind != WorkflowWorkspaceDefinition.MainKind) return Result.Failure<WorkflowInstance>(new Error("Workflow.Child.Start", "Child workflows must be started by their parent."));
+            if (scope.HasLegacyConflict || !scope.HasRequiredLocation)
+                return Result.Failure<WorkflowInstance>(new Error("Workflow.Location.Invalid", "This workflow's organization location is incomplete or conflicting; re-select it and publish again."));
+            instance.SetExecutionContext(scope.Location, binding.IsDemo);
         }
 
         await _instanceRepo.AddAsync(instance, cancellationToken);

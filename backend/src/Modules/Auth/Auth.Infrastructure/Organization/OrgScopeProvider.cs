@@ -179,6 +179,41 @@ internal sealed class OrgScopeProvider(
                 && db.FieldActivityTypes.Any(f => f.DepartmentCode == d.Code && f.Code == fieldActivityCode && f.IsActive),
             cancellationToken);
 
+    public async Task<bool> IsValidLocationAsync(OrgLocation location, CancellationToken cancellationToken)
+    {
+        var wanted = location.Normalized();
+
+        // Only the named units are read, and only active ones: the cached hierarchy keeps inactive
+        // units so old work still expands, but a new placement must name live ones.
+        var cbu = wanted.CbuCode is null ? null : await db.Cbus.AsNoTracking()
+            .Where(x => x.Code == wanted.CbuCode && x.IsActive)
+            .Select(x => new { x.Code, x.ClusterCode })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var clusterCodes = new[] { wanted.ClusterCode, cbu?.ClusterCode }.OfType<string>().Distinct().ToList();
+        var activeClusters = clusterCodes.Count == 0 ? [] : await db.Clusters.AsNoTracking()
+            .Where(x => clusterCodes.Contains(x.Code) && x.IsActive)
+            .Select(x => x.Code)
+            .ToListAsync(cancellationToken);
+
+        var branch = wanted.BranchCode is null ? null : await db.Branches.AsNoTracking()
+            .Where(x => x.Code == wanted.BranchCode && x.IsActive)
+            .Select(x => new { x.Code, x.CbuCode })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var area = wanted.OperationAreaCode is null ? null : await db.OperationAreas.AsNoTracking()
+            .Where(x => x.Code == wanted.OperationAreaCode && x.IsActive)
+            .Select(x => new { x.Code, x.CbuCode })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var active = OrgHierarchy.Build(
+            cbu is null ? [] : [(cbu.Code, (string?)cbu.ClusterCode)],
+            branch is null ? [] : [(branch.Code, branch.CbuCode)],
+            area is null ? [] : [(area.Code, (string?)area.CbuCode)]);
+
+        return wanted.FitsHierarchy(active, activeClusters);
+    }
+
     private async Task<OrgScopeSet> ScopeOfAsync(string ownerType, string ownerId, CancellationToken cancellationToken)
     {
         var rows = await db.OrgScopes

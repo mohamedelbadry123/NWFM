@@ -46,6 +46,13 @@ public interface IOrgDirectory
     /// file work under an activity (a form, a task) and must not name one the department does not have.
     /// </summary>
     Task<bool> IsFieldActivityInDepartmentAsync(string departmentCode, string fieldActivityCode, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether every unit a location names is active and sits under the unit named above it: the CBU
+    /// under the cluster, and the branch and the operation area — siblings — each under the CBU. A
+    /// branch or operation area needs its CBU named too. Which levels are required is the caller's rule.
+    /// </summary>
+    Task<bool> IsValidLocationAsync(OrgLocation location, CancellationToken cancellationToken);
 }
 
 /// <summary>The unit levels <see cref="IOrgDirectory.GetUnitNamesAsync"/> names beyond the territory ones.</summary>

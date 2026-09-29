@@ -1,0 +1,219 @@
+{
+  "name_en": "Leak Repair Completion Report",
+  "name_ar": "تقرير إنجاز إصلاح التسرب",
+  "elements": [
+    {
+      "type": "text",
+      "label_en": "Work Order Reference",
+      "label_ar": "مرجع أمر العمل",
+      "data_name": "work_order_ref",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "min_length": null,
+      "max_length": 50,
+      "pattern": null,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "date_time",
+      "label_en": "Repair Completed At",
+      "label_ar": "وقت إنجاز الإصلاح",
+      "data_name": "repair_completed_at",
+      "description_en": "When the repaired line was put back into service.",
+      "description_ar": "وقت إعادة تشغيل الخط بعد الإصلاح.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "default_value_mode": "now",
+      "date_rule": "on_or_before",
+      "min_date": null,
+      "max_date": null,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "single_choice",
+      "label_en": "Repair Method",
+      "label_ar": "طريقة الإصلاح",
+      "data_name": "repair_method",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "allow_other": false,
+      "multiple": false,
+      "parent_field": null,
+      "choices": [
+        {
+          "value": "clamp",
+          "label_en": "Repair clamp",
+          "label_ar": "جلبة إصلاح",
+          "dependency_value": null
+        },
+        {
+          "value": "section_replacement",
+          "label_en": "Pipe section replaced",
+          "label_ar": "استبدال جزء من الأنبوب",
+          "dependency_value": null
+        },
+        {
+          "value": "joint_resealed",
+          "label_en": "Joint resealed",
+          "label_ar": "إعادة إحكام الوصلة",
+          "dependency_value": null
+        }
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "numeric",
+      "label_en": "Pipe Diameter (mm)",
+      "label_ar": "قطر الأنبوب (مم)",
+      "data_name": "pipe_diameter_mm",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "format": "integer",
+      "min": 15,
+      "max": 2000,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "yes_no",
+      "label_en": "Supply Restored?",
+      "label_ar": "هل أعيدت الخدمة؟",
+      "data_name": "supply_restored",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "memo",
+      "label_en": "Remarks",
+      "label_ar": "ملاحظات",
+      "data_name": "remarks",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "min_length": null,
+      "max_length": 2000,
+      "pattern": null,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "photo",
+      "label_en": "After-Repair Photos",
+      "label_ar": "صور ما بعد الإصلاح",
+      "data_name": "after_repair_photos",
+      "description_en": "Up to 5 photos of the finished repair.",
+      "description_ar": "حتى 5 صور للإصلاح المنجز.",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "max_files": 5,
+      "max_file_size_mb": 10,
+      "allowed_extensions": [
+        "jpg",
+        "jpeg",
+        "png",
+        "heic",
+        "webp"
+      ],
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "signature",
+      "label_en": "Crew Supervisor Signature",
+      "label_ar": "توقيع مشرف الفريق",
+      "data_name": "supervisor_signature",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    }
+  ]
+}

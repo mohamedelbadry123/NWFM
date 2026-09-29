@@ -82,6 +82,80 @@ internal sealed class FormGateway(
         return forms.Select(ToInfo).ToList();
     }
 
+    public async Task<FieldActivityFormPage> ListForFieldActivityAsync(
+        string departmentCode,
+        string fieldActivityCode,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var department = departmentCode.Trim();
+        var activity = fieldActivityCode.Trim();
+        var page = Math.Max(pageNumber, 1);
+        var size = Math.Clamp(pageSize, 1, MaxListTake);
+
+        var query = context.FormDefinitions
+            .AsNoTracking()
+            .Where(f => f.DepartmentCode == department && f.FieldActivityCode == activity);
+
+        // The same rule as AcceptsSubmissions, spelled out so it translates to SQL.
+        var totalCount = await query.CountAsync(cancellationToken);
+        var usableCount = await query.CountAsync(
+            f => f.CurrentVersionNo != null && f.Status != FormStatuses.Deprecated && f.Status != FormStatuses.Archived,
+            cancellationToken);
+
+        var forms = await query
+            .OrderBy(f => f.CurrentVersionNo != null && f.Status != FormStatuses.Deprecated && f.Status != FormStatuses.Archived ? 0 : 1)
+            .ThenBy(f => f.Code)
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync(cancellationToken);
+
+        var items = await ToFieldActivityInfoAsync(forms, cancellationToken);
+
+        return new FieldActivityFormPage(items, totalCount, usableCount, page, size);
+    }
+
+    public async Task<FieldActivityFormInfo?> FindFieldActivityFormAsync(Guid formId, CancellationToken cancellationToken)
+    {
+        var form = await context.FormDefinitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == formId && f.DepartmentCode != null && f.FieldActivityCode != null, cancellationToken);
+
+        return form is null ? null : (await ToFieldActivityInfoAsync([form], cancellationToken))[0];
+    }
+
+    private async Task<IReadOnlyList<FieldActivityFormInfo>> ToFieldActivityInfoAsync(
+        IReadOnlyList<FormDefinition> forms,
+        CancellationToken cancellationToken)
+    {
+        var ids = forms.Select(f => f.Id).ToList();
+        var versions = await context.FormVersions
+            .AsNoTracking()
+            .Where(v => ids.Contains(v.FormDefinitionId) && v.TargetClient == FormTargetClients.Formly)
+            .Select(v => new { v.FormDefinitionId, v.VersionNo })
+            .ToListAsync(cancellationToken);
+        var versionsByForm = versions
+            .GroupBy(v => v.FormDefinitionId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<int>)g.Select(v => v.VersionNo).Distinct().OrderDescending().ToList());
+
+        return forms
+            .Select(f => new FieldActivityFormInfo(
+                f.Id,
+                f.Code,
+                f.NameEn,
+                f.NameAr,
+                f.Category,
+                f.Status,
+                f.DepartmentCode!,
+                f.FieldActivityCode!,
+                f.CurrentVersionNo,
+                versionsByForm.TryGetValue(f.Id, out var numbers) ? numbers : [],
+                f.AcceptsSubmissions,
+                f.UpdatedAt))
+            .ToList();
+    }
+
     public Task<string?> GetVersionSchemaAsync(Guid formId, int versionNo, CancellationToken cancellationToken) =>
         context.FormVersions
             .AsNoTracking()

@@ -1480,6 +1480,10 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BranchCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("BusinessEntityId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -1487,6 +1491,14 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CbuCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ClusterCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
@@ -1507,9 +1519,6 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
-                    b.Property<string>("GeographyJson")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -1517,6 +1526,10 @@ namespace Workflow.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsDemo")
                         .HasColumnType("bit");
+
+                    b.Property<string>("OperationAreaCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
@@ -1571,6 +1584,8 @@ namespace Workflow.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status");
 
                     b.HasIndex("WorkflowBindingId");
+
+                    b.HasIndex("OrganizationId", "CbuCode");
 
                     b.HasIndex("OrganizationId", "IdempotencyKey")
                         .IsUnique();

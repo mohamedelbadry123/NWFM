@@ -29,6 +29,8 @@ public sealed class FormSeedDataTests
     [InlineData("fulcrum-field-survey-import.json")]
     [InlineData("all-input-types.json")]
     [InlineData("leak-inspection-computed.json")]
+    [InlineData("leak-repair-completion.json")]
+    [InlineData("leak-repair-safety-checklist.json")]
     public void EverySeed_IsValidAndPublishable(string fileName)
     {
         var json = ReadResource(fileName);

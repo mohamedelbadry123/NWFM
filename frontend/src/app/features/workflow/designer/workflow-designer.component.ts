@@ -1,4 +1,8 @@
-import { WorkflowActivitySlaComponent } from '../workspace/workflow-activity-sla.component';
+import { WorkflowActivitySlaComponent, SlaManageRequest } from '../workspace/workflow-activity-sla.component';
+import { WorkflowSlaEditorComponent, SlaEditorRequest } from '../workspace/workflow-sla-editor.component';
+import { WorkflowActivityFormsComponent, ActivityFormPreviewRequest } from '../workspace/workflow-activity-forms.component';
+import { WorkflowFormPreviewComponent } from '../workspace/workflow-form-preview.component';
+import type { SlaRule } from '../workspace/workflow-sla-rules.service';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -14,15 +18,15 @@ import {
   ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
 import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
 import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
 import { WorkflowBusinessActivityComponent } from '../workspace/workflow-business-activity.component';
-import { WorkflowGeographyComponent } from '../workspace/workflow-geography.component';
-import { WorkspaceSettings } from '../workspace/workflow-workspace.service';
+import { WorkflowLocationComponent } from '../workspace/workflow-location.component';
+import { WorkspaceSettings, normalizeWorkspaceSettings } from '../workspace/workflow-workspace.service';
 import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -77,7 +81,7 @@ export interface FormFieldRow {
 
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
 export type NotificationFailurePolicyOption = 'Continue' | 'Retry' | 'FailWorkflow';
-export type InspectorTab = 'general' | 'assignment' | 'outcomes' | 'actions' | 'sla' | 'data' | 'form' | 'advanced';
+export type InspectorTab = 'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'advanced';
 export type BottomTab = 'variables' | 'validation';
 
 export interface CanvasOutcome {
@@ -293,7 +297,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [WorkflowActivitySlaComponent, FormsModule, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowGeographyComponent],
+  imports: [WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -442,14 +446,26 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Integer', 'Decimal', 'Boolean', 'Date', 'DateTime', 'Guid', 'Json'];
 
   // ── Inspector tab definitions
-  protected readonly userTaskTabs: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
+  // Accept / Reject and the rejection destination live in General. Form lists the Form Engine forms of the activity's
+  // Department + FA Type; a MainActivity has none of its own (they belong to its child workflow's activities).
+  private static readonly ACTIVITY_TABS: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
     { id: 'general',    labelKey: 'workflow.designer.tab_general',    helpKey: 'workflow.designer.tab_help_general'    },
     { id: 'assignment', labelKey: 'workflow.designer.tab_assignment', helpKey: 'workflow.designer.tab_help_assignment' },
-    { id: 'actions',    labelKey: 'workflow.designer.tab_actions',    helpKey: 'workflow.designer.tab_help_actions'    },
+    { id: 'form',       labelKey: 'workflow.designer.tab_form',       helpKey: 'workflow.designer.tab_help_form'       },
     { id: 'sla',        labelKey: 'workflow.designer.tab_sla',        helpKey: 'workflow.designer.tab_help_sla'        },
   ];
+  /** The tabs an activity of this type shows; empty for nodes that have a single settings panel. */
+  static tabsFor(type: NodeType | undefined | null): { id: InspectorTab; labelKey: string; helpKey: string }[] {
+    if (type === 'UserTask') return WorkflowDesignerComponent.ACTIVITY_TABS;
+    if (type === 'MainActivity') return WorkflowDesignerComponent.ACTIVITY_TABS.filter(t => t.id !== 'form');
+    return [];
+  }
+  protected readonly userTaskTabs = computed(() => WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type));
+  /** The panel actually shown: a tab the selected activity does not have (Form on a MainActivity) falls back to General. */
+  protected readonly activeInspectorTab = computed<InspectorTab>(() =>
+    this.userTaskTabs().some(t => t.id === this.inspectorTab()) ? this.inspectorTab() : 'general');
   protected readonly activeTabHelpKey = computed(() =>
-    this.userTaskTabs.find(t => t.id === this.inspectorTab())?.helpKey
+    this.userTaskTabs().find(t => t.id === this.activeInspectorTab())?.helpKey
     ?? 'workflow.designer.tab_help_general',
   );
 
@@ -671,7 +687,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         next: v => {
           if (this.versionId() !== requestedVersion) return;
           this.version.set(v);
-          try { this.workspace.set(v.workspaceJson ? JSON.parse(v.workspaceJson) : undefined); } catch { this.workspace.set(undefined); }
+          try { this.workspace.set(v.workspaceJson ? normalizeWorkspaceSettings(JSON.parse(v.workspaceJson)) : undefined); } catch { this.workspace.set(undefined); }
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
           if (v.status === 'Draft' && this.workspace()) { this.workspace.update(w => ({...w!, designerVersion: 2})); this.ensureSimpleActions(); this.convertEmbeddedEvents(); }
@@ -796,11 +812,15 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       state.nodes.filter(n => idMap.has(n.id)).map(n => n.nodeKey),
     );
 
+    // A published version shows what was published: publication adds the SLA snapshot to each activity's
+    // configuration, which the saved canvas never contained.
+    const published = v.status !== 'Draft' ? new Map(activities.map(a => [a.id, a.configurationJson])) : null;
     const nodes: CanvasNode[] = [];
     for (const n of state.nodes) {
       const backendId = idMap.get(n.id);
       if (!backendId) continue;
-      nodes.push({ ...n, id: backendId });
+      const configurationJson = published?.get(backendId);
+      nodes.push(configurationJson ? { ...n, id: backendId, configurationJson } : { ...n, id: backendId });
     }
 
     activities.forEach((a, i) => {
@@ -1126,16 +1146,76 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       return {...n,outcomes};
     }));
   }
-  protected rejectTarget(value:string):void {const n=this.selectedNode();if(!n)return;this.applyIntegrationConfiguration(JSON.stringify({...this.parseConfig(n.configurationJson),rejectTargetNodeKey:value}));}
   protected businessNodes(){return this.nodes().filter(n=>n.type==='UserTask'||n.type==='MainActivity');}
-  protected activityTabKey(event:KeyboardEvent,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const step=(event.key==='ArrowRight'?1:-1)*(this.locale.isRtl()?-1:1);const next=event.key==='Home'?0:event.key==='End'?this.userTaskTabs.length-1:(index+step+this.userTaskTabs.length)%this.userTaskTabs.length;this.inspectorTab.set(this.userTaskTabs[next].id);(event.target as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();}
-  protected rejectionDestinations(){
-    const current=this.selectedNode();if(!current)return [];
-    const reaches=(from:string,to:string)=>{const pending=[from],seen=new Set<string>();while(pending.length){const id=pending.pop()!;if(seen.has(id))continue;seen.add(id);for(const edge of this.edges().filter(e=>e.fromNodeId===id)){if(edge.toNodeId===to)return true;pending.push(edge.toNodeId);}}return false;};
-    const business=this.businessNodes();return business.filter(n=>n.id===current.id?!business.some(b=>b.id!==n.id&&reaches(b.id,n.id)):reaches(n.id,current.id)&&!reaches(current.id,n.id));
-  }
+  protected activityTabKey(event:KeyboardEvent,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const step=(event.key==='ArrowRight'?1:-1)*(this.locale.isRtl()?-1:1);const tabs=this.userTaskTabs();const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+step+tabs.length)%tabs.length;this.inspectorTab.set(tabs[next].id);(event.target as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();}
   protected selectedConfig(): any {return this.parseConfig(this.selectedNode()?.configurationJson||'{}');}
-  protected resetSimpleActions(){const n=this.selectedNode();if(!n||this.isReadonly())return;this.nodes.update(nodes=>nodes.map(x=>x.id===n.id?{...x,outcomes:[],actions:[]}:x));this.ensureSimpleActions();this.markUnsaved();}
+
+  // ── In-place SLA editing ──
+  // The editor is modal over the canvas, so the selected activity, pan/zoom and the unsaved draft cannot change underneath it.
+  // Saving it writes only the shared SLA rule; the workflow draft stays exactly as it was (still unsaved if it was).
+  protected readonly slaEditor = signal<SlaEditorRequest | null>(null);
+  protected legacySlaPolicyName(): string {
+    const id = this.selectedConfig()?.slaPolicyId as string | undefined;
+    return id ? this.slaPolicies().find(p => p.id === id)?.name ?? id : '';
+  }
+  protected openSlaEditor(request: SlaManageRequest): void {
+    const node = this.selectedNode();
+    if (!node || this.isReadonly() || !this.workspace()) return;
+    const matches = this.nodes().filter(n => (n.type === 'UserTask' || n.type === 'MainActivity') && (() => {
+      const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
+      return c['departmentCode'] === request.departmentCode && c['fieldActivityCode'] === request.fieldActivityCode;
+    })()).length;
+    this.slaEditor.set({ locked: true, ...request, activityName: node.name || node.nodeKey, currentWorkflowMatches: Math.max(matches, 1), versionId: this.versionId() });
+  }
+  protected closeSlaEditor(saved: SlaRule | null): void {
+    this.slaEditor.set(null);
+    if (saved) this.dropResolvedSlaIssues(saved);
+    this.restoreSlaFocus(10);
+  }
+  /** The SLA tab re-renders while it reloads the rule, so wait briefly for its action before settling on its heading. */
+  private restoreSlaFocus(attempts: number): void {
+    setTimeout(() => {
+      const action = document.getElementById('wf-activity-sla-action');
+      if (action || attempts <= 0) (action ?? document.getElementById('wf-activity-sla-title'))?.focus();
+      else this.restoreSlaFocus(attempts - 1);
+    }, 50);
+  }
+  /**
+   * An active rule satisfies the publish check for every activity with its combination. Re-validating would save the
+   * workflow first, so the stale issues are dropped locally instead; the next Validate re-checks everything on the server.
+   */
+  private dropResolvedSlaIssues(rule: SlaRule): void {
+    const result = this.validationResult();
+    if (!result?.errors?.length || !rule.isActive) return;
+    const covered = new Set(this.nodes().filter(n => {
+      const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
+      return c['departmentCode'] === rule.departmentCode && c['fieldActivityCode'] === rule.fieldActivityCode;
+    }).map(n => n.nodeKey));
+    const errors = result.errors.filter(e => !(e.code === 'SLA_MATCH_REQUIRED' && e.nodeKey && covered.has(e.nodeKey)));
+    if (errors.length !== result.errors.length) this.validationResult.set({ ...result, errors, isValid: errors.length === 0 });
+  }
+  // ── Form tab preview ──
+  // Modal over the canvas like the SLA editor: previewing never touches the draft, the selection or pan/zoom.
+  protected readonly formPreview = signal<ActivityFormPreviewRequest | null>(null);
+  protected openFormPreview(request: ActivityFormPreviewRequest): void { this.formPreview.set(request); }
+  protected closeFormPreview(): void {
+    const formId = this.formPreview()?.form.id;
+    this.formPreview.set(null);
+    setTimeout(() => (document.getElementById(`wf-form-preview-${formId}`) ?? document.getElementById('wf-activity-forms-title'))?.focus());
+  }
+  /** From the SLA or Form tab's "missing context" state to the General field that still needs a value. */
+  protected goToActivityContext(field: 'departmentCode' | 'fieldActivityCode'): void {
+    this.inspectorTab.set('general');
+    this.focusWhenRendered(field === 'departmentCode' ? 'wf-activity-department' : 'wf-activity-field-type', 10);
+  }
+  /** General renders after the tab switch, so the field may not exist yet on the first try. */
+  private focusWhenRendered(id: string, attempts: number): void {
+    setTimeout(() => {
+      const field = document.getElementById(id);
+      if (field || attempts <= 0) field?.focus();
+      else this.focusWhenRendered(id, attempts - 1);
+    }, 50);
+  }
   protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
   protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
 
@@ -1213,11 +1293,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     // Normal click: single-select (clear multi-select)
-    if (this.selectedNodeId() !== nodeId) {
-      const userTaskOnlyTabs: InspectorTab[] = ['assignment', 'outcomes', 'actions', 'sla', 'data', 'form', 'advanced'];
-      if ((node?.type !== 'UserTask' && node?.type !== 'MainActivity') && userTaskOnlyTabs.includes(this.inspectorTab())) {
-        this.inspectorTab.set('general');
-      }
+    if (this.selectedNodeId() !== nodeId && !WorkflowDesignerComponent.tabsFor(node?.type).some(t => t.id === this.inspectorTab())) {
+      this.inspectorTab.set('general');
     }
     this.selectedNodeIds.set([nodeId]);
     this.selectedNodeId.set(nodeId);
@@ -2043,6 +2120,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
+    // The SLA editor and form preview are modal: Escape, Delete or undo pressed inside them must not act on the canvas behind.
+    if (this.slaEditor() || this.formPreview()) return;
     const target = event.target as HTMLElement | null;
     const tag = target?.tagName ?? '';
     const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
@@ -2465,19 +2544,13 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.centerOnNode(node.id);
 
     const tab = this.inferTabFromCode(errorCode);
-    if ((node.type === 'UserTask' || node.type === 'MainActivity') || !['assignment', 'outcomes', 'actions', 'sla', 'data', 'form', 'advanced'].includes(tab)) {
-      this.inspectorTab.set(tab as InspectorTab);
-    } else {
-      this.inspectorTab.set('general');
-    }
+    this.inspectorTab.set(WorkflowDesignerComponent.tabsFor(node.type).some(t => t.id === tab) ? tab : 'general');
   }
 
-  private inferTabFromCode(code?: string | null): string {
+  private inferTabFromCode(code?: string | null): InspectorTab {
     if (!code) return 'general';
     const lower = code.toLowerCase();
     if (lower.includes('assignment') || lower.includes('assignmentkey')) return 'assignment';
-    if (lower.includes('outcome') || lower.includes('reject') || lower.includes('accept')) return 'actions';
-    if (lower.includes('action')) return 'actions';
     if (lower.includes('sla') || lower.includes('timer')) return 'sla';
     return 'general';
   }

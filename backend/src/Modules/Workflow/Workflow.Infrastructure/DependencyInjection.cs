@@ -29,6 +29,7 @@ public static class DependencyInjection
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
         services.AddScoped<Workflow.Application.Workspace.IWorkspaceSla, WorkspaceSla>();
+        services.AddScoped<Workflow.Application.Workspace.IWorkspaceActivityForms, Workflow.Application.Workspace.WorkspaceActivityForms>();
         services.AddScoped<Workflow.Application.Workspace.IWorkflowWorkspacePublisher, WorkflowWorkspacePublisher>();
         services.AddTransient(typeof(MediatR.IPipelineBehavior<,>), typeof(WorkflowRuntimeCommandLock<,>));
         services.AddScoped<IWorkflowParticipantRepository, WorkflowParticipantRepository>();

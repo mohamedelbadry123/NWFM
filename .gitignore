@@ -70,5 +70,7 @@ $RECYCLE.BIN/
 .work/workflow-*.json
 .work/workspace-*
 .work/*-workspace-edits.cjs
-/refernceApp
+.work/*-dev-*.log
+.work/iis-sites.json
+.work/inspect-iis.ps1
 /refernceApp

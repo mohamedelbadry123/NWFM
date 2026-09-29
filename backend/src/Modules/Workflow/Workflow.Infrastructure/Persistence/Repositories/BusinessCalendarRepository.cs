@@ -54,6 +54,9 @@ internal sealed class BusinessCalendarRepository : IBusinessCalendarRepository
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public void AddDetail(BusinessCalendarPeriod period) => _db.BusinessCalendarPeriods.Add(period);
+    public void AddDetail(BusinessCalendarHoliday holiday) => _db.BusinessCalendarHolidays.Add(holiday);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => _db.SaveChangesAsync(cancellationToken);
 }
