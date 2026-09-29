@@ -13,7 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-</ItemGroup>
+    <ProjectReference Include="..\Workflow.Application\Workflow.Application.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
