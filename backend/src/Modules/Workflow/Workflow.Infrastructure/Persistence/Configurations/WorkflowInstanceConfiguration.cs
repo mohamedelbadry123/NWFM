@@ -30,6 +30,11 @@ public sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<Wor
         builder.Property(x => x.CurrentActivityNodeKey).HasMaxLength(200).IsRequired();
         builder.Property(x => x.ParentInstanceId);
         builder.Property(x => x.ParentActivityNodeKey).HasMaxLength(200);
+        builder.Property(x => x.ClusterCode).HasMaxLength(WorkflowInstance.OrgCodeMaxLength);
+        builder.Property(x => x.CbuCode).HasMaxLength(WorkflowInstance.OrgCodeMaxLength);
+        builder.Property(x => x.BranchCode).HasMaxLength(WorkflowInstance.OrgCodeMaxLength);
+        builder.Property(x => x.OperationAreaCode).HasMaxLength(WorkflowInstance.OrgCodeMaxLength);
+        builder.Ignore(x => x.Location);
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.UpdatedAt);
         builder.Property(x => x.RowVersion).IsRowVersion();
@@ -39,5 +44,7 @@ public sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<Wor
         builder.HasIndex(x => x.WorkflowBindingId);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.ParentInstanceId);
+        // Territory filtering on the instance list reads these.
+        builder.HasIndex(x => new { x.OrganizationId, x.CbuCode });
     }
 }

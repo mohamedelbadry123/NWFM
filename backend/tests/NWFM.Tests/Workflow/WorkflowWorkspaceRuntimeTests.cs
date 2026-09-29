@@ -13,7 +13,7 @@ using global::Workflow.Infrastructure.Services;
 public sealed partial class WorkflowRuntimeEnginePathTests
 {
     [Fact]
-    public async Task Publication_RejectsInvalidGeographyDepartmentFieldTypeAndMissingSlaPolicy()
+    public async Task Publication_RejectsInvalidLocationDepartmentFieldTypeAndMissingSlaPolicy()
     {
         var seeded = SeedWorkspace(DateTime.UtcNow);
         var references = new Mock<NWFM.Shared.Integration.Workflow.IWorkflowReferenceData>();
@@ -23,9 +23,10 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         var settings = System.Text.Json.Nodes.JsonNode.Parse(main.ConfigurationJson!)!;
         settings["slaPolicyId"] = Guid.NewGuid().ToString();
         _db.Entry(main).Property(a => a.ConfigurationJson).CurrentValue = settings.ToJsonString();
-        var publisher = new WorkflowWorkspacePublisher(_db, references.Object, repository);
+        var directory = new Mock<NWFM.Shared.Integration.Organization.IOrgDirectory>();
+        var publisher = new WorkflowWorkspacePublisher(_db, references.Object, repository, directory.Object);
         var issues = await publisher.ValidateAsync(version, default);
-        issues.Should().Contain(i => i.Code == "WORKSPACE_GEOGRAPHY");
+        issues.Should().Contain(i => i.Code == "WORKSPACE_LOCATION");
         issues.Should().Contain(i => i.Code == "ACTIVITY_FIELD_TYPE");
         issues.Should().Contain(i => i.Code == "ACTIVITY_SLA");
     }
@@ -41,7 +42,8 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         _db.ActivityDefinitions.Add(ActivityDefinition.Create(seeded.ChildVersion, "cycle", ActivityType.MainActivity, "Recursive child", now,
             configurationJson: Config(new { definitionKey = parentKey, versionId = parent.Id })));
         await _db.SaveChangesAsync();
-        var publisher = new WorkflowWorkspacePublisher(_db, new Mock<NWFM.Shared.Integration.Workflow.IWorkflowReferenceData>().Object, repository);
+        var publisher = new WorkflowWorkspacePublisher(_db, new Mock<NWFM.Shared.Integration.Workflow.IWorkflowReferenceData>().Object, repository,
+            new Mock<NWFM.Shared.Integration.Organization.IOrgDirectory>().Object);
         (await publisher.ValidateAsync(parent, default)).Should().Contain(i => i.Code == "CHILD_RECURSION");
     }
 
@@ -167,6 +169,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         _db.WorkflowTransitions.AddRange(WorkflowTransition.Create(childVersion.Id, start.Id, timer.Id, "child-enter", 1, now), WorkflowTransition.Create(childVersion.Id, timer.Id, end.Id, "child-exit", 1, now));
         var parent = SeedSingleActivity(ActivityType.MainActivity, Config(new { definitionKey = child.DefinitionKey, versionId = childVersion.Id, slaDurationHours = 24, rejectTargetNodeKey = "activity" }), now);
         var version = _db.WorkflowVersions.Find(parent.Version)!;
+        // Pre-hierarchy shape on purpose: every test built on this seed also exercises the legacy read.
         version.SetWorkspace("{\"kind\":\"Main\",\"clusterCode\":\"CC\",\"regionCode\":\"R1\",\"cityCode\":\"C1\"}");
         version.PinChildVersions(JsonSerializer.Serialize(new Dictionary<string, Guid> { ["activity"] = childVersion.Id }));
         var group = Guid.NewGuid();
@@ -184,7 +187,8 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         started.IsSuccess.Should().BeTrue(started.IsFailure ? started.Error.Message : "");
         var rootId = started.Value.Id;
         var child = await _db.WorkflowInstances.SingleAsync(i => i.ParentInstanceId == rootId);
-        child.GeographyJson.Should().Be(started.Value.GeographyJson);
+        started.Value.Location.Should().Be(new NWFM.Shared.Organization.OrgLocation("CC", "R1", "C1"));
+        child.Location.Should().Be(started.Value.Location);
         child.PinnedWorkflowVersionId.Should().Be(seeded.ChildVersion);
         (await _db.WorkItems.CountAsync()).Should().Be(0);
         var timer = await _db.WorkflowTimers.SingleAsync();

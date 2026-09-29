@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NWFM.Shared.Integration.Organization;
 using NWFM.Shared.Integration.Workflow;
 using NWFM.Shared.Results;
 using Workflow.Application.DTOs;
@@ -13,7 +14,7 @@ using Workflow.Infrastructure.Persistence;
 namespace Workflow.Infrastructure.Services;
 
 internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
-    IWorkflowVersionRepository versions) : IWorkflowWorkspacePublisher
+    IWorkflowVersionRepository versions, IOrgDirectory directory) : IWorkflowWorkspacePublisher
 {
     public async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateAsync(WorkflowVersion version, CancellationToken ct)
     {
@@ -21,11 +22,11 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
         if (string.IsNullOrWhiteSpace(version.WorkspaceJson))
         {
             if (version.Activities.Any(a => a.ActivityType == ActivityType.MainActivity))
-                errors.Add(new("WORKSPACE_REQUIRED", "Select the workflow kind and geography before publishing main activities."));
+                errors.Add(new("WORKSPACE_REQUIRED", "Select the workflow kind and organization location before publishing main activities."));
             return errors;
         }
         WorkflowWorkspaceDefinition? workspace;
-        try { workspace = JsonSerializer.Deserialize<WorkflowWorkspaceDefinition>(version.WorkspaceJson, IntegrationJson.Options); }
+        try { workspace = WorkflowWorkspaceDefinition.Read(version.WorkspaceJson); }
         catch (JsonException) { errors.Add(new("WORKSPACE_INVALID", "Workflow settings are invalid.")); return errors; }
         if (workspace is null || workspace.Kind is not ("Main" or "Child"))
         { errors.Add(new("WORKSPACE_KIND", "Select Main or Child workflow.")); return errors; }
@@ -36,10 +37,7 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
             { errors.Add(new("ACTIVITY_CONFIG", "Activity settings contain an invalid value.")); }
         }
-        if (workspace.Kind == "Main" && !await references.IsValidGeographyAsync(new(workspace.ClusterCode ?? "", workspace.RegionCode ?? "", workspace.CityCode ?? ""), ct))
-            errors.Add(new("WORKSPACE_GEOGRAPHY", "Select an active cluster, region and city in the same hierarchy."));
-        if (workspace.Kind == "Child" && new[] { workspace.ClusterCode, workspace.RegionCode, workspace.CityCode }.Any(x => !string.IsNullOrEmpty(x)))
-            errors.Add(new("WORKSPACE_INHERITANCE", "Child workflows inherit geography; remove local geography selections."));
+        errors.AddRange(await ValidateLocationAsync(workspace, directory, ct));
         if (workspace.Kind == "Main" && !version.Activities.Any(a => a.ActivityType == ActivityType.MainActivity))
             errors.Add(new("WORKSPACE_MAIN_ACTIVITY", "Add at least one main activity with a child workflow."));
 
@@ -76,8 +74,7 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
                 if (child is null) Error("MAIN_CHILD", "Select a published child workflow.");
                 else
                 {
-                    var childSettings = JsonSerializer.Deserialize<WorkflowWorkspaceDefinition>(child.WorkspaceJson ?? "null", IntegrationJson.Options);
-                    if (childSettings?.Kind != "Child") Error("MAIN_CHILD_KIND", "Main activities require a workflow published as Child.");
+                    if (WorkflowWorkspaceDefinition.KindOf(child.WorkspaceJson) != WorkflowWorkspaceDefinition.ChildKind) Error("MAIN_CHILD_KIND", "Main activities require a workflow published as Child.");
                     if (!await CheckTreeAsync(child, new HashSet<Guid> { version.WorkflowDefinitionId }, 1, ct))
                         Error("CHILD_RECURSION", "Child workflow references must be acyclic and at most 16 levels deep.");
                 }
@@ -123,8 +120,8 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             if (child is not null) pins[activity.NodeKey] = child.Id;
         }
         version.PinChildVersions(JsonSerializer.Serialize(pins));
-        var settings = JsonSerializer.Deserialize<WorkflowWorkspaceDefinition>(version.WorkspaceJson, IntegrationJson.Options)!;
-        if (settings.Kind == "Main")
+        var settings = WorkflowWorkspaceDefinition.Read(version.WorkspaceJson)!;
+        if (settings.Kind == WorkflowWorkspaceDefinition.MainKind)
         {
             var definition = await db.WorkflowDefinitions.SingleAsync(d => d.Id == version.WorkflowDefinitionId, ct);
             var screen = "workspace:" + definition.Id;
@@ -136,6 +133,26 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             }
         }
         return Result.Success();
+    }
+
+    /// <summary>
+    /// The location rules shared by creating, publishing and starting a workflow. A main workflow is
+    /// placed at least at cluster and CBU, every unit active and under its parent (branch and operation
+    /// area as siblings under the CBU); a child names no place — it takes its parent's when it starts.
+    /// </summary>
+    internal static async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateLocationAsync(
+        WorkflowWorkspaceDefinition workspace, IOrgDirectory directory, CancellationToken ct)
+    {
+        if (workspace.HasLegacyConflict)
+            return [new("WORKSPACE_LOCATION_CONFLICT", "This workflow's saved location names two different CBUs or branches. Re-select its organization location.")];
+        var location = workspace.Location;
+        if (workspace.Kind == WorkflowWorkspaceDefinition.ChildKind)
+            return location.IsEmpty ? [] : [new("WORKSPACE_INHERITANCE", "Child workflows inherit the main workflow's organization location; remove the local selection.")];
+        if (!workspace.HasRequiredLocation)
+            return [new("WORKSPACE_LOCATION_REQUIRED", "Select at least a cluster and a CBU for a main workflow.")];
+        if (!await directory.IsValidLocationAsync(location, ct))
+            return [new("WORKSPACE_LOCATION", "Select an active cluster and CBU; a branch or operation area must belong to that CBU.")];
+        return [];
     }
 
     private async Task<WorkflowVersion?> ResolveChildAsync(BusinessActivityConfiguration config, CancellationToken ct)

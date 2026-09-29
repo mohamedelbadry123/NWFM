@@ -18,6 +18,14 @@ public interface IWorkspaceSla
     Task<IReadOnlyList<SlaCalendarOption>> CalendarsAsync(CancellationToken ct);
     Task<IReadOnlyList<WorkspaceSlaRule>> ListAsync(CancellationToken ct);
     Task<WorkspaceSlaRule?> ResolveAsync(string departmentCode, string fieldActivityCode, CancellationToken ct);
+    Task<WorkspaceSlaContext> ContextAsync(string departmentCode, string fieldActivityCode, Guid? excludeVersionId, CancellationToken ct);
     Task<Result<WorkspaceSlaRule>> SaveAsync(Guid? id, WorkspaceSlaInput input, CancellationToken ct);
 }
-public sealed record SlaCalendarOption(Guid Id, string Name, string TimeZone);
+public sealed record SlaCalendarOption(Guid Id, string Name, string TimeZone, bool HasWorkingPeriods = false);
+/// <summary>
+/// Everything the designer needs to manage the one rule shared by a Department + FA Type: the active rule (even when its
+/// calendar was deactivated), inactive rules that could be reactivated instead of duplicated, and who else uses the combination.
+/// </summary>
+public sealed record WorkspaceSlaContext(WorkspaceSlaRule? Rule, bool CalendarActive, IReadOnlyList<WorkspaceSlaRule> InactiveRules, WorkspaceSlaUsage Usage);
+/// <summary>Draft activities follow rule edits on their next publication; published versions keep their snapshot.</summary>
+public sealed record WorkspaceSlaUsage(int DraftActivities, int DraftWorkflows, IReadOnlyList<string> DraftWorkflowNames, int PublishedVersions);

@@ -25,8 +25,8 @@
   @if (!isLoading() && !loadError() && version()) {
 
     @if (workspace(); as settings) {
-      <details class="shrink-0 border-b p-3"><summary class="cursor-pointer font-medium">{{ locale.locale() === 'ar' ? 'إعدادات سير العمل والموقع' : 'Workflow settings and geography' }}</summary>
-        <app-workflow-geography [settings]="settings" [readonly]="isReadonly()" (settingsChange)="updateWorkspace($event)" />
+      <details class="shrink-0 border-b p-3"><summary class="cursor-pointer font-medium">{{ locale.locale() === 'ar' ? 'إعدادات سير العمل والموقع التنظيمي' : 'Workflow settings and organization location' }}</summary>
+        <app-workflow-location [settings]="settings" [readonly]="isReadonly()" (settingsChange)="updateWorkspace($event)" />
       </details>
     }
     <!-- ── Top bar ── -->
@@ -1266,11 +1266,11 @@
           @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
             <div class="sticky top-0 z-10 border-b shrink-0 designer-panel-header">
 
-              <div class="grid grid-cols-4 border-b border-dark-700/60" role="tablist" aria-label="Activity settings">
-                @for (tab of userTaskTabs; track tab.id; let i=$index) {
-                  <button
-                    role="tab" [attr.aria-selected]="inspectorTab()===tab.id" [attr.tabindex]="inspectorTab()===tab.id?0:-1" (keydown)="activityTabKey($event,i)" (click)="inspectorTab.set(tab.id)"
-                    [class]="inspectorTab() === tab.id
+              <div class="grid border-b border-dark-700/60" role="tablist" [attr.aria-label]="locale.isRtl() ? 'إعدادات النشاط' : 'Activity settings'" [style.grid-template-columns]="'repeat(' + userTaskTabs().length + ', minmax(0, 1fr))'">
+                @for (tab of userTaskTabs(); track tab.id; let i=$index) {
+                  <button type="button" [id]="'wf-activity-tab-' + tab.id" aria-controls="wf-activity-panel"
+                    role="tab" [attr.aria-selected]="activeInspectorTab()===tab.id" [attr.tabindex]="activeInspectorTab()===tab.id?0:-1" (keydown)="activityTabKey($event,i)" (click)="inspectorTab.set(tab.id)"
+                    [class]="activeInspectorTab() === tab.id
                       ? 'py-2 text-xs text-primary border-b-2 border-primary font-semibold bg-primary/5 transition-colors'
                       : 'py-2 text-xs text-dark-400 hover:text-white border-b-2 border-transparent transition-colors'">
                     {{ tab.labelKey | translate }}
@@ -1284,10 +1284,10 @@
           }
 
           <!-- ── Tab content ── -->
-          <div class="flex-1 overflow-y-auto">
+          <div class="flex-1 overflow-y-auto" id="wf-activity-panel" [attr.role]="userTaskTabs().length ? 'tabpanel' : null" [attr.aria-labelledby]="userTaskTabs().length ? 'wf-activity-tab-' + activeInspectorTab() : null">
 
             <!-- ─── General tab (all types) / non-UserTask single panel ─── -->
-            @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || inspectorTab() === 'general') {
+            @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || activeInspectorTab() === 'general') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 @if (workspace() && (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
                   <app-workflow-business-activity [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
@@ -1533,7 +1533,7 @@
             }
 
             <!-- ─── Assignment tab (UserTask) ─── -->
-            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'assignment') {
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && activeInspectorTab() === 'assignment') {
               <div class="p-4 space-y-4">
                 <p class="text-xs leading-relaxed rounded-xl px-3 py-2.5"
                   style="background: color-mix(in srgb, var(--ds-primary, #6d28d9) 12%, transparent); color: var(--ds-text-2)">
@@ -1581,15 +1581,12 @@
               </div>
             }
 
-            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'actions') {
-              <section class="p-4 space-y-4"><div class="border rounded-lg p-3"><strong>{{ locale.isRtl() ? 'قبول' : 'Accept' }}</strong><p>{{ locale.isRtl() ? 'الانتقال عبر السهم الأمامي بعد اكتمال المتطلبات.' : 'Move along the forward arrow after required work finishes.' }}</p></div>
-              <div class="border rounded-lg p-3"><strong>{{ locale.isRtl() ? 'رفض' : 'Reject' }}</strong><p>{{ locale.isRtl() ? 'يتطلب تعليقاً ويبدأ محاولة جديدة في النشاط السابق.' : 'Requires a comment and starts a fresh attempt at the earlier activity.' }}</p>
-              <label>{{ locale.isRtl() ? 'العودة إلى' : 'Return to' }}<select class="wf-input" [ngModel]="selectedConfig().rejectTargetNodeKey || ''" [ngModelOptions]="{standalone:true}" [disabled]="isReadonly()" (ngModelChange)="rejectTarget($event)"><option value="">—</option>@for(n of rejectionDestinations();track n.id){<option [value]="n.nodeKey">{{ n.name }}</option>}</select></label></div>
-              @if(selectedNode()!.actions.length || selectedNode()!.outcomes.length !== 2){<p role="status">{{ locale.isRtl() ? 'توجد إعدادات قديمة. انقل الإجراءات الآلية إلى عقد أحداث قبل استبدالها.' : 'Legacy actions are present. Move automated actions to event nodes before replacing them.' }}</p><button class="wf-btn-secondary" [disabled]="isReadonly()" (click)="resetSimpleActions()">{{ locale.isRtl() ? 'استبدال بقبول ورفض' : 'Replace with Accept and Reject' }}</button>}
-              </section>
+            <!-- ─── Form tab (UserTask only): Form Engine forms of the activity's Department + FA Type ─── -->
+            @if (selectedNode()!.type === 'UserTask' && activeInspectorTab() === 'form') {
+              <app-workflow-activity-forms [configuration]="selectedNode()!.configurationJson || '{}'" [legacy]="!workspace()" (editContext)="goToActivityContext($event)" (preview)="openFormPreview($event)" />
             }
-            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && inspectorTab() === 'sla') {
-              <app-workflow-activity-sla [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" />
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && activeInspectorTab() === 'sla') {
+              <app-workflow-activity-sla [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [legacy]="!workspace()" [legacyPolicyName]="legacySlaPolicyName()" [versionId]="versionId()" (manage)="openSlaEditor($event)" (editContext)="goToActivityContext($event)" />
             }
 
 
@@ -1798,4 +1795,14 @@
       </div>
     </div>
   </div>
+}
+
+<!-- ── Shared SLA rule editor (above fullscreen shell; the workflow stays visible behind it) ── -->
+@if (slaEditor(); as request) {
+  <app-workflow-sla-editor [request]="request" (closed)="closeSlaEditor($event)" />
+}
+
+<!-- ── Read-only preview of a form from the activity's Form tab ── -->
+@if (formPreview(); as request) {
+  <app-workflow-form-preview [request]="request" (closed)="closeFormPreview()" />
 }

@@ -6,15 +6,17 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { interval } from 'rxjs';
 import { LocaleService } from '@core/i18n/locale.service';
 import { AuthStore } from '@core/auth/auth.store';
+import { TranslateService } from '@ngx-translate/core';
+import { LEVEL_LABEL_KEYS } from '@shared/components/org-scope/org-scope.model';
 import { WorkflowIntegrationsService } from '../integrations/workflow-integrations.service';
-import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, WorkspaceTask } from './workflow-workspace.service';
+import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, WorkspaceLocationPart, WorkspaceTask } from './workflow-workspace.service';
 
 @Component({ selector: 'app-workflow-instance-workspace', standalone: true, imports: [FormsModule, DatePipe, RouterLink, NgTemplateOutlet], template: `
 <main class="p-5 sm:p-8 space-y-6 max-w-7xl mx-auto">
   <a routerLink="/admin/workflow/instances" class="text-primary underline">{{ t('Back to instances','العودة إلى النسخ') }}</a>
   @if (error()) {<p class="p-4 rounded-xl border border-red-300 bg-red-50 text-red-800" role="alert">{{ error() }}</p>}
   @if (detail(); as model) {
-    <header class="flex flex-wrap justify-between gap-4"><div><h1 class="text-2xl font-semibold">{{ model.tree[0].name }}</h1><p class="mt-2">{{ model.tree[0].status }} · {{ geography(model.geographyJson) }}</p></div><button class="wf-btn-secondary" (click)="load()" [disabled]="loading()">{{ t('Refresh','تحديث') }}</button></header>
+    <header class="flex flex-wrap justify-between gap-4"><div><h1 class="text-2xl font-semibold">{{ model.tree[0].name }}</h1><p class="mt-2">{{ model.tree[0].status }}@if (model.location.length) { · {{ location(model.location) }}}</p></div><button class="wf-btn-secondary" (click)="load()" [disabled]="loading()">{{ t('Refresh','تحديث') }}</button></header>
     @if (model.isDemo) {
       <div class="rounded-xl bg-amber-50 border border-amber-300 text-amber-950 p-4 space-y-2"><strong>{{ t('Demo instance','نسخة تجريبية') }}</strong>
       @if (model.demoActors.length) {<label class="block">{{ t('Test as user','التجربة كمستخدم') }}<select class="wf-input max-w-md" [(ngModel)]="demoActor" (ngModelChange)="load()"><option value="">{{ t('Signed-in user','المستخدم الحالي') }}</option>@for (actor of model.demoActors; track actor.userId) {<option [value]="actor.userId">{{ actor.name }}</option>}</select></label><p class="text-sm">{{ t('Every action records your account and the selected demo user.','يتم تسجيل حسابك والمستخدم التجريبي المحدد مع كل إجراء.') }}</p>}
@@ -68,7 +70,7 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
 </ng-template>` })
 export class WorkflowInstanceWorkspaceComponent implements OnInit {
   private readonly api = inject(WorkflowWorkspaceService); private readonly integrations = inject(WorkflowIntegrationsService);
-  private readonly route = inject(ActivatedRoute); private readonly locale = inject(LocaleService); private readonly destroy = inject(DestroyRef); private readonly auth = inject(AuthStore);
+  private readonly route = inject(ActivatedRoute); private readonly locale = inject(LocaleService); private readonly destroy = inject(DestroyRef); private readonly auth = inject(AuthStore); private readonly translate = inject(TranslateService);
   readonly detail = signal<WorkspaceDetail | null>(null); readonly error = signal(''); readonly loading = signal(false); readonly busy = signal(false);
   demoActor = ''; comments: Record<string,string> = {}; formValues: Record<string,Record<string,unknown>> = {}; private id = '';
   private pending: {fingerprint:string;id:string} | null = null;
@@ -92,7 +94,8 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
   }
   sourceName(id:string){for(const run of this.detail()?.tree||[]){const activity=run.activities.find(a=>a.id===id);if(activity)return activity.name;}return id;}
   children(instance: string, activity: string): WorkspaceExecution[] { return this.detail()?.tree.filter(x=>x.parentInstanceId===instance&&x.parentActivityInstanceId===activity)||[]; }
-  geography(raw?: string) { try { const g=JSON.parse(raw||'{}');return [g.clusterCode,g.regionCode,g.cityCode].filter(Boolean).join(' / '); } catch{return '';} }
+  /** The organization location level by level, in the shared hierarchy's terms and the reader's language. */
+  location(parts: WorkspaceLocationPart[]) { return parts.map(p=>`${this.translate.instant(LEVEL_LABEL_KEYS[p.level] ?? p.level)}: ${(this.locale.locale()==='ar' ? p.nameAr || p.nameEn : p.nameEn || p.nameAr) || p.code}`).join(' · '); }
   comment(raw?: string) { try{return JSON.parse(raw||'{}').comment || '';}catch{return '';} }
   overdue(due: string, status: string) { return status==='Active'&&Date.parse(due)<Date.now(); }
   phase(value?: string) { const labels:Record<string,string>={WaitingForChild:this.t('Waiting for child workflow','بانتظار سير العمل الفرعي'),AwaitingApproval:this.t('Awaiting approval','بانتظار الاعتماد'),WaitingForEnterEvents:this.t('Processing entry events','معالجة أحداث الدخول'),WaitingForOutcomeEvents:this.t('Processing required events','معالجة الأحداث المطلوبة')};return value ? labels[value] || value : ''; }

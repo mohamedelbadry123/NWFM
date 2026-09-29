@@ -139,14 +139,6 @@ html.dark .prv-input:disabled, html.dark .prv-select:disabled, html.dark .prv-te
 /* ── Base ────────────────────────────────────────────────────────────────────── */
 html {
   -webkit-font-smoothing: antialiased;
-
-  /*
-   * The density the whole UI is drawn at. PrimeNG and the Tailwind utilities size themselves in
-   * `rem`, so this one number is what makes a dashboard read as dense rather than oversized — at the
-   * browser default of 16px every control, gap and sidebar is a third larger than intended.
-   * Type set in px (the `prv-*` controls, `.hint-medium`) is deliberately unaffected.
-   */
-  font-size: 12px;
 }
 
 html,

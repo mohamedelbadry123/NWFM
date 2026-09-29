@@ -23,24 +23,24 @@ if errorlevel 1 (
     goto failed
 )
 
-rem Avoid starting duplicate servers when the launcher is opened again.
-powershell.exe -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 5080 -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
-if errorlevel 1 (
-    echo Port 5080 is already in use. No additional backend was started.
-) else (
+rem Verify service identity before reusing occupied ports. Check both before starting either.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\check-dev-port.ps1" backend
+set "backendState=%errorlevel%"
+if %backendState% GEQ 2 goto failed
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\check-dev-port.ps1" frontend
+set "frontendState=%errorlevel%"
+if %frontendState% GEQ 2 goto failed
+if "%backendState%"=="0" (
     start "NWFM Backend" /D "%~dp0" "%ComSpec%" /k ""%~f0" backend"
 )
 
-powershell.exe -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 4200 -State Listen -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
-if errorlevel 1 (
-    echo Port 4200 is already in use. No additional frontend was started.
-) else (
+if "%frontendState%"=="0" (
     start "NWFM Frontend" /D "%~dp0" "%ComSpec%" /k ""%~f0" frontend"
 )
 
 echo.
 echo Frontend:     http://localhost:4200
-echo API explorer: http://localhost:5080/swagger
+echo API explorer: http://localhost:5081/swagger
 echo.
 echo Wait for both server windows to report that they are ready.
 echo SQL Server must be running with the configured NWFM connection.
@@ -48,6 +48,9 @@ echo To stop an application, press Ctrl+C in its server window.
 exit /b 0
 
 :backend
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\check-dev-port.ps1" backend
+if errorlevel 2 exit /b 1
+if errorlevel 1 exit /b 0
 title NWFM Backend
 echo Starting the backend. SQL Server must be available.
 dotnet run --project "%~dp0backend\src\NWFM.Api" --launch-profile NWFM
@@ -59,6 +62,9 @@ if errorlevel 1 (
 exit /b 0
 
 :frontend
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\check-dev-port.ps1" frontend
+if errorlevel 2 exit /b 1
+if errorlevel 1 exit /b 0
 title NWFM Frontend
 cd /d "%~dp0frontend"
 if not exist "node_modules\@angular\cli\bin\ng.js" (

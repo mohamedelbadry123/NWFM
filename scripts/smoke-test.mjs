@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {loginForWorkflowTest,ensureTestParticipant} from './workflow-test-auth.mjs';
-const base=process.env.NWFM_API_URL||'http://localhost:5080';
+const base=process.env.NWFM_API_URL||'http://localhost:5081';
 const token=await loginForWorkflowTest(base);
 async function request(path,method='GET',body,status=200,headers={}){
  const response=await fetch(base+'/api/'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,...headers},body:body===undefined?undefined:JSON.stringify(body)});

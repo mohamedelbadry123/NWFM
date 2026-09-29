@@ -15,6 +15,11 @@ public sealed class WorkspaceSlaController(IWorkspaceSla sla) : ControllerBase
     [HttpGet("resolve"), Authorize(Policy = NwfmPolicies.ManageDefinitions)]
     public async Task<IActionResult> Resolve(string departmentCode, string fieldActivityCode, CancellationToken ct)
         => Ok(await sla.ResolveAsync(departmentCode, fieldActivityCode, ct));
+    [HttpGet("context"), Authorize(Policy = NwfmPolicies.SlaContextReaders)]
+    public async Task<IActionResult> Context(string departmentCode, string fieldActivityCode, Guid? excludeVersionId, CancellationToken ct)
+        => string.IsNullOrWhiteSpace(departmentCode) || string.IsNullOrWhiteSpace(fieldActivityCode)
+            ? BadRequest(new { Code = "Sla.Invalid", Message = "Select a Department and Field Activity Type." })
+            : Ok(await sla.ContextAsync(departmentCode, fieldActivityCode, excludeVersionId, ct));
     [HttpPost, Authorize(Policy = NwfmPolicies.ManageSlaPolicies)]
     public async Task<IActionResult> Create(WorkspaceSlaInput input, CancellationToken ct) => await Save(null, input, ct);
     [HttpPut("{id:guid}"), Authorize(Policy = NwfmPolicies.ManageSlaPolicies)]

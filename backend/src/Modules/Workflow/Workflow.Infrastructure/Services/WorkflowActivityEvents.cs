@@ -32,11 +32,7 @@ internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowInte
         var variables = (await db.WorkflowVariables.Where(v => v.WorkflowInstanceId == instance.Id).ToListAsync(ct))
             .ToDictionary(v => v.VariableName, v => (object?)JsonSerializer.Deserialize<JsonElement>(v.ValueJson ?? "null"));
         if (eventValues is not null) foreach (var (key, value) in eventValues) variables[key] = value;
-        if (instance.GeographyJson is not null)
-        {
-            var geography = JsonSerializer.Deserialize<NWFM.Shared.Integration.Workflow.WorkflowGeography>(instance.GeographyJson, IntegrationJson.Options)!;
-            variables["ClusterCode"] = geography.ClusterCode; variables["RegionCode"] = geography.RegionCode; variables["CityCode"] = geography.CityCode;
-        }
+        foreach (var (key, value) in LocationVariables(instance)) variables[key] = value;
         var ready = true;
         foreach (var item in configured)
         {
@@ -55,5 +51,23 @@ internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowInte
         }
         await db.SaveChangesAsync(ct);
         return Result.Success(ready);
+    }
+
+    /// <summary>
+    /// The instance's organization location as event template variables. <c>RegionCode</c> and
+    /// <c>CityCode</c> are the names templates used before the shared hierarchy; they always carried the
+    /// CBU and branch codes, so they keep those values for event configurations already published.
+    /// Remove them once no published event template references <c>{{RegionCode}}</c> or <c>{{CityCode}}</c>.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, object?> LocationVariables(WorkflowInstance instance)
+    {
+        var location = instance.Location.Normalized();
+        if (location.IsEmpty) return new Dictionary<string, object?>();
+        return new Dictionary<string, object?>
+        {
+            ["ClusterCode"] = location.ClusterCode, ["CbuCode"] = location.CbuCode,
+            ["BranchCode"] = location.BranchCode, ["OperationAreaCode"] = location.OperationAreaCode,
+            ["RegionCode"] = location.CbuCode, ["CityCode"] = location.BranchCode,
+        };
     }
 }

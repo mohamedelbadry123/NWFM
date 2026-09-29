@@ -300,8 +300,9 @@ export class OrgScopeSelectorComponent {
     this.lookups.listAll('Cbu', { parentCode: clusterCode, isActive: true })
       .pipe(finalize(() => this.loadingCbus.set(false)))
       .subscribe({
-        next: items => this.cbus.set(this.toOptions(items)),
-        error: () => this.cbus.set([]),
+        // A reply for a cluster no longer selected must not repopulate the list.
+        next: items => { if (this.clusterCode() === clusterCode) this.cbus.set(this.toOptions(items)); },
+        error: () => { if (this.clusterCode() === clusterCode) this.cbus.set([]); },
       });
   }
 
@@ -315,8 +316,8 @@ export class OrgScopeSelectorComponent {
     this.lookups.listAll('Branch', { parentCode: cbuCode, isActive: true })
       .pipe(finalize(() => this.loadingBranches.set(false)))
       .subscribe({
-        next: items => this.branches.set(this.toOptions(items)),
-        error: () => this.branches.set([]),
+        next: items => { if (this.cbuCode() === cbuCode) this.branches.set(this.toOptions(items)); },
+        error: () => { if (this.cbuCode() === cbuCode) this.branches.set([]); },
       });
   }
 
@@ -330,8 +331,8 @@ export class OrgScopeSelectorComponent {
     this.lookups.listAll('OperationArea', { parentCode: cbuCode, isActive: true })
       .pipe(finalize(() => this.loadingOperationAreas.set(false)))
       .subscribe({
-        next: items => this.operationAreas.set(this.toOptions(items)),
-        error: () => this.operationAreas.set([]),
+        next: items => { if (this.cbuCode() === cbuCode) this.operationAreas.set(this.toOptions(items)); },
+        error: () => { if (this.cbuCode() === cbuCode) this.operationAreas.set([]); },
       });
   }
 

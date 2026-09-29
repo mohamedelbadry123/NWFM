@@ -8,7 +8,9 @@ The application uses Auth login and permissions with one server-configured defau
 
 Prerequisites: .NET 10 SDK, Node.js 22.12+ (22.x), npm, and SQL Server.
 
-On Windows, double-click **start-dev.bat** in the project directory. It opens separate backend and frontend server windows and installs frontend dependencies if missing. Ports already in use are left alone. Open http://localhost:4200 once both servers are ready; press Ctrl+C in each server window to stop them.
+On Windows, double-click **start-dev.bat** in the project directory. It opens separate backend and frontend server windows and installs frontend dependencies if missing. It checks both ports before starting: existing healthy NWFM services are reused, while another application or an unhealthy service causes a clear error. It never silently switches ports. Open http://localhost:4200 once both servers are ready; press Ctrl+C in each server window to stop them.
+
+Reserve ports **4200** (frontend) and **5081** (API) for NWFM development on this machine. Other local applications and IIS sites must use separate ports. Stop the development servers before running the Docker configuration, which uses the same ports. The API launch profile, Angular proxy and Docker configuration all agree on port 5081; do not change just one to work around a conflict.
 
 For manual startup, use the following commands.
 
@@ -27,7 +29,7 @@ npm ci
 npm start
 ```
 
-Open http://localhost:4200. The API listens on http://localhost:5080 and its API explorer is at http://localhost:5080/swagger.
+Open http://localhost:4200. The API listens on http://localhost:5081 and its API explorer is at http://localhost:5081/swagger.
 
 The default connection uses Windows authentication to SQL Server on `localhost`, database `NWFM`. The startup identity needs permission to create that database. Override `ConnectionStrings__DefaultConnection` for another SQL Server; use a new NWFM database, never the reference database. No reference credentials or data are copied.
 

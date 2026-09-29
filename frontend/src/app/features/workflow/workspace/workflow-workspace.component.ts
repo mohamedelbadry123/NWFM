@@ -6,10 +6,10 @@ import { AuthStore } from '@core/auth/auth.store';
 import { LocaleService } from '@core/i18n/locale.service';
 import { WorkflowDefinitionsService } from '../workflow-definitions.service';
 import type { WorkflowDefinitionDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-definition-dto';
-import { WorkflowGeographyComponent } from './workflow-geography.component';
-import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, WorkspaceInstance } from './workflow-workspace.service';
+import { WorkflowLocationComponent } from './workflow-location.component';
+import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, WorkspaceInstance, hasRequiredLocation } from './workflow-workspace.service';
 
-@Component({ selector: 'app-workflow-workspace', standalone: true, imports: [FormsModule, RouterLink, DatePipe, WorkflowGeographyComponent], template: `
+@Component({ selector: 'app-workflow-workspace', standalone: true, imports: [FormsModule, RouterLink, DatePipe, WorkflowLocationComponent], template: `
 <main class="p-5 sm:p-8 space-y-6 max-w-7xl mx-auto">
   <header class="flex items-center justify-between gap-4"><div><h1 class="text-2xl font-semibold">{{ title() }}</h1><p class="text-sm opacity-70 mt-2">{{ subtitle() }}</p></div>
   @if (mode() === 'workflows') {<button class="wf-btn-primary" (click)="creating.set(!creating())">{{ t('Create workflow','إنشاء سير عمل') }}</button>}</header>
@@ -17,7 +17,7 @@ import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, Workspa
   @if (creating()) {
     <form (ngSubmit)="create()" class="rounded-xl border p-5 space-y-4 bg-white dark:bg-dark-800">
       <div class="grid gap-4 sm:grid-cols-2"><label>{{ t('Workflow name','اسم سير العمل') }}<input class="wf-input" name="name" [(ngModel)]="name" required maxlength="200"></label><label>{{ t('Arabic name','الاسم بالعربية') }}<input class="wf-input" name="nameAr" [(ngModel)]="nameAr" maxlength="200"></label></div>
-      <app-workflow-geography [settings]="settings" (settingsChange)="settings=$event" />
+      <app-workflow-location [settings]="settings" (settingsChange)="settings=$event" />
       <div class="flex gap-3"><button class="wf-btn-primary" [disabled]="busy() || !validCreate()">{{ t('Create and open designer','إنشاء وفتح المصمم') }}</button><button class="wf-btn-secondary" type="button" (click)="creating.set(false)">{{ t('Cancel','إلغاء') }}</button></div>
     </form>
   }
@@ -60,7 +60,7 @@ export class WorkflowWorkspaceComponent implements OnInit {
     else if (this.mode() === 'start') this.api.catalog().subscribe({next:r=>{this.catalog.set(r);this.loading.set(false);},error:failure});
     else this.api.instances(this.search).subscribe({next:r=>{this.instances.set(r);this.loading.set(false);},error:failure});
   }
-  validCreate() { return !!this.name.trim() && (this.settings.kind === 'Child' || !!(this.settings.clusterCode && this.settings.regionCode && this.settings.cityCode)); }
+  validCreate() { return !!this.name.trim() && hasRequiredLocation(this.settings); }
   create() { if (!this.validCreate() || this.busy()) return; this.busy.set(true); this.error.set(''); this.api.create(this.name,this.nameAr,this.settings).subscribe({next:r=>{this.busy.set(false);this.router.navigate(['/admin/workflow/definitions',r.definitionId,'versions',r.versionId,'designer']);},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Could not create workflow.');}}); }
   start() { if (!this.workflowId || this.busy()) return;this.busy.set(true);this.error.set('');this.api.start(this.workflowId,this.requestId,this.reference,this.isDemo).subscribe({next:r=>{this.busy.set(false);this.requestId=crypto.randomUUID();this.router.navigate(['/admin/workflow/instances',r.instanceId]);},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Could not start instance.');}}); }
 }

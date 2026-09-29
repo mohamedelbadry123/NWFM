@@ -19,6 +19,22 @@ public interface IFormGateway
     /// <summary>Forms that can take submissions, for a picker. Newest-named first is not implied; ordered by code.</summary>
     Task<IReadOnlyList<PublishedFormInfo>> ListPublishedAsync(string? search, int take, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The forms filed under one department's field activity, in every lifecycle state, a page at a
+    /// time. Usable forms (<see cref="FieldActivityFormInfo.IsUsable"/>) come first, then by code, so
+    /// a consumer listing "the forms for this activity" can show the fillable ones without hiding that
+    /// others exist. Both codes are required; there is no catalog-wide fallback.
+    /// </summary>
+    Task<FieldActivityFormPage> ListForFieldActivityAsync(
+        string departmentCode,
+        string fieldActivityCode,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    /// <summary>One form as <see cref="ListForFieldActivityAsync"/> describes it, or null when it is unknown or filed under no field activity.</summary>
+    Task<FieldActivityFormInfo?> FindFieldActivityFormAsync(Guid formId, CancellationToken cancellationToken);
+
     /// <summary>The frozen form-builder document of one published version, or null when there is no such version.</summary>
     Task<string?> GetVersionSchemaAsync(Guid formId, int versionNo, CancellationToken cancellationToken);
 
@@ -154,6 +170,34 @@ public sealed record PublishedFormInfo(
     string Status,
     int CurrentVersionNo,
     bool AcceptsSubmissions);
+
+/// <summary>
+/// A form filed under a department's field activity. <see cref="IsUsable"/> follows the form engine's
+/// own rule for taking submissions — a published version exists and the form is neither deprecated
+/// nor archived — so a draft never published, a deprecated or an archived form is listed but not
+/// offered as usable. <see cref="VersionNos"/> holds every published version, newest first.
+/// </summary>
+public sealed record FieldActivityFormInfo(
+    Guid Id,
+    string Code,
+    string NameEn,
+    string NameAr,
+    string Category,
+    string Status,
+    string DepartmentCode,
+    string FieldActivityCode,
+    int? CurrentVersionNo,
+    IReadOnlyList<int> VersionNos,
+    bool IsUsable,
+    DateTime UpdatedAt);
+
+/// <summary>One page of a field activity's forms, with totals over every page.</summary>
+public sealed record FieldActivityFormPage(
+    IReadOnlyList<FieldActivityFormInfo> Items,
+    int TotalCount,
+    int UsableCount,
+    int PageNumber,
+    int PageSize);
 
 /// <summary>One fill to record.</summary>
 public sealed record FormSubmitRequest

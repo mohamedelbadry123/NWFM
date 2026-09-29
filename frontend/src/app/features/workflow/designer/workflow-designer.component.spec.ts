@@ -185,6 +185,110 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(saved.duration).toBe('00:30:00');
   });
 
+  it('suspends canvas shortcuts while the SLA editor is open', () => {
+    const designer = component as unknown as {
+      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
+      slaEditor: WritableSignal<unknown>; onKeyDown(event: KeyboardEvent): void;
+    };
+    designer.addNode('UserTask', 100, 100);
+    const node = designer.nodes().find(n => n.type === 'UserTask')!;
+    designer.selectedNodeId.set(node.id);
+    designer.slaEditor.set({ locked: true, departmentCode: 'D1', fieldActivityCode: 'FA1' });
+    for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
+    expect(designer.nodes().some(n => n.id === node.id)).toBeTrue();
+    expect(designer.selectedNodeId()).toBe(node.id);
+    designer.slaEditor.set(null);
+    designer.onKeyDown(new KeyboardEvent('keydown', { key: 'Delete' }));
+    expect(designer.nodes().some(n => n.id === node.id)).toBeFalse();
+  });
+
+  it('shows Form instead of Actions on user tasks, and no Form on main activities or other nodes', () => {
+    const ids = (type: NodeType) => WorkflowDesignerComponent.tabsFor(type).map(t => t.id);
+    expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'sla']);
+    expect(ids('MainActivity')).toEqual(['general', 'assignment', 'sla']);
+    for (const type of ['Start', 'End', 'ExclusiveGateway', 'ParallelGateway', 'Timer', 'ServiceTask', 'NotificationTask', 'WaitEvent'] as NodeType[]) {
+      expect(ids(type)).withContext(type).toEqual([]);
+    }
+    expect(WorkflowDesignerComponent.tabsFor('UserTask').map(t => t.labelKey)).not.toContain('workflow.designer.tab_actions');
+  });
+
+  it('falls back to General when the selected activity has no Form tab', () => {
+    const designer = component as unknown as {
+      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
+      inspectorTab: WritableSignal<string>; activeInspectorTab: () => string; onNodeClick(event: MouseEvent, id: string): void;
+    };
+    designer.addNode('UserTask', 100, 100);
+    designer.addNode('MainActivity', 400, 100);
+    const [task, main] = [designer.nodes().find(n => n.type === 'UserTask')!, designer.nodes().find(n => n.type === 'MainActivity')!];
+    designer.onNodeClick(new MouseEvent('click'), task.id);
+    designer.inspectorTab.set('form');
+    expect(designer.activeInspectorTab()).toBe('form');
+    // Even before the click handler runs, a MainActivity never renders the Form panel.
+    designer.selectedNodeId.set(main.id);
+    expect(designer.activeInspectorTab()).toBe('general');
+    designer.selectedNodeId.set(task.id);
+    designer.onNodeClick(new MouseEvent('click'), main.id);
+    expect(designer.inspectorTab()).toBe('general');
+    designer.inspectorTab.set('sla');
+    designer.onNodeClick(new MouseEvent('click'), task.id);
+    expect(designer.inspectorTab()).withContext('a tab both have is kept').toBe('sla');
+  });
+
+  it('keeps the rejection destination and legacy task questions through General edits', () => {
+    const editor = configure('UserTask', { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', rejectTargetNodeKey: 'earlier_review', formFields: [{ key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false }] });
+    const node = editor.nodes().find(n => n.id === editor.selectedNodeId())!;
+    editor.patchPropsFromNode(node);
+    editor.propsForm.patchValue({ name: 'Renamed' });
+    const saved = JSON.parse(editor.buildConfigurationJson('UserTask', editor.propsForm.value));
+    expect(saved.rejectTargetNodeKey).toBe('earlier_review');
+    expect(saved.departmentCode).toBe('10');
+    expect(saved.fieldActivityCode).toBe('LEAK_REPAIR');
+    expect(saved.formFields.map((f: { key: string }) => f.key)).toEqual(['note']);
+  });
+
+  it('does not render an Accept and Reject section on the General tab', () => {
+    fixture.detectChanges();
+    const state = component as unknown as {
+      isLoading: { set: (v: boolean) => void }; loadError: { set: (v: string | null) => void };
+      version: { set: (v: { id: string; status: string; versionNumber: number }) => void };
+    };
+    state.isLoading.set(false);
+    state.loadError.set(null);
+    state.version.set({ id: 'v1', status: 'Draft', versionNumber: 1 });
+    for (const type of ['UserTask', 'MainActivity'] as NodeType[]) {
+      configure(type, { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', rejectTargetNodeKey: 'earlier_review' });
+      fixture.detectChanges();
+      const panel = (fixture.nativeElement as HTMLElement).querySelector('#wf-activity-panel');
+      expect(panel).withContext(type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-outcomes')).withContext(type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-reject-target')).withContext(type).toBeNull();
+      expect(panel!.textContent).withContext(type).not.toMatch(/Accept and Reject|Return to/);
+    }
+  });
+
+  it('suspends canvas shortcuts while a form preview is open', () => {
+    const designer = component as unknown as {
+      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
+      formPreview: WritableSignal<unknown>; onKeyDown(event: KeyboardEvent): void;
+    };
+    designer.addNode('UserTask', 100, 100);
+    const node = designer.nodes().find(n => n.type === 'UserTask')!;
+    designer.selectedNodeId.set(node.id);
+    designer.formPreview.set({ form: { id: 'f' }, departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', versionNo: 1 });
+    for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
+    designer.onKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    expect(designer.nodes().some(n => n.id === node.id)).toBeTrue();
+    expect(designer.selectedNodeId()).toBe(node.id);
+  });
+
+  it('shows the published configuration, with its SLA snapshot, on read-only versions', () => {
+    const merge = (status: string) => (component as unknown as { mergeWithBackend(state: unknown, v: unknown): { nodes: CanvasNode[] } }).mergeWithBackend(
+      { nodes: [{ id: 'canvas-1', nodeKey: 'review', type: 'UserTask', configurationJson: '{"departmentCode":"D1"}' }], edges: [], variables: [] },
+      { status, activities: [{ id: 'a1', nodeKey: 'review', activityType: 'UserTask', configurationJson: '{"departmentCode":"D1","publishedSla":{"name":"Captured"}}' }], transitions: [] });
+    expect(JSON.parse(merge('Published').nodes[0].configurationJson).publishedSla.name).toBe('Captured');
+    expect(JSON.parse(merge('Draft').nodes[0].configurationJson).publishedSla).toBeUndefined();
+  });
+
   it('loads legacy variable assignments and replaces them with edited assignments', () => {
     const editor = configure('ScriptTask', { assignments: { amount: 10 }, extension: true });
     expect(JSON.parse(editor.propsForm.value.setVariablesJson)).toEqual({ amount: 10 });

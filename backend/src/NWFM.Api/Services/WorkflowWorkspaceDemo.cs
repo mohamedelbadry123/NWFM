@@ -28,7 +28,6 @@ public static class WorkflowWorkspaceDemo
         var db = services.GetRequiredService<WorkflowDbContext>();
         var auth = services.GetRequiredService<AuthDbContext>();
         var tenant = services.GetRequiredService<ICurrentTenant>().OrganizationId;
-        var references = services.GetRequiredService<IWorkflowReferenceData>();
         var integrations = services.GetRequiredService<IWorkflowIntegrations>();
         var workspace = services.GetRequiredService<IWorkflowWorkspace>();
         var engine = services.GetRequiredService<Workflow.Application.Abstractions.IWorkflowRuntimeEngine>();
@@ -77,17 +76,15 @@ public static class WorkflowWorkspaceDemo
             policy.BindFieldActivity(departmentCode, fieldCode); db.SlaPolicies.Add(policy);
         }
         await db.SaveChangesAsync();
-        WorkflowGeography? geography = null;
-        foreach (var cluster in await references.ListAsync("clusters", null, default))
-        {
-            foreach (var region in await references.ListAsync("regions", cluster.Code, default))
-            {
-                var city = (await references.ListAsync("cities", region.Code, default)).FirstOrDefault();
-                if (city is not null) { geography = new(cluster.Code, region.Code, city.Code); break; }
-            }
-            if (geography is not null) break;
-        }
-        if (geography is null) throw new InvalidOperationException("WorkflowDemo needs one active cluster/region/city chain in Auth lookups.");
+        // The demo is placed in the shared org hierarchy: the first active CBU under an active cluster,
+        // and one of that CBU's active branches when it has any.
+        var location = await (from cbu in auth.Cbus
+                              join cluster in auth.Clusters on cbu.ClusterCode equals cluster.Code
+                              where cbu.IsActive && cluster.IsActive
+                              orderby cluster.Code, cbu.Code
+                              select new { ClusterCode = cluster.Code, CbuCode = cbu.Code }).FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("WorkflowDemo needs one active CBU under an active cluster in Auth lookups.");
+        var branchCode = await auth.Branches.Where(b => b.IsActive && b.CbuCode == location.CbuCode).OrderBy(b => b.Code).Select(b => b.Code).FirstOrDefaultAsync();
         var groups = new List<WorkflowAssignmentGroup>();
         var actors = new List<Guid>();
         for (var i = 0; i < 3; i++)
@@ -188,7 +185,7 @@ public static class WorkflowWorkspaceDemo
             audit.SetAttributeValue("actionKey", "http.request");
             nodes.Add(audit);
             if (callback) nodes.Insert(1, Node("callback", "WaitEvent", "Wait for field confirmation", new { connectionId = webhook.Id, eventKey = "demo.field.completed", correlationVariable = "CorrelationId", timeoutSeconds = 86400 }));
-            return await Publish("DEMO-MAIN-" + suffix, "Demo — Water isolation" + (suffix == "STANDARD" ? "" : " — " + suffix), new("Main", geography.ClusterCode, geography.RegionCode, geography.CityCode), nodes);
+            return await Publish("DEMO-MAIN-" + suffix, "Demo — Water isolation" + (suffix == "STANDARD" ? "" : " — " + suffix), new(WorkflowWorkspaceDefinition.MainKind, location.ClusterCode, location.CbuCode, branchCode), nodes);
         }
         var main = await Main("STANDARD");
         var overdue = await Main("OVERDUE", .001);

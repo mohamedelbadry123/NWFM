@@ -1,0 +1,93 @@
+{
+  "name_en": "Leak Repair Safety Checklist",
+  "name_ar": "قائمة التحقق من سلامة إصلاح التسرب",
+  "elements": [
+    {
+      "type": "yes_no",
+      "label_en": "Excavation Barriers Installed?",
+      "label_ar": "هل تم تركيب حواجز الحفر؟",
+      "data_name": "barriers_installed",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "yes_no",
+      "label_en": "Upstream Valve Isolated?",
+      "label_ar": "هل تم عزل المحبس العلوي؟",
+      "data_name": "valve_isolated",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "yes_no",
+      "label_en": "PPE Checked?",
+      "label_ar": "هل تم فحص معدات الوقاية الشخصية؟",
+      "data_name": "ppe_checked",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": true,
+      "hidden": false,
+      "disabled": false,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    },
+    {
+      "type": "memo",
+      "label_en": "Hazards Observed",
+      "label_ar": "المخاطر الملاحظة",
+      "data_name": "hazards_observed",
+      "description_en": "",
+      "description_ar": "",
+      "default_value": null,
+      "required": false,
+      "hidden": false,
+      "disabled": false,
+      "min_length": null,
+      "max_length": 1000,
+      "pattern": null,
+      "visible_conditions": {
+        "match": "all",
+        "conditions": [],
+        "preserve_data": false
+      },
+      "required_conditions": {
+        "match": "all",
+        "conditions": []
+      }
+    }
+  ]
+}

@@ -68,6 +68,15 @@ public static class NwfmPolicies
     /// <summary>Reading task types: to configure them, or to pick one when working with tasks.</summary>
     public const string TaskTypeReaders = AnyPrefix + ViewTasks + "," + ManageTaskTypes;
 
+    /// <summary>Reading the SLA rule an activity resolves to: workflow designers see it, SLA managers change it.</summary>
+    public const string SlaContextReaders = AnyPrefix + ManageDefinitions + "," + ManageSlaPolicies;
+
+    /// <summary>
+    /// Listing and previewing the forms an activity's Department + FA Type are filed under: workflow designers, or anyone who
+    /// may already view forms. Read-only — it grants nothing of form administration.
+    /// </summary>
+    public const string ActivityFormReaders = AnyPrefix + ManageDefinitions + "," + ViewForms;
+
     public static readonly IReadOnlyList<string> All =
     [
         CanManageRolePermissions,

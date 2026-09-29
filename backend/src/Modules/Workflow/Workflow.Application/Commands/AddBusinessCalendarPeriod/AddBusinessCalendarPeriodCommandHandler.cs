@@ -37,6 +37,7 @@ public sealed class AddBusinessCalendarPeriodCommandHandler
             request.DayOfWeek, request.StartTime, request.EndTime,
             DateTime.UtcNow, request.IsWorkingTime);
 
+        _repo.AddDetail(period);
         await _repo.SaveChangesAsync(cancellationToken);
         return Result.Success(WorkflowOpsMappings.ToDto(period));
     }

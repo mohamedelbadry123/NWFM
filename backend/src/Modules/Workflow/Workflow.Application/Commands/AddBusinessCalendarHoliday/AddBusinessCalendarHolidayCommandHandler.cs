@@ -34,6 +34,7 @@ public sealed class AddBusinessCalendarHolidayCommandHandler
             request.HolidayDate, request.Name, DateTime.UtcNow,
             request.NameAr, request.IsRecurring);
 
+        _repo.AddDetail(holiday);
         await _repo.SaveChangesAsync(cancellationToken);
         return Result.Success(WorkflowOpsMappings.ToDto(holiday));
     }

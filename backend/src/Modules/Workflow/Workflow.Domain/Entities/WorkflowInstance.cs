@@ -1,7 +1,9 @@
 namespace Workflow.Domain.Entities;
 
 using NWFM.Shared.Domain;
+using NWFM.Shared.Exceptions;
 using NWFM.Shared.MultiTenancy;
+using NWFM.Shared.Organization;
 using Workflow.Domain.Enums;
 
 /// <summary>
@@ -48,10 +50,26 @@ public sealed class WorkflowInstance : Entity, ITenantAware
     /// <summary>NodeKey of the CallActivity on the parent that spawned this child.</summary>
     public string? ParentActivityNodeKey { get; private set; }
     public Guid? ParentActivityInstanceId { get; private set; }
-    public string? GeographyJson { get; private set; }
+    public const int OrgCodeMaxLength = 50;
+
+    /// <summary>
+    /// Where the work sits in the shared org hierarchy — the main workflow's location, copied into every
+    /// child so the whole tree answers to one place. Null codes on instances started outside the workspace.
+    /// </summary>
+    public string? ClusterCode { get; private set; }
+    public string? CbuCode { get; private set; }
+    public string? BranchCode { get; private set; }
+    public string? OperationAreaCode { get; private set; }
+    public OrgLocation Location => new(ClusterCode, CbuCode, BranchCode, OperationAreaCode);
     public bool IsDemo { get; private set; }
-    public void SetExecutionContext(string? geographyJson, bool isDemo)
-    { GeographyJson = geographyJson; IsDemo = isDemo; }
+    public void SetExecutionContext(OrgLocation? location, bool isDemo)
+    {
+        var place = location?.Normalized() ?? OrgLocation.Empty;
+        if (new[] { place.ClusterCode, place.CbuCode, place.BranchCode, place.OperationAreaCode }.Any(c => c?.Length > OrgCodeMaxLength))
+            throw new DomainException($"Organization codes cannot exceed {OrgCodeMaxLength} characters.");
+        (ClusterCode, CbuCode, BranchCode, OperationAreaCode) = (place.ClusterCode, place.CbuCode, place.BranchCode, place.OperationAreaCode);
+        IsDemo = isDemo;
+    }
     public void AttachParentActivity(Guid? activityInstanceId) => ParentActivityInstanceId = activityInstanceId;
 
     public byte[] RowVersion { get; private set; } = [];

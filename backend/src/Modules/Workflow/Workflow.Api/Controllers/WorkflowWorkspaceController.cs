@@ -18,7 +18,8 @@ public sealed class WorkflowWorkspaceController(IWorkflowWorkspace workspace, IW
     [Authorize(Policy = NwfmPolicies.ViewWorkflows)]
     public async Task<IActionResult> Lookups(string kind, [FromQuery] string? parentCode, CancellationToken ct)
     {
-        if (kind is not ("clusters" or "regions" or "cities" or "departments" or "field-activity-types")) return NotFound();
+        // Territory lookups come from the shared org hierarchy (/api/v1/lookups), not from here.
+        if (kind is not ("departments" or "field-activity-types")) return NotFound();
         return Ok(await references.ListAsync(kind, parentCode, ct));
     }
     [HttpGet("groups")]
