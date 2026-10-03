@@ -15,7 +15,8 @@ import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
 import { ADMINISTRATOR_ROLE, HasPermissionDirective, PERMISSIONS } from '../../core/auth/permissions';
 import { AuthStore } from '../../core/auth/auth.store';
-import { LookupItem, LookupType, LookupsService } from '../../core/lookups/lookups.service';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { ActivitySourceKind, LookupItem, LookupType, LookupWrite, LookupsService } from '../../core/lookups/lookups.service';
 import { LocaleService } from '../../core/i18n/locale.service';
 import { FieldCatalogComponent } from '../form-engine/field-catalog/field-catalog.component';
 import { TaskTypeListComponent } from '../tasks/types/task-type-list.component';
@@ -49,7 +50,7 @@ interface PageTab {
   imports: [
     CommonModule, FormsModule, ReactiveFormsModule, TranslateModule,
     TableModule, Tabs, TabList, Tab, TabPanel, TabPanels,
-    ButtonModule, TagModule, InputTextModule, ToastModule, DialogModule, SelectModule, TooltipModule,
+    ButtonModule, TagModule, InputTextModule, ToastModule, DialogModule, SelectModule, MultiSelectModule, TooltipModule,
     HasPermissionDirective,
     FieldCatalogComponent,
     TaskTypeListComponent,
@@ -76,7 +77,8 @@ export class LookupsComponent implements OnInit {
         { key: 'clusters', type: 'Cluster', labelKey: 'lookups.tabs.clusters' },
         { key: 'cbus', type: 'Cbu', labelKey: 'lookups.tabs.cbus', parentType: 'Cluster', parentLabelKey: 'lookups.cluster' },
         { key: 'branches', type: 'Branch', labelKey: 'lookups.tabs.branches', parentType: 'Cbu', parentLabelKey: 'lookups.cbu' },
-        { key: 'field-activity-types', type: 'FieldActivityType', labelKey: 'workspace.fieldActivityTypes', parentType: 'Department', parentLabelKey: 'workspace.department' },
+        { key: 'field-activity-types', type: 'FieldActivityType', labelKey: 'lookups.tabs.activityTypes' },
+        { key: 'activity-sources', type: 'ActivitySource', labelKey: 'lookups.tabs.activitySources' },
         { key: 'operation-areas', type: 'OperationArea', labelKey: 'lookups.tabs.operationAreas', parentType: 'Cbu', parentLabelKey: 'lookups.cbu' },
       ] as (LookupTab & { key: string })[]
     ).map(({ key, ...lookup }): PageTab => ({
@@ -109,13 +111,39 @@ export class LookupsComponent implements OnInit {
   protected readonly editing = signal<LookupItem | null>(null);
   protected readonly saving = signal(false);
   protected readonly parentOptions = signal<{ label: string; value: string }[]>([]);
+  protected readonly sourceOptions = signal<{ label: string; value: string }[]>([]);
+  protected readonly kindOptions: { labelKey: string; value: ActivitySourceKind }[] = [
+    { labelKey: 'lookups.kinds.Internal', value: 'Internal' },
+    { labelKey: 'lookups.kinds.External', value: 'External' },
+  ];
 
   protected readonly form = this.fb.group({
     code: this.fb.control('', [Validators.required, Validators.maxLength(50)]),
     nameEn: this.fb.control('', [Validators.required, Validators.maxLength(200)]),
     nameAr: this.fb.control('', [Validators.required, Validators.maxLength(200)]),
     parentCode: this.fb.control<string | null>(null),
+    kind: this.fb.control<ActivitySourceKind>('Internal'),
+    url: this.fb.control<string | null>(null, [Validators.maxLength(500), Validators.pattern(/^https?:\/\/\S+$/i)]),
+    sourceCodes: this.fb.control<string[]>([]),
   });
+
+  /** The open tab edits activity sources: each is Internal or External, the latter reached at a URL. */
+  protected isSourceTab(): boolean {
+    return this.currentTab().type === 'ActivitySource';
+  }
+
+  /** The open tab edits activity types: each names the sources allowed to create it. */
+  protected isActivityTypeTab(): boolean {
+    return this.currentTab().type === 'FieldActivityType';
+  }
+
+  protected urlMissing(): boolean {
+    return this.form.controls.kind.value === 'External' && !this.form.controls.url.value?.trim();
+  }
+
+  protected sourcesMissing(): boolean {
+    return (this.form.controls.sourceCodes.value ?? []).length === 0;
+  }
 
   ngOnInit(): void {
     const requested = this.route.snapshot.queryParamMap.get('tab');
@@ -172,32 +200,52 @@ export class LookupsComponent implements OnInit {
 
   protected openCreate(): void {
     this.editing.set(null);
-    this.form.reset({ code: '', nameEn: '', nameAr: '', parentCode: null });
+    this.form.reset({ code: '', nameEn: '', nameAr: '', parentCode: null, kind: 'Internal', url: null, sourceCodes: [] });
     this.form.controls.code.enable();
     this.loadParents();
+    this.loadSources([]);
     this.dialogVisible.set(true);
   }
 
   protected openEdit(item: LookupItem): void {
     this.editing.set(item);
-    this.form.reset({ code: item.code, nameEn: item.nameEn, nameAr: item.nameAr, parentCode: item.parentCode ?? null });
+    this.form.reset({
+      code: item.code,
+      nameEn: item.nameEn,
+      nameAr: item.nameAr,
+      parentCode: item.parentCode ?? null,
+      kind: item.kind ?? 'Internal',
+      url: item.url ?? null,
+      sourceCodes: item.sourceCodes ?? [],
+    });
     this.form.controls.code.disable();
     this.loadParents();
+    this.loadSources(item.sourceCodes ?? []);
     this.dialogVisible.set(true);
   }
 
   protected save(): void {
-    if (this.form.invalid) {
+    const tab = this.currentTab();
+    const invalid = this.form.invalid
+      || (tab.type === 'ActivitySource' && this.urlMissing())
+      || (tab.type === 'FieldActivityType' && this.sourcesMissing());
+    if (invalid) {
       this.form.markAllAsTouched();
       return;
     }
-    const tab = this.currentTab();
     const raw = this.form.getRawValue();
+    const body: LookupWrite = {
+      nameEn: raw.nameEn!,
+      nameAr: raw.nameAr!,
+      parentCode: raw.parentCode,
+      ...(tab.type === 'ActivitySource' ? { kind: raw.kind, url: raw.url?.trim() || null } : {}),
+      ...(tab.type === 'FieldActivityType' ? { sourceCodes: raw.sourceCodes ?? [] } : {}),
+    };
     this.saving.set(true);
     const editing = this.editing();
     const request = editing
-      ? this.lookups.update(tab.type, editing.id, { nameEn: raw.nameEn!, nameAr: raw.nameAr!, parentCode: raw.parentCode })
-      : this.lookups.create(tab.type, { code: raw.code!, nameEn: raw.nameEn!, nameAr: raw.nameAr!, parentCode: raw.parentCode });
+      ? this.lookups.update(tab.type, editing.id, body)
+      : this.lookups.create(tab.type, { code: raw.code!, ...body });
 
     request.subscribe({
       next: (res) => {
@@ -229,6 +277,27 @@ export class LookupsComponent implements OnInit {
 
   protected displayName(item: LookupItem): string {
     return this.locale.isRtl() ? item.nameAr : item.nameEn;
+  }
+
+  /**
+   * The sources an activity type can name: the active ones, plus any it already names that has been
+   * deactivated since — so editing its names never drops one silently.
+   */
+  private loadSources(keep: string[]): void {
+    if (!this.isActivityTypeTab()) {
+      this.sourceOptions.set([]);
+      return;
+    }
+    this.lookups.listAll('ActivitySource').subscribe({
+      next: (items) => {
+        this.sourceOptions.set(items
+          .filter((i) => i.isActive || keep.includes(i.code))
+          .map((i) => ({
+            label: `${i.code} — ${this.locale.isRtl() ? i.nameAr : i.nameEn}`,
+            value: i.code,
+          })));
+      },
+    });
   }
 
   private loadParents(): void {

@@ -33,27 +33,40 @@ internal static class AuthLookupSeedData
         await UpsertOperationAreasAsync(context, ct);
         await context.SaveChangesAsync(ct);
 
+        await InsertActivitySourcesAsync(context, ct);
+        await context.SaveChangesAsync(ct);
+
         await InsertFieldActivityTypesAsync(context, ct);
         await context.SaveChangesAsync(ct);
     }
 
+    /// <summary>The source NWFM itself is: activities raised here. Inserted when missing, never overwritten.</summary>
+    internal const string InternalSourceCode = "NWFM";
+
+    private static async Task InsertActivitySourcesAsync(AuthDbContext context, CancellationToken ct)
+    {
+        if (!await context.ActivitySources.AnyAsync(s => s.Code == InternalSourceCode, ct))
+        {
+            context.ActivitySources.Add(ActivitySource.Create(InternalSourceCode, "NWFM", "NWFM", ActivitySourceKinds.Internal, null));
+        }
+    }
+
     /// <summary>
-    /// Field activities the example forms are filed under. Inserted when missing and never
+    /// Activity types the example forms are filed under. Inserted when missing and never
     /// overwritten, so an edit made on the lookups screen survives a restart.
     /// </summary>
     private static async Task InsertFieldActivityTypesAsync(AuthDbContext context, CancellationToken ct)
     {
-        (string DepartmentCode, string Code, string NameEn, string NameAr)[] activities =
+        (string Code, string NameEn, string NameAr)[] activities =
         [
-            ("10", "LEAK_REPAIR", "Leak repair", "إصلاح التسربات"),
+            ("LEAK_REPAIR", "Leak repair", "إصلاح التسربات"),
         ];
 
-        foreach (var (departmentCode, code, nameEn, nameAr) in activities)
+        foreach (var (code, nameEn, nameAr) in activities)
         {
-            if (await context.Departments.AnyAsync(d => d.Code == departmentCode, ct)
-                && !await context.FieldActivityTypes.AnyAsync(f => f.DepartmentCode == departmentCode && f.Code == code, ct))
+            if (!await context.FieldActivityTypes.AnyAsync(f => f.Code == code, ct))
             {
-                context.FieldActivityTypes.Add(FieldActivityType.Create(code, nameEn, nameAr, departmentCode));
+                context.FieldActivityTypes.Add(FieldActivityType.Create(code, nameEn, nameAr, [InternalSourceCode]));
             }
         }
     }

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -20,7 +20,6 @@ import { TranslateContextDirective } from '../../../core/i18n/translate-context.
 import { LocaleService } from '../../../core/i18n/locale.service';
 import { HasPermissionDirective, PERMISSIONS } from '../../../core/auth/permissions';
 import { apiErrorMessage } from '../../../core/api/api-error-message';
-import { OrgNamesService } from '../../../core/lookups/org-names.service';
 import { TaskTypesService } from '../../../core/tasks/task-types.service';
 import { TaskType } from '../../../core/tasks/tasks.models';
 import { TaskTypeDialogComponent } from './task-type-dialog.component';
@@ -96,8 +95,6 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
               <th>{{ t('taskTypes.code') }}</th>
               <th>{{ t('taskTypes.name') }}</th>
               <th>{{ t('taskTypes.forms') }}</th>
-              <th>{{ t('tasks.fields.department') }}</th>
-              <th>{{ t('taskTypes.sla') }}</th>
               <th>{{ t('taskTypes.status') }}</th>
               <th class="w-32 text-center">{{ t('common.actions') }}</th>
             </tr>
@@ -119,7 +116,7 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
                           <!-- New tasks of this type are refused until each of its forms has a version that takes fills. -->
                           <p-tag [value]="t('taskTypes.formNotPublished')" severity="warn" />
                         }
-                        @if (type.closesC2mActivity && form.isC2mClosingForm && type.forms.length > 1) {
+                        @if (form.isC2mClosingForm && type.forms.length > 1) {
                           <i class="pi pi-flag-fill text-xs text-amber-500" [title]="t('taskTypes.closingForm')"></i>
                         }
                       } @else {
@@ -129,8 +126,6 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
                   }
                 </div>
               </td>
-              <td>{{ orgNames.label('Department', type.departmentCode) }}</td>
-              <td>{{ type.fillSlaHours ?? '—' }} / {{ type.completionSlaHours ?? '—' }} {{ t('tasks.detail.hours') }}</td>
               <td>
                 <p-tag [value]="t(type.isActive ? 'common.active' : 'common.inactive')" [severity]="type.isActive ? 'success' : 'secondary'" />
               </td>
@@ -164,7 +159,7 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
 
           <ng-template pTemplate="emptymessage">
             <tr>
-              <td colspan="7" class="p-6 text-center text-surface-500">{{ t('taskTypes.empty') }}</td>
+              <td colspan="5" class="p-6 text-center text-surface-500">{{ t('taskTypes.empty') }}</td>
             </tr>
           </ng-template>
         </p-table>
@@ -174,14 +169,13 @@ import { TaskTypeDialogComponent } from './task-type-dialog.component';
     </ng-container>
   `,
 })
-export class TaskTypeListComponent implements OnInit {
+export class TaskTypeListComponent {
   private readonly api = inject(TaskTypesService);
   private readonly messages = inject(MessageService);
   private readonly confirm = inject(ConfirmationService);
   private readonly translate = inject(TranslateService);
   private readonly locale = inject(LocaleService);
   private readonly destroyRef = inject(DestroyRef);
-  protected readonly orgNames = inject(OrgNamesService);
 
   protected readonly PERMISSIONS = PERMISSIONS;
   protected readonly types = signal<TaskType[]>([]);
@@ -194,10 +188,6 @@ export class TaskTypeListComponent implements OnInit {
   protected search = '';
   private page = 1;
   private pageSize = 10;
-
-  ngOnInit(): void {
-    this.orgNames.ensureLoaded();
-  }
 
   protected name(type: TaskType): string {
     return this.locale.locale() === 'ar' ? type.nameAr : type.nameEn;

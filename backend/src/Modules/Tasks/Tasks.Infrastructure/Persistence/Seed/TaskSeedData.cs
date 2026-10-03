@@ -146,7 +146,7 @@ internal static class TaskSeedData
 
                 type = TaskType.Create(
                     seed.Code, seed.NameEn, seed.NameAr, null, null,
-                    [form.Id], null, seed.DepartmentCode, seed.FillSlaHours, seed.CompletionSlaHours, SeedActor, utcNow);
+                    [form.Id], null, SeedActor, utcNow);
 
                 context.TaskTypes.Add(type);
                 logger.LogInformation("Seeded task type {Code}.", seed.Code);
@@ -166,6 +166,9 @@ internal static class TaskSeedData
             {
                 continue;
             }
+
+            // Types carry no department or SLA; the seeded tasks take theirs from the seed.
+            var typeSeed = Types.First(t => t.Code == seed.TypeCode);
 
             var drafts = new List<TaskFormDraft>();
             foreach (var typeForm in type.Forms.OrderBy(f => f.SortOrder))
@@ -190,9 +193,9 @@ internal static class TaskSeedData
                     Title = seed.Title,
                     Priority = seed.Priority,
                     Location = new TaskLocation(
-                        seed.Latitude, seed.Longitude, seed.Address, RiyadhCbu, seed.BranchCode, null, type.DepartmentCode),
-                    FillSlaHours = type.FillSlaHours,
-                    CompletionSlaHours = type.CompletionSlaHours,
+                        seed.Latitude, seed.Longitude, seed.Address, RiyadhCbu, seed.BranchCode, null, typeSeed.DepartmentCode),
+                    FillSlaHours = typeSeed.FillSlaHours,
+                    CompletionSlaHours = typeSeed.CompletionSlaHours,
                     CreatedBy = SeedActor,
                 },
                 utcNow);

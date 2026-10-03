@@ -52,6 +52,13 @@
                       @if (tab.lookup?.parentType) {
                         <th>{{ tab.lookup!.parentLabelKey! | translate }}</th>
                       }
+                      @if (tab.lookup?.type === 'ActivitySource') {
+                        <th>{{ 'lookups.kind' | translate }}</th>
+                        <th>{{ 'lookups.url' | translate }}</th>
+                      }
+                      @if (tab.lookup?.type === 'FieldActivityType') {
+                        <th>{{ 'lookups.sources' | translate }}</th>
+                      }
                       <th>{{ 'lookups.status' | translate }}</th>
                       <th class="text-right">{{ 'common.actions' | translate }}</th>
                     </tr>
@@ -62,6 +69,30 @@
                       <td>{{ displayName(item) }}</td>
                       @if (tab.lookup?.parentType) {
                         <td>{{ item.parentCode || '—' }}</td>
+                      }
+                      @if (tab.lookup?.type === 'ActivitySource') {
+                        <td>
+                          <p-tag [value]="('lookups.kinds.' + (item.kind || 'Internal')) | translate"
+                            [severity]="item.kind === 'External' ? 'info' : 'secondary'" />
+                        </td>
+                        <td class="max-w-xs truncate" dir="ltr">
+                          @if (item.url) {
+                            <a [href]="item.url" target="_blank" rel="noopener noreferrer" class="underline">{{ item.url }}</a>
+                          } @else {
+                            —
+                          }
+                        </td>
+                      }
+                      @if (tab.lookup?.type === 'FieldActivityType') {
+                        <td>
+                          <div class="flex flex-wrap gap-1">
+                            @for (code of item.sourceCodes ?? []; track code) {
+                              <span class="app-badge app-badge--code">{{ code }}</span>
+                            } @empty {
+                              —
+                            }
+                          </div>
+                        </td>
                       }
                       <td>
                         <p-tag [value]="item.isActive ? ('common.active' | translate) : ('common.inactive' | translate)"
@@ -81,7 +112,7 @@
                   </ng-template>
                   <ng-template pTemplate="emptymessage">
                     <tr>
-                      <td [attr.colspan]="tab.lookup?.parentType ? 5 : 4" class="py-6 text-center">{{ 'common.noData' | translate }}</td>
+                      <td [attr.colspan]="4 + (tab.lookup?.parentType ? 1 : 0) + (tab.lookup?.type === 'ActivitySource' ? 2 : 0) + (tab.lookup?.type === 'FieldActivityType' ? 1 : 0)" class="py-6 text-center">{{ 'common.noData' | translate }}</td>
                     </tr>
                   </ng-template>
                 </p-table>
@@ -119,6 +150,43 @@
         <label>{{ currentTab().parentLabelKey! | translate }}</label>
         <p-select formControlName="parentCode" [options]="parentOptions()" optionLabel="label" optionValue="value"
           appendTo="body" styleClass="w-full" />
+      </div>
+    }
+    @if (isSourceTab()) {
+      <div class="flex flex-col gap-1">
+        <label for="lookup-kind">{{ 'lookups.kind' | translate }} <span class="text-red-500">*</span></label>
+        <p-select inputId="lookup-kind" formControlName="kind" [options]="kindOptions" optionValue="value"
+          appendTo="body" styleClass="w-full">
+          <ng-template let-option pTemplate="item">{{ option.labelKey | translate }}</ng-template>
+          <ng-template let-option pTemplate="selectedItem">{{ option?.labelKey | translate }}</ng-template>
+        </p-select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="lookup-url">
+          {{ 'lookups.url' | translate }}
+          @if (form.controls.kind.value === 'External') {
+            <span class="text-red-500">*</span>
+          }
+        </label>
+        <input pInputText id="lookup-url" formControlName="url" dir="ltr" placeholder="https://" />
+        @if (form.controls.url.touched && urlMissing()) {
+          <small class="text-red-500">{{ 'lookups.urlRequired' | translate }}</small>
+        } @else if (form.controls.url.touched && form.controls.url.invalid) {
+          <small class="text-red-500">{{ 'lookups.urlInvalid' | translate }}</small>
+        }
+      </div>
+    }
+    @if (isActivityTypeTab()) {
+      <div class="flex flex-col gap-1">
+        <label for="lookup-sources">{{ 'lookups.sources' | translate }} <span class="text-red-500">*</span></label>
+        <p-multiselect inputId="lookup-sources" formControlName="sourceCodes" [options]="sourceOptions()"
+          optionLabel="label" optionValue="value" display="chip" [filter]="true" appendTo="body" styleClass="w-full"
+          [placeholder]="'lookups.sourcesPlaceholder' | translate" />
+        @if (form.controls.sourceCodes.touched && sourcesMissing()) {
+          <small class="text-red-500">{{ 'lookups.sourcesRequired' | translate }}</small>
+        } @else {
+          <small class="text-surface-500">{{ 'lookups.sourcesHint' | translate }}</small>
+        }
       </div>
     }
   </form>

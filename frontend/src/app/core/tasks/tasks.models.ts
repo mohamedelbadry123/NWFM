@@ -134,8 +134,6 @@ export interface TaskDetail {
   createdBy: string | null;
   c2mAttempts: number;
   c2mLastAttemptAt: string | null;
-  /** The task's type closes C2M field activities — with an FA id, approving it will. */
-  typeClosesC2mActivity: boolean;
   assignments: TaskAssignment[];
 }
 
@@ -283,11 +281,6 @@ export interface TaskType {
   descriptionAr: string | null;
   /** The forms its tasks are filled with, in order. */
   forms: TaskTypeForm[];
-  departmentCode: string | null;
-  fillSlaHours: number | null;
-  completionSlaHours: number | null;
-  /** Approving one of its tasks that carries an FA id closes that field activity in C2M. */
-  closesC2mActivity: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -314,10 +307,6 @@ export interface TaskTypePayload {
   formDefinitionIds: string[];
   /** Which of them closes the C2M field activity; the first when null. */
   c2mClosingFormId: string | null;
-  departmentCode: string | null;
-  fillSlaHours: number | null;
-  completionSlaHours: number | null;
-  closesC2mActivity: boolean;
 }
 
 export interface CreateTaskTypePayload extends TaskTypePayload {

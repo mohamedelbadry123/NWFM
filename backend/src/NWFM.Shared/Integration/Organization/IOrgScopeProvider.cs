@@ -42,10 +42,10 @@ public interface IOrgDirectory
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Whether a field activity type is active and belongs to an active department. For modules that
-    /// file work under an activity (a form, a task) and must not name one the department does not have.
+    /// Whether the department is active and the activity type is active. Activity types belong to no
+    /// department; modules that file work under one (a form, a task) pair it with a department themselves.
     /// </summary>
-    Task<bool> IsFieldActivityInDepartmentAsync(string departmentCode, string fieldActivityCode, CancellationToken cancellationToken);
+    Task<bool> IsValidFieldActivityAsync(string departmentCode, string fieldActivityCode, CancellationToken cancellationToken);
 
     /// <summary>
     /// Whether every unit a location names is active and sits under the unit named above it: the CBU

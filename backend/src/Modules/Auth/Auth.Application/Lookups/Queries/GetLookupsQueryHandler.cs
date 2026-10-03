@@ -19,7 +19,11 @@ public sealed class GetLookupsQueryHandler(IAuthDbContext context)
             }),
             "FieldActivityType" => context.FieldActivityTypes.AsNoTracking().Select(x => new LookupItemDto
             {
-                Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive, ParentCode = x.DepartmentCode
+                Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive
+            }),
+            "ActivitySource" => context.ActivitySources.AsNoTracking().Select(x => new LookupItemDto
+            {
+                Id = x.Id, Code = x.Code, NameEn = x.NameEn, NameAr = x.NameAr, IsActive = x.IsActive, Kind = x.Kind, Url = x.Url
             }),
             "Cluster" => context.Clusters.AsNoTracking().Select(x => new LookupItemDto
             {
@@ -64,6 +68,17 @@ public sealed class GetLookupsQueryHandler(IAuthDbContext context)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(ct);
+
+        if (request.LookupType == "FieldActivityType" && items.Count > 0)
+        {
+            var ids = items.Select(x => x.Id).ToList();
+            var sources = await context.FieldActivityTypeSources.AsNoTracking()
+                .Where(s => ids.Contains(s.FieldActivityTypeId))
+                .Select(s => new { s.FieldActivityTypeId, s.SourceCode })
+                .ToListAsync(ct);
+            foreach (var item in items)
+                item.SourceCodes = sources.Where(s => s.FieldActivityTypeId == item.Id).Select(s => s.SourceCode).OrderBy(c => c).ToList();
+        }
 
         return Result<PaginatedResult<LookupItemDto>>.Success(
             new PaginatedResult<LookupItemDto>(items, totalCount, request.PageNumber, request.PageSize));

@@ -27,6 +27,7 @@ public sealed class CreateLookupCommandHandler(IAuthDbContext context, ICacheSer
             {
                 "Department" => await CreateDepartment(code, request, ct),
                 "FieldActivityType" => await CreateFieldActivityType(code, request, ct),
+                "ActivitySource" => await CreateActivitySource(code, request, ct),
                 "Cluster" => await CreateCluster(code, request, ct),
                 "Cbu" => await CreateCbu(code, request, ct),
                 "Branch" => await CreateBranch(code, request, ct),
@@ -103,10 +104,21 @@ public sealed class CreateLookupCommandHandler(IAuthDbContext context, ICacheSer
 
     private async Task<Result<LookupItemDto>> CreateFieldActivityType(string code, CreateLookupCommand request, CancellationToken ct)
     {
-        if (await context.FieldActivityTypes.AnyAsync(x => x.Code == code && x.DepartmentCode == request.ParentCode, ct))
+        if (await context.FieldActivityTypes.AnyAsync(x => x.Code == code, ct))
             return Result<LookupItemDto>.Failure(AuthErrors.LookupDuplicate);
-        var entity = FieldActivityType.Create(code, request.NameEn, request.NameAr, request.ParentCode!);
+        if (await ActivityLookups.ValidateSourcesAsync(context, request.SourceCodes, [], ct) is { } error)
+            return Result<LookupItemDto>.Failure(error);
+        var entity = FieldActivityType.Create(code, request.NameEn, request.NameAr, request.SourceCodes!);
         context.FieldActivityTypes.Add(entity);
-        return Map(entity.Id, entity.Code, entity.NameEn, entity.NameAr, entity.IsActive, entity.DepartmentCode);
+        return ActivityLookups.Map(entity);
+    }
+
+    private async Task<Result<LookupItemDto>> CreateActivitySource(string code, CreateLookupCommand request, CancellationToken ct)
+    {
+        if (await context.ActivitySources.AnyAsync(x => x.Code == code, ct))
+            return Result<LookupItemDto>.Failure(AuthErrors.LookupDuplicate);
+        var entity = ActivitySource.Create(code, request.NameEn, request.NameAr, request.Kind ?? "", request.Url);
+        context.ActivitySources.Add(entity);
+        return ActivityLookups.Map(entity);
     }
 }

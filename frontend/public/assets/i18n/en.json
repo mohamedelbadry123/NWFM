@@ -2065,8 +2065,22 @@
       "clusters": "Clusters",
       "cbus": "Regions",
       "branches": "Cities",
-      "operationAreas": "Operation areas"
-    }
+      "operationAreas": "Operation areas",
+      "activityTypes": "Activity Types",
+      "activitySources": "Activity Sources"
+    },
+    "kind": "Type",
+    "url": "URL",
+    "kinds": {
+      "Internal": "Internal",
+      "External": "External"
+    },
+    "urlRequired": "An external source needs its URL.",
+    "urlInvalid": "Enter an http:// or https:// address.",
+    "sources": "Allowed sources",
+    "sourcesPlaceholder": "Choose the sources",
+    "sourcesRequired": "Choose at least one source.",
+    "sourcesHint": "Activities of this type can be created from any of these sources."
   },
   "users": {
     "title": "User accounts",
@@ -2134,7 +2148,7 @@
     "workflows": "Workflows",
     "newInstance": "New Instance",
     "instances": "Instances",
-    "fieldActivityTypes": "Field Activity Types",
+    "fieldActivityTypes": "Activity Types",
     "department": "Department",
     "sla": "SLA"
   },
@@ -2632,11 +2646,10 @@
       "renderedWithVersion": "Shown with the version it was answered on.",
       "empty": "Nothing has been submitted yet."
     },
-    "fieldActivity": "Field activity",
-    "fieldActivityPlaceholder": "Choose the field activity",
-    "selectDepartmentFirst": "Choose a department first",
+    "fieldActivity": "Activity type",
+    "fieldActivityPlaceholder": "Choose the activity type",
     "departmentPlaceholder": "Choose the department",
-    "noFieldActivities": "This department has no active field activities."
+    "noFieldActivities": "There are no active activity types."
   },
   "tasks": {
     "title": "Field tasks",
@@ -2758,7 +2771,6 @@
       "typePlaceholder": "Choose a task type",
       "publishedOnlyHint": "Only types whose forms all have a published version are listed.",
       "formHint": "Filled with {{form}} v{{version}}",
-      "slaHint": "{{hours}}h to fill once assigned",
       "numberPlaceholder": "Leave blank to generate",
       "formsHint": "Filled with {{forms}}",
       "extraForms": "Additional forms",
@@ -2776,7 +2788,7 @@
       "teamPlaceholder": "Choose a team",
       "activeTasks": "{{count}} open task(s)",
       "noEligibleTeams": "No active team covers this task's location. Give a team this territory first.",
-      "slaHint": "Left blank, the deadlines are set from the task type's SLA, counted from now.",
+      "slaHint": "Left blank, the task's own SLA sets the deadlines, counted from now, when it has one.",
       "notePlaceholder": "Anything the crew should know"
     },
     "return": {
@@ -2939,9 +2951,6 @@
     "formChangeHint": "Tasks already raised keep the forms they were raised with; only new tasks use the new list.",
     "formNotPublished": "Not published",
     "formMissing": "Form not found",
-    "sla": "SLA (fill / review)",
-    "fillSla": "Fill SLA",
-    "completionSla": "Review SLA",
     "status": "Status",
     "activate": "Activate",
     "deactivate": "Deactivate",
@@ -2950,8 +2959,6 @@
     "codeInvalid": "Use letters, digits, \"-\" and \"_\" only.",
     "created": "Task type created.",
     "updated": "Task type updated.",
-    "closesC2mActivity": "Closes the C2M field activity",
-    "closesC2mActivityHint": "This type's form is the closing form: approving one of its tasks that carries an FA id closes that activity in C2M, with the outcome its Action Taken answer maps to.",
     "forms": "Forms",
     "addForm": "Add a published form",
     "formsRequired": "Add at least one form.",

@@ -133,7 +133,7 @@
                 @if (d.task.wfmTicketId) {
                   <span class="text-[var(--p-text-muted-color)]"> · {{ t('tasks.fields.wfmTicketId') }} <span dir="ltr">{{ d.task.wfmTicketId }}</span></span>
                 }
-                @if (d.task.faId && d.typeClosesC2mActivity) {
+                @if (d.task.faId) {
                   <span class="app-badge app-badge--brand ms-1">{{ t('tasks.c2m.closesOnApproval') }}</span>
                 }
               </span>
@@ -295,7 +295,7 @@
                   @if (form.source === 'EXTRA') {
                     <p-tag [value]="t('tasks.forms.source.EXTRA')" severity="secondary" />
                   }
-                  @if (form.isC2mClosingForm && d.typeClosesC2mActivity && multiForm()) {
+                  @if (form.isC2mClosingForm && d.task.faId && multiForm()) {
                     <i class="pi pi-flag-fill text-xs text-amber-500" [pTooltip]="t('taskTypes.closingForm')"></i>
                   }
                   @if (form.submissionCount > 0) {

@@ -23,4 +23,13 @@ public sealed class LookupItemDto
     public string NameAr { get; init; } = default!;
     public bool IsActive { get; init; }
     public string? ParentCode { get; init; }
+
+    /// <summary>Sources only: Internal or External.</summary>
+    public string? Kind { get; init; }
+
+    /// <summary>Sources only.</summary>
+    public string? Url { get; init; }
+
+    /// <summary>Activity types only: the sources allowed to create one.</summary>
+    public IReadOnlyList<string>? SourceCodes { get; set; }
 }

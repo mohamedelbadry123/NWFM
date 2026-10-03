@@ -142,11 +142,6 @@ export class TaskCreateDialogComponent {
     if (extras.some((id) => typeForms.has(id))) {
       this.form.controls.extraFormDefinitionIds.setValue(extras.filter((id) => !typeForms.has(id)));
     }
-
-    // The type names the department its work belongs to; start there, and let the operator change it.
-    if (type?.departmentCode && !this.form.controls.departmentCode.value) {
-      this.form.controls.departmentCode.setValue(type.departmentCode);
-    }
   }
 
   protected onLocationChange(location: OrgLocation): void {

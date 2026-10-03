@@ -3,7 +3,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { map, Observable } from 'rxjs';
 import { ApiResult, PaginatedResult } from '../api/api-result';
 
-export type LookupType = 'Department' | 'Cluster' | 'Cbu' | 'Branch' | 'OperationArea' | 'FieldActivityType';
+export type LookupType = 'Department' | 'Cluster' | 'Cbu' | 'Branch' | 'OperationArea' | 'FieldActivityType' | 'ActivitySource';
+
+export type ActivitySourceKind = 'Internal' | 'External';
 
 export interface LookupItem {
   id: string;
@@ -12,11 +14,28 @@ export interface LookupItem {
   nameAr: string;
   isActive: boolean;
   parentCode?: string | null;
+  /** Activity sources only. */
+  kind?: ActivitySourceKind | null;
+  /** Activity sources only; required when External. */
+  url?: string | null;
+  /** Activity types only: the sources allowed to create one. */
+  sourceCodes?: string[] | null;
+}
+
+/** What a lookup is created and edited with; each type reads the fields it has. */
+export interface LookupWrite {
+  nameEn: string;
+  nameAr: string;
+  parentCode?: string | null;
+  kind?: ActivitySourceKind | null;
+  url?: string | null;
+  sourceCodes?: string[] | null;
 }
 
 const PATHS: Record<LookupType, string> = {
   Department: 'departments',
   FieldActivityType: 'field-activity-types',
+  ActivitySource: 'activity-sources',
   Cluster: 'clusters',
   Cbu: 'cbus',
   Branch: 'branches',
@@ -50,11 +69,11 @@ export class LookupsService {
     return this.list(type, 1, 500, undefined, options).pipe(map(r => r.value?.items ?? []));
   }
 
-  create(type: LookupType, body: { code: string; nameEn: string; nameAr: string; parentCode?: string | null }): Observable<ApiResult<LookupItem>> {
+  create(type: LookupType, body: { code: string } & LookupWrite): Observable<ApiResult<LookupItem>> {
     return this.http.post<ApiResult<LookupItem>>(`${this.baseUrl}/${PATHS[type]}`, body);
   }
 
-  update(type: LookupType, id: string, body: { nameEn: string; nameAr: string; parentCode?: string | null }): Observable<ApiResult<LookupItem>> {
+  update(type: LookupType, id: string, body: LookupWrite): Observable<ApiResult<LookupItem>> {
     return this.http.put<ApiResult<LookupItem>>(`${this.baseUrl}/${PATHS[type]}/${id}`, body);
   }
 

@@ -15,6 +15,9 @@ public sealed class CreateLookupRequest
     public string NameEn { get; init; } = default!;
     public string NameAr { get; init; } = default!;
     public string? ParentCode { get; init; }
+    public string? Kind { get; init; }
+    public string? Url { get; init; }
+    public IReadOnlyList<string>? SourceCodes { get; init; }
 }
 
 public sealed class UpdateLookupRequest
@@ -22,6 +25,9 @@ public sealed class UpdateLookupRequest
     public string NameEn { get; init; } = default!;
     public string NameAr { get; init; } = default!;
     public string? ParentCode { get; init; }
+    public string? Kind { get; init; }
+    public string? Url { get; init; }
+    public IReadOnlyList<string>? SourceCodes { get; init; }
 }
 
 public sealed class SetLookupStatusRequest

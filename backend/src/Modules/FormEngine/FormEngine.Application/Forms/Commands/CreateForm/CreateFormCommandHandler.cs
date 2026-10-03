@@ -31,7 +31,7 @@ public sealed class CreateFormCommandHandler(
         var department = request.DepartmentCode!.Trim();
         var activity = request.FieldActivityCode!.Trim();
 
-        if (!await directory.IsFieldActivityInDepartmentAsync(department, activity, ct))
+        if (!await directory.IsValidFieldActivityAsync(department, activity, ct))
         {
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.InvalidFieldActivity(department, activity));
         }

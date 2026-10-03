@@ -133,9 +133,9 @@ export class FormListComponent {
   protected readonly nameOf = computed(() => (form: FormListItem) =>
     this.locale.locale() === 'ar' ? form.nameAr : form.nameEn);
 
-  /** Departments by code, and field activities by department and code — an activity code is only unique within its department. */
+  /** Departments and activity types, each by code. */
   private readonly departmentsByCode = signal(new Map<string, LookupItem>());
-  private readonly activitiesByKey = signal(new Map<string, LookupItem>());
+  private readonly activitiesByCode = signal(new Map<string, LookupItem>());
 
   protected readonly departmentName = computed(() => {
     const ar = this.locale.locale() === 'ar';
@@ -148,9 +148,9 @@ export class FormListComponent {
 
   protected readonly activityName = computed(() => {
     const ar = this.locale.locale() === 'ar';
-    const byKey = this.activitiesByKey();
+    const byCode = this.activitiesByCode();
     return (form: FormListItem) => {
-      const item = byKey.get(`${form.departmentCode ?? ''}|${form.fieldActivityCode ?? ''}`.toUpperCase());
+      const item = form.fieldActivityCode ? byCode.get(form.fieldActivityCode.toUpperCase()) : undefined;
       return item ? (ar ? item.nameAr : item.nameEn) : (form.fieldActivityCode ?? '');
     };
   });
@@ -165,7 +165,7 @@ export class FormListComponent {
       .listAll('FieldActivityType')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((items) =>
-        this.activitiesByKey.set(new Map(items.map((i) => [`${i.parentCode ?? ''}|${i.code}`.toUpperCase(), i]))));
+        this.activitiesByCode.set(new Map(items.map((i) => [i.code.toUpperCase(), i]))));
   }
 
   protected load(event?: TableLazyLoadEvent): void {

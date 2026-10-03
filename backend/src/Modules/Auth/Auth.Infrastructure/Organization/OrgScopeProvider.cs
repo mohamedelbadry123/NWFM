@@ -170,13 +170,13 @@ internal sealed class OrgScopeProvider(
         return byCode;
     }
 
-    public Task<bool> IsFieldActivityInDepartmentAsync(
+    public Task<bool> IsValidFieldActivityAsync(
         string departmentCode,
         string fieldActivityCode,
         CancellationToken cancellationToken) =>
         db.Departments.AsNoTracking().AnyAsync(
             d => d.Code == departmentCode && d.IsActive
-                && db.FieldActivityTypes.Any(f => f.DepartmentCode == d.Code && f.Code == fieldActivityCode && f.IsActive),
+                && db.FieldActivityTypes.Any(f => f.Code == fieldActivityCode && f.IsActive),
             cancellationToken);
 
     public async Task<bool> IsValidLocationAsync(OrgLocation location, CancellationToken cancellationToken)

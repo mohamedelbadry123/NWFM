@@ -29,10 +29,6 @@ public interface ITaskTypeInput
 
     /// <summary>Which of them closes the C2M field activity; the first when not given.</summary>
     Guid? C2mClosingFormId { get; }
-
-    string? DepartmentCode { get; }
-    int? FillSlaHours { get; }
-    int? CompletionSlaHours { get; }
 }
 
 [Authorize(Policy = NwfmPolicies.ManageTaskTypes)]
@@ -45,12 +41,6 @@ public sealed record CreateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string? DescriptionAr { get; init; }
     public IReadOnlyList<Guid> FormDefinitionIds { get; init; } = [];
     public Guid? C2mClosingFormId { get; init; }
-    public string? DepartmentCode { get; init; }
-    public int? FillSlaHours { get; init; }
-    public int? CompletionSlaHours { get; init; }
-
-    /// <summary>Whether approving one of its tasks that carries an FA id closes that activity in C2M.</summary>
-    public bool ClosesC2mActivity { get; init; }
 }
 
 /// <summary>
@@ -67,12 +57,6 @@ public sealed record UpdateTaskTypeCommand : IRequest<Result<TaskTypeDto>>, ITas
     public string? DescriptionAr { get; init; }
     public IReadOnlyList<Guid> FormDefinitionIds { get; init; } = [];
     public Guid? C2mClosingFormId { get; init; }
-    public string? DepartmentCode { get; init; }
-    public int? FillSlaHours { get; init; }
-    public int? CompletionSlaHours { get; init; }
-
-    /// <summary>Whether approving one of its tasks that carries an FA id closes that activity in C2M.</summary>
-    public bool ClosesC2mActivity { get; init; }
 }
 
 /// <summary>Deactivating a type stops new tasks of it; tasks already raised carry on.</summary>
@@ -99,9 +83,6 @@ public sealed class TaskTypeInputValidator : AbstractValidator<ITaskTypeInput>
         RuleFor(x => x.C2mClosingFormId)
             .Must((input, id) => id is null || input.FormDefinitionIds.Contains(id.Value))
             .WithMessage("The C2M closing form must be one of the type's forms.");
-        RuleFor(x => x.DepartmentCode).MaximumLength(TaskType.DepartmentCodeMaxLength);
-        RuleFor(x => x.FillSlaHours).InclusiveBetween(1, TaskType.MaxSlaHours).When(x => x.FillSlaHours is not null);
-        RuleFor(x => x.CompletionSlaHours).InclusiveBetween(1, TaskType.MaxSlaHours).When(x => x.CompletionSlaHours is not null);
     }
 }
 
@@ -158,12 +139,8 @@ public sealed class CreateTaskTypeCommandHandler(
                 request.DescriptionAr,
                 request.FormDefinitionIds,
                 request.C2mClosingFormId,
-                request.DepartmentCode,
-                request.FillSlaHours,
-                request.CompletionSlaHours,
                 TaskWrites.Actor(user),
                 timeProvider.GetUtcNow().UtcDateTime);
-            type.SetClosesC2mActivity(request.ClosesC2mActivity, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime);
         }
         catch (DomainException ex)
         {
@@ -211,12 +188,8 @@ public sealed class UpdateTaskTypeCommandHandler(
                 request.DescriptionAr,
                 request.FormDefinitionIds,
                 request.C2mClosingFormId,
-                request.DepartmentCode,
-                request.FillSlaHours,
-                request.CompletionSlaHours,
                 TaskWrites.Actor(user),
                 timeProvider.GetUtcNow().UtcDateTime);
-            type.SetClosesC2mActivity(request.ClosesC2mActivity, TaskWrites.Actor(user), timeProvider.GetUtcNow().UtcDateTime);
 
             await db.SaveChangesAsync(ct);
         }

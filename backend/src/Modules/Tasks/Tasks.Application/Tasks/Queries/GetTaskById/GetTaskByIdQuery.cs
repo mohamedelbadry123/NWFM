@@ -65,7 +65,6 @@ public sealed class GetTaskByIdQueryHandler(
             CreatedBy = task.CreatedBy,
             C2mAttempts = task.C2mAttempts,
             C2mLastAttemptAt = task.C2mLastAttemptAt,
-            TypeClosesC2mActivity = type?.ClosesC2mActivity ?? false,
             Assignments = task.Assignments
                 .OrderByDescending(a => a.AssignedDate)
                 .Select(a => new TaskAssignmentDto

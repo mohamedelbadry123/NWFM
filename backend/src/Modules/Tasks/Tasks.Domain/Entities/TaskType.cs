@@ -13,11 +13,7 @@ public sealed class TaskType : Entity
     public const int CodeMaxLength = 50;
     public const int NameMaxLength = 250;
     public const int DescriptionMaxLength = 1000;
-    public const int DepartmentCodeMaxLength = 50;
     public const int ActorMaxLength = 256;
-
-    /// <summary>A year: past that an SLA is a typo, not a target.</summary>
-    public const int MaxSlaHours = 24 * 366;
 
     /// <summary>More than this is a survey, not a visit; split it into types.</summary>
     public const int MaxForms = 10;
@@ -33,22 +29,6 @@ public sealed class TaskType : Entity
     public string NameAr { get; private set; } = default!;
     public string? DescriptionEn { get; private set; }
     public string? DescriptionAr { get; private set; }
-
-
-    /// <summary>The department whose work this is (<c>Auth.LKP_DEPARTMENT.Code</c>); a new task inherits it.</summary>
-    public string? DepartmentCode { get; private set; }
-
-    /// <summary>Hours a crew has to fill a task once it is assigned; seeds the fill due date.</summary>
-    public int? FillSlaHours { get; private set; }
-
-    /// <summary>Hours after the fill deadline for review to finish; seeds the completion due date.</summary>
-    public int? CompletionSlaHours { get; private set; }
-
-    /// <summary>
-    /// Whether this type's form is the closing form for C2M field activities: approving one of its
-    /// tasks that carries an FA id closes that activity in C2M.
-    /// </summary>
-    public bool ClosesC2mActivity { get; private set; }
 
     public bool IsActive { get; private set; }
     public string? CreatedBy { get; private set; }
@@ -69,9 +49,6 @@ public sealed class TaskType : Entity
         string? descriptionAr,
         IReadOnlyList<Guid> formDefinitionIds,
         Guid? c2mClosingFormId,
-        string? departmentCode,
-        int? fillSlaHours,
-        int? completionSlaHours,
         string? createdBy,
         DateTime utcNow)
     {
@@ -88,7 +65,7 @@ public sealed class TaskType : Entity
             CreatedAt = utcNow,
         };
 
-        type.Apply(nameEn, nameAr, descriptionEn, descriptionAr, departmentCode, fillSlaHours, completionSlaHours);
+        type.Apply(nameEn, nameAr, descriptionEn, descriptionAr);
         type.SetForms(formDefinitionIds, c2mClosingFormId, utcNow);
         type.Touch(createdBy, utcNow);
         return type;
@@ -101,20 +78,11 @@ public sealed class TaskType : Entity
         string? descriptionAr,
         IReadOnlyList<Guid> formDefinitionIds,
         Guid? c2mClosingFormId,
-        string? departmentCode,
-        int? fillSlaHours,
-        int? completionSlaHours,
         string? updatedBy,
         DateTime utcNow)
     {
-        Apply(nameEn, nameAr, descriptionEn, descriptionAr, departmentCode, fillSlaHours, completionSlaHours);
+        Apply(nameEn, nameAr, descriptionEn, descriptionAr);
         SetForms(formDefinitionIds, c2mClosingFormId, utcNow);
-        Touch(updatedBy, utcNow);
-    }
-
-    public void SetClosesC2mActivity(bool closes, string? updatedBy, DateTime utcNow)
-    {
-        ClosesC2mActivity = closes;
         Touch(updatedBy, utcNow);
     }
 
@@ -170,39 +138,17 @@ public sealed class TaskType : Entity
         }
     }
 
-    private void Apply(
-        string nameEn,
-        string nameAr,
-        string? descriptionEn,
-        string? descriptionAr,
-        string? departmentCode,
-        int? fillSlaHours,
-        int? completionSlaHours)
+    private void Apply(string nameEn, string nameAr, string? descriptionEn, string? descriptionAr)
     {
         if (string.IsNullOrWhiteSpace(nameEn) || string.IsNullOrWhiteSpace(nameAr))
         {
             throw new DomainException("A task type must have an English and an Arabic name.");
         }
 
-
-        EnsureSla(fillSlaHours, "fill");
-        EnsureSla(completionSlaHours, "completion");
-
         NameEn = nameEn.Trim();
         NameAr = nameAr.Trim();
         DescriptionEn = Normalize(descriptionEn);
         DescriptionAr = Normalize(descriptionAr);
-        DepartmentCode = Normalize(departmentCode);
-        FillSlaHours = fillSlaHours;
-        CompletionSlaHours = completionSlaHours;
-    }
-
-    private static void EnsureSla(int? hours, string which)
-    {
-        if (hours is not null && (hours <= 0 || hours > MaxSlaHours))
-        {
-            throw new DomainException($"The {which} SLA must be between 1 and {MaxSlaHours} hours.");
-        }
     }
 
     private void Touch(string? actor, DateTime utcNow)

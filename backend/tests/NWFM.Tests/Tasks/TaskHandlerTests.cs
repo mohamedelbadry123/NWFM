@@ -149,7 +149,7 @@ public sealed class TaskHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_PinsTheFormsCurrentVersion_AndTheTypesSla()
+    public async Task Create_PinsTheFormsCurrentVersion_AndTakesNoSlaFromTheType()
     {
         var type = TaskTestData.Type();
         _db.TaskTypes.Add(type);
@@ -164,7 +164,7 @@ public sealed class TaskHandlerTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         var created = await _db.Tasks.SingleAsync();
         created.Forms.Should().ContainSingle().Which.FormVersionNo.Should().Be(4);
-        created.FillSlaHours.Should().Be(48);
+        created.FillSlaHours.Should().BeNull();
         created.TaskNumber.Should().StartWith("TSK-260921-");
     }
 

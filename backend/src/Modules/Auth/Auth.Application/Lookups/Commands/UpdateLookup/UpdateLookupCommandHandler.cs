@@ -24,6 +24,7 @@ public sealed class UpdateLookupCommandHandler(IAuthDbContext context, ICacheSer
             {
                 "Department" => await UpdateDepartment(request, ct),
                 "FieldActivityType" => await UpdateFieldActivityType(request, ct),
+                "ActivitySource" => await UpdateActivitySource(request, ct),
                 "Cluster" => await UpdateCluster(request, ct),
                 "Cbu" => await UpdateCbu(request, ct),
                 "Branch" => await UpdateBranch(request, ct),
@@ -95,11 +96,20 @@ public sealed class UpdateLookupCommandHandler(IAuthDbContext context, ICacheSer
 
     private async Task<Result<LookupItemDto>> UpdateFieldActivityType(UpdateLookupCommand request, CancellationToken ct)
     {
-        var entity = await context.FieldActivityTypes.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        var entity = await context.FieldActivityTypes.Include(x => x.Sources).FirstOrDefaultAsync(x => x.Id == request.Id, ct);
         if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
-        if (await context.FieldActivityTypes.AnyAsync(x => x.Id != entity.Id && x.Code == entity.Code && x.DepartmentCode == request.ParentCode, ct))
-            return Result<LookupItemDto>.Failure(AuthErrors.LookupDuplicate);
-        entity.Update(request.NameEn, request.NameAr, request.ParentCode!);
-        return Map(entity.Id, entity.Code, entity.NameEn, entity.NameAr, entity.IsActive, entity.DepartmentCode);
+        var current = entity.Sources.Select(s => s.SourceCode).ToList();
+        if (await ActivityLookups.ValidateSourcesAsync(context, request.SourceCodes, current, ct) is { } error)
+            return Result<LookupItemDto>.Failure(error);
+        entity.Update(request.NameEn, request.NameAr, request.SourceCodes!);
+        return ActivityLookups.Map(entity);
+    }
+
+    private async Task<Result<LookupItemDto>> UpdateActivitySource(UpdateLookupCommand request, CancellationToken ct)
+    {
+        var entity = await context.ActivitySources.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
+        entity.Update(request.NameEn, request.NameAr, request.Kind ?? "", request.Url);
+        return ActivityLookups.Map(entity);
     }
 }

@@ -18,10 +18,8 @@ public sealed class TaskTypeConfiguration : IEntityTypeConfiguration<TaskType>
         builder.Property(x => x.NameAr).HasMaxLength(TaskType.NameMaxLength).IsRequired();
         builder.Property(x => x.DescriptionEn).HasMaxLength(TaskType.DescriptionMaxLength);
         builder.Property(x => x.DescriptionAr).HasMaxLength(TaskType.DescriptionMaxLength);
-        builder.Property(x => x.DepartmentCode).HasMaxLength(TaskType.DepartmentCodeMaxLength);
         builder.Property(x => x.CreatedBy).HasMaxLength(TaskType.ActorMaxLength);
         builder.Property(x => x.UpdatedBy).HasMaxLength(TaskType.ActorMaxLength);
-        builder.Property(x => x.ClosesC2mActivity).HasDefaultValue(false);
         builder.Property(x => x.RowVersion).IsRowVersion();
 
         builder.HasIndex(x => x.Code).IsUnique();

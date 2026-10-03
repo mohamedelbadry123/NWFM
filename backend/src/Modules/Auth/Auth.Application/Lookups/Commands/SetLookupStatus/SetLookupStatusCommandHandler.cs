@@ -19,6 +19,7 @@ public sealed class SetLookupStatusCommandHandler(IAuthDbContext context, ICache
         {
             "Department" => await SetDepartment(request, ct),
             "FieldActivityType" => await SetFieldActivityType(request, ct),
+            "ActivitySource" => await SetActivitySource(request, ct),
             "Cluster" => await SetCluster(request, ct),
             "Cbu" => await SetCbu(request, ct),
             "Branch" => await SetBranch(request, ct),
@@ -54,10 +55,18 @@ public sealed class SetLookupStatusCommandHandler(IAuthDbContext context, ICache
 
     private async Task<Result<LookupItemDto>> SetFieldActivityType(SetLookupStatusCommand request, CancellationToken ct)
     {
-        var entity = await context.FieldActivityTypes.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        var entity = await context.FieldActivityTypes.Include(x => x.Sources).FirstOrDefaultAsync(x => x.Id == request.Id, ct);
         if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
         entity.SetActive(request.IsActive);
-        return new LookupItemDto { Id = entity.Id, Code = entity.Code, NameEn = entity.NameEn, NameAr = entity.NameAr, IsActive = entity.IsActive, ParentCode = entity.DepartmentCode };
+        return ActivityLookups.Map(entity);
+    }
+
+    private async Task<Result<LookupItemDto>> SetActivitySource(SetLookupStatusCommand request, CancellationToken ct)
+    {
+        var entity = await context.ActivitySources.FirstOrDefaultAsync(x => x.Id == request.Id, ct);
+        if (entity is null) return Result<LookupItemDto>.Failure(AuthErrors.LookupNotFound);
+        entity.SetActive(request.IsActive);
+        return ActivityLookups.Map(entity);
     }
 
     private async Task<Result<LookupItemDto>> SetCbu(SetLookupStatusCommand request, CancellationToken ct)

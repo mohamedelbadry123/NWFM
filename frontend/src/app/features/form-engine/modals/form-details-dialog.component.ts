@@ -55,16 +55,8 @@ export class FormDetailsDialogComponent {
     nameAr: ['', [Validators.required, Validators.maxLength(250)]],
     category: ['GENERAL', [Validators.required]],
     departmentCode: [null as string | null, [Validators.required]],
-    fieldActivityCode: [{ value: null as string | null, disabled: true }, [Validators.required]],
+    fieldActivityCode: [null as string | null, [Validators.required]],
   });
-
-  constructor() {
-    // A field activity is a department's, so the list follows the department and a choice the new
-    // department does not have is dropped rather than saved against the wrong one.
-    this.model.controls.departmentCode.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((code) => this.loadFieldActivities(code, this.model.controls.fieldActivityCode.value));
-  }
 
   protected get isEdit(): boolean {
     return this.form() !== null;
@@ -82,7 +74,7 @@ export class FormDetailsDialogComponent {
       fieldActivityCode: form?.fieldActivityCode ?? null,
     }, { emitEvent: false });
 
-    this.loadFieldActivities(form?.departmentCode ?? null, form?.fieldActivityCode ?? null);
+    this.loadFieldActivities(form?.fieldActivityCode ?? null);
 
     // The code identifies published versions, so it is set once and then read-only.
     if (this.isEdit) {
@@ -103,29 +95,17 @@ export class FormDetailsDialogComponent {
     return this.locale.locale() === 'ar' ? item.nameAr : item.nameEn;
   }
 
-  private loadFieldActivities(departmentCode: string | null, keep: string | null): void {
+  /** Activity types belong to no department: every active one can be paired with the form's department. */
+  private loadFieldActivities(keep: string | null): void {
     const control = this.model.controls.fieldActivityCode;
-
-    if (!departmentCode) {
-      this.fieldActivities.set([]);
-      control.reset(null);
-      control.disable({ emitEvent: false });
-      return;
-    }
 
     this.loadingActivities.set(true);
     this.lookups
-      .listAll('FieldActivityType', { parentCode: departmentCode, isActive: true })
+      .listAll('FieldActivityType', { isActive: true })
       .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loadingActivities.set(false)))
       .subscribe({
         next: (items) => {
-          // A stale reply for a department no longer chosen is ignored.
-          if (this.model.controls.departmentCode.value !== departmentCode) {
-            return;
-          }
-
           this.fieldActivities.set(items);
-          control.enable({ emitEvent: false });
           control.setValue(items.some((i) => i.code === keep) ? keep : null, { emitEvent: false });
         },
       });

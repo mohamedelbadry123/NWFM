@@ -6,20 +6,17 @@ import { Observable, finalize } from 'rxjs';
 
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
-import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
 import { MessageService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { TextareaModule } from 'primeng/textarea';
-import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { TooltipModule } from 'primeng/tooltip';
 
 import { TranslateContextDirective } from '../../../core/i18n/translate-context.directive';
 import { LocaleService } from '../../../core/i18n/locale.service';
 import { ApiResult } from '../../../core/api/api-result';
 import { apiErrorMessage } from '../../../core/api/api-error-message';
-import { LookupsService } from '../../../core/lookups/lookups.service';
 import { TaskTypesService } from '../../../core/tasks/task-types.service';
 import { FormOption, TaskType } from '../../../core/tasks/tasks.models';
 
@@ -45,12 +42,10 @@ const MAX_FORMS = 10;
     TranslateContextDirective,
     ButtonModule,
     DialogModule,
-    InputNumberModule,
     InputTextModule,
     MessageModule,
     SelectModule,
     TextareaModule,
-    ToggleSwitchModule,
     TooltipModule,
     FormsModule,
   ],
@@ -75,21 +70,7 @@ const MAX_FORMS = 10;
             }
           </div>
 
-          <div class="flex flex-col gap-2">
-            <label for="type-department" class="text-sm font-medium">{{ t('tasks.fields.department') }}</label>
-            <p-select
-              inputId="type-department"
-              formControlName="departmentCode"
-              [options]="departments()"
-              optionLabel="label"
-              optionValue="value"
-              [showClear]="true"
-              [filter]="true"
-              filterBy="label"
-              appendTo="body"
-              styleClass="w-full"
-            />
-          </div>
+          <div class="hidden sm:block"></div>
 
           <div class="flex flex-col gap-2">
             <label for="type-name-en" class="text-sm font-medium">{{ t('taskTypes.nameEn') }} <span class="text-red-500">*</span></label>
@@ -110,7 +91,7 @@ const MAX_FORMS = 10;
                   <li class="flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5">
                     <span class="app-badge app-badge--code">{{ i + 1 }}</span>
                     <span class="min-w-0 flex-1 truncate text-sm">{{ entry.label }}</span>
-                    @if (closesC2m()) {
+                    @if (selectedForms().length > 1) {
                       <p-button
                         [icon]="closingFormId() === entry.value ? 'pi pi-flag-fill' : 'pi pi-flag'"
                         [severity]="closingFormId() === entry.value ? 'warn' : 'secondary'"
@@ -158,16 +139,6 @@ const MAX_FORMS = 10;
           </div>
 
           <div class="flex flex-col gap-2">
-            <label for="type-fill-sla" class="text-sm font-medium">{{ t('taskTypes.fillSla') }}</label>
-            <p-inputNumber inputId="type-fill-sla" formControlName="fillSlaHours" [min]="1" [max]="8784" [showButtons]="false" suffix=" h" styleClass="w-full" inputStyleClass="w-full" />
-          </div>
-
-          <div class="flex flex-col gap-2">
-            <label for="type-completion-sla" class="text-sm font-medium">{{ t('taskTypes.completionSla') }}</label>
-            <p-inputNumber inputId="type-completion-sla" formControlName="completionSlaHours" [min]="1" [max]="8784" suffix=" h" styleClass="w-full" inputStyleClass="w-full" />
-          </div>
-
-          <div class="flex flex-col gap-2">
             <label for="type-desc-en" class="text-sm font-medium">{{ t('taskTypes.descriptionEn') }}</label>
             <textarea pTextarea id="type-desc-en" formControlName="descriptionEn" rows="2" class="w-full"></textarea>
           </div>
@@ -175,14 +146,6 @@ const MAX_FORMS = 10;
           <div class="flex flex-col gap-2">
             <label for="type-desc-ar" class="text-sm font-medium">{{ t('taskTypes.descriptionAr') }}</label>
             <textarea pTextarea id="type-desc-ar" formControlName="descriptionAr" rows="2" class="w-full" dir="rtl"></textarea>
-          </div>
-
-          <div class="flex items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 sm:col-span-2">
-            <p-toggleswitch inputId="type-closes-c2m" formControlName="closesC2mActivity" />
-            <div class="flex flex-col gap-1">
-              <label for="type-closes-c2m" class="text-sm font-medium">{{ t('taskTypes.closesC2mActivity') }}</label>
-              <small class="text-surface-500">{{ t('taskTypes.closesC2mActivityHint') }}</small>
-            </div>
           </div>
         </form>
 
@@ -200,7 +163,6 @@ export class TaskTypeDialogComponent {
   readonly saved = output<void>();
 
   private readonly api = inject(TaskTypesService);
-  private readonly lookups = inject(LookupsService);
   private readonly messageService = inject(MessageService);
   private readonly translate = inject(TranslateService);
   private readonly locale = inject(LocaleService);
@@ -209,13 +171,11 @@ export class TaskTypeDialogComponent {
   protected readonly saving = signal(false);
   protected readonly loadingForms = signal(false);
   protected readonly forms = signal<FormOption[]>([]);
-  protected readonly departments = signal<SelectOption[]>([]);
   protected readonly maxForms = MAX_FORMS;
 
   /** The type's forms, in order. Labels are kept with them so a form no longer offered (deprecated since) still reads. */
   protected readonly selectedForms = signal<SelectOption[]>([]);
   protected readonly closingFormId = signal<string | null>(null);
-  protected readonly closesC2m = signal(false);
   protected readonly formsTouched = signal(false);
 
   protected readonly isEdit = computed(() => this.taskType() !== null);
@@ -248,15 +208,7 @@ export class TaskTypeDialogComponent {
     nameAr: this.fb.control('', [Validators.required, Validators.maxLength(250)]),
     descriptionEn: this.fb.control<string>('', Validators.maxLength(1000)),
     descriptionAr: this.fb.control<string>('', Validators.maxLength(1000)),
-    departmentCode: this.fb.control<string | null>(null),
-    fillSlaHours: this.fb.control<number | null>(null),
-    completionSlaHours: this.fb.control<number | null>(null),
-    closesC2mActivity: this.fb.control(false),
   });
-
-  constructor() {
-    this.form.controls.closesC2mActivity.valueChanges.subscribe((value) => this.closesC2m.set(!!value));
-  }
 
   protected addForm(formId: string | null): void {
     const option = this.formOptions().find((o) => o.value === formId);
@@ -297,10 +249,6 @@ export class TaskTypeDialogComponent {
       nameAr: type?.nameAr ?? '',
       descriptionEn: type?.descriptionEn ?? '',
       descriptionAr: type?.descriptionAr ?? '',
-      departmentCode: type?.departmentCode ?? null,
-      fillSlaHours: type?.fillSlaHours ?? null,
-      completionSlaHours: type?.completionSlaHours ?? null,
-      closesC2mActivity: type?.closesC2mActivity ?? false,
     });
 
     const typeForms = [...(type?.forms ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -311,7 +259,6 @@ export class TaskTypeDialogComponent {
       value: f.formDefinitionId,
     })));
     this.closingFormId.set(typeForms.find((f) => f.isC2mClosingForm)?.formDefinitionId ?? null);
-    this.closesC2m.set(type?.closesC2mActivity ?? false);
     this.formsTouched.set(false);
 
     this.loadingForms.set(true);
@@ -319,13 +266,6 @@ export class TaskTypeDialogComponent {
       .formOptions()
       .pipe(finalize(() => this.loadingForms.set(false)))
       .subscribe({ next: (res) => this.forms.set(res.value ?? []), error: () => this.forms.set([]) });
-
-    this.lookups.listAll('Department', { isActive: true }).subscribe({
-      next: (items) =>
-        this.departments.set(
-          items.map((d) => ({ label: `${d.code} — ${this.locale.locale() === 'ar' ? d.nameAr : d.nameEn}`, value: d.code })),
-        ),
-    });
   }
 
   protected save(): void {
@@ -345,10 +285,6 @@ export class TaskTypeDialogComponent {
       descriptionAr: value.descriptionAr?.trim() || null,
       formDefinitionIds: formIds,
       c2mClosingFormId: closing && formIds.includes(closing) ? closing : null,
-      departmentCode: value.departmentCode,
-      fillSlaHours: value.fillSlaHours,
-      completionSlaHours: value.completionSlaHours,
-      closesC2mActivity: !!value.closesC2mActivity,
     };
 
     const current = this.taskType();

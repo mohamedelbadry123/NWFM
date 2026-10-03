@@ -36,9 +36,6 @@
         @if (selectedType(); as type) {
           <small class="text-surface-500">
             {{ t('tasks.create.formsHint', { forms: typeForms(type).join(', ') }) }}
-            @if (type.fillSlaHours) {
-              · {{ t('tasks.create.slaHint', { hours: type.fillSlaHours }) }}
-            }
           </small>
         } @else {
           <small class="text-surface-500">{{ t('tasks.create.publishedOnlyHint') }}</small>

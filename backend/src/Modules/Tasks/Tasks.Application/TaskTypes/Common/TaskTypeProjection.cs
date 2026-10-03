@@ -44,10 +44,6 @@ internal static class TaskTypeProjection
                             f.IsC2mClosingForm);
                     })
                     .ToList(),
-                DepartmentCode = type.DepartmentCode,
-                FillSlaHours = type.FillSlaHours,
-                CompletionSlaHours = type.CompletionSlaHours,
-                ClosesC2mActivity = type.ClosesC2mActivity,
                 IsActive = type.IsActive,
                 CreatedAt = type.CreatedAt,
                 UpdatedAt = type.UpdatedAt,

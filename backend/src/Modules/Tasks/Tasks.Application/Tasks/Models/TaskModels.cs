@@ -159,9 +159,6 @@ public sealed class TaskDetailDto
     public int C2mAttempts { get; init; }
     public DateTime? C2mLastAttemptAt { get; init; }
 
-    /// <summary>Whether the task's type closes C2M field activities — with an FA id, approving it will.</summary>
-    public bool TypeClosesC2mActivity { get; init; }
-
     public IReadOnlyList<TaskAssignmentDto> Assignments { get; init; } = [];
 }
 

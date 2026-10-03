@@ -84,17 +84,16 @@ public sealed class C2mClosureTests : IDisposable
     {
         var options = Options.Create(_options);
         var dispatcher = new C2mDispatcher(_db, _forms.Object, _client.Object, Resolver(), options, _clock, NullLogger<C2mDispatcher>.Instance);
-        return new TaskC2mClosure(_db, dispatcher, options, _clock);
+        return new TaskC2mClosure(dispatcher, options, _clock);
     }
 
     private CompleteTaskCommandHandler Handler() =>
         new(_db, new TaskAccess(_db, _scopes.Object, _user.Object), Closure(), _user.Object, _clock);
 
-    /// <summary>A filled task of a closing type, carrying FA-1001 and WFM ticket 77.</summary>
-    private async Task<Guid> SeedFilledTaskAsync(bool typeCloses = true, string? faId = "FA-1001")
+    /// <summary>A filled task, carrying FA-1001 and WFM ticket 77.</summary>
+    private async Task<Guid> SeedFilledTaskAsync(string? faId = "FA-1001")
     {
         var type = TaskTestData.Type();
-        type.SetClosesC2mActivity(typeCloses, "admin", Now);
 
         var task = TaskTestData.Task(type);
         task.SetFieldActivity(faId, 77, "admin", Now);
@@ -235,12 +234,10 @@ public sealed class C2mClosureTests : IDisposable
         _client.Verify(c => c.CloseFieldActivityAsync(It.IsAny<C2mClosureRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Theory]
-    [InlineData(false, "FA-1001")]
-    [InlineData(true, null)]
-    public async Task Complete_OnlyAClosingTypeWithAnFaIdClosesAnything(bool typeCloses, string? faId)
+    [Fact]
+    public async Task Complete_ATaskWithoutAnFaIdClosesNothing()
     {
-        var id = await SeedFilledTaskAsync(typeCloses, faId);
+        var id = await SeedFilledTaskAsync(faId: null);
 
         await Handler().Handle(new CompleteTaskCommand { TaskId = id }, CancellationToken.None);
 

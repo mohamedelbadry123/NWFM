@@ -8,7 +8,6 @@ internal static class LookupParentValidator
     {
         "Cbu" => db.Clusters.AnyAsync(x => x.Code == parent && x.IsActive, ct),
         "Branch" or "OperationArea" => db.Cbus.AnyAsync(x => x.Code == parent && x.IsActive, ct),
-        "FieldActivityType" => db.Departments.AnyAsync(x => x.Code == parent && x.IsActive, ct),
         _ => Task.FromResult(true)
     };
 }

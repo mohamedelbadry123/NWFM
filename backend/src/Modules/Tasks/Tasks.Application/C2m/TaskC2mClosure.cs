@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Tasks.Application.Common.Interfaces;
 using Tasks.Domain.Constants;
 using Tasks.Domain.Entities;
 
@@ -11,7 +9,6 @@ namespace Tasks.Application.C2m;
 /// approval, a person's retry and the background sender, so the three can never disagree.
 /// </summary>
 public sealed class TaskC2mClosure(
-    ITasksDbContext db,
     IC2mDispatcher dispatcher,
     IOptions<C2mOptions> options,
     TimeProvider clock)
@@ -19,12 +16,12 @@ public sealed class TaskC2mClosure(
     public C2mOptions Options => options.Value;
 
     /// <summary>
-    /// Whether approving the task has to close an activity in C2M: it names one (an FA id), and its
-    /// type's form is the closing form. Work raised in NWFM for its own sake closes nothing upstream.
+    /// Whether approving the task has to close an activity in C2M: it names one (an FA id), whose
+    /// closing form's answers decide the outcome. Work raised in NWFM for its own sake carries no FA id
+    /// and closes nothing upstream.
     /// </summary>
-    public async Task<bool> AppliesAsync(FieldTask task, CancellationToken ct) =>
-        !string.IsNullOrWhiteSpace(task.FaId)
-        && await db.TaskTypes.AsNoTracking().AnyAsync(t => t.Id == task.TaskTypeId && t.ClosesC2mActivity, ct);
+    public Task<bool> AppliesAsync(FieldTask task, CancellationToken ct) =>
+        Task.FromResult(!string.IsNullOrWhiteSpace(task.FaId));
 
     /// <param name="queueOnTransportFailure">
     /// True on the background path: C2M not answering leaves the closure queued for the next retry,

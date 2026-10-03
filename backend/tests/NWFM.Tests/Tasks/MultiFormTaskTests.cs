@@ -202,7 +202,7 @@ public sealed class MultiFormTaskTests : IDisposable
     [Fact]
     public void C2mClosingForm_IsTheTypesFlaggedForm()
     {
-        var type = TaskType.Create("T", "T", "T", null, null, [FormA, FormB], FormB, null, null, null, "tester", Now);
+        var type = TaskType.Create("T", "T", "T", null, null, [FormA, FormB], FormB, "tester", Now);
         var task = TaskTestData.Task(type);
 
         task.C2mClosingForm!.FormDefinitionId.Should().Be(FormB);
@@ -225,7 +225,7 @@ public sealed class MultiFormTaskTests : IDisposable
         var type = TaskTestData.Type(FormA, FormB);
         var rowA = type.Forms.Single(f => f.FormDefinitionId == FormA).Id;
 
-        type.Update("Survey", "مسح", null, null, [FormC, FormA], null, null, 48, 24, "tester", Now);
+        type.Update("Survey", "مسح", null, null, [FormC, FormA], null, "tester", Now);
 
         type.FormIds.Should().Equal(FormC, FormA);
         type.Forms.Single(f => f.FormDefinitionId == FormA).Id.Should().Be(rowA);
@@ -242,7 +242,7 @@ public sealed class MultiFormTaskTests : IDisposable
     [Theory]
     [MemberData(nameof(BadFormLists))]
     public void TaskType_RefusesABadFormList(Guid[] forms, Guid? closing) =>
-        FluentActions.Invoking(() => TaskType.Create("T", "T", "T", null, null, forms, closing, null, null, null, "tester", Now))
+        FluentActions.Invoking(() => TaskType.Create("T", "T", "T", null, null, forms, closing, "tester", Now))
             .Should().Throw<DomainException>();
 
     // --- Through the handlers ---------------------------------------------------------------------

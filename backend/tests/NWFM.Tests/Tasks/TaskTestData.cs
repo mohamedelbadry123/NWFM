@@ -24,7 +24,7 @@ internal static class TaskTestData
     /// <summary>A type filled with <see cref="FormId"/>, or with the forms given, in order.</summary>
     public static TaskType Type(params Guid[] formIds) =>
         TaskType.Create(
-            "SURVEY", "Survey", "مسح", null, null, formIds.Length == 0 ? [FormId] : formIds, null, null, 48, 24, "tester", Now);
+            "SURVEY", "Survey", "مسح", null, null, formIds.Length == 0 ? [FormId] : formIds, null, "tester", Now);
 
     /// <summary>A task in Riyadh city, branch R-16, department 10, pinning each of its type's forms at version 1.</summary>
     public static FieldTask Task(TaskType type, string number = "TSK-1", string branch = "R-16", string? department = "10") =>
@@ -39,8 +39,8 @@ internal static class TaskTestData
                     .ToList(),
                 Title = "Meter survey",
                 Location = new TaskLocation(24.66, 46.71, "Al Moraba", "RCBU", branch, null, department),
-                FillSlaHours = type.FillSlaHours,
-                CompletionSlaHours = type.CompletionSlaHours,
+                FillSlaHours = 48,
+                CompletionSlaHours = 24,
                 CreatedBy = "tester",
             },
             Now);

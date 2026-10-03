@@ -26,7 +26,7 @@ public sealed class FormDetailsCommandTests : IDisposable
         _user.SetupGet(u => u.Id).Returns("user-1");
 
         _directory
-            .Setup(d => d.IsFieldActivityInDepartmentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(d => d.IsValidFieldActivityAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string dept, string code, CancellationToken _) => dept == "D-1" && code == "FA-1");
     }
 
@@ -88,7 +88,7 @@ public sealed class FormDetailsCommandTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value.NameEn.Should().Be("Renamed");
         _directory.Verify(
-            d => d.IsFieldActivityInDepartmentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            d => d.IsValidFieldActivityAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

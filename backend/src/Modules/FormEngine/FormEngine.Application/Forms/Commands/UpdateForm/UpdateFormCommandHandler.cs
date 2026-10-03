@@ -40,7 +40,7 @@ public sealed class UpdateFormCommandHandler(
         var changed = !string.Equals(form.DepartmentCode, department, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(form.FieldActivityCode, activity, StringComparison.OrdinalIgnoreCase);
 
-        if (changed && !await directory.IsFieldActivityInDepartmentAsync(department, activity, ct))
+        if (changed && !await directory.IsValidFieldActivityAsync(department, activity, ct))
         {
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.InvalidFieldActivity(department, activity));
         }

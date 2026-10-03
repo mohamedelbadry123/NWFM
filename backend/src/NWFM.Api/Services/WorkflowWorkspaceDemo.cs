@@ -42,19 +42,24 @@ public static class WorkflowWorkspaceDemo
             department = Department.Create("DEMO-WATER", "Water Network", "شبكة المياه");
             auth.Departments.Add(department); await auth.SaveChangesAsync();
         }
+        const string demoSource = "NWFM";
+        if (!await auth.ActivitySources.AnyAsync(s => s.Code == demoSource))
+        {
+            auth.ActivitySources.Add(ActivitySource.Create(demoSource, "NWFM", "NWFM", ActivitySourceKinds.Internal, null));
+            await auth.SaveChangesAsync();
+        }
         foreach (var (code, name) in new[] { ("ISOLATION", "Isolation"), ("DEMO-REVIEW", "Demo — Request review"), ("DEMO-CLOSURE", "Demo — Closure"), ("DEMO-OVERDUE", "Demo — Short SLA test") })
-            if (!await auth.FieldActivityTypes.AnyAsync(f => f.DepartmentCode == department.Code && f.Code == code))
-                auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, code == "ISOLATION" ? "عزل" : "تجريبي — " + name, department.Code));
+            if (!await auth.FieldActivityTypes.AnyAsync(f => f.Code == code))
+                auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, code == "ISOLATION" ? "عزل" : "تجريبي — " + name, [demoSource]));
         await auth.SaveChangesAsync();
         var demoFieldTypes = new[] {
             ("11", "DEMO-BLOCKAGE", "Demo — Blockage Inspection", "تجريبي — فحص الانسداد"),
             ("11", "DEMO-SEWER", "Demo — Sewer Cleaning", "تجريبي — تنظيف الصرف"),
             ("50", "DEMO-SURVEY", "Demo — Site Survey", "تجريبي — المسح الميداني"),
             ("50", "DEMO-CONNECTION", "Demo — Connection Installation", "تجريبي — تركيب التوصيلة") };
-        foreach (var (departmentCode, code, name, nameAr) in demoFieldTypes)
-            if (await auth.Departments.AnyAsync(d => d.Code == departmentCode && d.IsActive)
-                && !await auth.FieldActivityTypes.AnyAsync(f => f.Code == code && f.DepartmentCode == departmentCode))
-                auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, nameAr, departmentCode));
+        foreach (var (_, code, name, nameAr) in demoFieldTypes)
+            if (!await auth.FieldActivityTypes.AnyAsync(f => f.Code == code))
+                auth.FieldActivityTypes.Add(FieldActivityType.Create(code, name, nameAr, [demoSource]));
         await auth.SaveChangesAsync();
         var calendar = await db.BusinessCalendars.FirstOrDefaultAsync(c => c.Code == "DEMO-WORKSPACE-CALENDAR");
         if (calendar is null)
@@ -68,7 +73,8 @@ public static class WorkflowWorkspaceDemo
             .Concat(demoFieldTypes.Select(f => (f.Item1, f.Item2)));
         foreach (var (departmentCode, fieldCode) in seededTypes)
         {
-            if (!await auth.FieldActivityTypes.AnyAsync(f => f.Code == fieldCode && f.DepartmentCode == departmentCode)) continue;
+            if (!await auth.Departments.AnyAsync(d => d.Code == departmentCode && d.IsActive)
+                || !await auth.FieldActivityTypes.AnyAsync(f => f.Code == fieldCode)) continue;
             var code = "DEMO-SLA-" + departmentCode + "-" + fieldCode;
             if (await db.SlaPolicies.AnyAsync(p => p.PolicyCode == code || p.OrganizationId == tenant && p.IsActive && p.DepartmentCode == departmentCode && p.FieldActivityCode == fieldCode)) continue;
             var policy = SlaPolicy.Create(code, "Demo — " + fieldCode, fieldCode == "DEMO-OVERDUE" ? 1 : 24, fieldCode == "DEMO-OVERDUE" ? SlaDurationUnit.Minutes : SlaDurationUnit.Hours, calendar.Id, now, tenant,

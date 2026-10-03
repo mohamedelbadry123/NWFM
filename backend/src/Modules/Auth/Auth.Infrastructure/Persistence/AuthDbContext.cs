@@ -23,6 +23,8 @@ public class AuthDbContext : IdentityDbContext<ApplicationUser, ApplicationRole,
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<FieldActivityType> FieldActivityTypes => Set<FieldActivityType>();
+    public DbSet<FieldActivityTypeSource> FieldActivityTypeSources => Set<FieldActivityTypeSource>();
+    public DbSet<ActivitySource> ActivitySources => Set<ActivitySource>();
     public DbSet<Cluster> Clusters => Set<Cluster>();
     public DbSet<Cbu> Cbus => Set<Cbu>();
     public DbSet<Branch> Branches => Set<Branch>();

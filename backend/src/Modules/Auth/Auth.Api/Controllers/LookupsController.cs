@@ -32,6 +32,21 @@ public sealed class LookupsController(ISender sender) : ControllerBase
     [Authorize(Policy = NwfmPolicies.ManageLookups)]
     public Task<IActionResult> SetFieldActivityTypeStatus(Guid id, SetLookupStatusRequest request, CancellationToken ct) => SetStatus("FieldActivityType", id, request, ct);
 
+    [HttpGet("activity-sources")]
+    public Task<IActionResult> GetActivitySources([FromQuery] LookupListQuery query, CancellationToken ct) => Get("ActivitySource", query, ct);
+
+    [HttpPost("activity-sources")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> CreateActivitySource(CreateLookupRequest request, CancellationToken ct) => Create("ActivitySource", request, ct);
+
+    [HttpPut("activity-sources/{id:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> UpdateActivitySource(Guid id, UpdateLookupRequest request, CancellationToken ct) => Update("ActivitySource", id, request, ct);
+
+    [HttpPut("activity-sources/{id:guid}/status")]
+    [Authorize(Policy = NwfmPolicies.ManageLookups)]
+    public Task<IActionResult> SetActivitySourceStatus(Guid id, SetLookupStatusRequest request, CancellationToken ct) => SetStatus("ActivitySource", id, request, ct);
+
     [HttpGet("departments")]
     public Task<IActionResult> GetDepartments([FromQuery] LookupListQuery query, CancellationToken ct) =>
         Get("Department", query, ct);
@@ -149,7 +164,10 @@ public sealed class LookupsController(ISender sender) : ControllerBase
             Code = request.Code,
             NameEn = request.NameEn,
             NameAr = request.NameAr,
-            ParentCode = request.ParentCode
+            ParentCode = request.ParentCode,
+            Kind = request.Kind,
+            Url = request.Url,
+            SourceCodes = request.SourceCodes
         }, ct);
         return result.IsSuccess ? StatusCode(StatusCodes.Status201Created, result) : BadRequest(result);
     }
@@ -162,7 +180,10 @@ public sealed class LookupsController(ISender sender) : ControllerBase
             Id = id,
             NameEn = request.NameEn,
             NameAr = request.NameAr,
-            ParentCode = request.ParentCode
+            ParentCode = request.ParentCode,
+            Kind = request.Kind,
+            Url = request.Url,
+            SourceCodes = request.SourceCodes
         }, ct);
         return result.IsSuccess ? Ok(result) : BadRequest(result);
     }

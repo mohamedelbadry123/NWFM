@@ -12,10 +12,6 @@ public sealed class TaskTypeDto
     /// <summary>The forms its tasks are filled with, in order.</summary>
     public IReadOnlyList<TaskTypeFormDto> Forms { get; init; } = [];
 
-    public string? DepartmentCode { get; init; }
-    public int? FillSlaHours { get; init; }
-    public int? CompletionSlaHours { get; init; }
-    public bool ClosesC2mActivity { get; init; }
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }

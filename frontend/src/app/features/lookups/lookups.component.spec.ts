@@ -71,14 +71,20 @@ describe('LookupsComponent tabs', () => {
     expect(create({ roles: [ADMINISTRATOR_ROLE], tab: 'c2m-actions' }).activeKey()).toBe('c2m-actions');
   });
 
-  it('keeps workflow field activity types available with their department parent', () => {
+  it('keeps activity types available with no department parent', () => {
     const page = create({ permissions: [PERMISSIONS.manageLookups], tab: 'field-activity-types' });
 
     expect(page.activeKey()).toBe('field-activity-types');
-    expect(page.currentTab()).toEqual(jasmine.objectContaining({
-      type: 'FieldActivityType', parentType: 'Department',
-    }));
+    expect(page.currentTab().type).toBe('FieldActivityType');
+    expect(page.currentTab().parentType).toBeUndefined();
     expect(page.visibleTabs().map((tab) => tab.key)).not.toContain('task-types');
+  });
+
+  it('lists activity sources as a lookup of their own', () => {
+    const page = create({ permissions: [PERMISSIONS.manageLookups], tab: 'activity-sources' });
+
+    expect(page.activeKey()).toBe('activity-sources');
+    expect(page.currentTab().type).toBe('ActivitySource');
   });
 
   it('falls back to the first tab it may show when the asked-for one is not allowed', () => {
