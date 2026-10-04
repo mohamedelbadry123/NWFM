@@ -40,9 +40,10 @@ internal static class WorkflowScopeFilter
     }
 
     /// <summary>
-    /// The same rule for an instance already loaded. With <paramref name="departmentCode"/> — the
-    /// department of the activity being worked — the coverage must reach both in one department group.
+    /// The same rule for an instance already loaded. With <paramref name="departmentCode"/> and
+    /// <paramref name="activityTypeCode"/> — those of the activity being worked — the coverage must reach
+    /// the place and both kinds of work in one group.
     /// </summary>
-    public static bool Allows(WorkflowInstance instance, OrgScopeSet scope, string? departmentCode = null) =>
-        instance.Location.IsCoveredBy(scope, departmentCode);
+    public static bool Allows(WorkflowInstance instance, OrgScopeSet scope, string? departmentCode = null, string? activityTypeCode = null) =>
+        instance.Location.IsCoveredBy(scope, departmentCode, activityTypeCode);
 }

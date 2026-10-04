@@ -2124,14 +2124,17 @@
     "operationArea": "Operation area",
     "selectOperationArea": "Select operation area",
     "addScope": "Add scope",
-    "addScopeHint": "Pick a place, a department, or both — then add. A broader level covers everything beneath it.",
+    "addScopeHint": "Pick a place, departments, activity types, or a mix — then add. A broader level covers everything beneath it; leaving a list empty covers all of it.",
     "noScopes": "No coverage assigned — this account sees everything.",
     "scope": "Organization scope",
     "department": "Department",
     "allDepartments": "All departments",
     "everywhere": "All territories",
     "filterByOrg": "Filter by organization",
-    "filterHint": "Narrow the list to a cluster, CBU, branch or operation area. Your own territory still applies."
+    "filterHint": "Narrow the list to a cluster, CBU, branch or operation area. Your own territory still applies.",
+    "departments": "Departments",
+    "activityTypes": "Activity types",
+    "allActivityTypes": "All activity types"
   },
   "admin": {
     "rolePermissions": {

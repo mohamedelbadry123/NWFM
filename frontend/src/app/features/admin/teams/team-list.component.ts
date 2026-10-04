@@ -260,8 +260,12 @@ export class TeamListComponent implements OnInit {
       parts.push(this.translate.instant('org.everywhere'));
     }
 
-    if (scope.departmentId) {
-      parts.push(this.orgNames.label('Department', scope.departmentId));
+    for (const department of scope.departmentCodes ?? []) {
+      parts.push(this.orgNames.label('Department', department));
+    }
+
+    if (scope.activityTypeCodes?.length) {
+      parts.push(scope.activityTypeCodes.join(', '));
     }
 
     return parts.join(' · ');

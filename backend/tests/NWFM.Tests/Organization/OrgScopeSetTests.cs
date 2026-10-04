@@ -113,4 +113,47 @@ public sealed class OrgScopeSetTests
         territory.BranchCodes.Should().BeEquivalentTo(["BR1", "BR2"]);
         territory.OperationAreaCodes.Should().BeEquivalentTo(["OA1"]);
     }
+
+    [Fact]
+    public void Covers_ARowNamingSeveralDepartmentsReachesEachOfThem_InItsTerritoryOnly()
+    {
+        var scope = Scope(new OrgScopeRow(OrgLevels.Cbu, "CB1", ["5", "8"], []));
+
+        scope.Covers("CB1", null, null, "5").Should().BeTrue();
+        scope.Covers("CB1", null, null, "8").Should().BeTrue();
+        scope.Covers("CB1", null, null, "10").Should().BeFalse();
+        scope.Covers("CB3", null, null, "5").Should().BeFalse();
+        scope.ToTerritories().Select(t => t.DepartmentCode).Should().BeEquivalentTo(["5", "8"]);
+    }
+
+    [Fact]
+    public void Covers_ActivityTypesNarrowARow_AndWorkWithNoTypeIsStillTaken()
+    {
+        var scope = Scope(new OrgScopeRow(OrgLevels.Cbu, "CB1", ["10"], ["LEAK_REPAIR"]));
+
+        scope.Covers("CB1", null, null, "10", "LEAK_REPAIR").Should().BeTrue();
+        scope.Covers("CB1", null, null, "10", "ISOLATION").Should().BeFalse();
+        scope.Covers("CB1", null, null, "10").Should().BeTrue();
+        scope.ToTerritories().Single().ActivityTypeCodes.Should().BeEquivalentTo(["LEAK_REPAIR"]);
+    }
+
+    [Fact]
+    public void Covers_AnActivityTypeOnlyRowReachesThatTypeEverywhere_InEveryDepartment()
+    {
+        var scope = Scope(new OrgScopeRow(null, null, [], ["ISOLATION"]));
+
+        scope.Covers("CB3", "BR4", null, "11", "ISOLATION").Should().BeTrue();
+        scope.Covers("CB3", "BR4", null, "11", "LEAK_REPAIR").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Overlaps_OnlyWhenTheActivityTypesMeet()
+    {
+        var leaks = Scope(new OrgScopeRow(OrgLevels.Cluster, "C1", [], ["LEAK_REPAIR"]));
+        var isolation = Scope(new OrgScopeRow(OrgLevels.Branch, "BR1", [], ["ISOLATION"]));
+        var anyType = Scope(new OrgScopeRow(OrgLevels.Branch, "BR1", null));
+
+        leaks.Overlaps(isolation).Should().BeFalse();
+        leaks.Overlaps(anyType).Should().BeTrue();
+    }
 }

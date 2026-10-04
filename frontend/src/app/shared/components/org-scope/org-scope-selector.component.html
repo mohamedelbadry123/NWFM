@@ -83,23 +83,46 @@
   </div>
 
   @if (mode() === 'multi') {
-    <div class="flex flex-col gap-1 md:max-w-[calc(50%-0.375rem)]">
-      <label class="text-sm font-medium">{{ 'org.department' | translate }}</label>
-      <p-select
-        [options]="departments()"
-        [ngModel]="departmentId()"
-        (ngModelChange)="departmentId.set($event)"
-        optionLabel="label"
-        optionValue="value"
-        [placeholder]="'org.allDepartments' | translate"
-        [showClear]="true"
-        [filter]="true"
-        filterBy="label"
-        [loading]="loadingDepartments()"
-        [disabled]="disabled()"
-        appendTo="body"
-        styleClass="w-full"
-      />
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'org.departments' | translate }}</label>
+        <p-multiselect
+          [options]="departments()"
+          [ngModel]="departmentCodes()"
+          (ngModelChange)="departmentCodes.set($event ?? [])"
+          optionLabel="label"
+          optionValue="value"
+          display="chip"
+          [placeholder]="'org.allDepartments' | translate"
+          [showClear]="true"
+          [filter]="true"
+          filterBy="label"
+          [loading]="loadingDepartments()"
+          [disabled]="disabled()"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label class="text-sm font-medium">{{ 'org.activityTypes' | translate }}</label>
+        <p-multiselect
+          [options]="activityTypes()"
+          [ngModel]="activityTypeCodes()"
+          (ngModelChange)="activityTypeCodes.set($event ?? [])"
+          optionLabel="label"
+          optionValue="value"
+          display="chip"
+          [placeholder]="'org.allActivityTypes' | translate"
+          [showClear]="true"
+          [filter]="true"
+          filterBy="label"
+          [loading]="loadingActivityTypes()"
+          [disabled]="disabled()"
+          appendTo="body"
+          styleClass="w-full"
+        />
+      </div>
     </div>
 
     <div class="flex items-center gap-2">

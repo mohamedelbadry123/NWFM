@@ -54,9 +54,13 @@ export function isEmptyLocation(location: OrgLocation | null | undefined): boole
   return !location?.clusterCode && !location?.cbuCode && !location?.branchCode && !location?.operationAreaCode;
 }
 
-/** One coverage row: a territory, a department code, or both. */
+/**
+ * One coverage row: a territory (or everywhere), narrowed to some departments and activity types.
+ * An empty list covers all of them.
+ */
 export interface OrgScopeAssignment {
   level?: string | null;
   code?: string | null;
-  departmentId?: string | null;
+  departmentCodes?: string[] | null;
+  activityTypeCodes?: string[] | null;
 }

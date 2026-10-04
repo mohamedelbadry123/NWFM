@@ -166,11 +166,11 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 foreach (var item in items)
                 {
                     var member = await groups.IsMemberAsync(instance.OrganizationId, item.AssignmentGroupId, effective, ct);
-                    var covered = WorkflowScopeFilter.Allows(instance, scope, config.DepartmentCode);
+                    var covered = WorkflowScopeFilter.Allows(instance, scope, config.DepartmentCode, config.FieldActivityCode);
                     var canAct = running && member && covered && (item.Status == WorkItemStatus.Pending || item.Status == WorkItemStatus.Claimed && item.ClaimedByUserId == effective);
                     var completionBlocked = await db.IntegrationJobs.AnyAsync(j => j.ActivityInstanceId == activity.Id && j.IsActivityEvent && j.Required && j.Status != "Completed", ct);
                     tasks.Add(new(await assembler.ToDtoAsync(item, true, ct), canAct, canAct ? null : !running ? "Workflow or parent is paused or finished." : !member ? "Assigned to another group."
-                        : !covered ? "This activity's department is outside your organization coverage." : "Task is completed or claimed by another user.", completionBlocked));
+                        : !covered ? "This activity's department or activity type is outside your organization coverage." : "Task is completed or claimed by another user.", completionBlocked));
                 }
                 activityDtos.Add(new(activity.Id, activity.ActivityNodeKey, activity.Name, activity.ActivityType.ToString(), activity.Status.ToString(), activity.Phase,
                     activity.StartedAt, activity.CompletedAt, activity.DueAt, config.DepartmentCode, config.FieldActivityCode, tasks,
@@ -227,8 +227,9 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             var execution = await db.ActivityInstances.FindAsync([item.ActivityInstanceId], ct);
             var version = await versions.GetByIdWithProjectionAsync(instance.PinnedWorkflowVersionId, ct);
             var definition = version!.Activities.First(a => a.NodeKey == execution!.ActivityNodeKey);
-            if (!WorkflowScopeFilter.Allows(instance, scope, IntegrationJson.Read<BusinessActivityConfiguration>(definition.ConfigurationJson).DepartmentCode))
-                return Result.Failure(Invalid("This activity's department is outside your organization coverage."));
+            var activityConfig = IntegrationJson.Read<BusinessActivityConfiguration>(definition.ConfigurationJson);
+            if (!WorkflowScopeFilter.Allows(instance, scope, activityConfig.DepartmentCode, activityConfig.FieldActivityCode))
+                return Result.Failure(Invalid("This activity's department or activity type is outside your organization coverage."));
             if (definition.ActivityType == ActivityType.MainActivity && execution!.Phase != "AwaitingApproval") return Result.Failure(Invalid("Complete the child workflow before acting on its parent."));
             if (input.Comment?.Length > 4000) return Result.Failure(Invalid("Comments cannot exceed 4000 characters."));
             if ((input.Action.Equals("comment", StringComparison.OrdinalIgnoreCase) || input.Action.Equals("reject", StringComparison.OrdinalIgnoreCase)) && string.IsNullOrWhiteSpace(input.Comment)) return Result.Failure(Invalid("A comment is required."));

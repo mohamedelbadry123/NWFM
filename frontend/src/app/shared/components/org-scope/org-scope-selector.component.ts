@@ -6,6 +6,7 @@ import { finalize, firstValueFrom } from 'rxjs';
 
 import { ButtonModule } from 'primeng/button';
 import { Chip } from 'primeng/chip';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 
 import { LookupsService } from '../../../core/lookups/lookups.service';
@@ -34,7 +35,7 @@ interface SelectOption {
 @Component({
   selector: 'app-org-scope-selector',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, Chip, SelectModule],
+  imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, Chip, MultiSelectModule, SelectModule],
   templateUrl: './org-scope-selector.component.html',
 })
 export class OrgScopeSelectorComponent {
@@ -56,24 +57,28 @@ export class OrgScopeSelectorComponent {
   protected readonly cbuCode = signal<string | null>(null);
   protected readonly branchCode = signal<string | null>(null);
   protected readonly operationAreaCode = signal<string | null>(null);
-  protected readonly departmentId = signal<string | null>(null);
+  protected readonly departmentCodes = signal<string[]>([]);
+  protected readonly activityTypeCodes = signal<string[]>([]);
 
   protected readonly clusters = signal<SelectOption[]>([]);
   protected readonly cbus = signal<SelectOption[]>([]);
   protected readonly branches = signal<SelectOption[]>([]);
   protected readonly operationAreas = signal<SelectOption[]>([]);
   protected readonly departments = signal<SelectOption[]>([]);
+  protected readonly activityTypes = signal<SelectOption[]>([]);
 
   protected readonly loadingClusters = signal(false);
   protected readonly loadingCbus = signal(false);
   protected readonly loadingBranches = signal(false);
   protected readonly loadingOperationAreas = signal(false);
   protected readonly loadingDepartments = signal(false);
+  protected readonly loadingActivityTypes = signal(false);
 
   protected readonly scopes = signal<OrgScopeAssignment[]>([]);
 
   private readonly scopeLabels = signal<Map<string, string>>(new Map());
   private readonly departmentLabels = signal<Map<string, string>>(new Map());
+  private readonly activityTypeLabels = signal<Map<string, string>>(new Map());
 
   protected readonly selectedLevel = computed<OrgScopeLevel | null>(() => {
     if (this.operationAreaCode()) return ORG_SCOPE_LEVELS.operationArea;
@@ -90,25 +95,25 @@ export class OrgScopeSelectorComponent {
   protected readonly canAdd = computed(() => {
     const level = this.selectedLevel();
     const code = this.selectedCode();
-    const department = this.departmentId();
+    const departments = this.departmentCodes();
+    const activityTypes = this.activityTypeCodes();
 
     if (this.disabled()) {
       return false;
     }
 
-    if ((!level || !code) && department === null) {
+    if ((!level || !code) && departments.length === 0 && activityTypes.length === 0) {
       return false;
     }
 
-    return !this.scopes().some(scope =>
-      (scope.level ?? null) === (level ?? null)
-      && (scope.code ?? null) === (code ?? null)
-      && (scope.departmentId ?? null) === department);
+    const candidate: OrgScopeAssignment = { level, code, departmentCodes: departments, activityTypeCodes: activityTypes };
+    return !this.scopes().some(scope => this.isSameScope(scope, candidate));
   });
 
   constructor() {
     this.loadClusters();
     this.loadDepartments();
+    this.loadActivityTypes();
 
     effect(() => {
       const location = this.initialLocation();
@@ -124,7 +129,8 @@ export class OrgScopeSelectorComponent {
           initial.map(scope => ({
             level: scope.level,
             code: scope.code,
-            departmentId: scope.departmentId,
+            departmentCodes: [...(scope.departmentCodes ?? [])],
+            activityTypeCodes: [...(scope.activityTypeCodes ?? [])],
           })),
         );
         if (initial.length > 0) {
@@ -171,11 +177,12 @@ export class OrgScopeSelectorComponent {
 
     const level = this.selectedLevel();
     const code = this.selectedCode();
-    const department = this.departmentId();
+    const departments = [...this.departmentCodes()];
+    const activityTypes = [...this.activityTypeCodes()];
     const hasTerritory = !!level && !!code;
 
     const covered = hasTerritory
-      ? this.scopes().filter(scope => !this.isCoveredBy(scope, level!, code!, department))
+      ? this.scopes().filter(scope => !this.isCoveredBy(scope, level!, code!, departments, activityTypes))
       : this.scopes();
 
     this.scopes.set([
@@ -183,7 +190,8 @@ export class OrgScopeSelectorComponent {
       {
         level: hasTerritory ? level! : undefined,
         code: hasTerritory ? code! : undefined,
-        departmentId: department ?? undefined,
+        departmentCodes: departments,
+        activityTypeCodes: activityTypes,
       },
     ]);
 
@@ -213,17 +221,25 @@ export class OrgScopeSelectorComponent {
       parts.push(this.translate.instant('org.everywhere'));
     }
 
+    const departments = scope.departmentCodes ?? [];
     parts.push(
-      scope.departmentId == null
+      departments.length === 0
         ? this.translate.instant('org.allDepartments')
-        : (this.departmentLabels().get(scope.departmentId) ?? `#${scope.departmentId}`),
+        : departments.map(code => this.departmentLabels().get(code) ?? `#${code}`).join(', '),
+    );
+
+    const activityTypes = scope.activityTypeCodes ?? [];
+    parts.push(
+      activityTypes.length === 0
+        ? this.translate.instant('org.allActivityTypes')
+        : activityTypes.map(code => this.activityTypeLabels().get(code) ?? code).join(', '),
     );
 
     return parts.join(' · ');
   }
 
   protected scopeKey(scope: OrgScopeAssignment): string {
-    return `${scope.level ?? ''}|${scope.code ?? ''}|${scope.departmentId ?? ''}`;
+    return `${scope.level ?? ''}|${scope.code ?? ''}|${this.listKey(scope.departmentCodes)}|${this.listKey(scope.activityTypeCodes)}`;
   }
 
   reset(): void {
@@ -234,7 +250,13 @@ export class OrgScopeSelectorComponent {
   private isSameScope(left: OrgScopeAssignment, right: OrgScopeAssignment): boolean {
     return (left.level ?? null) === (right.level ?? null)
       && (left.code ?? null) === (right.code ?? null)
-      && (left.departmentId ?? null) === (right.departmentId ?? null);
+      && this.listKey(left.departmentCodes) === this.listKey(right.departmentCodes)
+      && this.listKey(left.activityTypeCodes) === this.listKey(right.activityTypeCodes);
+  }
+
+  /** A list's identity regardless of order: rows naming the same codes are the same row. */
+  private listKey(codes: readonly string[] | null | undefined): string {
+    return [...(codes ?? [])].map(code => code.toUpperCase()).sort().join(',');
   }
 
   private resetSelection(): void {
@@ -242,7 +264,8 @@ export class OrgScopeSelectorComponent {
     this.cbuCode.set(null);
     this.branchCode.set(null);
     this.operationAreaCode.set(null);
-    this.departmentId.set(null);
+    this.departmentCodes.set([]);
+    this.activityTypeCodes.set([]);
     this.cbus.set([]);
     this.branches.set([]);
     this.operationAreas.set([]);
@@ -342,7 +365,7 @@ export class OrgScopeSelectorComponent {
       .pipe(finalize(() => this.loadingDepartments.set(false)))
       .subscribe({
         next: items => {
-          this.departments.set(this.toDepartmentOptions(items));
+          this.departments.set(this.toNameOptions(items));
           const labels = new Map(untracked(this.departmentLabels));
           for (const item of items) {
             labels.set(item.code, this.localizedName(item.nameEn, item.nameAr) || item.code);
@@ -350,6 +373,23 @@ export class OrgScopeSelectorComponent {
           this.departmentLabels.set(labels);
         },
         error: () => this.departments.set([]),
+      });
+  }
+
+  private loadActivityTypes(): void {
+    this.loadingActivityTypes.set(true);
+    this.lookups.listAll('FieldActivityType', { isActive: true })
+      .pipe(finalize(() => this.loadingActivityTypes.set(false)))
+      .subscribe({
+        next: items => {
+          this.activityTypes.set(this.toNameOptions(items));
+          const labels = new Map(untracked(this.activityTypeLabels));
+          for (const item of items) {
+            labels.set(item.code, this.localizedName(item.nameEn, item.nameAr) || item.code);
+          }
+          this.activityTypeLabels.set(labels);
+        },
+        error: () => this.activityTypes.set([]),
       });
   }
 
@@ -389,9 +429,11 @@ export class OrgScopeSelectorComponent {
     scope: OrgScopeAssignment,
     level: OrgScopeLevel,
     code: string,
-    departmentId: string | null,
+    departmentCodes: readonly string[],
+    activityTypeCodes: readonly string[],
   ): boolean {
-    if ((scope.departmentId ?? null) !== departmentId) {
+    if (this.listKey(scope.departmentCodes) !== this.listKey(departmentCodes)
+      || this.listKey(scope.activityTypeCodes) !== this.listKey(activityTypeCodes)) {
       return false;
     }
     if (!scope.level || !scope.code) {
@@ -422,7 +464,7 @@ export class OrgScopeSelectorComponent {
     }));
   }
 
-  private toDepartmentOptions(items: { code: string; nameEn: string; nameAr: string }[]): SelectOption[] {
+  private toNameOptions(items: { code: string; nameEn: string; nameAr: string }[]): SelectOption[] {
     return items.map(item => ({
       label: this.localizedName(item.nameEn, item.nameAr) || item.code,
       value: item.code,

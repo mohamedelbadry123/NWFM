@@ -94,7 +94,14 @@ internal sealed class OrgScopeProvider(
         var rows = await db.OrgScopes
             .AsNoTracking()
             .Where(s => s.OwnerType == OrgScopeOwnerTypes.Team && s.IsActive)
-            .Select(s => new { s.OwnerId, s.Level, s.Code, s.DepartmentId })
+            .Select(s => new
+            {
+                s.OwnerId,
+                s.Level,
+                s.Code,
+                DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
+                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+            })
             .ToListAsync(cancellationToken);
 
         var byOwner = rows.ToLookup(r => r.OwnerId, StringComparer.OrdinalIgnoreCase);
@@ -115,7 +122,7 @@ internal sealed class OrgScopeProvider(
 
             coverage.Add(new OrgTeamCoverage(
                 team,
-                OrgScopeSet.FromRows(teamRows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentId)), hierarchy)));
+                OrgScopeSet.FromRows(teamRows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.ActivityTypeCodes)), hierarchy)));
         }
 
         return coverage;
@@ -219,7 +226,13 @@ internal sealed class OrgScopeProvider(
         var rows = await db.OrgScopes
             .AsNoTracking()
             .Where(s => s.OwnerType == ownerType && s.OwnerId == ownerId && s.IsActive)
-            .Select(s => new OrgScopeRow(s.Level, s.Code, s.DepartmentId))
+            .Select(s => new
+            {
+                s.Level,
+                s.Code,
+                DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
+                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+            })
             .ToListAsync(cancellationToken);
 
         if (rows.Count == 0)
@@ -228,7 +241,8 @@ internal sealed class OrgScopeProvider(
         }
 
         var hierarchy = await GetHierarchyValueAsync(cancellationToken);
-        return OrgScopeSet.FromRows(rows, hierarchy);
+        return OrgScopeSet.FromRows(
+            rows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.ActivityTypeCodes)), hierarchy);
     }
 
     private async ValueTask<OrgHierarchy> LoadHierarchyAsync(CancellationToken cancellationToken)

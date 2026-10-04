@@ -33,7 +33,8 @@ internal sealed class GetCurrentUserProfileQueryHandler(
                 ScopeId = s.Id,
                 Level = s.Level,
                 Code = s.Code,
-                DepartmentId = s.DepartmentId
+                DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
+                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
             })
             .AsNoTracking()
             .ToListAsync(cancellationToken);

@@ -137,7 +137,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
 
         var otherDepartment = await Workspace(CoverageOf(new OrgScopeRow(OrgLevels.Cbu, "R1", "10")))
             .ActAsync(task.Id, new(Guid.NewGuid(), "APPROVE"), Guid.NewGuid(), false, default);
-        otherDepartment.Error.Message.Should().Contain("department is outside your organization coverage");
+        otherDepartment.Error.Message.Should().Contain("department or activity type is outside your organization coverage");
     }
 
     [Fact]

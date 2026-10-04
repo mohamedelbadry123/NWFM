@@ -1,30 +1,44 @@
 namespace NWFM.Shared.Organization;
 
 /// <summary>
-/// One row of an owner's coverage — a place, a kind of work, or both. A null <see cref="Level"/> /
-/// <see cref="Code"/> means every territory; a null <see cref="DepartmentCode"/> means every
-/// department.
+/// One row of an owner's coverage — a place, kinds of work, or both. A null <see cref="Level"/> /
+/// <see cref="Code"/> means every territory; no <see cref="DepartmentCodes"/> means every department;
+/// no <see cref="ActivityTypeCodes"/> means every activity type.
 /// </summary>
-public sealed record OrgScopeRow(string? Level, string? Code, string? DepartmentCode);
+public sealed record OrgScopeRow(
+    string? Level,
+    string? Code,
+    IReadOnlyList<string> DepartmentCodes,
+    IReadOnlyList<string> ActivityTypeCodes)
+{
+    /// <summary>A row for one department, or for all of them when null, and every activity type.</summary>
+    public OrgScopeRow(string? level, string? code, string? departmentCode)
+        : this(level, code, string.IsNullOrWhiteSpace(departmentCode) ? [] : [departmentCode], [])
+    {
+    }
+}
 
 /// <summary>
 /// One department's coverage flattened into plain code lists, for a caller that must filter in the
 /// database. <see cref="OrgScopeSet.Covers"/> answers the same question for a row already loaded;
-/// this hands the codes to a query so the rows never have to be.
+/// this hands the codes to a query so the rows never have to be. <see cref="ActivityTypeCodes"/> is
+/// empty when the group takes every activity type.
 /// </summary>
 public sealed record OrgScopeTerritory(
     string? DepartmentCode,
     bool CoversAllTerritory,
     IReadOnlyList<string> CbuCodes,
     IReadOnlyList<string> BranchCodes,
-    IReadOnlyList<string> OperationAreaCodes);
+    IReadOnlyList<string> OperationAreaCodes,
+    IReadOnlyList<string> ActivityTypeCodes);
 
 /// <summary>
-/// The expanded coverage an owner — a user or a team — holds: its scope rows grouped by department,
-/// each group carrying every CBU, branch and operation area code its rows reach.
+/// The expanded coverage an owner — a user or a team — holds: its scope rows grouped by department
+/// (and the activity types the row names), each group carrying every CBU, branch and operation area
+/// code its rows reach. A row naming several departments counts as one row per department.
 ///
-/// Grouped by department rather than flattened because the two axes are not independent: an owner
-/// working water in Riyadh and waste-water in Jeddah must not thereby be given water in Jeddah.
+/// Grouped rather than flattened because the axes are not independent: an owner working water in
+/// Riyadh and waste-water in Jeddah must not thereby be given water in Jeddah.
 ///
 /// An owner with no rows at all is <see cref="IsUnrestricted"/>, not "covers nothing" — coverage can
 /// be rolled out gradually without anyone's worklist going blank the moment it is enforced.
@@ -54,39 +68,56 @@ public sealed class OrgScopeSet
 
         var groups = new Dictionary<string, Group>(StringComparer.OrdinalIgnoreCase);
 
-        // "" stands in for "no department" so one dictionary keys both cases.
         foreach (var row in list)
         {
-            var key = row.DepartmentCode?.Trim() ?? string.Empty;
+            var activityTypes = Clean(row.ActivityTypeCodes);
+            var departments = Clean(row.DepartmentCodes);
 
-            if (!groups.TryGetValue(key, out var group))
+            // A row with no department is one group taking every department.
+            IEnumerable<string?> targets = departments.Count == 0 ? [null] : departments;
+
+            foreach (var department in targets)
             {
-                group = new Group(string.IsNullOrEmpty(key) ? null : key);
-                groups[key] = group;
-            }
+                // "" stands in for "no department", and the activity types join the key, so rows that
+                // cover the same kinds of work share one group and their territories union.
+                var key = (department ?? string.Empty) + "|" + string.Join(",", activityTypes.Order(StringComparer.OrdinalIgnoreCase));
 
-            if (string.IsNullOrWhiteSpace(row.Level) || string.IsNullOrWhiteSpace(row.Code))
-            {
-                // A department-only row: that kind of work, wherever it is.
-                group.CoversAllTerritory = true;
-                continue;
-            }
+                if (!groups.TryGetValue(key, out var group))
+                {
+                    group = new Group(department, activityTypes);
+                    groups[key] = group;
+                }
 
-            Expand(group, row.Level.Trim(), row.Code.Trim(), hierarchy);
+                if (string.IsNullOrWhiteSpace(row.Level) || string.IsNullOrWhiteSpace(row.Code))
+                {
+                    // A row with no territory: those kinds of work, wherever they are.
+                    group.CoversAllTerritory = true;
+                    continue;
+                }
+
+                Expand(group, row.Level.Trim(), row.Code.Trim(), hierarchy);
+            }
         }
 
         return new OrgScopeSet(false, [.. groups.Values]);
     }
 
     /// <summary>
-    /// True when this coverage reaches the given work. Both axes must be satisfied by the <b>same</b>
-    /// group — the reason for grouping by department. On the location axis, reaching the work through
-    /// any one of CBU, branch or operation area is enough, since work need not carry every level.
+    /// True when this coverage reaches the given work. Every axis must be satisfied by the <b>same</b>
+    /// group — the reason for grouping. On the location axis, reaching the work through any one of
+    /// CBU, branch or operation area is enough, since work need not carry every level. Work with no
+    /// activity type (a task, say) is taken by any group, as work with no department is.
     /// </summary>
-    public bool Covers(string? cbuCode, string? branchCode, string? operationAreaCode, string? departmentCode) =>
+    public bool Covers(
+        string? cbuCode,
+        string? branchCode,
+        string? operationAreaCode,
+        string? departmentCode,
+        string? activityTypeCode = null) =>
         IsUnrestricted
         || _groups.Any(group =>
             group.AcceptsDepartment(departmentCode)
+            && group.AcceptsActivityType(activityTypeCode)
             && group.AcceptsLocation(cbuCode, branchCode, operationAreaCode));
 
     /// <summary>True when this coverage and <paramref name="other"/> share any work at all.</summary>
@@ -94,7 +125,9 @@ public sealed class OrgScopeSet
         IsUnrestricted
         || other.IsUnrestricted
         || _groups.Any(group => other._groups.Any(otherGroup =>
-            group.AcceptsDepartment(otherGroup.DepartmentCode) && group.OverlapsLocation(otherGroup)));
+            group.AcceptsDepartment(otherGroup.DepartmentCode)
+            && group.OverlapsActivityTypes(otherGroup)
+            && group.OverlapsLocation(otherGroup)));
 
     /// <summary>
     /// The coverage as one set of code lists per department group — what a query needs to narrow a
@@ -107,7 +140,12 @@ public sealed class OrgScopeSet
             group.CoversAllTerritory,
             [.. group.CbuCodes],
             [.. group.BranchCodes],
-            [.. group.OperationAreaCodes]))];
+            [.. group.OperationAreaCodes],
+            [.. group.ActivityTypeCodes]))];
+
+    private static List<string> Clean(IReadOnlyList<string>? codes) =>
+        (codes ?? []).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     private static void Expand(Group group, string level, string code, OrgHierarchy hierarchy)
     {
@@ -153,9 +191,12 @@ public sealed class OrgScopeSet
         }
     }
 
-    private sealed class Group(string? departmentCode)
+    private sealed class Group(string? departmentCode, IEnumerable<string> activityTypeCodes)
     {
         public string? DepartmentCode { get; } = departmentCode;
+
+        /// <summary>The activity types the group takes; empty for every one.</summary>
+        public HashSet<string> ActivityTypeCodes { get; } = new(activityTypeCodes, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Set by a department-only row: that department, in every territory.</summary>
         public bool CoversAllTerritory { get; set; }
@@ -173,6 +214,17 @@ public sealed class OrgScopeSet
             DepartmentCode is null
             || string.IsNullOrWhiteSpace(departmentCode)
             || string.Equals(DepartmentCode, departmentCode.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>The same rule as the department: no list takes any type, work with no type is taken.</summary>
+        public bool AcceptsActivityType(string? activityTypeCode) =>
+            ActivityTypeCodes.Count == 0
+            || string.IsNullOrWhiteSpace(activityTypeCode)
+            || ActivityTypeCodes.Contains(activityTypeCode.Trim());
+
+        public bool OverlapsActivityTypes(Group other) =>
+            ActivityTypeCodes.Count == 0
+            || other.ActivityTypeCodes.Count == 0
+            || ActivityTypeCodes.Overlaps(other.ActivityTypeCodes);
 
         public bool AcceptsLocation(string? cbuCode, string? branchCode, string? operationAreaCode) =>
             CoversAllTerritory
