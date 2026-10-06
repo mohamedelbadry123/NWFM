@@ -67,6 +67,7 @@ public static class NwfmPolicies
 
     /// <summary>Reading task types: to configure them, or to pick one when working with tasks.</summary>
     public const string TaskTypeReaders = AnyPrefix + ViewTasks + "," + ManageTaskTypes;
+    public const string WorkflowLookupReaders = AnyPrefix + ViewWorkflows + "," + ManageDefinitions;
 
     /// <summary>Reading the SLA rule an activity resolves to: workflow designers see it, SLA managers change it.</summary>
     public const string SlaContextReaders = AnyPrefix + ManageDefinitions + "," + ManageSlaPolicies;

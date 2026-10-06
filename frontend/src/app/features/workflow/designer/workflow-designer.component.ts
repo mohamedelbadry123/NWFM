@@ -1,3 +1,4 @@
+import { WorkflowTaskPaletteComponent } from './workflow-task-palette.component';
 import { WorkflowActivitySlaComponent, SlaManageRequest } from '../workspace/workflow-activity-sla.component';
 import { WorkflowSlaEditorComponent, SlaEditorRequest } from '../workspace/workflow-sla-editor.component';
 import { WorkflowActivityFormsComponent, ActivityFormPreviewRequest } from '../workspace/workflow-activity-forms.component';
@@ -26,7 +27,7 @@ import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
 import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
 import { WorkflowBusinessActivityComponent } from '../workspace/workflow-business-activity.component';
 import { WorkflowLocationComponent } from '../workspace/workflow-location.component';
-import { WorkspaceSettings, normalizeWorkspaceSettings } from '../workspace/workflow-workspace.service';
+import { WorkspaceSettings, ReferenceItem, normalizeWorkspaceSettings } from '../workspace/workflow-workspace.service';
 import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -297,7 +298,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
+  imports: [WorkflowTaskPaletteComponent, WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -1219,8 +1220,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
   protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
 
-  protected addNode(type: NodeType, x?: number, y?: number, protocol?: string): void {
+  protected addTaskActivity(task: ReferenceItem): void { this.addNode('MainActivity', undefined, undefined, undefined, task); }
+
+  protected addNode(type: NodeType, x?: number, y?: number, protocol?: string, task?: ReferenceItem): void {
     if (this.isReadonly()) return;
+    if (task && (this.workspace()?.kind !== 'Main' || type !== 'MainActivity' || !task.id)) return;
     const count = this.nodes().length;
     const px = x ?? 160 + (count % 4) * 48;
     const py = y ?? 140 + (count % 4) * 48;
@@ -1232,6 +1236,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       x: px, y: py, outcomes: [], actions: [],
     };
     this.pushUndo();
+    if(task) { node.name=task.nameEn; node.nameAr=task.nameAr || ''; node.configurationJson=JSON.stringify({taskTypeId:task.id}); }
     if(type==='ServiceTask') { node.actionKey='http.request'; node.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
     if(protocol==='Sms') node.name='SMS';
     if(type==='NotificationTask') node.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
@@ -1258,7 +1263,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const rect = svg.getBoundingClientRect();
     const x = (event.clientX - rect.left - this.panX()) / this.zoom();
     const y = (event.clientY - rect.top  - this.panY()) / this.zoom();
-    this.addNode(type, x, y, event.dataTransfer?.getData('nodeProtocol'));
+    let task: ReferenceItem | undefined;
+    const payload=event.dataTransfer?.getData('workflowTaskType');
+    if(payload) { try { task=JSON.parse(payload); if(!task || typeof task.id!=='string' || typeof task.nameEn!=='string') return; } catch { return; } }
+    this.addNode(type, x, y, event.dataTransfer?.getData('nodeProtocol'), task);
   }
 
   protected onCanvasDragOver(event: DragEvent): void { event.preventDefault(); }

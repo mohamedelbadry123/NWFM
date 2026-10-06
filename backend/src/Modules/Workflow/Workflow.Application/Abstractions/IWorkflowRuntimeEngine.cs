@@ -28,7 +28,7 @@ public interface IWorkflowRuntimeEngine
         Guid? parentInstanceId = null,
         string? parentActivityNodeKey = null,
         Guid? pinnedWorkflowVersionId = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, NWFM.Shared.Organization.OrgLocation? executionLocation = null);
 
     /// <summary>
     /// Continues an existing instance after a WorkItem has been completed.

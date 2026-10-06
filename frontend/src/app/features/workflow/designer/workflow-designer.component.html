@@ -198,6 +198,7 @@
                 class="designer-icon-btn"
                 [attr.title]="'workflow.designer.palette_title' | translate"
                 [attr.aria-label]="'workflow.designer.palette_title' | translate">›</button>
+              @if(workspace()?.kind === 'Main') { <app-workflow-task-palette [readonly]="isReadonly()" [collapsed]="true" (add)="addTaskActivity($event)" /> }
               @for (p of paletteNodes; track p.labelKey) {
                 <div draggable="true"
                   [attr.title]="p.labelKey | translate"
@@ -246,6 +247,7 @@
                 class="designer-field" />
             </div>
             <div class="flex-1 overflow-y-auto py-2 px-2">
+              @if(workspace()?.kind === 'Main') { <app-workflow-task-palette [readonly]="isReadonly()" [query]="paletteSearch()" (add)="addTaskActivity($event)" /> }
               @for (cat of paletteCategories; track cat.id) {
                 @let catNodes = paletteNodesInCategory(cat.id);
                 @if (catNodes.length > 0) {
@@ -273,7 +275,7 @@
                   </div>
                 }
               }
-              @if (filteredPalette().length === 0) {
+              @if (filteredPalette().length === 0 && workspace()?.kind !== 'Main') {
                 <p class="text-xs text-center py-6 px-3" style="color: var(--ds-text-3)">{{ 'workflow.designer.palette_empty' | translate }}</p>
               }
             </div>
@@ -1290,7 +1292,7 @@
             @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || activeInspectorTab() === 'general') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
                 @if (workspace() && (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
-                  <app-workflow-business-activity [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
+                  <app-workflow-business-activity [parentSettings]="workspace() ?? null" [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
                 }
                 <!-- Name EN -->
                 <div>

@@ -17,7 +17,10 @@ public sealed record OrgScopeTerritory(
     bool CoversAllTerritory,
     IReadOnlyList<string> CbuCodes,
     IReadOnlyList<string> BranchCodes,
-    IReadOnlyList<string> OperationAreaCodes);
+    IReadOnlyList<string> OperationAreaCodes)
+{
+    public IReadOnlyList<string> ClusterCodes { get; init; } = [];
+}
 
 /// <summary>
 /// The expanded coverage an owner — a user or a team — holds: its scope rows grouped by department,
@@ -89,6 +92,11 @@ public sealed class OrgScopeSet
             group.AcceptsDepartment(departmentCode)
             && group.AcceptsLocation(cbuCode, branchCode, operationAreaCode));
 
+    /// <summary>Broad cluster work requires an explicit cluster grant, not just one of its CBUs.</summary>
+    public bool CoversCluster(string? clusterCode, string? departmentCode = null) => IsUnrestricted
+        || _groups.Any(g => g.AcceptsDepartment(departmentCode)
+            && (g.CoversAllTerritory || clusterCode is not null && g.ClusterCodes.Contains(clusterCode)));
+
     /// <summary>True when this coverage and <paramref name="other"/> share any work at all.</summary>
     public bool Overlaps(OrgScopeSet other) =>
         IsUnrestricted
@@ -107,7 +115,7 @@ public sealed class OrgScopeSet
             group.CoversAllTerritory,
             [.. group.CbuCodes],
             [.. group.BranchCodes],
-            [.. group.OperationAreaCodes]))];
+            [.. group.OperationAreaCodes]) { ClusterCodes = [.. group.ClusterCodes] })];
 
     private static void Expand(Group group, string level, string code, OrgHierarchy hierarchy)
     {

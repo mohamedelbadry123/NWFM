@@ -10,9 +10,9 @@ internal sealed class SerializedWorkflowRuntimeEngine(WorkflowRuntimeEngine engi
 {
     public Task<Result<WorkflowInstance>> StartAsync(Guid organizationId, Guid workflowBindingId, string businessEntityId, string idempotencyKey,
         DateTime now, string? correlationId = null, Guid? startedByUserId = null, Guid? parentInstanceId = null, string? parentActivityNodeKey = null,
-        Guid? pinnedWorkflowVersionId = null, CancellationToken cancellationToken = default)
+        Guid? pinnedWorkflowVersionId = null, CancellationToken cancellationToken = default, NWFM.Shared.Organization.OrgLocation? executionLocation = null)
         => WorkflowExecutionLock.RunAsync(db, $"start:{organizationId}:{idempotencyKey}", () => engine.StartAsync(organizationId, workflowBindingId, businessEntityId,
-            idempotencyKey, now, correlationId, startedByUserId, parentInstanceId, parentActivityNodeKey, pinnedWorkflowVersionId, cancellationToken), cancellationToken);
+            idempotencyKey, now, correlationId, startedByUserId, parentInstanceId, parentActivityNodeKey, pinnedWorkflowVersionId, cancellationToken, executionLocation), cancellationToken);
     public Task<Result> AdvanceAsync(Guid workflowInstanceId, Guid completedWorkItemId, DateTime now, CancellationToken cancellationToken = default)
         => WorkflowExecutionLock.RunAsync(db, "instance:" + workflowInstanceId, async () =>
         {

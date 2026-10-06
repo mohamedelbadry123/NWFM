@@ -7,9 +7,11 @@ import { LocaleService } from '@core/i18n/locale.service';
 import { WorkflowDefinitionsService } from '../workflow-definitions.service';
 import type { WorkflowDefinitionDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-definition-dto';
 import { WorkflowLocationComponent } from './workflow-location.component';
-import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, WorkspaceInstance, hasRequiredLocation } from './workflow-workspace.service';
+import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, WorkspaceInstance, hasRequiredLocation, hasRequiredClassification, scopeLocation, scopeContains } from './workflow-workspace.service';
+import { OrgScopeSelectorComponent } from '@shared/components/org-scope/org-scope-selector.component';
+import { OrgLocation, EMPTY_ORG_LOCATION } from '@shared/components/org-scope/org-scope.model';
 
-@Component({ selector: 'app-workflow-workspace', standalone: true, imports: [FormsModule, RouterLink, DatePipe, WorkflowLocationComponent], template: `
+@Component({ selector: 'app-workflow-workspace', standalone: true, imports: [FormsModule, RouterLink, DatePipe, WorkflowLocationComponent, OrgScopeSelectorComponent], template: `
 <main class="p-5 sm:p-8 space-y-6 max-w-7xl mx-auto">
   <header class="flex items-center justify-between gap-4"><div><h1 class="text-2xl font-semibold">{{ title() }}</h1><p class="text-sm opacity-70 mt-2">{{ subtitle() }}</p></div>
   @if (mode() === 'workflows') {<button class="wf-btn-primary" (click)="creating.set(!creating())">{{ t('Create workflow','إنشاء سير عمل') }}</button>}</header>
@@ -23,10 +25,17 @@ import { WorkflowWorkspaceService, WorkspaceSettings, WorkspaceWorkflow, Workspa
   }
   @if (mode() === 'start') {
     <form (ngSubmit)="start()" class="rounded-xl border p-6 space-y-5 max-w-2xl bg-white dark:bg-dark-800">
-      <label class="block">{{ t('Published workflow','سير عمل منشور') }}<select class="wf-input" name="workflow" [(ngModel)]="workflowId" required><option value="">{{ t('Select a workflow','اختر سير عمل') }}</option>@for (workflow of catalog(); track workflow.id) {<option [value]="workflow.id">{{ workflow.name }} · {{ t('Version','الإصدار') }} {{ workflow.versionNumber }}</option>}</select></label>
+      <label class="block">{{ t('Published workflow','سير عمل منشور') }}<select class="wf-input" name="workflow" [(ngModel)]="workflowId" (ngModelChange)="selectWorkflow($event)" required><option value="">{{ t('Select a workflow','اختر سير عمل') }}</option>@for (workflow of catalog(); track workflow.id) {<option [value]="workflow.id">{{ workflow.name }} · {{ t('Version','الإصدار') }} {{ workflow.versionNumber }}</option>}</select></label>
+      @if (startScopes()) {
+        <fieldset class="space-y-3"><legend class="font-medium">{{ t('Instance location', 'موقع النسخة') }}</legend>
+          <app-org-scope-selector mode="single" [initialLocation]="startSeed" (locationChange)="startLocation=$event" />
+          <p class="text-sm opacity-70">{{ t('Choose one location within the scope supported by this workflow and its children.', 'اختر موقعاً واحداً ضمن النطاق المدعوم لسير العمل والمسارات الفرعية.') }}</p>
+          @if (startLocation.clusterCode && !validStart()) { <p role="alert" class="text-red-600">{{ t('This location is outside the supported scope. Select a more specific eligible location.', 'هذا الموقع خارج النطاق المدعوم. اختر موقعاً مؤهلاً أكثر تحديداً.') }}</p> }
+        </fieldset>
+      }
       <label class="block">{{ t('Reference (optional)','المرجع (اختياري)') }}<input class="wf-input" name="reference" [(ngModel)]="reference" maxlength="200"></label>
       @if (administrator()) {<label class="flex gap-2 items-center"><input type="checkbox" name="demo" [(ngModel)]="isDemo">{{ t('Demo instance — allow testing as demo users','نسخة تجريبية — السماح بالتجربة كمستخدمين تجريبيين') }}</label>}
-      <button class="wf-btn-primary" [disabled]="busy() || !workflowId">{{ t('Start instance','بدء النسخة') }}</button>
+      <button class="wf-btn-primary" [disabled]="busy() || !validStart()">{{ t('Start instance','بدء النسخة') }}</button>
       @if (!loading() && !catalog().length) {<p>{{ t('Publish a main workflow before starting an instance.','انشر سير عمل رئيسي قبل بدء نسخة.') }}</p>}
     </form>
   } @else {
@@ -48,7 +57,9 @@ export class WorkflowWorkspaceComponent implements OnInit {
   private readonly route = inject(ActivatedRoute); private readonly router = inject(Router); private readonly locale = inject(LocaleService); private readonly auth = inject(AuthStore);
   readonly mode = signal('workflows'); readonly creating = signal(false); readonly loading = signal(true); readonly busy = signal(false); readonly error = signal('');
   readonly definitions = signal<WorkflowDefinitionDto[]>([]); readonly catalog = signal<WorkspaceWorkflow[]>([]); readonly instances = signal<WorkspaceInstance[]>([]);
-  name = ''; nameAr = ''; search = ''; settings: WorkspaceSettings = { kind: 'Main' }; workflowId = ''; reference = ''; isDemo = false;
+  name = ''; nameAr = ''; search = ''; settings: WorkspaceSettings = { kind: 'Main', schemaVersion: 2, organizationScopes: [] }; workflowId = ''; reference = ''; isDemo = false;
+  startLocation: OrgLocation = { ...EMPTY_ORG_LOCATION };
+  startSeed: OrgLocation = { ...EMPTY_ORG_LOCATION };
   private requestId = crypto.randomUUID();
   t(en: string, ar: string) { return this.locale.locale() === 'ar' ? ar : en; }
   administrator() { return this.auth.roles().includes('Administrator'); }
@@ -60,7 +71,16 @@ export class WorkflowWorkspaceComponent implements OnInit {
     else if (this.mode() === 'start') this.api.catalog().subscribe({next:r=>{this.catalog.set(r);this.loading.set(false);},error:failure});
     else this.api.instances(this.search).subscribe({next:r=>{this.instances.set(r);this.loading.set(false);},error:failure});
   }
-  validCreate() { return !!this.name.trim() && hasRequiredLocation(this.settings); }
+  validCreate() { return !!this.name.trim() && hasRequiredLocation(this.settings) && hasRequiredClassification(this.settings); }
+  startScopes() { return this.catalog().find(w => w.id === this.workflowId)?.startScopes; }
+  selectWorkflow(id: string) {
+    this.workflowId = id;
+    const scopes = this.startScopes();
+    this.startLocation = scopes?.length === 1 ? scopeLocation(scopes[0]) : { ...EMPTY_ORG_LOCATION };
+    this.startSeed = { ...this.startLocation };
+    this.requestId = crypto.randomUUID();
+  }
+  validStart() { const scopes = this.startScopes(); return !!this.workflowId && (!scopes || scopes.some(s => scopeContains(s, this.startLocation))); }
   create() { if (!this.validCreate() || this.busy()) return; this.busy.set(true); this.error.set(''); this.api.create(this.name,this.nameAr,this.settings).subscribe({next:r=>{this.busy.set(false);this.router.navigate(['/admin/workflow/definitions',r.definitionId,'versions',r.versionId,'designer']);},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Could not create workflow.');}}); }
-  start() { if (!this.workflowId || this.busy()) return;this.busy.set(true);this.error.set('');this.api.start(this.workflowId,this.requestId,this.reference,this.isDemo).subscribe({next:r=>{this.busy.set(false);this.requestId=crypto.randomUUID();this.router.navigate(['/admin/workflow/instances',r.instanceId]);},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Could not start instance.');}}); }
+  start() { if (!this.validStart() || this.busy()) return;this.busy.set(true);this.error.set('');this.api.start(this.workflowId,this.requestId,this.reference,this.isDemo,this.startScopes() ? this.startLocation : undefined).subscribe({next:r=>{this.busy.set(false);this.requestId=crypto.randomUUID();this.router.navigate(['/admin/workflow/instances',r.instanceId]);},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Could not start instance.');}}); }
 }

@@ -3,7 +3,7 @@ import { provideRouter, ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 
-import { CanvasNode, NodeType, WorkflowDesignerComponent } from './workflow-designer.component';
+import { buildNWFMXml, CanvasNode, NodeType, WorkflowDesignerComponent } from './workflow-designer.component';
 import { WritableSignal } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { WorkflowVersionsService } from '../workflow-versions.service';
@@ -94,6 +94,22 @@ describe('WorkflowDesignerComponent scale', () => {
       add('UserTask', 40 + (i % 20) * 80, 40 + Math.floor(i / 20) * 70);
     }
   }
+
+  it('creates a task activity and preserves its identity through undo, duplication and XML save', () => {
+    const c = component as any;
+    c.workspace.set({kind:'Main',schemaVersion:2,organizationScopes:[{level:'Cluster',code:'CC',clusterCode:'CC'}]});
+    c.addTaskActivity({id:'task-id',code:'SURVEY',nameEn:'Survey',nameAr:'مسح'});
+    let node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');
+    expect(node.name).toBe('Survey');expect(JSON.parse(node.configurationJson).taskTypeId).toBe('task-id');
+    c.undo();expect(c.nodes().some((n:CanvasNode)=>n.type==='MainActivity')).toBeFalse();
+    c.redo();node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');c.selectedNodeId.set(node.id);
+    c.duplicateSelected();
+    const activities=c.nodes().filter((n:CanvasNode)=>n.type==='MainActivity');expect(activities.length).toBe(2);
+    for(const activity of activities)expect(JSON.parse(activity.configurationJson).taskTypeId).toBe('task-id');
+    const doc=new DOMParser().parseFromString(buildNWFMXml({nodes:c.nodes(),edges:[],variables:[],workspace:c.workspace()}),'application/xml');
+    const saved=Array.from(doc.querySelectorAll('Activity')).filter(n=>n.getAttribute('type')==='MainActivity');
+    expect(saved.length).toBe(2);for(const activity of saved)expect(JSON.parse(activity.getAttribute('configurationJson')!).taskTypeId).toBe('task-id');
+  });
 
   function nodeCount(): number {
     return (component as unknown as { nodes: () => unknown[] }).nodes().length;

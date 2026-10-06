@@ -26,7 +26,8 @@ namespace Workflow.Infrastructure.Services;
 
 internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant tenant, ISender sender,
     IWorkflowRuntimeEngine engine, IWorkflowGroupDirectory groups, IWorkItemDtoAssembler assembler,
-    IWorkflowVersionRepository versions, WorkflowActivityEvents events, IOrgScopeProvider scopes, IOrgDirectory directory) : IWorkflowWorkspace
+    IWorkflowVersionRepository versions, WorkflowActivityEvents events, IOrgScopeProvider scopes, IOrgDirectory directory,
+    IWorkflowReferenceData? references = null, IWorkflowTaskTypeCatalog? taskTypes = null) : IWorkflowWorkspace
 {
     private OrgScopeSet? _scope;
 
@@ -41,8 +42,8 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             if (actor == Guid.Empty || string.IsNullOrWhiteSpace(input.Name)) return Result.Failure<WorkspaceCreated>(Invalid("A name and signed-in workflow participant are required."));
             var settings = input.Settings;
             if (settings.Kind is not (WorkflowWorkspaceDefinition.MainKind or WorkflowWorkspaceDefinition.ChildKind)) return Result.Failure<WorkspaceCreated>(Invalid("Select Main or Child workflow."));
-            // A child takes its parent's location when it starts, so nothing it was sent is kept.
-            if (settings.Kind == WorkflowWorkspaceDefinition.ChildKind) settings = new(WorkflowWorkspaceDefinition.ChildKind, DesignerVersion: settings.DesignerVersion);
+            // Legacy children inherit location only; scoped children retain their eligible territory.
+            if (settings.Kind == WorkflowWorkspaceDefinition.ChildKind && !settings.HasScopeSettings) settings = new(WorkflowWorkspaceDefinition.ChildKind, DesignerVersion: settings.DesignerVersion);
             else
             {
                 var location = settings.Location;
@@ -50,6 +51,10 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 var issues = await WorkflowWorkspacePublisher.ValidateLocationAsync(settings, directory, ct);
                 if (issues.Count > 0) return Result.Failure<WorkspaceCreated>(Invalid(issues[0].Message));
             }
+            if (!settings.HasScopeSettings)
+                return Result.Failure<WorkspaceCreated>(Invalid("Select organization scope and the workflow's Activity Type or Task Type."));
+            var classificationIssues = await WorkflowClassificationValidator.ValidateAsync(settings, references, taskTypes, ct);
+            if (classificationIssues.Count > 0) return Result.Failure<WorkspaceCreated>(Invalid(classificationIssues[0].Message));
             var created = await sender.Send(new CreateWorkflowDefinitionCommand(tenant.OrganizationId, "workflow-" + Guid.NewGuid().ToString("N"), input.Name, input.NameAr, null, null), ct);
             if (created.IsFailure) return Result.Failure<WorkspaceCreated>(created.Error);
             var draft = await sender.Send(new CreateWorkflowDraftCommand(created.Value.Id, actor), ct);
@@ -66,10 +71,28 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
     public async Task<IReadOnlyList<WorkspaceWorkflow>> CatalogAsync(CancellationToken ct)
     {
         var scope = await CallerScopeAsync(ct);
-        return (await CatalogForKindAsync(WorkflowWorkspaceDefinition.MainKind, ct)).Where(w => Reaches(scope, w)).ToList();
+        var result = new List<WorkspaceWorkflow>();
+        OrgHierarchy? hierarchy = null;
+        foreach (var workflow in await CatalogForKindAsync(WorkflowWorkspaceDefinition.MainKind, ct))
+        {
+            var settings = WorkflowWorkspaceDefinition.Read(workflow.WorkspaceJson)!;
+            if (!settings.HasScopeSettings)
+            {
+                if (Reaches(scope, workflow)) result.Add(workflow);
+                continue;
+            }
+            var version = await versions.GetByIdWithProjectionAsync(workflow.VersionId, ct);
+            if (version is null) continue;
+            var eligible = await WorkflowScopeRules.StartScopesAsync(version, db, versions, ct);
+            if (eligible.Count == 0) continue;
+            hierarchy ??= await scopes.GetHierarchyAsync(ct);
+            var coverage = OrgScopeSet.FromRows(eligible.Select(s => new OrgScopeRow(s.Level, s.Code, null)), hierarchy);
+            if (scope.Overlaps(coverage)) result.Add(workflow with { StartScopes = eligible });
+        }
+        return result;
     }
 
-    public Task<IReadOnlyList<WorkspaceWorkflow>> ChildrenAsync(CancellationToken ct) => CatalogForKindAsync(WorkflowWorkspaceDefinition.ChildKind, ct);
+    public Task<IReadOnlyList<WorkspaceWorkflow>> ChildrenAsync(CancellationToken ct, Guid? selectedVersionId = null) => CatalogForKindAsync(WorkflowWorkspaceDefinition.ChildKind, ct, selectedVersionId);
 
     /// <summary>A conflicting or unreadable location reaches only unrestricted callers — never everyone.</summary>
     private static bool Reaches(OrgScopeSet scope, WorkspaceWorkflow workflow)
@@ -78,13 +101,14 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
         try { return WorkflowWorkspaceDefinition.Read(workflow.WorkspaceJson) is { HasLegacyConflict: false } settings && settings.Location.IsCoveredBy(scope); }
         catch (JsonException) { return false; }
     }
-    private async Task<IReadOnlyList<WorkspaceWorkflow>> CatalogForKindAsync(string kind, CancellationToken ct)
+    private async Task<IReadOnlyList<WorkspaceWorkflow>> CatalogForKindAsync(string kind, CancellationToken ct, Guid? selectedVersionId = null)
     {
         var rows = await (from v in db.WorkflowVersions.AsNoTracking() join d in db.WorkflowDefinitions on v.WorkflowDefinitionId equals d.Id
             where d.IsActive && v.Status == WorkflowVersionStatus.Published && v.WorkspaceJson != null
             select new WorkspaceWorkflow(d.Id, d.Name, d.NameAr, v.Id, v.VersionNumber, v.WorkspaceJson, d.DefinitionKey)).ToListAsync(ct);
         return rows.Where(x => WorkflowWorkspaceDefinition.KindOf(x.WorkspaceJson) == kind)
-            .GroupBy(x => x.Id).Select(g => g.MaxBy(x => x.VersionNumber)!).OrderBy(x => x.Name).ToList();
+            .GroupBy(x => x.Id).SelectMany(g => g.Where(x => x.VersionId == selectedVersionId || x.VersionNumber == g.Max(v => v.VersionNumber)))
+            .OrderBy(x => x.Name).ThenByDescending(x => x.VersionNumber).ToList();
     }
 
     public Task<Result<Guid>> StartAsync(Guid definitionId, WorkspaceStartInput input, Guid actor, bool administrator, CancellationToken ct) =>
@@ -95,7 +119,10 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             if (existing is not null)
             {
                 var original = await db.WorkflowVersions.FindAsync([existing.PinnedWorkflowVersionId], ct);
+                var originalSettings = WorkflowWorkspaceDefinition.Read(original?.WorkspaceJson);
+                var requestedLocation = input.Location?.Normalized() ?? originalSettings?.DefaultLocation;
                 return original?.WorkflowDefinitionId == definitionId && existing.StartedByUserId == actor && existing.IsDemo == input.IsDemo
+                    && requestedLocation == existing.Location && existing.Location.IsCoveredBy(await CallerScopeAsync(ct))
                     ? Result.Success(existing.Id) : Result.Failure<Guid>(Invalid("This request identifier was already used for a different start."));
             }
             var workflow = (await CatalogForKindAsync(WorkflowWorkspaceDefinition.MainKind, ct)).FirstOrDefault(x => x.Id == definitionId);
@@ -103,7 +130,18 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             var settings = WorkflowWorkspaceDefinition.Read(workflow.WorkspaceJson)!;
             var issues = await WorkflowWorkspacePublisher.ValidateLocationAsync(settings, directory, ct);
             if (issues.Count > 0) return Result.Failure<Guid>(Invalid("This workflow's organization location is no longer valid. " + issues[0].Message));
-            if (!Reaches(await CallerScopeAsync(ct), workflow)) return Result.Failure<Guid>(Invalid("This workflow's location is outside your organization coverage."));
+            var location = input.Location?.Normalized() ?? settings.DefaultLocation;
+            if (location is null || !settings.AllowsLocation(location))
+                return Result.Failure<Guid>(Invalid("Select a location within this workflow's organization scope."));
+            if (!location.IsCoveredBy(await CallerScopeAsync(ct))) return Result.Failure<Guid>(Invalid("This workflow's location is outside your organization coverage."));
+            if (!await directory.IsValidLocationAsync(location, ct))
+                return Result.Failure<Guid>(Invalid("Select an active location under its correct Cluster and CBU."));
+            if (settings.HasScopeSettings)
+            {
+                var version = await versions.GetByIdWithProjectionAsync(workflow.VersionId, ct);
+                if (version is null || !await WorkflowScopeRules.AllowsTreeAsync(version, location, db, versions, ct))
+                    return Result.Failure<Guid>(Invalid("This location is not supported by all of the workflow's child workflows."));
+            }
             var screen = "workspace:" + definitionId + (input.IsDemo ? ":demo" : "");
             var binding = await db.WorkflowBindings.FirstOrDefaultAsync(b => b.ScreenKey == screen, ct);
             if (binding is null)
@@ -114,7 +152,7 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 binding.Activate(DateTime.UtcNow); db.WorkflowBindings.Add(binding); await db.SaveChangesAsync(ct);
             }
             var started = await engine.StartAsync(tenant.OrganizationId, binding.Id, input.RequestId.ToString(), "workspace:" + input.RequestId,
-                DateTime.UtcNow, input.Reference, actor, pinnedWorkflowVersionId: workflow.VersionId, cancellationToken: ct);
+                DateTime.UtcNow, input.Reference, actor, pinnedWorkflowVersionId: workflow.VersionId, cancellationToken: ct, executionLocation: location);
             return started.IsSuccess ? Result.Success(started.Value.Id) : Result.Failure<Guid>(started.Error);
         }, ct);
 

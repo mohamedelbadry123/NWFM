@@ -7,8 +7,8 @@ namespace Workflow.Domain.Entities;
 
 /// <summary>
 /// Versioned business context. Null on legacy definitions for backwards compatibility.
-/// A main workflow is placed in the shared org hierarchy (cluster → CBU → branch | operation area);
-/// a child workflow has no place of its own and takes its parent's when it starts.
+/// New definitions hold eligible organization scopes; each execution resolves one location.
+/// Legacy definitions retain their single location and child inheritance behavior.
 /// </summary>
 public sealed record WorkflowWorkspaceDefinition(
     string Kind,
@@ -21,6 +21,25 @@ public sealed record WorkflowWorkspaceDefinition(
     public const string MainKind = "Main";
     public const string ChildKind = "Child";
 
+    public int SchemaVersion { get; init; } = 1;
+    public IReadOnlyList<WorkflowOrganizationScope>? OrganizationScopes { get; init; }
+    public Guid? FieldActivityTypeId { get; init; }
+    public string? DepartmentCode { get; init; }
+    public string? FieldActivityCode { get; init; }
+    public Guid? TaskTypeId { get; init; }
+
+    [JsonIgnore]
+    public bool HasScopeSettings => SchemaVersion >= 2 || OrganizationScopes is not null;
+
+    [JsonIgnore]
+    public OrgLocation? DefaultLocation => HasScopeSettings
+        ? OrganizationScopes is { Count: 1 } scopes && scopes[0] is { IsWellFormed: true } ? scopes[0].Location : null
+        : Kind == MainKind ? Location : null;
+
+    public bool AllowsLocation(OrgLocation location) => !HasLegacyConflict && (HasScopeSettings
+        ? OrganizationScopes?.Any(s => s is not null && s.Contains(location)) == true
+        : Kind == ChildKind || Location == location.Normalized());
+
     [JsonIgnore]
     public OrgLocation Location => new OrgLocation(ClusterCode, CbuCode, BranchCode, OperationAreaCode).Normalized();
 
@@ -32,9 +51,11 @@ public sealed record WorkflowWorkspaceDefinition(
     [JsonIgnore]
     public bool HasLegacyConflict { get; init; }
 
-    /// <summary>A main workflow must name at least its cluster and CBU — the level work is scoped by.</summary>
+    /// <summary>New scopes may stop at Cluster; legacy main locations still require Cluster and CBU.</summary>
     [JsonIgnore]
-    public bool HasRequiredLocation => Location is { ClusterCode: not null, CbuCode: not null };
+    public bool HasRequiredLocation => HasScopeSettings
+        ? OrganizationScopes is { Count: > 0 and <= 500 } && OrganizationScopes.All(s => s is { IsWellFormed: true })
+        : Location is { ClusterCode: not null, CbuCode: not null };
 
     /// <summary>
     /// Reads stored settings, whichever shape they were written in.
@@ -86,6 +107,12 @@ public sealed record WorkflowWorkspaceDefinition(
             designerVersion)
         {
             HasLegacyConflict = conflict,
+            SchemaVersion = settings["schemaVersion"]?.Deserialize<int?>() ?? 1,
+            OrganizationScopes = settings["organizationScopes"]?.Deserialize<List<WorkflowOrganizationScope>>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true }),
+            FieldActivityTypeId = settings["fieldActivityTypeId"]?.Deserialize<Guid?>(),
+            DepartmentCode = Text("departmentCode"),
+            FieldActivityCode = Text("fieldActivityCode"),
+            TaskTypeId = settings["taskTypeId"]?.Deserialize<Guid?>(),
         };
     }
 

@@ -14,7 +14,7 @@ using Workflow.Infrastructure.Persistence;
 namespace Workflow.Infrastructure.Services;
 
 internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
-    IWorkflowVersionRepository versions, IOrgDirectory directory) : IWorkflowWorkspacePublisher
+    IWorkflowVersionRepository versions, IOrgDirectory directory, IWorkflowTaskTypeCatalog? taskTypes = null) : IWorkflowWorkspacePublisher
 {
     public async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateAsync(WorkflowVersion version, CancellationToken ct)
     {
@@ -38,6 +38,19 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             { errors.Add(new("ACTIVITY_CONFIG", "Activity settings contain an invalid value.")); }
         }
         errors.AddRange(await ValidateLocationAsync(workspace, directory, ct));
+        errors.AddRange(await WorkflowClassificationValidator.ValidateAsync(workspace, references, taskTypes, ct));
+        if (workspace.HasScopeSettings && workspace.HasRequiredLocation)
+        {
+            try
+            {
+                if ((await WorkflowScopeRules.StartScopesAsync(version, db, versions, ct)).Count == 0)
+                    errors.Add(new("WORKSPACE_CHILD_SCOPE", "The workflow and its child workflows must share an eligible organization location."));
+            }
+            catch (JsonException)
+            {
+                errors.Add(new("WORKSPACE_CHILD_SCOPE", "A child workflow has invalid settings or configuration."));
+            }
+        }
         if (workspace.Kind == "Main" && !version.Activities.Any(a => a.ActivityType == ActivityType.MainActivity))
             errors.Add(new("WORKSPACE_MAIN_ACTIVITY", "Add at least one main activity with a child workflow."));
 
@@ -68,16 +81,28 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             }
             if (activity.ActivityType == ActivityType.MainActivity)
             {
+                var exactMatchRequired = version.IsDraft && workspace.Kind == WorkflowWorkspaceDefinition.MainKind;
+                if (exactMatchRequired && (config.TaskTypeId is not Guid taskTypeId || taskTypes is null
+                    || !await taskTypes.IsActiveAsync(taskTypeId, ct)))
+                    Error("MAIN_TASK_TYPE", "Select an active Task Type for this activity.");
                 if (!activity.Outcomes.Any(o => o.OutcomeKey.Equals("approve", StringComparison.OrdinalIgnoreCase)))
                     Error("MAIN_APPROVAL", "Main activities require an Approve outcome.");
                 var child = await ResolveChildAsync(config, ct);
                 if (child is null) Error("MAIN_CHILD", "Select a published child workflow.");
                 else
                 {
+                    if (exactMatchRequired && !WorkflowChildMatch.Matches(workspace, WorkflowChildMatch.ReadChild(child.WorkspaceJson), config.TaskTypeId))
+                        Error("MAIN_CHILD_MATCH", "The child workflow must have the same Task Type as this activity and exactly the same organization scope as the main workflow.");
                     if (WorkflowWorkspaceDefinition.KindOf(child.WorkspaceJson) != WorkflowWorkspaceDefinition.ChildKind) Error("MAIN_CHILD_KIND", "Main activities require a workflow published as Child.");
                     if (!await CheckTreeAsync(child, new HashSet<Guid> { version.WorkflowDefinitionId }, 1, ct))
                         Error("CHILD_RECURSION", "Child workflow references must be acyclic and at most 16 levels deep.");
                 }
+            }
+            if (activity.ActivityType == ActivityType.CallActivity && version.IsDraft && workspace.Kind == WorkflowWorkspaceDefinition.MainKind)
+            {
+                var child = await ResolveChildAsync(config, ct);
+                if (child is null || !WorkflowChildMatch.SameScope(workspace, WorkflowChildMatch.ReadChild(child.WorkspaceJson)))
+                    Error("CALL_CHILD_SCOPE", "The called workflow must have exactly the same organization scope as the main workflow.");
             }
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in config.Events ?? [])
@@ -145,6 +170,15 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
     {
         if (workspace.HasLegacyConflict)
             return [new("WORKSPACE_LOCATION_CONFLICT", "This workflow's saved location names two different CBUs or branches. Re-select its organization location.")];
+        if (workspace.HasScopeSettings)
+        {
+            if (workspace.SchemaVersion != 2 || !workspace.HasRequiredLocation || !workspace.Location.IsEmpty)
+                return [new("WORKSPACE_SCOPE_REQUIRED", "Select at least one cluster and valid organization scopes (up to 500).")];
+            foreach (var scope in workspace.OrganizationScopes!)
+                if (!await directory.IsValidLocationAsync(scope.Location, ct))
+                    return [new("WORKSPACE_SCOPE", "Select active organization units under their correct Cluster and CBU.")];
+            return [];
+        }
         var location = workspace.Location;
         if (workspace.Kind == WorkflowWorkspaceDefinition.ChildKind)
             return location.IsEmpty ? [] : [new("WORKSPACE_INHERITANCE", "Child workflows inherit the main workflow's organization location; remove the local selection.")];
