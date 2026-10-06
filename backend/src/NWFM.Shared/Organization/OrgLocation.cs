@@ -31,7 +31,9 @@ public sealed record OrgLocation(
     /// here unless given, so any group in the scope may take it — the reference rule for unclassified work.
     /// </summary>
     public bool IsCoveredBy(OrgScopeSet scope, string? departmentCode = null, string? activityTypeCode = null) =>
-        scope.Covers(Clean(CbuCode), Clean(BranchCode), Clean(OperationAreaCode), departmentCode, activityTypeCode);
+        Clean(CbuCode) is null && Clean(BranchCode) is null && Clean(OperationAreaCode) is null
+            ? scope.CoversCluster(Clean(ClusterCode), departmentCode, activityTypeCode)
+            : scope.Covers(Clean(CbuCode), Clean(BranchCode), Clean(OperationAreaCode), departmentCode, activityTypeCode);
 
     /// <summary>
     /// The hierarchy rule, given the units the directory holds as active. <paramref name="active"/> and

@@ -4,6 +4,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Integration.Workflow;
 using NWFM.Shared.Results;
+using NWFM.Shared.Organization;
+using NWFM.Shared.Integration.Organization;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Constants;
 using Workflow.Domain.Entities;
@@ -48,6 +50,8 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
     private readonly IWorkflowRequestProjector _requestProjector;
     private readonly IWorkflowIntegrationRuntime? _integrations;
     private readonly WorkflowActivityEvents? _activityEvents;
+    private readonly IOrgDirectory? _directory;
+    private readonly IOrgScopeProvider? _scopes;
 
     public WorkflowRuntimeEngine(
         WorkflowDbContext db,
@@ -76,7 +80,8 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         IWorkflowExecutionTokenRepository tokenRepo,
         IWorkflowOutcomeDispatcher outcomeDispatcher,
         IWorkflowRequestProjector requestProjector,
-        IWorkflowIntegrationRuntime? integrations = null, WorkflowActivityEvents? activityEvents = null)
+        IWorkflowIntegrationRuntime? integrations = null, WorkflowActivityEvents? activityEvents = null,
+        IOrgDirectory? directory = null, IOrgScopeProvider? scopes = null)
     {
         _db                     = db;
         _bindingRepo            = bindingRepo;
@@ -106,14 +111,16 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         _requestProjector       = requestProjector;
         _integrations           = integrations;
         _activityEvents = activityEvents;
+        _directory = directory;
+        _scopes = scopes;
     }
 
     public Task<Result<WorkflowInstance>> StartAsync(Guid organizationId, Guid workflowBindingId, string businessEntityId,
         string idempotencyKey, DateTime now, string? correlationId = null, Guid? startedByUserId = null,
         Guid? parentInstanceId = null, string? parentActivityNodeKey = null, Guid? pinnedWorkflowVersionId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, OrgLocation? executionLocation = null)
         => StartCoreAsync(organizationId, workflowBindingId, businessEntityId, idempotencyKey, now, correlationId,
-            startedByUserId, parentInstanceId, parentActivityNodeKey, pinnedWorkflowVersionId, cancellationToken);
+            startedByUserId, parentInstanceId, parentActivityNodeKey, pinnedWorkflowVersionId, cancellationToken, executionLocation: executionLocation);
 
     private async Task<Result<WorkflowInstance>> StartCoreAsync(
         Guid organizationId,
@@ -128,10 +135,12 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         Guid? pinnedWorkflowVersionId = null,
         CancellationToken cancellationToken = default,
         IReadOnlyDictionary<string, object?>? initialVariables = null,
-        Guid? parentActivityInstanceId = null)
+        Guid? parentActivityInstanceId = null, OrgLocation? executionLocation = null)
     {
         var existingInstance = await _instanceRepo.GetByIdempotencyKeyAsync(organizationId, idempotencyKey, cancellationToken);
-        if (existingInstance is not null) return Result.Success(existingInstance);
+        if (existingInstance is not null) return executionLocation is not null && existingInstance.Location != executionLocation.Normalized()
+            ? Result.Failure<WorkflowInstance>(new Error("Workflow.Location.Conflict", "This start identifier was already used for another location."))
+            : Result.Success(existingInstance);
         var binding = await _bindingRepo.GetByIdAsync(workflowBindingId, cancellationToken);
         if (binding is null)
             return Result.Failure<WorkflowInstance>(WorkflowErrors.Binding.NotFound);
@@ -170,7 +179,10 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             var parentContext = await _instanceRepo.GetByIdAsync(parentId, cancellationToken);
             if (parentContext is null || !await WorkflowTreeGuard.CanRunAsync(_db, parentId, cancellationToken))
                 return Result.Failure<WorkflowInstance>(WorkflowErrors.Instance.NotRunning);
-            // A child has no location of its own: the whole tree answers to the main workflow's place.
+            if (WorkflowWorkspaceDefinition.Read(version.WorkspaceJson) is { HasScopeSettings: true } childSettings
+                && (!childSettings.AllowsLocation(parentContext.Location)
+                    || !await WorkflowScopeRules.AllowsTreeAsync(version, parentContext.Location, _db, _versionRepo, cancellationToken)))
+                return Result.Failure<WorkflowInstance>(new Error("Workflow.Child.Scope", "The parent's location is outside this child workflow's organization scope."));
             instance.SetExecutionContext(parentContext.Location, parentContext.IsDemo);
         }
         else if (version.WorkspaceJson is not null)
@@ -179,7 +191,14 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             if (scope.Kind != WorkflowWorkspaceDefinition.MainKind) return Result.Failure<WorkflowInstance>(new Error("Workflow.Child.Start", "Child workflows must be started by their parent."));
             if (scope.HasLegacyConflict || !scope.HasRequiredLocation)
                 return Result.Failure<WorkflowInstance>(new Error("Workflow.Location.Invalid", "This workflow's organization location is incomplete or conflicting; re-select it and publish again."));
-            instance.SetExecutionContext(scope.Location, binding.IsDemo);
+            var location = executionLocation?.Normalized() ?? scope.DefaultLocation;
+            if (location is null || !scope.AllowsLocation(location)
+                || scope.HasScopeSettings && (!await WorkflowScopeRules.AllowsTreeAsync(version, location, _db, _versionRepo, cancellationToken)
+                    || _directory is not null && !await _directory.IsValidLocationAsync(location, cancellationToken)))
+                return Result.Failure<WorkflowInstance>(new Error("Workflow.Location.Invalid", "Select a location allowed by the workflow and its child workflows."));
+            if (scope.HasScopeSettings && _scopes is not null && !location.IsCoveredBy(await _scopes.GetCurrentUserScopeAsync(cancellationToken)))
+                return Result.Failure<WorkflowInstance>(new Error("Workflow.Location.Forbidden", "This location is outside your organization coverage."));
+            instance.SetExecutionContext(location, binding.IsDemo);
         }
 
         await _instanceRepo.AddAsync(instance, cancellationToken);

@@ -8,9 +8,12 @@ namespace Workflow.Application.Workspace;
 
 public sealed record WorkspaceDefinitionInput(string Name, string? NameAr, WorkflowWorkspaceDefinition Settings);
 public sealed record WorkspaceCreated(Guid DefinitionId, Guid VersionId);
-public sealed record WorkspaceStartInput(Guid RequestId, string? Reference, bool IsDemo = false);
+public sealed record WorkspaceStartInput(Guid RequestId, string? Reference, bool IsDemo = false, OrgLocation? Location = null);
 public sealed record WorkspaceActionInput(Guid RequestId, string Action, string? Comment = null, Dictionary<string, JsonElement>? FormValues = null, Guid? DemoActorId = null);
-public sealed record WorkspaceWorkflow(Guid Id, string Name, string? NameAr, Guid VersionId, int VersionNumber, string? WorkspaceJson, string? DefinitionKey = null);
+public sealed record WorkspaceWorkflow(Guid Id, string Name, string? NameAr, Guid VersionId, int VersionNumber, string? WorkspaceJson, string? DefinitionKey = null)
+{
+    public IReadOnlyList<WorkflowOrganizationScope>? StartScopes { get; init; }
+}
 public sealed record WorkspaceInstanceSummary(Guid Id, string Name, string Status, string? Reference, DateTime StartedAt, bool IsDemo, OrgLocation Location);
 /// <summary>One named level of an instance's organization location, for display. Level is one of <see cref="OrgLevels"/>.</summary>
 public sealed record WorkspaceLocationPart(string Level, string Code, string? NameEn, string? NameAr);
@@ -28,7 +31,7 @@ public interface IWorkflowWorkspace
 {
     Task<Result<WorkspaceCreated>> CreateAsync(WorkspaceDefinitionInput input, Guid actor, CancellationToken ct);
     Task<IReadOnlyList<WorkspaceWorkflow>> CatalogAsync(CancellationToken ct);
-    Task<IReadOnlyList<WorkspaceWorkflow>> ChildrenAsync(CancellationToken ct);
+    Task<IReadOnlyList<WorkspaceWorkflow>> ChildrenAsync(CancellationToken ct, Guid? selectedVersionId = null);
     Task<Result<Guid>> StartAsync(Guid definitionId, WorkspaceStartInput input, Guid actor, bool administrator, CancellationToken ct);
     Task<IReadOnlyList<WorkspaceInstanceSummary>> ListAsync(string? search, CancellationToken ct);
     Task<Result<WorkspaceDetail>> GetAsync(Guid id, Guid actor, bool administrator, Guid? demoActorId, CancellationToken ct);

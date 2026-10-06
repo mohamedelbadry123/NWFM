@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { map, Observable } from 'rxjs';
+import { EMPTY, expand, map, Observable, reduce } from 'rxjs';
 import { ApiResult, PaginatedResult } from '../api/api-result';
 
 export type LookupType = 'Department' | 'Cluster' | 'Cbu' | 'Branch' | 'OperationArea' | 'FieldActivityType' | 'ActivitySource';
@@ -66,7 +66,13 @@ export class LookupsService {
   }
 
   listAll(type: LookupType, options?: { parentCode?: string; isActive?: boolean }): Observable<LookupItem[]> {
-    return this.list(type, 1, 500, undefined, options).pipe(map(r => r.value?.items ?? []));
+    const pageSize = 500;
+    const page = (number: number) => this.list(type, number, pageSize, undefined, options)
+      .pipe(map(result => ({ number, value: result.value })));
+    return page(1).pipe(
+      expand(({ number, value }) => value?.items.length && number * pageSize < value.totalCount ? page(number + 1) : EMPTY),
+      reduce((items, { value }) => [...items, ...(value?.items ?? [])], [] as LookupItem[]),
+    );
   }
 
   create(type: LookupType, body: { code: string } & LookupWrite): Observable<ApiResult<LookupItem>> {

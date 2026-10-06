@@ -55,6 +55,12 @@ public sealed class CreateWorkflowDraftCommandHandler
             now,
             request.ChangeSummary);
 
+        // A fresh canvas still belongs to the same workflow classification and eligible territory.
+        // Published JSON is copied verbatim; the source version and its content hash stay immutable.
+        var previous = await _versionRepo.GetLatestPublishedAsync(request.DefinitionId, cancellationToken);
+        if (previous?.WorkspaceJson is { } workspaceJson)
+            version.SetWorkspace(workspaceJson);
+
         await _versionRepo.AddAsync(version, cancellationToken);
         await _versionRepo.SaveChangesAsync(cancellationToken);
 

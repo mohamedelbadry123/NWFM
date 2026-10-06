@@ -117,13 +117,14 @@ describe('Workflow organization location', () => {
       expect(component.seed()).toBe(seed);
     });
 
-    it('clears the location when switching to a child, keeping the designer version', () => {
+    it('preserves scope when switching to a child, upgrading legacy settings and keeping the designer version', () => {
       component.settings = { kind: 'Main', clusterCode: 'CC', cbuCode: 'RCBU', designerVersion: 2 };
       component.ngOnChanges();
 
       component.kind('Child');
 
-      expect(emitted.at(-1)).toEqual({ kind: 'Child', designerVersion: 2 });
+      expect(emitted.at(-1)).toEqual({ kind: 'Child', designerVersion: 2, schemaVersion: 2,
+        organizationScopes: [{ level: 'Cbu', code: 'RCBU', clusterCode: 'CC', cbuCode: 'RCBU' }] });
     });
   });
 });

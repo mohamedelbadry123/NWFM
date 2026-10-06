@@ -33,10 +33,13 @@ internal static class WorkflowScopeFilter
         var cbuCodes = territories.SelectMany(t => t.CbuCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var branchCodes = territories.SelectMany(t => t.BranchCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var areaCodes = territories.SelectMany(t => t.OperationAreaCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var clusterCodes = territories.SelectMany(t => t.ClusterCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         return i => (i.CbuCode != null && cbuCodes.Contains(i.CbuCode))
             || (i.BranchCode != null && branchCodes.Contains(i.BranchCode))
-            || (i.OperationAreaCode != null && areaCodes.Contains(i.OperationAreaCode));
+            || (i.OperationAreaCode != null && areaCodes.Contains(i.OperationAreaCode))
+            || (i.CbuCode == null && i.BranchCode == null && i.OperationAreaCode == null
+                && i.ClusterCode != null && clusterCodes.Contains(i.ClusterCode));
     }
 
     /// <summary>

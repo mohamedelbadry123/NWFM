@@ -30,7 +30,10 @@ public sealed record OrgScopeTerritory(
     IReadOnlyList<string> CbuCodes,
     IReadOnlyList<string> BranchCodes,
     IReadOnlyList<string> OperationAreaCodes,
-    IReadOnlyList<string> ActivityTypeCodes);
+    IReadOnlyList<string> ActivityTypeCodes)
+{
+    public IReadOnlyList<string> ClusterCodes { get; init; } = [];
+}
 
 /// <summary>
 /// The expanded coverage an owner — a user or a team — holds: its scope rows grouped by department
@@ -74,7 +77,7 @@ public sealed class OrgScopeSet
             var departments = Clean(row.DepartmentCodes);
 
             // A row with no department is one group taking every department.
-            IEnumerable<string?> targets = departments.Count == 0 ? [null] : departments;
+            IEnumerable<string?> targets = departments.Count == 0 ? new string?[] { null } : departments;
 
             foreach (var department in targets)
             {
@@ -120,6 +123,12 @@ public sealed class OrgScopeSet
             && group.AcceptsActivityType(activityTypeCode)
             && group.AcceptsLocation(cbuCode, branchCode, operationAreaCode));
 
+    /// <summary>Broad cluster work requires an explicit cluster grant, not just one of its CBUs.</summary>
+    public bool CoversCluster(string? clusterCode, string? departmentCode = null, string? activityTypeCode = null) => IsUnrestricted
+        || _groups.Any(g => g.AcceptsDepartment(departmentCode)
+            && g.AcceptsActivityType(activityTypeCode)
+            && (g.CoversAllTerritory || clusterCode is not null && g.ClusterCodes.Contains(clusterCode)));
+
     /// <summary>True when this coverage and <paramref name="other"/> share any work at all.</summary>
     public bool Overlaps(OrgScopeSet other) =>
         IsUnrestricted
@@ -141,7 +150,7 @@ public sealed class OrgScopeSet
             [.. group.CbuCodes],
             [.. group.BranchCodes],
             [.. group.OperationAreaCodes],
-            [.. group.ActivityTypeCodes]))];
+            [.. group.ActivityTypeCodes]) { ClusterCodes = [.. group.ClusterCodes] })];
 
     private static List<string> Clean(IReadOnlyList<string>? codes) =>
         (codes ?? []).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())

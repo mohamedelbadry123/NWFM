@@ -29,6 +29,7 @@ public static class DependencyInjection
 
         builder.Services.AddScoped<ITasksDbContext>(sp => sp.GetRequiredService<TasksDbContext>());
         builder.Services.AddScoped<TaskAccess>();
+        builder.Services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowTaskTypeCatalog, WorkflowTaskTypeCatalog>();
         builder.Services.AddSingleton<ITaskReportRenderer, TaskReportRenderer>();
 
         // C2M closure of field activities — off unless C2m:Enabled; see C2mOptions.

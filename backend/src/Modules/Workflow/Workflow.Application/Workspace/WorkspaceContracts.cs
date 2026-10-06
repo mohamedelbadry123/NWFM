@@ -6,6 +6,7 @@ namespace Workflow.Application.Workspace;
 
 public sealed class BusinessActivityConfiguration
 {
+    public Guid? TaskTypeId { get; set; }
     public string? DepartmentCode { get; set; }
     public string? FieldActivityCode { get; set; }
     public string? DefinitionKey { get; set; }

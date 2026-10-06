@@ -3,20 +3,25 @@ import { FormsModule } from '@angular/forms';
 import { LocaleService } from '@core/i18n/locale.service';
 import { OrgScopeSelectorComponent } from '@shared/components/org-scope/org-scope-selector.component';
 import { EMPTY_ORG_LOCATION, OrgLocation } from '@shared/components/org-scope/org-scope.model';
-import { WorkspaceSettings, hasLegacyLocationConflict, workspaceLocation } from './workflow-workspace.service';
+import { WorkspaceSettings, WorkflowOrganizationScope, hasLegacyLocationConflict, workspaceLocation } from './workflow-workspace.service';
+import { WorkflowScopeEditorComponent } from './workflow-scope-editor.component';
+import { WorkflowTypeSelectorComponent } from './workflow-type-selector.component';
 
 /**
  * The workflow kind and, for a main workflow, its place in the shared org hierarchy — picked with the
  * same cascading selector as every other module, so the levels, lookups and parent rules are one set.
  */
-@Component({ selector: 'app-workflow-location', standalone: true, imports: [FormsModule, OrgScopeSelectorComponent], template: `
+@Component({ selector: 'app-workflow-location', standalone: true, imports: [FormsModule, OrgScopeSelectorComponent, WorkflowScopeEditorComponent, WorkflowTypeSelectorComponent], template: `
   <fieldset [disabled]="readonly" class="grid gap-3">
     <label class="sm:max-w-xs">{{ t('Workflow type','نوع سير العمل') }}
       <select class="wf-input" [ngModel]="settings.kind" [ngModelOptions]="standalone" (ngModelChange)="kind($event)">
         <option value="Main">{{ t('Main workflow','سير عمل رئيسي') }}</option><option value="Child">{{ t('Child workflow','سير عمل فرعي') }}</option>
       </select>
     </label>
-    @if (settings.kind === 'Main') {
+    @if (settings.schemaVersion === 2) {
+      <app-workflow-scope-editor [scopes]="settings.organizationScopes || []" [readonly]="readonly" (scopesChange)="chooseScopes($event)" />
+      <app-workflow-type-selector [settings]="settings" [readonly]="readonly" (settingsChange)="updateType($event)" />
+    } @else if (settings.kind === 'Main') {
       <div class="grid gap-2">
         <span class="font-medium">{{ t('Organization location','الموقع التنظيمي') }}</span>
         @if (conflict()) {
@@ -26,6 +31,10 @@ import { WorkspaceSettings, hasLegacyLocationConflict, workspaceLocation } from 
         <p class="text-xs opacity-70">{{ t('Select at least a cluster and a CBU. Branch and operation area are optional; both sit directly under the CBU.','اختر القطاع ووحدة الأعمال على الأقل. الفرع ومنطقة العمليات اختياريان، وكلاهما يتبع وحدة الأعمال مباشرة.') }}</p>
       </div>
     } @else { <p class="text-sm">{{ t('The organization location is inherited from the main workflow when this child starts.','يتم توريث الموقع التنظيمي من سير العمل الرئيسي عند بدء التنفيذ.') }}</p> }
+    @if (settings.schemaVersion !== 2 && !readonly) {
+      <button type="button" class="wf-btn-secondary justify-self-start" (click)="upgrade()">{{ t('Configure organization scope and workflow type', 'إعداد النطاق التنظيمي ونوع النشاط أو المهمة') }}</button>
+      <p class="text-xs opacity-70">{{ t('Review the scope when upgrading this older workflow. Branch and Operation Area selections will be separate eligible units.', 'راجع النطاق عند تحديث سير العمل القديم. تصبح الفروع ومناطق العمليات المحددة وحدات مؤهلة مستقلة.') }}</p>
+    }
   </fieldset>
 ` })
 export class WorkflowLocationComponent implements OnChanges {
@@ -44,10 +53,29 @@ export class WorkflowLocationComponent implements OnChanges {
     if (this.settings !== this.emitted) this.seed.set(workspaceLocation(this.settings));
   }
   kind(kind: 'Main' | 'Child') {
-    // A child names no place of its own, and a new main starts from an empty location.
-    this.seed.set({ ...EMPTY_ORG_LOCATION });
-    this.emit({ kind, ...(this.settings.designerVersion ? { designerVersion: this.settings.designerVersion } : {}) });
+    if (this.readonly) return;
+    if (this.settings.schemaVersion !== 2) this.upgrade();
+    const { fieldActivityTypeId: _field, departmentCode: _department, fieldActivityCode: _code, taskTypeId: _task, ...rest } = this.settings;
+    this.emit({ ...rest, kind });
   }
+  upgrade() {
+    if (this.readonly) return;
+    const place = workspaceLocation(this.settings);
+    const scopes: WorkflowOrganizationScope[] = [];
+    if (place.clusterCode) {
+      const base = { clusterCode: place.clusterCode, ...(place.cbuCode ? { cbuCode: place.cbuCode } : {}) };
+      if (place.branchCode) scopes.push({ ...base, level: 'Branch', code: place.branchCode });
+      if (place.operationAreaCode) scopes.push({ ...base, level: 'OperationArea', code: place.operationAreaCode });
+      if (!scopes.length) scopes.push({ ...base, level: place.cbuCode ? 'Cbu' : 'Cluster', code: place.cbuCode || place.clusterCode });
+    }
+    this.chooseScopes(scopes);
+  }
+  chooseScopes(organizationScopes: WorkflowOrganizationScope[]) {
+    if (this.readonly) return;
+    const { clusterCode: _cluster, cbuCode: _cbu, branchCode: _branch, operationAreaCode: _area, regionCode: _region, cityCode: _city, ...rest } = this.settings;
+    this.emit({ ...rest, schemaVersion: 2, organizationScopes });
+  }
+  updateType(settings: WorkspaceSettings) { if (!this.readonly) this.emit(settings); }
   chooseLocation(location: OrgLocation) {
     // An explicit choice replaces whatever the saved settings held, legacy keys included.
     const { regionCode: _region, cityCode: _city, clusterCode: _cluster, cbuCode: _cbu, branchCode: _branch, operationAreaCode: _area, ...rest } = this.settings;
