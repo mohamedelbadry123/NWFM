@@ -81,8 +81,7 @@ export interface FieldCatalogItem {
 /** A submission row: base columns plus whatever answer columns the form declares. */
 export type FormSubmissionRow = Record<string, unknown>;
 
-export interface CreateFormPayload {
-  code: string;
+export interface UpdateFormPayload {
   nameEn: string;
   nameAr: string;
   category: string;
@@ -90,7 +89,10 @@ export interface CreateFormPayload {
   fieldActivityCode: string;
 }
 
-export type UpdateFormPayload = Omit<CreateFormPayload, 'code'>;
+/** A new form needs only its code and names; it is classified later through an update. */
+export type CreateFormPayload = Pick<UpdateFormPayload, 'nameEn' | 'nameAr'>
+  & Partial<Omit<UpdateFormPayload, 'nameEn' | 'nameAr'>>
+  & { code: string };
 
 export interface CloneFormPayload {
   newCode: string;

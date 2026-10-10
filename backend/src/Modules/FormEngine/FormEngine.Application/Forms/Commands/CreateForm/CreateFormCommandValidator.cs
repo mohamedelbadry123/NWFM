@@ -10,8 +10,8 @@ public sealed class CreateFormCommandValidator : AbstractValidator<CreateFormCom
         RuleFor(x => x.Code).ValidFormCode();
         RuleFor(x => x.NameEn).ValidFormName("English");
         RuleFor(x => x.NameAr).ValidFormName("Arabic");
-        RuleFor(x => x.Category).ValidFormCategory();
-        RuleFor(x => x.DepartmentCode).RequiredDepartmentCode();
-        RuleFor(x => x.FieldActivityCode).RequiredFieldActivityCode();
+        RuleFor(x => x.Category!).ValidFormCategory().When(x => !string.IsNullOrWhiteSpace(x.Category));
+        RuleFor(x => x.DepartmentCode).ValidDepartmentCode();
+        RuleFor(x => x.FieldActivityCode).ValidFieldActivityCode();
     }
 }

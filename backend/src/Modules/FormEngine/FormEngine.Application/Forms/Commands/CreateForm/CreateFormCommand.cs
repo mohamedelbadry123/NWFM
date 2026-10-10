@@ -13,9 +13,11 @@ public sealed record CreateFormCommand : IRequest<Result<FormDetailDto>>
     public string Code { get; init; } = default!;
     public string NameEn { get; init; } = default!;
     public string NameAr { get; init; } = default!;
-    public string Category { get; init; } = default!;
+    /// <summary>Defaults to <c>GENERAL</c> when omitted.</summary>
+    public string? Category { get; init; }
+
     public string? DepartmentCode { get; init; }
 
-    /// <summary>The field activity the form records, one of the department's.</summary>
+    /// <summary>The field activity the form records, one of the department's. Optional at creation.</summary>
     public string? FieldActivityCode { get; init; }
 }
