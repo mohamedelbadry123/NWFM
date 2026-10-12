@@ -36,6 +36,12 @@ internal sealed class FormGateway(
     /// </summary>
     private readonly Dictionary<(Guid FormId, int VersionNo), FormSchema?> _schemas = [];
 
+    public async Task<IReadOnlyList<FieldActivityFormInfo>> ListByIdsAsync(IReadOnlyList<Guid> ids, CancellationToken cancellationToken)
+    {
+        var forms = await context.FormDefinitions.AsNoTracking().Where(f => ids.Contains(f.Id)).ToListAsync(cancellationToken);
+        return await ToFieldActivityInfoAsync(forms, cancellationToken);
+    }
+
     public async Task<PublishedFormInfo?> FindPublishedAsync(Guid formId, CancellationToken cancellationToken)
     {
         var form = await context.FormDefinitions
@@ -147,8 +153,8 @@ internal sealed class FormGateway(
                 f.NameAr,
                 f.Category,
                 f.Status,
-                f.DepartmentCode!,
-                f.FieldActivityCode!,
+                f.DepartmentCode ?? "",
+                f.FieldActivityCode ?? "",
                 f.CurrentVersionNo,
                 versionsByForm.TryGetValue(f.Id, out var numbers) ? numbers : [],
                 f.AcceptsSubmissions,

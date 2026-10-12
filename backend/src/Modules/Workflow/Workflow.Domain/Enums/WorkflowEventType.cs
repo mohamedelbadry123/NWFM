@@ -38,4 +38,5 @@ public enum WorkflowEventType
     IntegrationCompleted = 33,
     IntegrationFailed = 34,
     SlaBreached = 35,
+    FormSubmitted = 36,
 }

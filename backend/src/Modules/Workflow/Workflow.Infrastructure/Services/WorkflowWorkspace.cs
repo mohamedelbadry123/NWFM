@@ -284,7 +284,7 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 if (!definition.Outcomes.Any(o => o.IsActive && o.OutcomeKey == input.Action)) return Result.Failure(Invalid("Select a configured task outcome."));
                 if (item.Status == WorkItemStatus.Pending)
                 { var claimed = await sender.Send(new ClaimWorkItemCommand(item.Id, effective, tenant.OrganizationId), ct); if (claimed.IsFailure) return Result.Failure(claimed.Error); }
-                var completed = await sender.Send(new CompleteWorkItemCommand(item.Id, effective, tenant.OrganizationId, input.Action, input.Comment, FormValues: input.FormValues), ct);
+                var completed = await sender.Send(new CompleteWorkItemCommand(item.Id, effective, tenant.OrganizationId, input.Action, input.Comment, FormValues: input.FormValues, FormVisitId: input.FormVisitId), ct);
                 if (completed.IsFailure) return Result.Failure(completed.Error);
             }
             db.WorkspaceActions.Add(WorkflowWorkspaceAction.Create(tenant.OrganizationId, input.RequestId, workItemId, actor, effective, fingerprint));

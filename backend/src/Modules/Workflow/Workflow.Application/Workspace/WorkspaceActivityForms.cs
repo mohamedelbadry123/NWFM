@@ -1,5 +1,6 @@
 using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Results;
+using NWFM.Shared.Integration.Workflow;
 
 namespace Workflow.Application.Workspace;
 
@@ -7,18 +8,40 @@ namespace Workflow.Application.Workspace;
 public sealed record ActivityFormPreview(Guid FormId, string Code, string NameEn, string NameAr, string Status, int VersionNo, bool IsUsable, string SchemaJson);
 
 /// <summary>
-/// The Form Engine forms an activity's Department + Field Activity Type are filed under, as the designer's Form tab shows
-/// them. Discovery only: nothing here binds a form to the activity, and the form engine stays the owner of the forms —
-/// they are read through <see cref="IFormGateway"/>, never from its tables.
+/// Discovers and previews forms associated with an activity's Task Type. Legacy classification lookups remain
+/// available for compatibility. FormEngine owns schemas; reads go through <see cref="IFormGateway"/>.
 /// </summary>
 public interface IWorkspaceActivityForms
 {
+    Task<Result<FieldActivityFormPage>> ListForTaskTypeAsync(Guid taskTypeId, CancellationToken ct);
+    Task<Result<ActivityFormPreview>> PreviewForTaskTypeAsync(Guid taskTypeId, Guid formId, int versionNo, CancellationToken ct);
     Task<Result<FieldActivityFormPage>> ListAsync(string? departmentCode, string? fieldActivityCode, int pageNumber, int pageSize, CancellationToken ct);
     Task<Result<ActivityFormPreview>> PreviewAsync(string? departmentCode, string? fieldActivityCode, Guid formId, int versionNo, CancellationToken ct);
 }
 
-public sealed class WorkspaceActivityForms(IFormGateway forms) : IWorkspaceActivityForms
+public sealed class WorkspaceActivityForms(IFormGateway forms, IWorkflowTaskTypeCatalog? taskTypes = null) : IWorkspaceActivityForms
 {
+    public async Task<Result<FieldActivityFormPage>> ListForTaskTypeAsync(Guid taskTypeId, CancellationToken ct)
+    {
+        if (taskTypes is null || !await taskTypes.IsActiveAsync(taskTypeId, ct))
+            return Result.Failure<FieldActivityFormPage>(new Error("ActivityForms.TaskType", "Select an active Task Type."));
+        var ids = await taskTypes.FormIdsAsync(taskTypeId, ct);
+        var found = await forms.ListByIdsAsync(ids, ct);
+        var items = ids.Select(id => found.FirstOrDefault(f => f.Id == id)).OfType<FieldActivityFormInfo>().ToList();
+        return Result.Success(new FieldActivityFormPage(items, items.Count, items.Count(f => f.IsUsable), 1, MaxPageSize));
+    }
+
+    public async Task<Result<ActivityFormPreview>> PreviewForTaskTypeAsync(Guid taskTypeId, Guid formId, int versionNo, CancellationToken ct)
+    {
+        var page = await ListForTaskTypeAsync(taskTypeId, ct);
+        if (page.IsFailure) return Result.Failure<ActivityFormPreview>(page.Error);
+        var form = page.Value.Items.FirstOrDefault(f => f.Id == formId);
+        if (form is null) return Result.Failure<ActivityFormPreview>(NotFound);
+        if (!form.VersionNos.Contains(versionNo)) return Result.Failure<ActivityFormPreview>(VersionNotFound);
+        var schema = await forms.GetVersionSchemaAsync(formId, versionNo, ct);
+        return schema is null ? Result.Failure<ActivityFormPreview>(VersionNotFound)
+            : Result.Success(new ActivityFormPreview(form.Id, form.Code, form.NameEn, form.NameAr, form.Status, versionNo, form.IsUsable, schema));
+    }
     public const int MaxPageSize = 100;
     public static readonly Error ContextRequired = new("ActivityForms.ContextRequired", "Select a Department and Field Activity Type.");
     public static readonly Error NotFound = new("ActivityForms.NotFound", "This form is not filed under the activity's Department and Field Activity Type.");

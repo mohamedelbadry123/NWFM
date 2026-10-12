@@ -1,3 +1,5 @@
+import type { ActivityFormStep, ActivityFormVisit } from './workflow-form-routing.types';
+import type { WorkflowSelectedForm } from './workflow-selected-form.component';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { WorkItemDto } from '@shared/models/models/Workflow/Application/DTOs/work-item-dto';
@@ -91,7 +93,7 @@ export interface WorkspaceLocationPart { level: OrgScopeLevel; code: string; nam
 export interface ReferenceItem { id: string; code: string; nameEn: string; nameAr: string; parentCode?: string }
 export interface WorkspaceWorkflow { id: string; name: string; nameAr?: string; versionId: string; versionNumber: number; workspaceJson: string; definitionKey?: string; startScopes?: WorkflowOrganizationScope[] }
 export interface WorkspaceInstance { id: string; name: string; status: string; reference?: string; startedAt: string; isDemo: boolean; location: OrgLocation }
-export interface WorkspaceTask { task: WorkItemDto & { instructionsEn?: string; instructionsAr?: string; formFields?: {key: string; labelEn: string; labelAr: string; type: string; required: boolean; options?: string[]}[]; formValues?: Record<string, unknown> }; canAct: boolean; completionBlocked?: boolean; disabledReason?: string }
+export interface WorkspaceTask { task: WorkItemDto & { instructionsEn?: string; instructionsAr?: string; formFields?: {key: string; labelEn: string; labelAr: string; type: string; required: boolean; options?: string[]}[]; selectedForm?: WorkflowSelectedForm; formVisitId?: string; activeFormStepId?: string; formSteps?: ActivityFormStep[]; formHistory?: ActivityFormVisit[]; formValues?: Record<string, unknown> }; canAct: boolean; completionBlocked?: boolean; disabledReason?: string }
 export interface WorkspaceActivity { id: string; nodeKey: string; name: string; type: string; status: string; phase?: string; startedAt: string; completedAt?: string; dueAt?: string; departmentCode?: string; fieldActivityCode?: string; assignedGroup?: string; sla?: {name:string;duration:number;durationUnit:string;timeZone:string}; tasks: WorkspaceTask[] }
 export interface WorkspaceExecution { id: string; parentInstanceId?: string; parentActivityInstanceId?: string; name: string; status: string; activities: WorkspaceActivity[] }
 export interface WorkspaceDetail { id: string; isDemo: boolean; location: WorkspaceLocationPart[]; tree: WorkspaceExecution[]; history: { id: string; instanceId: string; type: string; nodeKey?: string; actorName?: string; occurredAt: string; payloadJson?: string }[]; operations: { id: string; activityId: string; eventNodeKey?: string; name?: string; kind: string; trigger?: string; required: boolean; status: string; attempts: number; error?: string; statusCode?: number; responseJson?: string }[]; demoActors: { userId: string; name: string }[] }
@@ -107,5 +109,5 @@ export class WorkflowWorkspaceService {
   start(id: string, requestId: string, reference: string, isDemo: boolean, location?: OrgLocation) { return this.http.post<{ instanceId: string }>(`${this.base}/definitions/${id}/instances`, { requestId, reference, isDemo, location }); }
   instances(search = '') { return this.http.get<WorkspaceInstance[]>(`${this.base}/instances`, { params: { search } }); }
   detail(id: string, demoActorId?: string) { return this.http.get<WorkspaceDetail>(`${this.base}/instances/${id}`, { params: demoActorId ? { demoActorId } : {} }); }
-  act(id: string, body: { requestId: string; action: string; comment?: string; formValues?: Record<string, unknown>; demoActorId?: string }) { return this.http.post<void>(`${this.base}/tasks/${id}/${body.action === 'comment' ? 'comments' : 'actions'}`, body); }
+  act(id: string, body: { requestId: string; action: string; comment?: string; formValues?: Record<string, unknown>; demoActorId?: string; formVisitId?: string }) { return this.http.post<void>(`${this.base}/tasks/${id}/${body.action === 'comment' ? 'comments' : 'actions'}`, body); }
 }

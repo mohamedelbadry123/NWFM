@@ -107,7 +107,11 @@
     "FormEngine.Form.InvalidFieldActivity": "النشاط الميداني ليس نشاطاً فعّالاً للإدارة المختارة.",
     "Tasks.TaskForm.NotFound": "هذا النموذج ليس من نماذج المهمة.",
     "Tasks.TaskForm.Duplicate": "المهمة تحمل هذا النموذج بالفعل.",
-    "Tasks.TaskForm.ChoiceRequired": "اختر أي نموذج من نماذج المهمة تتم تعبئته."
+    "Tasks.TaskForm.ChoiceRequired": "اختر أي نموذج من نماذج المهمة تتم تعبئته.",
+    "Workflow.Form.VisitRequired": "حدث المهمة قبل إرسال النموذج.",
+    "Workflow.Form.StaleVisit": "هذا النموذج لم يعد نشطاً. حدث المهمة.",
+    "Workflow.Form.Routing": "تحتاج إعدادات توجيه النموذج إلى تصحيح. تواصل مع مصمم سير العمل.",
+    "Workflow.Form.Invalid": "تعذر إرسال النموذج. راجع الإجابات وأعد المحاولة."
   },
   "workflow": {
     "common": {
@@ -735,7 +739,7 @@
       "tab_help_outcomes": "أزرار المراجع (موافقة، رفض، إعادة). لا تعمل حتى ترسم سهماً من القرار لكل مفتاح.",
       "tab_help_sla": "عدد الساعات المسموح بها لهذه المهمة قبل اعتبارها متأخرة.",
       "tab_help_data": "ربط حقول الطلب بهذه الخطوة وإعادة النتائج إلى الوحدة.",
-      "tab_help_form": "نماذج محرك النماذج المصنفة تحت قسم هذا النشاط ونوع نشاطه الميداني. تُعرض للاطلاع والمعاينة فقط؛ لا يُربط أي منها بالنشاط ولا يصبح إلزامياً.",
+      "tab_help_form": "عاين النماذج المنشورة المرتبطة بنوع مهمة هذا النشاط وأضفها. اضبط وجهات كل نموذج في الإجراءات.",
       "tab_help_advanced": "JSON تقني لخيارات نادرة. اتركه فارغاً إن لم تحتج إليه.",
       "props_sla_duration_hours": "مدة الاتفاقية (ساعات)",
       "props_sla_escalation_key": "مفتاح التصعيد",
@@ -936,7 +940,9 @@
       "node_main_activity": "نشاط رئيسي",
       "node_desc_main_activity": "سير عمل فرعي ثم اعتماد رئيسي",
       "node_sms": "SMS",
-      "node_desc_sms": "إرسال رسالة نصية عبر مزود HTTP"
+      "node_desc_sms": "إرسال رسالة نصية عبر مزود HTTP",
+      "tab_actions": "الإجراءات",
+      "tab_help_actions": "إعداد قواعد التوجيه لكل نموذج."
     },
     "help": {
       "title": "قاعدة معرفة سير العمل",
@@ -1443,7 +1449,8 @@
         "history_event_WorkItemReleased": "أُخليت الخطوة",
         "history_event_WorkItemReassigned": "أُعيد تعيين الخطوة",
         "history_event_WorkItemDelegated": "فُوِّضت الخطوة",
-        "history_event_ActivityFailed": "فشلت الخطوة"
+        "history_event_ActivityFailed": "فشلت الخطوة",
+        "history_event_FormSubmitted": "تم إرسال النموذج"
       },
       "case": {
         "close": "إغلاق",

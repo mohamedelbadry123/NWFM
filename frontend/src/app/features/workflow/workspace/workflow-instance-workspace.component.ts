@@ -1,4 +1,6 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { WorkflowFormProgressComponent } from './workflow-form-progress.component';
+import { WorkflowSelectedFormComponent } from './workflow-selected-form.component';
+import { QueryList, ViewChildren, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -11,7 +13,7 @@ import { LEVEL_LABEL_KEYS } from '@shared/components/org-scope/org-scope.model';
 import { WorkflowIntegrationsService } from '../integrations/workflow-integrations.service';
 import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, WorkspaceLocationPart, WorkspaceTask } from './workflow-workspace.service';
 
-@Component({ selector: 'app-workflow-instance-workspace', standalone: true, imports: [FormsModule, DatePipe, RouterLink, NgTemplateOutlet], template: `
+@Component({ selector: 'app-workflow-instance-workspace', standalone: true, imports: [WorkflowFormProgressComponent,WorkflowSelectedFormComponent, FormsModule, DatePipe, RouterLink, NgTemplateOutlet], template: `
 <main class="p-5 sm:p-8 space-y-6 max-w-7xl mx-auto">
   <a routerLink="/admin/workflow/instances" class="text-primary underline">{{ t('Back to instances','العودة إلى النسخ') }}</a>
   @if (error()) {<p class="p-4 rounded-xl border border-red-300 bg-red-50 text-red-800" role="alert">{{ error() }}</p>}
@@ -49,7 +51,10 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
       @for (child of children(run.id,activity.id); track child.id) {<details class="mt-4 border-s-2 ps-4" open><summary class="cursor-pointer font-medium">{{ child.name }} · {{ child.status }}</summary><div class="mt-3"><ng-container *ngTemplateOutlet="execution; context: {$implicit:child}" /></div></details>}
       @for (entry of activity.tasks; track entry.task.id) {
         <div class="mt-4 border-t pt-4 space-y-3"><p class="text-sm">{{ t('Assigned group','المجموعة المسؤولة') }}: <strong>{{ entry.task.assignmentGroupName }}</strong></p>
+        <app-workflow-form-progress [steps]="entry.task.formSteps||[]" [history]="entry.task.formHistory||[]" [activeStepId]="entry.task.activeFormStepId" [workItemId]="entry.task.id" [completed]="entry.task.status==='Completed'" />
+        @if(entry.task.selectedForm){<app-workflow-selected-form [selectedForm]="entry.task.selectedForm" [workItemId]="entry.task.id" [answers]="formValues[entry.task.id]" (answersChange)="formValues[entry.task.id]=$event" [readonly]="!entry.canAct" />}
         @if (entry.canAct) {
+          @if(!demoActor){<a class="text-primary underline text-sm" [routerLink]="['/org/workflow/tasks',entry.task.id]">{{t('Open task details','فتح تفاصيل المهمة')}}</a>}
           <p class="text-sm">{{ entry.task.instructionsEn }}</p>
           @for (field of entry.task.formFields || []; track field.key) {
             <label class="block text-sm">{{ field.labelEn || field.key }} @if (field.required) {*}
@@ -60,7 +65,7 @@ import { WorkflowWorkspaceService, WorkspaceDetail, WorkspaceExecution, Workspac
             </label>
           }
           <label class="block text-sm">{{ t('Comment','تعليق') }}<textarea class="wf-input" rows="3" maxlength="4000" [(ngModel)]="comments[entry.task.id]"></textarea></label>
-          @if(entry.completionBlocked){<p role="status">{{ t('Waiting for required events to finish. See Events and integrations for details.','بانتظار اكتمال الأحداث المطلوبة. راجع تفاصيل الأحداث والتكاملات.') }}</p>}<div class="flex flex-wrap gap-2">@for (outcome of entry.task.availableOutcomes || []; track outcome.id) {<button class="wf-btn-primary" [disabled]="busy() || entry.completionBlocked" (click)="act(entry,outcome.outcomeKey)">{{ outcome.outcomeKey === 'APPROVE' ? t('Accept','قبول') : outcome.outcomeKey === 'REJECT' ? t('Reject','رفض') : outcome.name }}</button>}<button class="wf-btn-secondary" [disabled]="busy() || !comments[entry.task.id]?.trim()" (click)="act(entry,'comment')">{{ t('Add comment','إضافة تعليق') }}</button></div>
+          @if(entry.completionBlocked){<p role="status">{{ t('Waiting for required events to finish. See Events and integrations for details.','بانتظار اكتمال الأحداث المطلوبة. راجع تفاصيل الأحداث والتكاملات.') }}</p>}<div class="flex flex-wrap gap-2">@for (outcome of entry.task.availableOutcomes || []; track outcome.id) {<button class="wf-btn-primary" [disabled]="busy() || entry.completionBlocked" (click)="act(entry,outcome.outcomeKey)">{{ outcome.outcomeKey === 'APPROVE' ? (entry.task.formSteps?.length ? t('Submit and continue','إرسال ومتابعة') : t('Accept','قبول')) : outcome.outcomeKey === 'REJECT' ? t('Reject','رفض') : outcome.name }}</button>}<button class="wf-btn-secondary" [disabled]="busy() || !comments[entry.task.id]?.trim()" (click)="act(entry,'comment')">{{ t('Add comment','إضافة تعليق') }}</button></div>
         } @else {<p class="text-sm opacity-70">{{ entry.disabledReason }}</p>}
         </div>
       }
@@ -72,7 +77,8 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
   private readonly api = inject(WorkflowWorkspaceService); private readonly integrations = inject(WorkflowIntegrationsService);
   private readonly route = inject(ActivatedRoute); private readonly locale = inject(LocaleService); private readonly destroy = inject(DestroyRef); private readonly auth = inject(AuthStore); private readonly translate = inject(TranslateService);
   readonly detail = signal<WorkspaceDetail | null>(null); readonly error = signal(''); readonly loading = signal(false); readonly busy = signal(false);
-  demoActor = ''; comments: Record<string,string> = {}; formValues: Record<string,Record<string,unknown>> = {}; private id = '';
+  demoActor = ''; comments: Record<string,string> = {}; formValues: Record<string,Record<string,unknown>> = {}; private visits:Record<string,string|undefined>={}; private id = '';
+  @ViewChildren(WorkflowSelectedFormComponent) selectedForms!:QueryList<WorkflowSelectedFormComponent>;
   private pending: {fingerprint:string;id:string} | null = null;
   private loadSequence = 0;
   t(en: string, ar: string) { return this.locale.locale() === 'ar' ? ar : en; }
@@ -85,7 +91,7 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
       next:d=>{
         if(sequence!==this.loadSequence)return;
         for(const run of d.tree)for(const activity of run.activities)for(const entry of activity.tasks){
-          const id=entry.task.id!;this.formValues[id] ??= {...entry.task.formValues};this.comments[id] ??= '';
+          const id=entry.task.id!;if(this.visits[id]!==entry.task.formVisitId){this.visits[id]=entry.task.formVisitId;this.formValues[id]={...entry.task.formValues};}if(entry.task.status==='Completed'&&JSON.stringify(this.formValues[id])!==JSON.stringify(entry.task.formValues))this.formValues[id]={...entry.task.formValues};this.formValues[id] ??= {...entry.task.formValues};this.comments[id] ??= '';
         }
         this.detail.set(d);this.loading.set(false);if(!quiet)this.error.set('');
       },
@@ -99,6 +105,6 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
   comment(raw?: string) { try{return JSON.parse(raw||'{}').comment || '';}catch{return '';} }
   overdue(due: string, status: string) { return status==='Active'&&Date.parse(due)<Date.now(); }
   phase(value?: string) { const labels:Record<string,string>={WaitingForChild:this.t('Waiting for child workflow','بانتظار سير العمل الفرعي'),AwaitingApproval:this.t('Awaiting approval','بانتظار الاعتماد'),WaitingForEnterEvents:this.t('Processing entry events','معالجة أحداث الدخول'),WaitingForOutcomeEvents:this.t('Processing required events','معالجة الأحداث المطلوبة')};return value ? labels[value] || value : ''; }
-  act(entry: WorkspaceTask, action: string) { if(this.busy()||!entry.task.id)return;const body={action,comment:this.comments[entry.task.id],formValues:this.formValues[entry.task.id],demoActorId:this.demoActor||undefined};const fingerprint=JSON.stringify({id:entry.task.id,...body});if(this.pending?.fingerprint!==fingerprint)this.pending={fingerprint,id:crypto.randomUUID()};this.busy.set(true);this.error.set('');this.api.act(entry.task.id,{...body,requestId:this.pending!.id}).subscribe({next:()=>{this.pending=null;this.comments[entry.task.id!]='';this.busy.set(false);this.load();},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Action could not be completed.');}}); }
+  act(entry: WorkspaceTask, action: string) { if(this.busy()||!entry.task.id)return;const renderer=this.selectedForms?.find(f=>f.workItemId===entry.task.id);if(entry.task.selectedForm&&action!=='comment'&&action.toUpperCase()!=='REJECT'&&(!renderer||!renderer.validate()))return;const body={action,formVisitId:entry.task.formVisitId,comment:this.comments[entry.task.id],formValues:entry.task.selectedForm?renderer?.payload():this.formValues[entry.task.id],demoActorId:this.demoActor||undefined};const fingerprint=JSON.stringify({id:entry.task.id,...body});if(this.pending?.fingerprint!==fingerprint)this.pending={fingerprint,id:crypto.randomUUID()};this.busy.set(true);this.error.set('');this.api.act(entry.task.id,{...body,requestId:this.pending!.id}).subscribe({next:()=>{this.pending=null;this.comments[entry.task.id!]='';this.busy.set(false);this.load();},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Action could not be completed.');}}); }
   retry(id: string) { this.busy.set(true);this.integrations.replay(id).subscribe({next:()=>{this.busy.set(false);this.load();},error:e=>{this.busy.set(false);this.error.set(e.error?.message || 'Retry failed.');}}); }
 }

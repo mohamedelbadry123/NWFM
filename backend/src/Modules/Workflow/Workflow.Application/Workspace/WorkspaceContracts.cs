@@ -7,6 +7,10 @@ namespace Workflow.Application.Workspace;
 public sealed class BusinessActivityConfiguration
 {
     public Guid? TaskTypeId { get; set; }
+    public Guid? FormDefinitionId { get; set; }
+    public int? FormVersionNo { get; set; }
+    public List<ActivityFormStep> FormSteps { get; set; } = [];
+    public bool FormStepsReviewRequired { get; set; }
     public string? DepartmentCode { get; set; }
     public string? FieldActivityCode { get; set; }
     public string? DefinitionKey { get; set; }

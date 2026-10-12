@@ -1,3 +1,5 @@
+import type { WorkflowSelectedForm } from './workspace/workflow-selected-form.component';
+import type { ActivityFormStep, ActivityFormVisit } from './workspace/workflow-form-routing.types';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -14,7 +16,8 @@ import type { CompleteWorkItemPayload, WorkflowWorkItemExtras } from '@core/mode
 export type WorkflowWorkItemView = WorkItemDto & WorkflowWorkItemExtras & {
   instructionsEn?: string; instructionsAr?: string;
   formFields?: { key: string; labelEn: string; labelAr: string; type: string; required: boolean; options?: string[] }[];
-  formValues?: Record<string, unknown>;
+  selectedForm?: WorkflowSelectedForm; formValues?: Record<string, unknown>;
+  formVisitId?: string; activeFormStepId?: string; formSteps?: ActivityFormStep[]; formHistory?: ActivityFormVisit[];
 };
 
 @Injectable({ providedIn: 'root' })

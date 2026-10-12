@@ -9,7 +9,7 @@ namespace Workflow.Application.Workspace;
 public sealed record WorkspaceDefinitionInput(string Name, string? NameAr, WorkflowWorkspaceDefinition Settings);
 public sealed record WorkspaceCreated(Guid DefinitionId, Guid VersionId);
 public sealed record WorkspaceStartInput(Guid RequestId, string? Reference, bool IsDemo = false, OrgLocation? Location = null);
-public sealed record WorkspaceActionInput(Guid RequestId, string Action, string? Comment = null, Dictionary<string, JsonElement>? FormValues = null, Guid? DemoActorId = null);
+public sealed record WorkspaceActionInput(Guid RequestId, string Action, string? Comment = null, Dictionary<string, JsonElement>? FormValues = null, Guid? DemoActorId = null, Guid? FormVisitId = null);
 public sealed record WorkspaceWorkflow(Guid Id, string Name, string? NameAr, Guid VersionId, int VersionNumber, string? WorkspaceJson, string? DefinitionKey = null)
 {
     public IReadOnlyList<WorkflowOrganizationScope>? StartScopes { get; init; }

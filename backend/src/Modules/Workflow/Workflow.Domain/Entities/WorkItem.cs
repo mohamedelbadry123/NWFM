@@ -32,6 +32,8 @@ public sealed class WorkItem : Entity, ITenantAware
     public string? ActionTaken { get; private set; }
     public string? CommentText { get; private set; }
     public string? FormDataJson { get; private set; }
+    public string? FormProgressJson { get; private set; }
+    public void SetFormProgress(string json) => FormProgressJson = json;
     public void SetFormData(string json) => FormDataJson = json;
 
     /// <summary>Optimistic concurrency token — only one claimant wins a concurrent race.</summary>
@@ -131,4 +133,3 @@ public sealed class WorkItem : Entity, ITenantAware
         SetUpdated(delegatedAt);
     }
 }
-

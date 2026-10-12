@@ -366,6 +366,7 @@
             <g [attr.transform]="'translate(' + panX() + ',' + panY() + ') scale(' + zoom() + ')'">
 
               @for(link of visualLinks();track link.id){<g (click)="onNodeClick($event,link.target)"><path [attr.d]="link.path" fill="none" stroke="#c084fc" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow)"/><text [attr.x]="link.x" [attr.y]="link.y" fill="#9333ea" font-size="12">{{ link.label }}</text></g>}
+              @for(link of formRouteLinks();track link.id){<g (click)="openFormRoute($event,link.source)"><path [attr.d]="link.path" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow)"/><text [attr.x]="link.x" [attr.y]="link.y" fill="#0284c7" font-size="11">{{link.label}}</text></g>}
               <!-- Edges -->
               @for (e of edges(); track e.id) {
                 <g class="edge-group" (click)="onEdgeClick($event, e.id)" (contextmenu)="onEdgeContextMenu($event, e.id)">
@@ -521,26 +522,26 @@
                     <!-- Task nodes: rounded rectangle with left accent bar -->
                     <!-- Multi-select secondary highlight (dashed) -->
                     @if (selectedNodeIds().includes(n.id) && selectedNodeId() !== n.id) {
-                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="NODE_W + 6" [attr.height]="NODE_H + 6" rx="12"
+                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="nodeWidth(n) + 6" [attr.height]="nodeHeight(n) + 6" rx="12"
                         fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,2" class="pointer-events-none" />
                     }
                     <!-- Shadow/glow for primary selected -->
                     @if (selectedNodeId() === n.id) {
-                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="NODE_W + 6" [attr.height]="NODE_H + 6" rx="11"
+                      <rect [attr.x]="n.x - 3" [attr.y]="n.y - 3" [attr.width]="nodeWidth(n) + 6" [attr.height]="nodeHeight(n) + 6" rx="11"
                         [attr.fill]="nodeColor(n.type)" fill-opacity="0.15" class="pointer-events-none" />
                     }
                     <!-- Main body -->
-                    <rect [attr.x]="n.x" [attr.y]="n.y" [attr.width]="NODE_W" [attr.height]="NODE_H" rx="9"
+                    <rect [attr.x]="n.x" [attr.y]="n.y" [attr.width]="nodeWidth(n)" [attr.height]="nodeHeight(n)" rx="9"
                       [attr.fill]="taskFill(selectedNodeId() === n.id)"
                       [attr.stroke]="taskStroke(selectedNodeId() === n.id)"
                       [attr.stroke-width]="selectedNodeId() === n.id ? 2 : 1.25"
                       class="cursor-move" />
                     <!-- Left accent bar — full height minus corners -->
-                    <rect [attr.x]="n.x" [attr.y]="n.y + 9" width="4" [attr.height]="NODE_H - 18" rx="2"
+                    <rect [attr.x]="n.x" [attr.y]="n.y + 9" width="4" [attr.height]="nodeHeight(n) - 18" rx="2"
                       [attr.fill]="nodeColor(n.type)" class="pointer-events-none" />
                     <!-- Separator line between top and bottom halves -->
                     <line [attr.x1]="n.x + 6" [attr.y1]="n.y + NODE_H * 0.56"
-                      [attr.x2]="n.x + NODE_W - 4" [attr.y2]="n.y + NODE_H * 0.56"
+                      [attr.x2]="n.x + nodeWidth(n) - 4" [attr.y2]="n.y + NODE_H * 0.56"
                       stroke="#312e81" stroke-width="0.5" class="pointer-events-none" />
 
                     <!-- Top half: icon + name -->
@@ -571,7 +572,7 @@
                     @if (nodeSubLabel(n)) {
                       <!-- Assignment key or Action key badge -->
                       <rect [attr.x]="n.x + 8" [attr.y]="n.y + NODE_H * 0.58 + 3"
-                        [attr.width]="NODE_W - 16" height="15" rx="3"
+                        [attr.width]="nodeWidth(n) - 16" height="15" rx="3"
                         fill="var(--ds-primary-soft)" class="pointer-events-none" />
                       <text [attr.x]="n.x + 12" [attr.y]="n.y + NODE_H * 0.58 + 14"
                         font-size="9" fill="var(--ds-primary)" class="pointer-events-none select-none">
@@ -582,7 +583,7 @@
 
                     <!-- Outcome count pill (top-right) -->
                     @if (n.outcomes.length > 0) {
-                      <g [attr.transform]="'translate(' + (n.x + NODE_W - 22) + ',' + (n.y + 11) + ')'">
+                      <g [attr.transform]="'translate(' + (n.x + nodeWidth(n) - 22) + ',' + (n.y + 11) + ')'">
                         <rect x="-10" y="-8" width="22" height="15" rx="7" fill="#4f46e5" class="pointer-events-none" />
                         <text text-anchor="middle" dy="4" font-size="8.5" fill="white" font-weight="600"
                           class="pointer-events-none select-none">{{ n.outcomes.length }}▸</text>
@@ -590,11 +591,22 @@
                     }
                     <!-- Action count pill (below outcome) -->
                     @if (n.actions.length > 0) {
-                      <g [attr.transform]="'translate(' + (n.x + NODE_W - 22) + ',' + (n.y + 30) + ')'">
+                      <g [attr.transform]="'translate(' + (n.x + nodeWidth(n) - 22) + ',' + (n.y + 30) + ')'">
                         <rect x="-10" y="-8" width="22" height="15" rx="7" fill="#0e7490" class="pointer-events-none" />
                         <text text-anchor="middle" dy="4" font-size="8.5" fill="white" font-weight="600"
                           class="pointer-events-none select-none">{{ n.actions.length }}⚡</text>
                       </g>
+                    }
+                  }
+
+                  @if(childVersion(n)) {
+                    <foreignObject (keydown)="$event.stopPropagation()" [attr.x]="n.x+8" [attr.y]="n.y+85" [attr.width]="nodeWidth(n)-16" height="23" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+                      <div xmlns="http://www.w3.org/1999/xhtml"><button type="button" class="text-xs underline" [attr.aria-expanded]="childExpanded(n)" (click)="toggleChild(n)">{{ childExpanded(n) ? (locale.isRtl() ? 'طي سير العمل الفرعي' : 'Collapse child workflow') : (locale.isRtl() ? 'عرض سير العمل الفرعي' : 'Expand child workflow') }}</button></div>
+                    </foreignObject>
+                    @if(childExpanded(n)){
+                      <foreignObject (keydown)="$event.stopPropagation()" [attr.x]="n.x+8" [attr.y]="n.y+113" width="544" height="319" (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()" (contextmenu)="$event.stopPropagation()" (wheel)="$event.stopPropagation()">
+                        <div xmlns="http://www.w3.org/1999/xhtml" style="height:100%"><app-workflow-child-preview [versionId]="childVersion(n)" /></div>
+                      </foreignObject>
                     }
                   }
 
@@ -650,7 +662,7 @@
                   @if (selectedNodeId() === n.id && !isReadonly() && !drawingEdge()) {
                     @if (!isGateway(n.type) && n.type !== 'Start' && n.type !== 'End') {
                       <g class="node-delete-btn"
-                        [attr.transform]="'translate(' + (n.x + NODE_W - 2) + ',' + (n.y - 2) + ')'"
+                        [attr.transform]="'translate(' + (n.x + nodeWidth(n) - 2) + ',' + (n.y - 2) + ')'"
                         (click)="requestDeleteNode($event, n)"
                         (mousedown)="$event.stopPropagation()">
                         <title>{{ 'common.delete' | translate }}</title>
@@ -1291,7 +1303,7 @@
             <!-- ─── General tab (all types) / non-UserTask single panel ─── -->
             @if ((selectedNode()!.type !== 'UserTask' && selectedNode()!.type !== 'MainActivity') || activeInspectorTab() === 'general') {
               <form [formGroup]="propsForm" class="p-4 space-y-4">
-                @if (workspace() && (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity')) {
+                @if (selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') {
                   <app-workflow-business-activity [parentSettings]="workspace() ?? null" [configuration]="selectedNode()!.configurationJson || '{}'" [main]="selectedNode()!.type === 'MainActivity'" [readonly]="isReadonly()" [nodes]="nodes()" [variables]="variables()" (configurationChange)="applyIntegrationConfiguration($event)" />
                 }
                 <!-- Name EN -->
@@ -1583,9 +1595,12 @@
               </div>
             }
 
-            <!-- ─── Form tab (UserTask only): Form Engine forms of the activity's Department + FA Type ─── -->
-            @if (selectedNode()!.type === 'UserTask' && activeInspectorTab() === 'form') {
-              <app-workflow-activity-forms [configuration]="selectedNode()!.configurationJson || '{}'" [legacy]="!workspace()" (editContext)="goToActivityContext($event)" (preview)="openFormPreview($event)" />
+            <!-- ─── Form tab: ordered Form Engine forms of the activity's Task Type ─── -->
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && activeInspectorTab() === 'form') {
+              <app-workflow-activity-forms [readonly]="isReadonly()" (configurationChange)="applyIntegrationConfiguration($event)" [configuration]="selectedNode()!.configurationJson || '{}'" [legacy]="!workspace()" (editContext)="goToActivityContext($event)" (preview)="openFormPreview($event)" />
+            }
+            @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && activeInspectorTab() === 'actions') {
+              <app-workflow-form-actions [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [nodeKey]="selectedNode()!.nodeKey" [nodes]="routingNodes()" (configurationChange)="applyIntegrationConfiguration($event)" />
             }
             @if ((selectedNode()!.type === 'UserTask' || selectedNode()!.type === 'MainActivity') && activeInspectorTab() === 'sla') {
               <app-workflow-activity-sla [configuration]="selectedNode()!.configurationJson || '{}'" [readonly]="isReadonly()" [legacy]="!workspace()" [legacyPolicyName]="legacySlaPolicyName()" [versionId]="versionId()" (manage)="openSlaEditor($event)" (editContext)="goToActivityContext($event)" />
@@ -1746,7 +1761,7 @@
               </div>
             } @else {
               <div class="divide-y divide-dark-700">
-                @for (err of validationResult()!.errors; track err.code) {
+                @for (err of validationResult()!.errors; track $index) {
                   <div class="flex items-start gap-2 px-4 py-2"
                     [class.cursor-pointer]="!!err.nodeKey"
                     (click)="navigateToError(err.nodeKey, err.code)">

@@ -1,4 +1,7 @@
+import { WorkflowFormProgressComponent } from '../workspace/workflow-form-progress.component';
+import { WorkflowSelectedFormComponent } from '../workspace/workflow-selected-form.component';
 import {
+  ViewChild,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -38,6 +41,8 @@ type TaskDetailTab = 'action' | 'details' | 'steps';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    WorkflowFormProgressComponent,
+    WorkflowSelectedFormComponent,
     DatePipe,
     ReactiveFormsModule,
     FormsModule,
@@ -74,6 +79,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
   protected readonly request = signal<WorkflowRequestView | null>(null);
   protected readonly timeline = signal<WorkflowHistoryEvent[]>([]);
   protected readonly liveGraphOpen = signal(false);
+  @ViewChild(WorkflowSelectedFormComponent) selectedForm?:WorkflowSelectedFormComponent;
   protected formValues: Record<string, any> = {};
   protected formLabel(field: { labelEn: string; labelAr: string; key: string }) { return (this.locale.isRtl() ? field.labelAr : field.labelEn) || field.labelEn || field.key; }
 
@@ -194,11 +200,13 @@ export class WorkflowTaskDetailComponent implements OnInit {
     const id = this.item()?.id;
     if (!id) return;
     const { actionTaken, comment, redirectGroupId, redirectDepartmentId } = this.completeForm.getRawValue();
+    if(this.item()?.selectedForm&&!this.isRedirectSelected()&&actionTaken?.toUpperCase()!=='REJECT'&&!this.selectedForm?.validate())return;
     this.isSubmitting.set(true);
     this.submitError.set(null);
     this.workItemsService.complete(id, {
       actionTaken: actionTaken!,
-      formValues: Object.fromEntries(Object.entries(this.formValues).map(([key, value]) => {
+      formVisitId: this.item()?.formVisitId,
+      formValues: this.item()?.selectedForm ? this.selectedForm?.payload() : Object.fromEntries(Object.entries(this.formValues).map(([key, value]) => {
         const field = this.item()?.formFields?.find(f => f.key === key);
         return [key, field?.type === 'number' && value !== '' && value != null ? Number(value) : value];
       })),
@@ -206,8 +214,9 @@ export class WorkflowTaskDetailComponent implements OnInit {
       redirectAssignmentGroupId: this.isRedirectSelected() ? (redirectGroupId || null) : null,
       redirectDepartmentId: this.isRedirectSelected() ? (redirectDepartmentId || null) : null,
     }).subscribe({
-      next: () => {
+      next: updated => {
         this.isSubmitting.set(false);
+        if(updated.status !== 'Completed' && updated.formVisitId){this.item.set(updated);this.formValues={...(updated.formValues??{})};this.completeForm.patchValue({comment:''});return;}
         const view = this.isRedirectSelected() ? 'available' : 'claimedByMe';
         this.router.navigate(['/org/workflow/tasks'], { queryParams: { view } });
       },

@@ -16,154 +16,18 @@ const form = (code: string, usable = true, extra: Partial<ActivityForm> = {}): A
 const page = (items: ActivityForm[], totalCount = items.length, usableCount = items.filter(f => f.isUsable).length, pageNumber = 1): ActivityFormPage =>
   ({ items, totalCount, usableCount, pageNumber, pageSize: 20 });
 
-describe('WorkflowActivityFormsComponent (Form tab)', () => {
-  let api: jasmine.SpyObj<WorkflowActivityFormsService>;
-  let locale: 'en' | 'ar';
-  function create() {
-    TestBed.configureTestingModule({ providers: [
-      { provide: LocaleService, useValue: { locale: () => locale } },
-      { provide: WorkflowActivityFormsService, useValue: api },
-      { provide: WorkflowWorkspaceService, useValue: { references: (kind: string) => of(kind === 'departments'
-        ? [{ id: '1', code: '10', nameEn: 'Water Network', nameAr: 'شبكة المياه' }]
-        : [{ id: '2', code: 'LEAK_REPAIR', nameEn: 'Leak repair', nameAr: 'إصلاح التسربات' }]) } },
-    ] });
-    return TestBed.runInInjectionContext(() => new WorkflowActivityFormsComponent());
-  }
-  const configure = (component: WorkflowActivityFormsComponent, config: object) => { component.configuration = JSON.stringify(config); component.ngOnChanges(); };
-  const context = { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR' };
-  beforeEach(() => { locale = 'en'; api = jasmine.createSpyObj<WorkflowActivityFormsService>('api', ['list', 'preview']); });
-
-  it('names the missing selections and never asks for the whole catalog', () => {
-    const component = create();
-    configure(component, { departmentCode: '10' });
-    expect(component.missing()).toEqual(['fieldActivityCode']);
-    configure(component, {});
-    expect(component.missing()).toEqual(['departmentCode', 'fieldActivityCode']);
-    expect(api.list).not.toHaveBeenCalled();
-    const go = jasmine.createSpy('editContext');
-    component.editContext.subscribe(go);
-    component.editContext.emit(component.missing()[0]);
-    expect(go).toHaveBeenCalledWith('departmentCode');
-  });
-
-  it('loads the forms of both codes as soon as they are chosen, usable ones apart from the rest', () => {
-    api.list.and.returnValue(of(page([form('DEMO-LEAK-INSPECTION'), form('DEMO-LEAK-REPAIR-COMPLETION'), form('DEMO-LEAK-REPAIR-CHECKLIST', false)])));
-    const component = create();
-    configure(component, context);
-    expect(api.list).toHaveBeenCalledOnceWith('10', 'LEAK_REPAIR', 1);
-    expect(component.usable().map(f => f.code)).toEqual(['DEMO-LEAK-INSPECTION', 'DEMO-LEAK-REPAIR-COMPLETION']);
-    expect(component.unusable().map(f => f.code)).toEqual(['DEMO-LEAK-REPAIR-CHECKLIST']);
-    expect(component.departmentName()).toBe('Water Network (10)');
-    expect(component.versionText(component.unusable()[0])).toContain('Never published');
-  });
-
-  it('keeps the list for unrelated edits and reloads for a different combination', () => {
-    api.list.and.returnValue(of(page([form('A')])));
-    const component = create();
-    configure(component, context);
-    configure(component, { ...context, rejectTargetNodeKey: 'review' });
-    expect(api.list).toHaveBeenCalledTimes(1);
-    api.list.and.returnValue(of(page([])));
-    configure(component, { departmentCode: '10', fieldActivityCode: '01' });
-    expect(api.list).toHaveBeenCalledTimes(2);
-    expect(component.items()).toEqual([]);
-    expect(component.total()).toBe(0);
-  });
-
-  it('drops a late response for a combination the activity no longer has', () => {
-    const slow = new Subject<ActivityFormPage>(), fast = new Subject<ActivityFormPage>();
-    api.list.and.returnValues(slow, fast);
-    const component = create();
-    configure(component, context);
-    configure(component, { departmentCode: '10', fieldActivityCode: '01' });
-    fast.next(page([form('ISOLATION')]));
-    slow.next(page([form('LEAK-A'), form('LEAK-B')]));
-    expect(component.items().map(f => f.code)).toEqual(['ISOLATION']);
-    expect(component.loading()).toBeFalse();
-  });
-
-  it('clears stale results while the new combination loads', () => {
-    const next = new Subject<ActivityFormPage>();
-    api.list.and.returnValues(of(page([form('LEAK-A')])), next);
-    const component = create();
-    configure(component, context);
-    configure(component, { departmentCode: '10', fieldActivityCode: '01' });
-    expect(component.items()).toEqual([]);
-    expect(component.loading()).toBeTrue();
-  });
-
-  it('pages through every match instead of stopping at the first page', () => {
-    const first = Array.from({ length: 20 }, (_, i) => form(`F${String(i).padStart(2, '0')}`));
-    api.list.and.returnValues(of(page(first, 23)), of(page([form('F20'), form('F21'), form('F22')], 23, 23, 2)));
-    const component = create();
-    configure(component, context);
-    expect(component.summary()).toContain('Showing 20 of 23');
-    component.loadMore();
-    expect(api.list.calls.mostRecent().args).toEqual(['10', 'LEAK_REPAIR', 2]);
-    expect(component.items().length).toBe(23);
-  });
-
-  it('ignores a next page that arrives after the context changed', () => {
-    const more = new Subject<ActivityFormPage>();
-    api.list.and.returnValues(of(page([form('LEAK-A')], 21)), more, of(page([form('ISOLATION')])));
-    const component = create();
-    configure(component, context);
-    component.loadMore();
-    configure(component, { departmentCode: '10', fieldActivityCode: '01' });
-    more.next(page([form('LEAK-Z')], 21, 21, 2));
-    expect(component.items().map(f => f.code)).toEqual(['ISOLATION']);
-  });
-
-  it('shows no matches, a permission problem, and a retryable failure distinctly', () => {
-    api.list.and.returnValue(of(page([])));
-    const component = create();
-    configure(component, context);
-    expect(component.total()).toBe(0);
-    expect(component.error()).toBe('');
-
-    api.list.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
-    component.load();
-    expect(component.forbidden()).toBeTrue();
-    expect(component.error()).toBe('');
-
-    api.list.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
-    component.load();
-    expect(component.forbidden()).toBeFalse();
-    expect(component.error()).toContain('could not be loaded');
-
-    api.list.and.returnValue(of(page([form('LEAK-A')])));
-    component.load();
-    expect(component.error()).toBe('');
-    expect(component.items().length).toBe(1);
-  });
-
-  it('does not look forms up for a legacy workflow, and mentions preserved inline questions', () => {
-    const component = create();
-    component.legacy = true;
-    configure(component, { ...context, formFields: [{ key: 'note' }, { key: 'count' }] });
-    expect(api.list).not.toHaveBeenCalled();
-    expect(component.legacyFields()).toBe(2);
-  });
-
-  it('opens the preview at the current version, with the activity context', () => {
-    api.list.and.returnValue(of(page([form('LEAK-A', true, { currentVersionNo: 3, versionNos: [3, 2, 1] })])));
-    const component = create();
-    configure(component, context);
-    const opened = jasmine.createSpy('preview');
-    component.preview.subscribe(opened);
-    component.open(component.usable()[0]);
-    expect(opened).toHaveBeenCalledWith(jasmine.objectContaining({ departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', versionNo: 3 }));
-  });
-
-  it('speaks Arabic', () => {
-    locale = 'ar';
-    api.list.and.returnValue(of(page([form('LEAK-A')])));
-    const component = create();
-    configure(component, context);
-    expect(component.name(component.usable()[0])).toBe('LEAK-A AR');
-    expect(component.status(component.usable()[0])).toBe('منشور');
-    expect(component.fieldActivityName()).toBe('إصلاح التسربات (LEAK_REPAIR)');
-  });
+describe('WorkflowActivityFormsComponent (Task Type forms)', () => {
+  let api:jasmine.SpyObj<WorkflowActivityFormsService>;
+  beforeEach(()=>{api=jasmine.createSpyObj('forms',['listForTaskType','previewForTaskType']);api.listForTaskType.and.returnValue(of(page([form('A'),form('B'),form('DRAFT',false)])));TestBed.configureTestingModule({providers:[{provide:LocaleService,useValue:{locale:()=> 'en'}},{provide:WorkflowActivityFormsService,useValue:api}]});});
+  function create(config:object={}){const c=TestBed.runInInjectionContext(()=>new WorkflowActivityFormsComponent());c.configuration=JSON.stringify(config);c.ngOnChanges();return c;}
+  it('never loads the catalog without a Task Type',()=>{const c=create();expect(c.items()).toEqual([]);expect(api.listForTaskType).not.toHaveBeenCalled();});
+  it('lists all associated forms, including unavailable ones',()=>{const c=create({taskTypeId:'T'});expect(api.listForTaskType).toHaveBeenCalledOnceWith('T');expect(c.items().map(f=>f.id)).toEqual(['A','B','DRAFT']);});
+  it('adds an ordered pinned form and supplies missing SLA context',()=>{const c=create({taskTypeId:'T',rejectTargetNodeKey:'previous'});const saved=jasmine.createSpy('saved');c.configurationChange.subscribe(saved);c.select(c.items()[1]);const config=JSON.parse(saved.calls.mostRecent().args[0]);expect(config.taskTypeId).toBe('T');expect(config.rejectTargetNodeKey).toBe('previous');expect(config.formSteps[0]).toEqual(jasmine.objectContaining({formId:'B',versionNo:1,otherwise:{kind:'Next'}}));expect(config.departmentCode).toBe('10');expect(config.fieldActivityCode).toBe('LEAK_REPAIR');});
+  it('preserves existing SLA context and forbids selecting unavailable forms',()=>{const c=create({taskTypeId:'T',departmentCode:'old',fieldActivityCode:'OLD'});const saved=jasmine.createSpy('saved');c.configurationChange.subscribe(saved);c.select(c.items()[0]);expect(JSON.parse(saved.calls.mostRecent().args[0]).departmentCode).toBe('old');c.select(c.items()[2]);expect(saved).toHaveBeenCalledTimes(1);c.readonly=true;c.select(c.items()[1]);expect(saved).toHaveBeenCalledTimes(1);});
+  it('previews a saved version without changing the selection',()=>{const c=create({taskTypeId:'T',formDefinitionId:'A',formVersionNo:1});const preview=jasmine.createSpy('preview'),saved=jasmine.createSpy('saved');c.preview.subscribe(preview);c.configurationChange.subscribe(saved);c.open(c.items()[1]);expect(preview.calls.mostRecent().args[0].taskTypeId).toBe('T');expect(saved).not.toHaveBeenCalled();});
+  it('ignores an old Task Type response',()=>{const slow=new Subject<ActivityFormPage>();api.listForTaskType.and.returnValues(slow,of(page([form('NEW')])));const c=create({taskTypeId:'OLD'});c.configuration=JSON.stringify({taskTypeId:'NEW'});c.ngOnChanges();slow.next(page([form('OLD')]));expect(c.items().map(f=>f.id)).toEqual(['NEW']);});
+  it('flags a saved form removed from the Task Type',()=>{const c=create({taskTypeId:'T',formDefinitionId:'REMOVED',formVersionNo:1});expect(c.selectedAvailable()).toBeFalse();});
+  it('shows a recoverable loading error',()=>{api.listForTaskType.and.returnValue(throwError(()=>new HttpErrorResponse({status:500})));const c=create({taskTypeId:'T'});expect(c.error()).toBeTruthy();api.listForTaskType.and.returnValue(of(page([form('OK')])));c.load();expect(c.error()).toBe('');expect(c.items().length).toBe(1);});
 });
 
 describe('WorkflowFormPreviewComponent', () => {
@@ -206,7 +70,7 @@ describe('WorkflowFormPreviewComponent', () => {
   it('explains a form that is no longer filed under the activity, without offering a retry', () => {
     api.preview.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
     const component = create();
-    expect(component.error()).toContain('no longer filed');
+    expect(component.error()).toContain('no longer available');
     expect(component.canRetry()).toBeFalse();
   });
 

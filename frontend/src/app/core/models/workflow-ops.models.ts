@@ -148,6 +148,7 @@ export interface WorkflowWorkItemExtras {
 }
 
 export interface CompleteWorkItemPayload {
+  formVisitId?: string;
   formValues?: Record<string, unknown>;
   actionTaken: string;
   comment?: string | null;

@@ -62,12 +62,12 @@ export class WorkflowFormPreviewComponent implements OnInit {
   select(versionNo:number){if(versionNo===this.versionNo())return;this.versionNo.set(versionNo);this.load();}
   load(){
     const call=++this.call,r=this.request;this.loading.set(true);this.error.set('');this.definition.set(null);
-    this.api.preview(r.form.id,this.versionNo(),r.departmentCode,r.fieldActivityCode).subscribe({
+    (r.taskTypeId ? this.api.previewForTaskType(r.taskTypeId,r.form.id,this.versionNo()) : this.api.preview(r.form.id,this.versionNo(),r.departmentCode,r.fieldActivityCode)).subscribe({
       next:p=>{if(call!==this.call)return;this.loading.set(false);this.preview.set(p);
         try{this.definition.set(JSON.parse(p.schemaJson) as Record<string,unknown>);}catch{this.canRetry.set(false);this.error.set(this.t('This version’s form definition could not be read.','تعذرت قراءة تعريف النموذج لهذا الإصدار.'));}},
       error:(e:unknown)=>{if(call!==this.call)return;this.loading.set(false);const status=e instanceof HttpErrorResponse?e.status:0;this.canRetry.set(status!==403&&status!==404);
         this.error.set(status===403?this.t('You do not have permission to preview this form.','ليست لديك صلاحية معاينة هذا النموذج.')
-          :status===404?this.t('This form or version is no longer filed under the activity’s Department and Field Activity Type.','لم يعد هذا النموذج أو الإصدار مصنفاً تحت قسم النشاط ونوع النشاط الميداني.')
+          :status===404?this.t('This form or version is no longer available for the selected Task Type.','لم يعد هذا النموذج أو الإصدار مصنفاً تحت قسم النشاط ونوع النشاط الميداني.')
           :this.t('The form could not be loaded.','تعذر تحميل النموذج.'));}});
   }
   /** Document level so Escape still closes the preview wherever focus is inside it. */

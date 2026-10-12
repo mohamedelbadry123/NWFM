@@ -22,6 +22,7 @@ const WORKSPACE_ROUTES: readonly string[] = [
   '/admin/workflow/definitions',
   '/admin/workflow/instances',
   '/workflow/start',
+  '/org/workflow/tasks',
   ...WORKSPACE_SHARED_ROUTES,
 ];
 

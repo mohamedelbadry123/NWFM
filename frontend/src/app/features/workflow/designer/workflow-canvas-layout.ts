@@ -17,6 +17,7 @@ export type LayoutNodeType =
 export interface LayoutNode {
   id: string;
   type: LayoutNodeType;
+  width?:number; height?:number;
 }
 
 export interface LayoutEdge {
@@ -112,10 +113,12 @@ export function layoutWorkflowGraph(
   const startY = 100;
   const pos: Record<string, { x: number; y: number }> = {};
 
+  let layerY = startY;
   layers.forEach((layer, li) => {
-    const widths = layer.map(id => nodeWidth(typeById[id]));
+    const widths = layer.map(id => nodes.find(n=>n.id===id)?.width ?? nodeWidth(typeById[id]));
     let x = 120;
-    const y = startY + li * LAYER_GAP;
+    const y = layerY;
+    layerY += Math.max(LAYER_GAP, ...layer.map(id=>(nodes.find(n=>n.id===id)?.height ?? nodeHeight(typeById[id]))+120));
     layer.forEach((id, i) => {
       const w = widths[i];
       const h = nodeHeight(typeById[id]);
@@ -182,13 +185,13 @@ export function mapCanvasIdsToActivities(
 }
 
 export function canvasWorldSize(
-  nodes: Array<{ x: number; y: number; type: LayoutNodeType }>,
+  nodes: Array<{ x: number; y: number; type: LayoutNodeType; width?:number; height?:number }>,
 ): { width: number; height: number } {
   let maxX = MIN_WORLD_W;
   let maxY = MIN_WORLD_H;
   for (const n of nodes) {
-    maxX = Math.max(maxX, n.x + nodeWidth(n.type) + 480);
-    maxY = Math.max(maxY, n.y + nodeHeight(n.type) + 480);
+    maxX = Math.max(maxX, n.x + (n.width ?? nodeWidth(n.type)) + 480);
+    maxY = Math.max(maxY, n.y + (n.height ?? nodeHeight(n.type)) + 480);
   }
   return { width: Math.ceil(maxX), height: Math.ceil(maxY) };
 }

@@ -10,6 +10,8 @@ using Workflow.Domain.Repositories;
 using Workflow.Application.Helpers;
 using Workflow.Application.Integrations;
 using System.Text.Json;
+using NWFM.Shared.Integration.Forms;
+using Workflow.Application.Workspace;
 
 public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
 {
@@ -19,13 +21,14 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
     private readonly IActivityInstanceRepository _activities;
     private readonly IWorkflowVersionRepository _versions;
     private readonly IWorkflowVariableRepository? _variables;
+    private readonly IFormGateway? _forms;
 
     public WorkItemDtoAssembler(
         IWorkflowRequestRepository requests,
         IWorkflowAssignmentGroupRepository groups,
         IWorkflowInstanceRepository instances,
         IActivityInstanceRepository activities,
-        IWorkflowVersionRepository versions, IWorkflowVariableRepository? variables = null)
+        IWorkflowVersionRepository versions, IWorkflowVariableRepository? variables = null, IFormGateway? forms = null)
     {
         _requests = requests;
         _groups = groups;
@@ -33,6 +36,7 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
         _activities = activities;
         _versions = versions;
         _variables = variables;
+        _forms = forms;
     }
 
     public async Task<WorkItemDto> ToDtoAsync(
@@ -51,6 +55,11 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
         try
         {
             var config = WorkflowTaskForm.Parse(definition?.ConfigurationJson);
+            var binding = IntegrationJson.Read<BusinessActivityConfiguration>(definition?.ConfigurationJson ?? "{}");
+            WorkflowSelectedFormDto? selectedForm = null;
+            if (binding.FormDefinitionId is Guid formId && binding.FormVersionNo is > 0)
+                selectedForm = new(formId, binding.FormVersionNo.Value,
+                    _forms is null ? null : await _forms.GetVersionSchemaAsync(formId, binding.FormVersionNo.Value, cancellationToken));
             var values = new Dictionary<string, object?>();
             if (item.FormDataJson is not null) values = JsonSerializer.Deserialize<Dictionary<string, object?>>(item.FormDataJson) ?? [];
             else if (_variables is not null && config.InputMappingJson is not null)
@@ -59,7 +68,33 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
                     .ToDictionary(v => v.VariableName, v => JsonSerializer.Deserialize<JsonElement>(v.ValueJson ?? "null"));
                 values = IntegrationValueMapper.Map(JsonSerializer.Serialize(new { variables }), WorkflowTaskForm.Mappings(config.InputMappingJson));
             }
-            return dto with { AvailableOutcomes = outcomes, FormFields = config.FormFields, FormValues = values,
+            if (selectedForm is not null && item.FormDataJson is null && _forms is not null)
+            {
+                var fill = await _forms.GetLatestByContextAsync(selectedForm.FormId, "WorkItem", item.Id.ToString(), cancellationToken);
+                if (fill is not null) values = fill.Answers.ToDictionary(x => x.Key, x => x.Value);
+            }
+            ActivityFormProgress? progress = null;
+            var history = new List<WorkflowFormVisitDto>();
+            if (binding.FormSteps.Count > 0)
+            {
+                progress = ActivityFormProgress.Read(item.FormProgressJson, binding.FormSteps, item.Id);
+                var step = binding.FormSteps.First(s => s.Id == progress.ActiveStepId);
+                selectedForm = new(step.FormId, step.VersionNo,
+                    _forms is null ? null : await _forms.GetVersionSchemaAsync(step.FormId, step.VersionNo, cancellationToken), progress.VisitId, step.Id);
+                values = item.Status == WorkItemStatus.Completed ? progress.Visits.LastOrDefault()?.Answers ?? [] : [];
+                var schemas = new Dictionary<(Guid, int), string?>();
+                foreach (var visit in progress.Visits)
+                {
+                    var key = (visit.FormId, visit.VersionNo);
+                    if (!schemas.ContainsKey(key)) schemas[key] = _forms is null ? null : await _forms.GetVersionSchemaAsync(visit.FormId, visit.VersionNo, cancellationToken);
+                    history.Add(new(visit.VisitId, visit.StepId, visit.FormId, visit.VersionNo, visit.SubmissionId,
+                        visit.SubmittedAt, visit.RuleId, visit.Destination, visit.Answers, schemas[key]));
+                }
+            }
+            return dto with { AvailableOutcomes = outcomes, FormFields = selectedForm is null ? config.FormFields : [], FormValues = values,
+                FormVisitId = progress?.VisitId, ActiveFormStepId = progress?.ActiveStepId,
+                FormSteps = binding.FormSteps.Count > 0 ? binding.FormSteps : null, FormHistory = progress is null ? null : history,
+                SelectedForm = selectedForm,
                 InstructionsEn = config.InstructionsEn, InstructionsAr = config.InstructionsAr };
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)

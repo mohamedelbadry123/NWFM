@@ -13,6 +13,7 @@ import { WorkflowBindingsService } from '../workflow-bindings.service';
 import { WorkflowSlaPoliciesService } from '../workflow-sla-policies.service';
 import { ToastService } from '@core/notifications/toast.service';
 import { ThemeService } from '@core/theme/theme.service';
+import { WorkflowWorkspaceService } from '../workspace/workflow-workspace.service';
 import { LocaleService } from '@core/i18n/locale.service';
 
 /**
@@ -72,7 +73,8 @@ describe('WorkflowDesignerComponent scale', () => {
         { provide: WorkflowSlaPoliciesService, useValue: { getAll: () => of([]), getPaged: () => of({ items: [] }) } },
         { provide: ToastService, useValue: { success: () => undefined, error: () => undefined } },
         { provide: ThemeService, useValue: { isDark: () => false } },
-        { provide: LocaleService, useValue: { current: () => 'en', isRtl: () => false } },
+        { provide: LocaleService, useValue: { current: () => 'en', locale: () => 'en', isRtl: () => false } },
+        { provide: WorkflowWorkspaceService, useValue: { references: () => of([]), children: () => of([]) } },
       ],
     });
 
@@ -218,17 +220,17 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(designer.nodes().some(n => n.id === node.id)).toBeFalse();
   });
 
-  it('shows Form instead of Actions on user tasks, and no Form on main activities or other nodes', () => {
+  it('shows Form on both business activity types and no tabs on other nodes', () => {
     const ids = (type: NodeType) => WorkflowDesignerComponent.tabsFor(type).map(t => t.id);
-    expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'sla']);
-    expect(ids('MainActivity')).toEqual(['general', 'assignment', 'sla']);
+    expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
+    expect(ids('MainActivity')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
     for (const type of ['Start', 'End', 'ExclusiveGateway', 'ParallelGateway', 'Timer', 'ServiceTask', 'NotificationTask', 'WaitEvent'] as NodeType[]) {
       expect(ids(type)).withContext(type).toEqual([]);
     }
-    expect(WorkflowDesignerComponent.tabsFor('UserTask').map(t => t.labelKey)).not.toContain('workflow.designer.tab_actions');
+    expect(WorkflowDesignerComponent.tabsFor('UserTask').map(t => t.labelKey)).toContain('workflow.designer.tab_actions');
   });
 
-  it('falls back to General when the selected activity has no Form tab', () => {
+  it('keeps Form selected when moving between business activities', () => {
     const designer = component as unknown as {
       addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
       inspectorTab: WritableSignal<string>; activeInspectorTab: () => string; onNodeClick(event: MouseEvent, id: string): void;
@@ -239,19 +241,19 @@ describe('WorkflowDesignerComponent scale', () => {
     designer.onNodeClick(new MouseEvent('click'), task.id);
     designer.inspectorTab.set('form');
     expect(designer.activeInspectorTab()).toBe('form');
-    // Even before the click handler runs, a MainActivity never renders the Form panel.
+    // Both activity types expose the same form selection panel.
     designer.selectedNodeId.set(main.id);
-    expect(designer.activeInspectorTab()).toBe('general');
+    expect(designer.activeInspectorTab()).toBe('form');
     designer.selectedNodeId.set(task.id);
     designer.onNodeClick(new MouseEvent('click'), main.id);
-    expect(designer.inspectorTab()).toBe('general');
+    expect(designer.inspectorTab()).toBe('form');
     designer.inspectorTab.set('sla');
     designer.onNodeClick(new MouseEvent('click'), task.id);
     expect(designer.inspectorTab()).withContext('a tab both have is kept').toBe('sla');
   });
 
   it('keeps the rejection destination and legacy task questions through General edits', () => {
-    const editor = configure('UserTask', { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', rejectTargetNodeKey: 'earlier_review', formFields: [{ key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false }] });
+    const editor = configure('UserTask', { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', taskTypeId: 'type', formDefinitionId: 'form', formVersionNo: 2, rejectTargetNodeKey: 'earlier_review', formFields: [{ key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false }] });
     const node = editor.nodes().find(n => n.id === editor.selectedNodeId())!;
     editor.patchPropsFromNode(node);
     editor.propsForm.patchValue({ name: 'Renamed' });
@@ -259,6 +261,7 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(saved.rejectTargetNodeKey).toBe('earlier_review');
     expect(saved.departmentCode).toBe('10');
     expect(saved.fieldActivityCode).toBe('LEAK_REPAIR');
+    expect(saved.formDefinitionId).toBe('form');expect(saved.formVersionNo).toBe(2);expect(saved.taskTypeId).toBe('type');
     expect(saved.formFields.map((f: { key: string }) => f.key)).toEqual(['note']);
   });
 
@@ -276,6 +279,9 @@ describe('WorkflowDesignerComponent scale', () => {
       fixture.detectChanges();
       const panel = (fixture.nativeElement as HTMLElement).querySelector('#wf-activity-panel');
       expect(panel).withContext(type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-task-type')).withContext(type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-department')).withContext(type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-field-type')).withContext(type).toBeNull();
       expect(panel!.querySelector('#wf-activity-outcomes')).withContext(type).toBeNull();
       expect(panel!.querySelector('#wf-activity-reject-target')).withContext(type).toBeNull();
       expect(panel!.textContent).withContext(type).not.toMatch(/Accept and Reject|Return to/);

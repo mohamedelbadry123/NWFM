@@ -8,6 +8,7 @@ const HUMAN_EVENT_TYPES = new Set([
   'InstanceFailed',
   'WorkItemClaimed',
   'WorkItemCompleted',
+  'FormSubmitted',
   'WorkItemReleased',
   'WorkItemReassigned',
   'WorkItemDelegated',

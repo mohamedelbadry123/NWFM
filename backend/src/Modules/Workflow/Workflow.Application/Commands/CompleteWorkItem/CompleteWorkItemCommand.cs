@@ -12,4 +12,5 @@ public sealed record CompleteWorkItemCommand(
     string? Comment = null,
     Guid? RedirectAssignmentGroupId = null,
     Guid? RedirectDepartmentId = null,
-    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null) : IRequest<Result<WorkItemDto>>;
+    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null,
+    Guid? FormVisitId = null) : IRequest<Result<WorkItemDto>>;

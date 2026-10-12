@@ -433,6 +433,17 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         var selected = selectedKey is null
             ? null
             : outgoing.FirstOrDefault(t => t.TransitionKey == selectedKey);
+        if (completedWorkItem?.FormProgressJson is not null)
+        {
+            var progress = JsonSerializer.Deserialize<Workflow.Application.Workspace.ActivityFormProgress>(completedWorkItem.FormProgressJson);
+            if (!string.IsNullOrWhiteSpace(progress?.ExitNodeKey))
+            {
+                var target = version.Activities.FirstOrDefault(a => a.NodeKey == progress.ExitNodeKey);
+                if (target is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                selected = WorkflowTransition.Create(version.Id, currentActivity.Id, target.Id,
+                    currentNodeKey + ":form:" + progress.Visits.Last().VisitId, 0, now);
+            }
+        }
         var nextActivity = selected is null
             ? null
             : version.Activities.FirstOrDefault(a => a.Id == selected.ToActivityDefinitionId);
@@ -1318,7 +1329,15 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         await _events.AppendAsync(
             instance.OrganizationId, instance.Id,
             WorkflowEventType.ActivityStarted, now, currentActivity.NodeKey,
-            payloadJson: currentActivity.ConfigurationJson,
+            // Configuration is already frozen on the pinned version. Form routing can be much
+            // larger than the event ledger's payload limit; record execution references only.
+            payloadJson: JsonSerializer.Serialize(new
+            {
+                activityInstanceId = createdCall.Id,
+                workflowVersionId = version.Id,
+                childWorkflowVersionId = childVersion.Id,
+                waitForCompletion = config.WaitForCompletion
+            }),
             cancellationToken: cancellationToken);
 
         if (currentActivity.ActivityType == ActivityType.MainActivity)

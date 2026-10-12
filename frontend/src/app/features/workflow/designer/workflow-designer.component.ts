@@ -1,3 +1,6 @@
+import { WorkflowFormActionsComponent } from '../workspace/workflow-form-actions.component';
+import { activityFormSteps } from '../workspace/workflow-form-routing.types';
+import { WorkflowChildPreviewComponent } from './workflow-child-preview.component';
 import { WorkflowTaskPaletteComponent } from './workflow-task-palette.component';
 import { WorkflowActivitySlaComponent, SlaManageRequest } from '../workspace/workflow-activity-sla.component';
 import { WorkflowSlaEditorComponent, SlaEditorRequest } from '../workspace/workflow-sla-editor.component';
@@ -82,7 +85,7 @@ export interface FormFieldRow {
 
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
 export type NotificationFailurePolicyOption = 'Continue' | 'Retry' | 'FailWorkflow';
-export type InspectorTab = 'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'advanced';
+export type InspectorTab = 'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'actions' | 'advanced';
 export type BottomTab = 'variables' | 'validation';
 
 export interface CanvasOutcome {
@@ -298,7 +301,7 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [WorkflowTaskPaletteComponent, WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
+  imports: [WorkflowFormActionsComponent, WorkflowChildPreviewComponent, WorkflowTaskPaletteComponent, WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
@@ -346,7 +349,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly nodes     = signal<CanvasNode[]>([]);
   protected readonly edges     = signal<CanvasEdge[]>([]);
   protected readonly variables = signal<CanvasVariable[]>([]);
-  protected readonly canvasWorld = computed(() => canvasWorldSize(this.nodes()));
+  protected readonly canvasWorld = computed(() => canvasWorldSize(this.nodes().map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)}))));
 
   // ── Selection
   protected readonly selectedNodeId = signal<string | null>(null);
@@ -447,22 +450,22 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Integer', 'Decimal', 'Boolean', 'Date', 'DateTime', 'Guid', 'Json'];
 
   // ── Inspector tab definitions
-  // Accept / Reject and the rejection destination live in General. Form lists the Form Engine forms of the activity's
-  // Department + FA Type; a MainActivity has none of its own (they belong to its child workflow's activities).
+  // Both business activity types configure ordered versioned forms from their own Task Type.
   private static readonly ACTIVITY_TABS: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
     { id: 'general',    labelKey: 'workflow.designer.tab_general',    helpKey: 'workflow.designer.tab_help_general'    },
     { id: 'assignment', labelKey: 'workflow.designer.tab_assignment', helpKey: 'workflow.designer.tab_help_assignment' },
     { id: 'form',       labelKey: 'workflow.designer.tab_form',       helpKey: 'workflow.designer.tab_help_form'       },
+    { id: 'actions', labelKey: 'workflow.designer.tab_actions', helpKey: 'workflow.designer.tab_help_actions' },
     { id: 'sla',        labelKey: 'workflow.designer.tab_sla',        helpKey: 'workflow.designer.tab_help_sla'        },
   ];
   /** The tabs an activity of this type shows; empty for nodes that have a single settings panel. */
   static tabsFor(type: NodeType | undefined | null): { id: InspectorTab; labelKey: string; helpKey: string }[] {
     if (type === 'UserTask') return WorkflowDesignerComponent.ACTIVITY_TABS;
-    if (type === 'MainActivity') return WorkflowDesignerComponent.ACTIVITY_TABS.filter(t => t.id !== 'form');
+    if (type === 'MainActivity') return WorkflowDesignerComponent.ACTIVITY_TABS;
     return [];
   }
   protected readonly userTaskTabs = computed(() => WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type));
-  /** The panel actually shown: a tab the selected activity does not have (Form on a MainActivity) falls back to General. */
+  /** Non-business nodes fall back to General. */
   protected readonly activeInspectorTab = computed<InspectorTab>(() =>
     this.userTaskTabs().some(t => t.id === this.inspectorTab()) ? this.inspectorTab() : 'general');
   protected readonly activeTabHelpKey = computed(() =>
@@ -629,6 +632,25 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   // ── Seed IDs (for GUID panel)
 
   // ── Expose constants to template
+  protected readonly collapsedChildren = signal<Record<string,string>>({});
+  protected childVersion(n:CanvasNode):string { return n.type==='MainActivity' ? String(this.parseConfig(n.configurationJson||'{}')['versionId'] || '') : ''; }
+  protected childExpanded(n:CanvasNode):boolean { const version=this.childVersion(n);return !!version&&this.collapsedChildren()[n.id]!==version; }
+  protected nodeWidth(n:CanvasNode):number { return this.childExpanded(n)?560:NODE_W; }
+  protected nodeHeight(n:CanvasNode):number { return this.childExpanded(n)?440:this.childVersion(n)?112:NODE_H; }
+  protected toggleChild(n:CanvasNode):void {
+    this.collapsedChildren.update(c=>({...c,[n.id]:this.childExpanded(n)?this.childVersion(n):''}));
+    this.makeRoomForChildren();
+  }
+  private makeRoomForChildren():void {
+    const nodes=this.nodes();
+    const overlaps=nodes.some(a=>this.childExpanded(a)&&nodes.some(b=>{
+      if(a.id===b.id)return false;const x=this.nodeBounds(a),y=this.nodeBounds(b);
+      return x.x<y.x+y.w+24&&x.x+x.w+24>y.x&&x.y<y.y+y.h+24&&x.y+x.h+24>y.y;
+    }));
+    if(!overlaps)return;
+    const positions=layoutWorkflowGraph(nodes.map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})),this.edges());
+    this.nodes.update(all=>all.map(n=>({...n,...positions[n.id]})));
+  }
   protected readonly NODE_W    = NODE_W;
   protected readonly NODE_H    = NODE_H;
   protected readonly GATEWAY_R = GATEWAY_R;
@@ -693,6 +715,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           this.initCanvasFromVersion(v);
           if (v.status === 'Draft' && this.workspace()) { this.workspace.update(w => ({...w!, designerVersion: 2})); this.ensureSimpleActions(); this.convertEmbeddedEvents(); }
           this.relayoutIfCollapsed();
+          this.makeRoomForChildren();
           if (v.status !== 'Draft') {
             this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
           }
@@ -842,7 +865,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private relayoutIfCollapsed(): void {
     if (!nodesAreCollapsed(this.nodes())) return;
-    const posMap = layoutWorkflowGraph(this.nodes(), this.edges());
+    const posMap = layoutWorkflowGraph(this.nodes().map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})), this.edges());
     this.nodes.update(all => all.map(n => posMap[n.id] ? { ...n, ...posMap[n.id] } : n));
     this.resetView();
     if (!this.isReadonly()) this.markUnsaved();
@@ -1205,9 +1228,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     setTimeout(() => (document.getElementById(`wf-form-preview-${formId}`) ?? document.getElementById('wf-activity-forms-title'))?.focus());
   }
   /** From the SLA or Form tab's "missing context" state to the General field that still needs a value. */
-  protected goToActivityContext(field: 'departmentCode' | 'fieldActivityCode'): void {
-    this.inspectorTab.set('general');
-    this.focusWhenRendered(field === 'departmentCode' ? 'wf-activity-department' : 'wf-activity-field-type', 10);
+  protected goToActivityContext(field: 'departmentCode' | 'fieldActivityCode' | 'taskTypeId'): void {
+    this.inspectorTab.set(field === 'taskTypeId' ? 'general' : 'form');
+    this.focusWhenRendered(field === 'taskTypeId' ? 'wf-activity-task-type' : 'wf-activity-forms-title', 10);
   }
   /** General renders after the tab switch, so the field may not exist yet on the first try. */
   private focusWhenRendered(id: string, attempts: number): void {
@@ -1218,6 +1241,20 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }, 50);
   }
   protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
+  protected routingNodes(){return this.nodes().filter(n=>['UserTask','MainActivity','End'].includes(n.type));}
+  protected formRouteLinks(){
+    const links:{id:string;path:string;label:string;x:number;y:number;source:string}[]=[];
+    for(const n of this.nodes())for(const step of activityFormSteps(this.parseConfig(n.configurationJson))) {
+      const destinations=[...step.rules.map(r=>({id:r.id,label:r.name,destination:r.destination})),{id:'otherwise',label:this.locale.isRtl()?'وإلا':'Otherwise',destination:step.otherwise}];
+      for(const route of destinations){
+        if(route.destination.kind!=='Activity')continue;
+        const target=this.nodes().find(t=>t.nodeKey===route.destination.target);if(!target)continue;
+        const x=n.x+105,y=n.y+84,tx=target.x+105,ty=target.y;
+        links.push({id:n.id+':'+step.id+':'+route.id,path:n.id===target.id?`M ${x} ${y} C ${x+250} ${y+100}, ${tx+250} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+80}, ${tx} ${ty-80}, ${tx} ${ty}`,label:(step.name||step.id)+' / '+route.label,x:(x+tx)/2,y:(y+ty)/2+16,source:n.id});
+      }
+    }return links;
+  }
+  protected openFormRoute(event:MouseEvent,source:string){this.onNodeClick(event,source);this.inspectorTab.set('actions');}
   protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
 
   protected addTaskActivity(task: ReferenceItem): void { this.addNode('MainActivity', undefined, undefined, undefined, task); }
@@ -1511,8 +1548,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private nodeInMarquee(n: CanvasNode, m: { x: number; y: number; w: number; h: number }): boolean {
     const nx = this.isGateway(n.type) ? n.x - GATEWAY_R : n.x;
     const ny = this.isGateway(n.type) ? n.y - GATEWAY_R : n.y;
-    const nw = this.isGateway(n.type) ? GATEWAY_R * 2 : NODE_W;
-    const nh = this.isGateway(n.type) ? GATEWAY_R * 2 : NODE_H;
+    const nw = this.isGateway(n.type) ? GATEWAY_R * 2 : this.nodeWidth(n);
+    const nh = this.isGateway(n.type) ? GATEWAY_R * 2 : this.nodeHeight(n);
     return nx < m.x + m.w && nx + nw > m.x && ny < m.y + m.h && ny + nh > m.y;
   }
 
@@ -1591,7 +1628,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         maxX = Math.max(maxX, n.x + 24); maxY = Math.max(maxY, n.y + 24);
       } else {
         minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-        maxX = Math.max(maxX, n.x + NODE_W); maxY = Math.max(maxY, n.y + NODE_H);
+        maxX = Math.max(maxX, n.x + this.nodeWidth(n)); maxY = Math.max(maxY, n.y + this.nodeHeight(n));
       }
     }
     const contentW = maxX - minX + padding * 2;
@@ -1656,13 +1693,13 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected portOutPos(n: CanvasNode): { x: number; y: number } {
     if (this.isGateway(n.type)) return { x: n.x + GATEWAY_R + 10, y: n.y };
     if (n.type === 'Start' || n.type === 'End') return { x: n.x + 28, y: n.y };
-    return { x: n.x + NODE_W + 10, y: n.y + NODE_H / 2 };
+    return { x: n.x + this.nodeWidth(n) + 10, y: n.y + this.nodeHeight(n) / 2 };
   }
 
   protected portInPos(n: CanvasNode): { x: number; y: number } {
     if (this.isGateway(n.type)) return { x: n.x - GATEWAY_R - 10, y: n.y };
     if (n.type === 'Start' || n.type === 'End') return { x: n.x - 28, y: n.y };
-    return { x: n.x - 10, y: n.y + NODE_H / 2 };
+    return { x: n.x - 10, y: n.y + this.nodeHeight(n) / 2 };
   }
 
   protected startEdge(event: MouseEvent, fromNodeId: string, outcomeKey?: string): void {
@@ -1750,8 +1787,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         const dy = y - n.y;
         if (dx * dx + dy * dy <= (26 + pad) * (26 + pad)) return n.id;
       } else if (
-        x >= n.x - pad && x <= n.x + NODE_W + pad &&
-        y >= n.y - pad && y <= n.y + NODE_H + pad
+        x >= n.x - pad && x <= n.x + this.nodeWidth(n) + pad &&
+        y >= n.y - pad && y <= n.y + this.nodeHeight(n) + pad
       ) {
         return n.id;
       }
@@ -1967,7 +2004,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const ns = this.nodes();
     if (ns.length === 0) return;
     if (!this.isReadonly()) this.pushUndo();
-    const posMap = layoutWorkflowGraph(ns, this.edges());
+    const posMap = layoutWorkflowGraph(ns.map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})), this.edges());
     this.nodes.update(all => all.map(n => posMap[n.id] ? { ...n, ...posMap[n.id] } : n));
     this.resetView();
     const scroller = this.canvasScrollRef?.nativeElement;
@@ -2000,8 +2037,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const viewW = svg.clientWidth || 800;
     const viewH = svg.clientHeight || 600;
     const z = this.zoom();
-    const cx = this.isGateway(node.type) ? node.x : node.x + NODE_W / 2;
-    const cy = this.isGateway(node.type) ? node.y : node.y + NODE_H / 2;
+    const cx = this.isGateway(node.type) ? node.x : node.x + this.nodeWidth(node) / 2;
+    const cy = this.isGateway(node.type) ? node.y : node.y + this.nodeHeight(node) / 2;
     this.panX.set(viewW / 2 - cx * z);
     this.panY.set(viewH / 2 - cy * z);
   }
@@ -2269,6 +2306,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       ? { ...n, configurationJson, actionKey: n.type === 'ServiceTask' ? 'http.request' : n.actionKey } : n));
     const node = this.nodes().find(n => n.id === nodeId);
     if (node) this.patchPropsFromNode(node);
+    this.makeRoomForChildren();
     this.markUnsaved();
   }
 
@@ -2557,6 +2595,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private inferTabFromCode(code?: string | null): InspectorTab {
     if (!code) return 'general';
+    if (code.startsWith('ROUTING_')) return 'actions';
+    if (code.startsWith('ACTIVITY_FORM_')) return 'form';
     const lower = code.toLowerCase();
     if (lower.includes('assignment') || lower.includes('assignmentkey')) return 'assignment';
     if (lower.includes('sla') || lower.includes('timer')) return 'sla';
@@ -2831,17 +2871,17 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   // ── SVG helpers ───────────────────────────────────────────────────────────
 
   protected nodeCenterX(n: CanvasNode): number {
-    return this.isGateway(n.type) ? n.x : n.x + NODE_W / 2;
+    return this.isGateway(n.type) ? n.x : n.x + this.nodeWidth(n) / 2;
   }
 
   protected nodeCenterY(n: CanvasNode): number {
-    return this.isGateway(n.type) ? n.y : n.y + NODE_H / 2;
+    return this.isGateway(n.type) ? n.y : n.y + this.nodeHeight(n) / 2;
   }
 
   private nodeCenter(n: CanvasNode): { x: number; y: number } {
     if (n.type === 'Start' || n.type === 'End') return { x: n.x, y: n.y };
     if (this.isGateway(n.type)) return { x: n.x, y: n.y };
-    return { x: n.x + NODE_W / 2, y: n.y + NODE_H / 2 };
+    return { x: n.x + this.nodeWidth(n) / 2, y: n.y + this.nodeHeight(n) / 2 };
   }
 
   private nodeBounds(n: CanvasNode): { x: number; y: number; w: number; h: number } {
@@ -2853,7 +2893,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       const r = GATEWAY_R;
       return { x: n.x - r, y: n.y - r, w: r * 2, h: r * 2 };
     }
-    return { x: n.x, y: n.y, w: NODE_W, h: NODE_H };
+    return { x: n.x, y: n.y, w: this.nodeWidth(n), h: this.nodeHeight(n) };
   }
 
   private anchorOnSide(n: CanvasNode, side: 'left' | 'right' | 'top' | 'bottom'): { x: number; y: number } {
@@ -3183,7 +3223,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     // Keep quick-add below the outbound port so it never steals connect drags
     if (this.isGateway(n.type)) return { x: n.x + GATEWAY_R + 10, y: n.y + GATEWAY_R + 18 };
     if (n.type === 'Start') return { x: n.x + 28, y: n.y + 40 };
-    return { x: n.x + NODE_W + 10, y: n.y + NODE_H / 2 + 26 };
+    return { x: n.x + this.nodeWidth(n) + 10, y: n.y + this.nodeHeight(n) / 2 + 26 };
   }
 
   protected quickAddNode(type: NodeType, protocol?:string): void {

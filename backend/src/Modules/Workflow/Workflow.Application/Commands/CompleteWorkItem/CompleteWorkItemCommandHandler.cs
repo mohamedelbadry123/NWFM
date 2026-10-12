@@ -9,6 +9,9 @@ using Workflow.Application.Helpers;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
+using NWFM.Shared.Integration.Forms;
+using Workflow.Application.Workspace;
+using Workflow.Application.Integrations;
 
 public sealed class CompleteWorkItemCommandHandler
     : IRequestHandler<CompleteWorkItemCommand, Result<WorkItemDto>>
@@ -25,6 +28,7 @@ public sealed class CompleteWorkItemCommandHandler
     private readonly IWorkflowDepartmentRepository _departmentRepo;
     private readonly IWorkflowCandidateFactory _candidateFactory;
     private readonly IWorkItemCandidateRepository _candidateRepo;
+    private readonly IFormGateway? _forms;
 
     public CompleteWorkItemCommandHandler(
         IWorkflowFeatureGate gate,
@@ -38,7 +42,7 @@ public sealed class CompleteWorkItemCommandHandler
         IWorkflowAssignmentGroupRepository groupRepo,
         IWorkflowDepartmentRepository departmentRepo,
         IWorkflowCandidateFactory candidateFactory,
-        IWorkItemCandidateRepository candidateRepo)
+        IWorkItemCandidateRepository candidateRepo, IFormGateway? forms = null)
     {
         _gate             = gate;
         _workItemRepo     = workItemRepo;
@@ -52,6 +56,7 @@ public sealed class CompleteWorkItemCommandHandler
         _departmentRepo   = departmentRepo;
         _candidateFactory = candidateFactory;
         _candidateRepo    = candidateRepo;
+        _forms = forms;
     }
 
     public async Task<Result<WorkItemDto>> Handle(
@@ -65,7 +70,13 @@ public sealed class CompleteWorkItemCommandHandler
             return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotFound);
 
         if (item.Status == WorkItemStatus.Completed)
+        {
+            // Completed visits are immutable receipts, including when a response was lost.
+            if (request.FormVisitId is Guid replayId && item.CompletedByUserId == request.UserId && item.FormProgressJson is not null
+                && System.Text.Json.JsonSerializer.Deserialize<ActivityFormProgress>(item.FormProgressJson)?.Visits.Any(v => v.VisitId == replayId && v.ActorId == request.UserId) == true)
+                return Result.Success(await _assembler.ToDtoAsync(item, true, cancellationToken));
             return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.AlreadyCompleted);
+        }
 
         if (item.Status != WorkItemStatus.Claimed)
             return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotClaimed);
@@ -101,11 +112,43 @@ public sealed class CompleteWorkItemCommandHandler
         try
         {
             var formConfig = WorkflowTaskForm.Parse(formDefinition?.ConfigurationJson);
-            var formError = WorkflowTaskForm.Validate(formConfig, request.FormValues ?? []);
-            if (formError is not null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", formError));
-            item.SetFormData(System.Text.Json.JsonSerializer.Serialize(request.FormValues ?? []));
+            var binding = IntegrationJson.Read<BusinessActivityConfiguration>(formDefinition?.ConfigurationJson ?? "{}");
+            if (binding.FormSteps.Count > 0 && !request.ActionTaken.Equals("REJECT", StringComparison.OrdinalIgnoreCase))
+            {
+                var processed = await SubmitFormStepAsync(item, request, binding, formVersion!, formDefinition!, cancellationToken);
+                if (processed.IsFailure) return Result.Failure<WorkItemDto>(processed.Error);
+                if (!processed.Value) return Result.Success(await _assembler.ToDtoAsync(item, true, cancellationToken));
+            }
+            else if (binding.FormSteps.Count > 0) { /* Reject does not submit or evaluate a form. */ }
+            else if (binding.FormDefinitionId is Guid formId)
+            {
+                // Rejection keeps its existing comment/rework behavior; it does not complete a form.
+                if (!request.ActionTaken.Equals("REJECT", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_forms is null || binding.FormVersionNo is not > 0)
+                        return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The selected form version is unavailable."));
+                    var submitted = await _forms.SubmitAsync(new FormSubmitRequest
+                    {
+                        FormId = formId, VersionNo = binding.FormVersionNo.Value,
+                        ContextType = "WorkItem", ContextId = item.Id.ToString(), ClientSubmissionId = item.Id,
+                        Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
+                    }, cancellationToken);
+                    if (submitted.IsFailure) return Result.Failure<WorkItemDto>(submitted.Error);
+                    // A retry must use the answers actually recorded, including normalized media values.
+                    var recorded = await _forms.GetLatestByContextAsync(formId, "WorkItem", item.Id.ToString(), cancellationToken);
+                    if (recorded is null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The form submission could not be read. Retry the action."));
+                    item.SetFormData(System.Text.Json.JsonSerializer.Serialize(recorded.Answers));
+                }
+            }
+            else
+            {
+                var formError = WorkflowTaskForm.Validate(formConfig, request.FormValues ?? []);
+                if (formError is not null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", formError));
+                item.SetFormData(System.Text.Json.JsonSerializer.Serialize(request.FormValues ?? []));
+            }
         }
-        catch (System.Text.Json.JsonException) { return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The task form configuration is invalid.")); }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or FormatException or InvalidOperationException or OverflowException)
+        { return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Routing", "The form or routing configuration is invalid: " + ex.Message)); }
 
         var now = DateTime.UtcNow;
         item.Complete(request.UserId, request.ActionTaken, now, request.Comment);
@@ -132,6 +175,56 @@ public sealed class CompleteWorkItemCommandHandler
         if (advanceResult.IsFailure) return Result.Failure<WorkItemDto>(advanceResult.Error);
 
         return Result.Success(await _assembler.ToDtoAsync(item, includeOutcomes: false, cancellationToken));
+    }
+
+    private async Task<Result<bool>> SubmitFormStepAsync(WorkItem item, CompleteWorkItemCommand request,
+        BusinessActivityConfiguration binding, WorkflowVersion version, ActivityDefinition definition, CancellationToken ct)
+    {
+        var progress = ActivityFormProgress.Read(item.FormProgressJson, binding.FormSteps, item.Id);
+        if (request.FormVisitId is not Guid visitId)
+            return Result.Failure<bool>(new Error("Workflow.Form.VisitRequired", "Refresh this task before submitting its active form."));
+        if (progress.Visits.Any(v => v.VisitId == visitId && v.ActorId == request.UserId)) return Result.Success(false);
+        if (visitId != progress.VisitId || progress.ExitNodeKey is not null)
+            return Result.Failure<bool>(new Error("Workflow.Form.StaleVisit", "This form is no longer active. Refresh the task."));
+        var step = binding.FormSteps.Single(s => s.Id == progress.ActiveStepId);
+        if (_forms is null || await _forms.GetVersionSchemaAsync(step.FormId, step.VersionNo, ct) is null)
+            return Result.Failure<bool>(new Error("Workflow.Form.Invalid", "The selected form version is unavailable."));
+        var fields = await _forms.GetFieldsAsync(step.FormId, step.VersionNo, ct);
+        // Check every possible route before recording an immutable submission.
+        foreach (var destination in step.Rules.Select(r => r.Destination).Append(step.Otherwise))
+            WorkflowFormRouting.ResolveDestination(binding.FormSteps, step, destination, version, definition.NodeKey);
+        foreach (var rule in step.Rules)
+        {
+            var errors = WorkflowFormRouting.Validate(rule.When, fields);
+            if (errors.Count > 0) return Result.Failure<bool>(new Error("Workflow.Form.Routing", errors[0]));
+        }
+        var context = item.Id + ":" + visitId;
+        var submitted = await _forms.SubmitAsync(new FormSubmitRequest
+        {
+            FormId = step.FormId, VersionNo = step.VersionNo, ContextType = "WorkItem", ContextId = context,
+            ClientSubmissionId = visitId, Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
+        }, ct);
+        if (submitted.IsFailure) return Result.Failure<bool>(submitted.Error);
+        var recorded = await _forms.GetLatestByContextAsync(step.FormId, "WorkItem", context, ct);
+        if (recorded is null) return Result.Failure<bool>(new Error("Workflow.Form.Invalid", "The submission could not be read. Retry the action."));
+        var decision = WorkflowFormRouting.Decide(step, fields, recorded.Answers);
+        var target = WorkflowFormRouting.ResolveDestination(binding.FormSteps, step, decision.Destination, version, definition.NodeKey);
+        var now = DateTime.UtcNow;
+        progress.Visits.Add(new ActivityFormVisit
+        {
+            VisitId = visitId, StepId = step.Id, FormId = step.FormId, VersionNo = step.VersionNo, SubmissionId = recorded.SubmissionId,
+            ActorId = request.UserId, SubmittedAt = now, RuleId = decision.RuleId, Destination = decision.Destination,
+            Answers = recorded.Answers.ToDictionary(x => x.Key, x => x.Value)
+        });
+        if (target.FormStepId is not null) { progress.ActiveStepId = target.FormStepId; progress.VisitId = Guid.NewGuid(); }
+        else progress.ExitNodeKey = target.NodeKey;
+        item.SetFormProgress(System.Text.Json.JsonSerializer.Serialize(progress));
+        if (target.FormStepId is null) item.SetFormData(System.Text.Json.JsonSerializer.Serialize(recorded.Answers));
+        await _events.AppendAsync(item.OrganizationId, item.WorkflowInstanceId, WorkflowEventType.FormSubmitted, now,
+            activityNodeKey: definition.NodeKey, actorUserId: request.UserId,
+            payloadJson: System.Text.Json.JsonSerializer.Serialize(new { workItemId = item.Id, comment = request.Comment, visitId, stepId = step.Id, formId = step.FormId, step.VersionNo, submissionId = recorded.SubmissionId, ruleId = decision.RuleId, fallback = decision.RuleId is null, destination = decision.Destination }), cancellationToken: ct);
+        if (target.FormStepId is not null) await _workItemRepo.SaveChangesAsync(ct);
+        return Result.Success(target.FormStepId is null);
     }
 
     private async Task<Result<WorkItemDto>> RedirectAsync(

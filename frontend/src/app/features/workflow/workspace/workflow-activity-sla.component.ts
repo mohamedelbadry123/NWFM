@@ -33,9 +33,9 @@ type ContextField = 'departmentCode' | 'fieldActivityCode';
     }
   } @else if(missing().length){
     <div role="status" class="space-y-2 rounded-lg px-3 py-3 text-sm" style="background:var(--acc-warn-bg);color:var(--acc-warn-fg)">
-      <p>{{ t('The SLA is chosen from the activity’s Department and Field Activity Type. Still missing:','تُحدد مدة الخدمة من قسم النشاط ونوع النشاط الميداني. ما زال ناقصاً:') }}</p>
+      <p>{{ t('Select an activity form to supply the missing SLA classification. Still missing:','اختر نموذج النشاط لتوفير تصنيف الخدمة الناقص. ما زال ناقصاً:') }}</p>
       <ul class="list-disc ps-5">@for(m of missing();track m){<li>{{ m === 'departmentCode' ? t('Department','القسم') : t('Field Activity Type','نوع النشاط الميداني') }}</li>}</ul>
-      <button type="button" class="underline" (click)="editContext.emit(missing()[0])">{{ t('Go to General settings','الانتقال إلى الإعدادات العامة') }}</button>
+      <button type="button" class="underline" (click)="editContext.emit(missing()[0])">{{ t('Go to Form settings','الانتقال إلى إعدادات النموذج') }}</button>
     </div>
   } @else if(loading()){
     <p role="status" class="text-sm">{{ t('Finding the SLA rule…','جارٍ البحث عن قاعدة الخدمة…') }}</p>

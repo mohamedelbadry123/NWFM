@@ -162,6 +162,10 @@
         </section>
       }
 
+      <app-workflow-form-progress [steps]="item()!.formSteps||[]" [history]="item()!.formHistory||[]" [activeStepId]="item()!.activeFormStepId" [workItemId]="item()!.id!" [completed]="item()!.status==='Completed'" />
+      @if(tab() === 'details' && item()!.selectedForm; as selected){
+        <app-workflow-selected-form [selectedForm]="selected" [workItemId]="item()!.id!" [answers]="formValues" [readonly]="true" />
+      }
       @if (tab() === 'steps') {
         <section class="wf-card p-5 sm:p-6 space-y-6">
           <div>
@@ -206,6 +210,7 @@
           @if (item()!.instructionsEn || item()!.instructionsAr) {
             <p class="mb-4 whitespace-pre-wrap">{{ locale.isRtl() ? (item()!.instructionsAr || item()!.instructionsEn) : (item()!.instructionsEn || item()!.instructionsAr) }}</p>
           }
+          @if(item()!.selectedForm; as selected){<app-workflow-selected-form [selectedForm]="selected" [workItemId]="item()!.id!" [answers]="formValues" (answersChange)="formValues=$event" />}
           <form [formGroup]="completeForm" (ngSubmit)="complete()" class="space-y-4">
             @for (field of item()!.formFields || []; track field.key) {
               <label class="block text-sm" style="color:var(--ds-text)">{{ formLabel(field) }} {{ field.required ? '*' : '' }}
@@ -313,7 +318,9 @@
                   ? ('common.processing' | translate)
                   : (isRedirectSelected()
                     ? ('workflow.runtime.task_detail.redirect_submit' | translate)
-                    : ('workflow.runtime.task_detail.complete_btn' | translate)) }}
+                    : (item()!.formSteps?.length && completeForm.controls.actionTaken.value === 'APPROVE'
+                      ? (locale.isRtl() ? 'إرسال ومتابعة' : 'Submit and continue')
+                      : ('workflow.runtime.task_detail.complete_btn' | translate))) }}
               </button>
             </div>
           </form>
