@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { deserializeSchema } from './form-schema-import';
 import { ELEMENT_TYPES } from './form-schema.types';
 
@@ -15,7 +16,12 @@ describe('form schema import', () => {
           label_en: 'Area',
           label_ar: 'المساحة',
           output_type: 'number',
-          rules: [{ when: { match: 'any', conditions: [{ field: ' w ', operator: 'is_not_empty' }] }, then: 'w * 2' }],
+          rules: [
+            {
+              when: { match: 'any', conditions: [{ field: ' w ', operator: 'is_not_empty' }] },
+              then: 'w * 2',
+            },
+          ],
           default: '',
         },
       ],
@@ -24,10 +30,10 @@ describe('form schema import', () => {
     const column = schema.computed_columns![0];
     expect(column.key).toBe('area');
     expect(column.output_type).toBe('number');
-    expect(column.show_in_task_grid).toBeFalse();
+    expect(column.show_in_task_grid).toBe(false);
     expect(column.rules[0].when.match).toBe('any');
     expect(column.rules[0].when.conditions[0].field).toBe('w');
-    expect('computed_columns' in deserializeSchema({ elements: [] })).toBeFalse();
+    expect('computed_columns' in deserializeSchema({ elements: [] })).toBe(false);
   });
 
   it('fills in the defaults a document leaves out', () => {
@@ -112,7 +118,9 @@ describe('form schema import', () => {
     });
 
     expect(schema.elements[0].data_name).toBe('note');
-    expect((schema.elements[0] as unknown as Record<string, unknown>)['legacy_widget_id']).toBeUndefined();
+    expect(
+      (schema.elements[0] as unknown as Record<string, unknown>)['legacy_widget_id'],
+    ).toBeUndefined();
     expect((schema.elements[0] as unknown as Record<string, unknown>)['unknown']).toBeUndefined();
   });
 });

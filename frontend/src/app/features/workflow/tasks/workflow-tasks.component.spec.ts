@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
@@ -20,10 +21,10 @@ const ITEM: WorkflowWorkItemView = {
 
 describe('WorkflowTasksComponent', () => {
   let fixture: ComponentFixture<WorkflowTasksComponent>;
-  let claimSpy: jasmine.Spy;
+  let claimSpy: Mock;
 
   beforeEach(() => {
-    claimSpy = jasmine.createSpy('claim').and.returnValue(of(ITEM));
+    claimSpy = vi.fn().mockReturnValue(of(ITEM));
     TestBed.configureTestingModule({
       imports: [WorkflowTasksComponent, TranslateModule.forRoot()],
       providers: [

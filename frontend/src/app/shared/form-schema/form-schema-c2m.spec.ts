@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { deserializeSchema } from './form-schema-import';
 import { ACTION_TAKEN_DATA_NAME, C2M_FA_STATUSES } from './form-schema.types';
 
@@ -12,7 +13,13 @@ describe('form schema C2M metadata', () => {
         type: 'single_choice',
         data_name: ACTION_TAKEN_DATA_NAME,
         choices: [
-          { value: 'OCUL01', label_en: 'Done', label_ar: 'تم', c2m_fa_status: ' c ', c2m_reason: ' OK ' },
+          {
+            value: 'OCUL01',
+            label_en: 'Done',
+            label_ar: 'تم',
+            c2m_fa_status: ' c ',
+            c2m_reason: ' OK ',
+          },
           { value: 'MMFCNR1', label_en: 'No contract', label_ar: 'لا عقد' },
         ],
       },

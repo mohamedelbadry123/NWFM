@@ -1,6 +1,9 @@
+import { describe, expect, it } from 'vitest';
 import { buildNWFMXml, type CanvasNode, type CanvasState } from './workflow-designer.component';
 
-function node(partial: Partial<CanvasNode> & Pick<CanvasNode, 'id' | 'nodeKey' | 'type'>): CanvasNode {
+function node(
+  partial: Partial<CanvasNode> & Pick<CanvasNode, 'id' | 'nodeKey' | 'type'>,
+): CanvasNode {
   return {
     name: partial.name ?? partial.nodeKey,
     nameAr: '',
@@ -72,7 +75,9 @@ describe('org-owned workflow cycle (designer XML)', () => {
     expect(xml).toContain(`assignmentGroupId="${groupId}"`);
     expect(xml).toContain('assignmentKey="PRIVACY_REVIEW"');
     expect(xml).toContain('assigneeType="AssignmentGroup"');
-    expect(xml).toContain(`<AssignmentRule assigneeType="AssignmentGroup" assignmentGroupId="${groupId}" assignmentKey="PRIVACY_REVIEW" />`);
+    expect(xml).toContain(
+      `<AssignmentRule assigneeType="AssignmentGroup" assignmentGroupId="${groupId}" assignmentKey="PRIVACY_REVIEW" />`,
+    );
   });
 
   it('writes node coordinates so reload can restore the canvas', () => {

@@ -1,0 +1,2 @@
+node scripts/quality/branch-guard.mjs commit
+npx --no-install lint-staged --diff-filter=ACMRD --hide-unstaged --concurrent false

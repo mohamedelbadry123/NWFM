@@ -1,0 +1,15 @@
+**/node_modules/
+**/bin/
+**/obj/
+**/dist/
+**/.angular/
+**/coverage/
+**/TestResults/
+frontend/src/app/shared/models/
+frontend/src/app/shared/services/
+**/Persistence/Migrations/
+.agents/skills/e2e/
+.claude/
+.work/
+.e2e/
+**/package-lock.json

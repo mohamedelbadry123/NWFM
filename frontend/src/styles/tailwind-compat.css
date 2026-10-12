@@ -1,0 +1,37 @@
+/* Preserve the v3 utility contract while the build uses Tailwind 4.
+   Existing templates and component class bindings keep these public spellings. */
+@theme {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --radius-sm: 0.125rem;
+  --blur-sm: 4px;
+}
+@utility rounded {
+  border-radius: 0.25rem;
+}
+@utility shadow {
+  --tw-shadow:
+    0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)),
+    0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+  box-shadow:
+    var(--tw-inset-shadow, 0 0 #0000), var(--tw-inset-ring-shadow, 0 0 #0000),
+    var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+@utility outline-none {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+@utility outline {
+  outline-style: solid;
+}
+
+/* Tailwind 4 also emits its built-in outline-none rule. Place the legacy
+   overrides after that layer's generated utilities, including keyboard focus. */
+@layer utilities {
+  .outline-none,
+  .focus\:outline-none:focus,
+  .focus-visible\:outline-none:focus-visible {
+    --tw-outline-style: solid;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}

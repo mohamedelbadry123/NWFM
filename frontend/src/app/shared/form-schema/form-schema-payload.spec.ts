@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { PREVIEW_VALUE_KINDS, fromStoredAnswers, toPreviewPayload } from './form-schema-payload';
 
 /**
@@ -39,7 +40,14 @@ describe('form schema payload', () => {
     const payload = toPreviewPayload(
       {
         site_photos: [
-          { fileId: 'f1', path: 'pending/f1.jpg', name: 'a.jpg', type: 'image/jpeg', size: 10, url: 'blob:x' },
+          {
+            fileId: 'f1',
+            path: 'pending/f1.jpg',
+            name: 'a.jpg',
+            type: 'image/jpeg',
+            size: 10,
+            url: 'blob:x',
+          },
         ],
       },
       kinds,
@@ -58,7 +66,8 @@ describe('form schema payload', () => {
         seen_on: '2026-01-05T00:00:00',
         seen_at: '08:30:00',
         is_hazard: true,
-        site_photos: '[{"fileId":"f1","path":"forms/x/f1.jpg","name":"a.jpg","type":"image/jpeg","size":10}]',
+        site_photos:
+          '[{"fileId":"f1","path":"forms/x/f1.jpg","name":"a.jpg","type":"image/jpeg","size":10}]',
       },
       kinds,
     );

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-12T04:17:57.752Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Accept\" in \"Request Review checklist\"",
+        "target": {
+          "role": "button",
+          "name": "Accept",
+          "within": "Request Review checklist"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/workflow-lifecycle.e2e.ts::a%20workflow%20progresses%20through%20child%20approvals%20to%20persisted%20completion",
+      "targetId": "chromium",
+      "instructionDigest": "efdbd6ba5ab9a87f4cb64a052111fd2415384838f4f565814d5f3428a9d7e180",
+      "paramsDigest": "0d7c756654afb586800f0844d6fc287db91798d8e0d8bf8820e9713c1c9f40f5",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Accepted the Request Review checklist child task. Its child workflow now shows Completed; the parent Request Review approval remains waiting for child workflow and was not accepted.",
+    "startPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endAnchors": [
+      {
+        "text": "Demo — Request Review steps — Visual · Completed"
+      },
+      {
+        "text": "Completed"
+      },
+      {
+        "text": "Workflow or parent is paused or finished."
+      },
+      {
+        "role": "heading",
+        "name": "Completed"
+      },
+      {
+        "text": "end"
+      },
+      {
+        "text": "review->end"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "Waiting for child workflow"
+      },
+      {
+        "text": "Complete the child workflow before approving this activity."
+      },
+      {
+        "text": "Demo — Request Review steps — Visual · Running"
+      }
+    ],
+    "endWaitMs": 12433,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "631c6881b8a0bf692d328f5599cda29787551d35eb61d876546567bb7b81b604",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "96bb74140c497b1e9b484f905e3e12bb533b95d50b9d7e17832f76889447fd0a",
+      "agentContextDigest": "b42883aaaffa5ebe4f759748acdd78d7e6a8e75654bb89d1b15a6126e6424e55"
+    }
+  }
+}

@@ -162,3 +162,7 @@ Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_E
 Copy `.env.example` to `.env`, set a local SQL Server password, and run `docker compose up --build`. The frontend is available at http://localhost:4200. The database volume is separate from any reference project volume. This is a local development configuration, not a production deployment.
 
 The workspace was verified with SQL Server, 319 backend tests, 60 frontend tests, production builds, authenticated API checks, real process restarts and browser checks. See the workspace guide for evidence and remaining build warnings. The containers have not been run for this workspace change.
+
+## Contribution quality gates
+
+See [quality gates and end-to-end tests](docs/quality-gates.md) for setup, local checks, ChatGPT sign-in, CI replay, and the GitHub-only merge policy.

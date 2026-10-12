@@ -1,8 +1,11 @@
+import { describe, expect, it } from 'vitest';
 import { fileNameFromDisposition } from './save-file-response';
 
 describe('fileNameFromDisposition', () => {
   it('reads a quoted file name', () => {
-    expect(fileNameFromDisposition('attachment; filename="Task_TSK-1_20260921.pdf"', 'x.pdf')).toBe('Task_TSK-1_20260921.pdf');
+    expect(fileNameFromDisposition('attachment; filename="Task_TSK-1_20260921.pdf"', 'x.pdf')).toBe(
+      'Task_TSK-1_20260921.pdf',
+    );
   });
 
   it('stops at the semicolon rather than swallowing the UTF-8 copy', () => {
@@ -12,7 +15,9 @@ describe('fileNameFromDisposition', () => {
   });
 
   it('decodes an encoded name', () => {
-    expect(fileNameFromDisposition("attachment; filename*=UTF-8''%D9%85%D9%87%D9%85%D8%A9.pdf", 'x.pdf')).toBe('مهمة.pdf');
+    expect(
+      fileNameFromDisposition("attachment; filename*=UTF-8''%D9%85%D9%87%D9%85%D8%A9.pdf", 'x.pdf'),
+    ).toBe('مهمة.pdf');
   });
 
   it('falls back when the header is missing', () => {
