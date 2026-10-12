@@ -31,4 +31,14 @@ public sealed record WorkItemDto(
     IReadOnlyList<ActivityOutcomeDefinitionDto>? AvailableOutcomes = null,
     IReadOnlyList<Workflow.Application.Helpers.WorkflowTaskField>? FormFields = null,
     IReadOnlyDictionary<string, object?>? FormValues = null,
-    string? InstructionsEn = null, string? InstructionsAr = null);
+    string? InstructionsEn = null, string? InstructionsAr = null,
+    WorkflowSelectedFormDto? SelectedForm = null,
+    Guid? FormVisitId = null, string? ActiveFormStepId = null,
+    IReadOnlyList<Workflow.Application.Workspace.ActivityFormStep>? FormSteps = null,
+    IReadOnlyList<WorkflowFormVisitDto>? FormHistory = null);
+
+public sealed record WorkflowSelectedFormDto(Guid FormId, int VersionNo, string? SchemaJson, Guid? VisitId = null, string? StepId = null);
+
+public sealed record WorkflowFormVisitDto(Guid VisitId, string StepId, Guid FormId, int VersionNo, Guid SubmissionId,
+    DateTime SubmittedAt, string? RuleId, Workflow.Application.Workspace.FormRouteDestination Destination,
+    IReadOnlyDictionary<string, object?> Answers, string? SchemaJson);

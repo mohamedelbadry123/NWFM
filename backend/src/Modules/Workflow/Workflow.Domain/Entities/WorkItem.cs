@@ -32,6 +32,8 @@ public sealed class WorkItem : Entity, ITenantAware
     public string? ActionTaken { get; private set; }
     public string? CommentText { get; private set; }
     public string? FormDataJson { get; private set; }
+    public string? FormProgressJson { get; private set; }
+    public void SetFormProgress(string json) => FormProgressJson = json;
     public void SetFormData(string json) => FormDataJson = json;
 
     /// <summary>Optimistic concurrency token — only one claimant wins a concurrent race.</summary>
@@ -49,14 +51,14 @@ public sealed class WorkItem : Entity, ITenantAware
     {
         return new WorkItem
         {
-            Id                 = Guid.NewGuid(),
-            OrganizationId     = organizationId,
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
             WorkflowInstanceId = workflowInstanceId,
             ActivityInstanceId = activityInstanceId,
-            AssignmentGroupId  = assignmentGroupId,
-            Status             = WorkItemStatus.Pending,
-            DueAt              = dueAt,
-            CreatedAt          = createdAt,
+            AssignmentGroupId = assignmentGroupId,
+            Status = WorkItemStatus.Pending,
+            DueAt = dueAt,
+            CreatedAt = createdAt,
         };
     }
 
@@ -66,8 +68,8 @@ public sealed class WorkItem : Entity, ITenantAware
             throw new InvalidOperationException("Only Pending work items can be claimed.");
 
         ClaimedByUserId = userId;
-        ClaimedAt       = claimedAt;
-        Status          = WorkItemStatus.Claimed;
+        ClaimedAt = claimedAt;
+        Status = WorkItemStatus.Claimed;
         SetUpdated(claimedAt);
     }
 
@@ -77,8 +79,8 @@ public sealed class WorkItem : Entity, ITenantAware
             throw new InvalidOperationException("Only Claimed work items can be released.");
 
         ClaimedByUserId = null;
-        ClaimedAt       = null;
-        Status          = WorkItemStatus.Pending;
+        ClaimedAt = null;
+        Status = WorkItemStatus.Pending;
         SetUpdated(releasedAt);
     }
 
@@ -88,10 +90,10 @@ public sealed class WorkItem : Entity, ITenantAware
             throw new InvalidOperationException("Only Claimed work items can be completed.");
 
         CompletedByUserId = userId;
-        CompletedAt       = completedAt;
-        ActionTaken       = actionTaken;
-        CommentText       = comment;
-        Status            = WorkItemStatus.Completed;
+        CompletedAt = completedAt;
+        ActionTaken = actionTaken;
+        CommentText = comment;
+        Status = WorkItemStatus.Completed;
         SetUpdated(completedAt);
     }
 
@@ -127,8 +129,7 @@ public sealed class WorkItem : Entity, ITenantAware
             throw new InvalidOperationException("Only Claimed work items can be delegated.");
 
         ClaimedByUserId = toUserId;
-        ClaimedAt       = delegatedAt;
+        ClaimedAt = delegatedAt;
         SetUpdated(delegatedAt);
     }
 }
-

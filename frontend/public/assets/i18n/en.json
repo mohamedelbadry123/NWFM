@@ -107,7 +107,11 @@
     "FormEngine.Form.InvalidFieldActivity": "The field activity is not an active activity of the chosen department.",
     "Tasks.TaskForm.NotFound": "That form is not one of the task's forms.",
     "Tasks.TaskForm.Duplicate": "The task already carries that form.",
-    "Tasks.TaskForm.ChoiceRequired": "Choose which of the task's forms is being filled."
+    "Tasks.TaskForm.ChoiceRequired": "Choose which of the task's forms is being filled.",
+    "Workflow.Form.VisitRequired": "Refresh this task before submitting its active form.",
+    "Workflow.Form.StaleVisit": "This form is no longer active. Refresh the task.",
+    "Workflow.Form.Routing": "The form routing settings need correction. Contact the workflow designer.",
+    "Workflow.Form.Invalid": "The selected form could not be submitted. Check its answers and retry."
   },
   "workflow": {
     "common": {
@@ -735,7 +739,7 @@
       "tab_help_outcomes": "Buttons the reviewer clicks (Approve, Reject, Return). They do nothing until you draw one Decision arrow per key.",
       "tab_help_sla": "The matching Department and FA Type rule sets the deadline and alert schedule.",
       "tab_help_data": "Map request fields into this step and write results back to the module.",
-      "tab_help_form": "Form Engine forms filed under this activity’s Department and Field Activity Type. Listed for discovery and preview; none is attached or made required.",
+      "tab_help_form": "Preview and add published forms associated with this activity’s Task Type. Configure each form’s destinations in Actions.",
       "tab_help_advanced": "Technical JSON for rare options. Leave empty unless you need it.",
       "props_sla_duration_hours": "SLA Duration (hours)",
       "props_sla_escalation_key": "Escalation Assignment Key",
@@ -936,7 +940,9 @@
       "node_main_activity": "Main activity",
       "node_desc_main_activity": "Child workflow followed by final approval",
       "node_sms": "SMS",
-      "node_desc_sms": "Send a message through an HTTP SMS provider"
+      "node_desc_sms": "Send a message through an HTTP SMS provider",
+      "tab_actions": "Actions",
+      "tab_help_actions": "Configure ordered routing rules for each form."
     },
     "help": {
       "title": "Workflow Knowledge Base",
@@ -1443,7 +1449,8 @@
         "history_event_WorkItemReleased": "Step released",
         "history_event_WorkItemReassigned": "Step reassigned",
         "history_event_WorkItemDelegated": "Step delegated",
-        "history_event_ActivityFailed": "Step failed"
+        "history_event_ActivityFailed": "Step failed",
+        "history_event_FormSubmitted": "Form submitted"
       },
       "case": {
         "close": "Close",

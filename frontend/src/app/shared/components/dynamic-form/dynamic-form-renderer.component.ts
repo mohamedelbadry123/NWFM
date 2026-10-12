@@ -57,6 +57,7 @@ import {
           [form]="form()"
           [fields]="fields()"
           [model]="model()"
+          (modelChange)="valueChanged.emit(payload())"
           [options]="formOptions()"
         />
       </form>
@@ -212,6 +213,8 @@ export class DynamicFormRendererComponent {
 
   /** The respondent pressed Enter / submitted the inner form; the host decides what that means. */
   readonly submitted = output<void>();
+  /** Hosts can retain in-progress answers when switching tabs or refreshing task data. */
+  readonly valueChanged = output<Record<string, unknown>>();
 
   readonly form = signal(new FormGroup({}));
   readonly fields = signal<FormlyFieldConfig[]>([]);

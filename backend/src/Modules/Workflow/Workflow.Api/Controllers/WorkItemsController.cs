@@ -1,11 +1,10 @@
 namespace Workflow.Api.Controllers;
 
-using NWFM.Shared.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using NWFM.Shared.Results;
+using NWFM.Shared.Constants;
 using Workflow.Application.Commands.ClaimWorkItem;
 using Workflow.Application.Commands.CompleteWorkItem;
 using Workflow.Application.Commands.DelegateWorkItem;
@@ -130,7 +129,7 @@ public sealed class WorkItemsController : WorkflowControllerBase
             new CompleteWorkItemCommand(
                 workItemId, GetUserId(), GetOrgId(),
                 body.ActionTaken, body.Comment,
-                body.RedirectAssignmentGroupId, body.RedirectDepartmentId, body.FormValues),
+                body.RedirectAssignmentGroupId, body.RedirectDepartmentId, body.FormValues, body.FormVisitId),
             cancellationToken);
         if (result.IsFailure) return BadRequest(new { result.Error.Code, result.Error.Message });
         return Ok(result.Value);
@@ -172,6 +171,7 @@ public sealed record CompleteWorkItemRequest(
     string? Comment = null,
     Guid? RedirectAssignmentGroupId = null,
     Guid? RedirectDepartmentId = null,
-    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null);
+    Dictionary<string, System.Text.Json.JsonElement>? FormValues = null,
+    Guid? FormVisitId = null);
 public sealed record ReassignWorkItemRequest(Guid NewAssignmentGroupId);
 public sealed record DelegateWorkItemRequest(Guid DelegateToUserId, string? Comment = null);

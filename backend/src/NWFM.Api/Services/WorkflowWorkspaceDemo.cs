@@ -95,16 +95,14 @@ public static class WorkflowWorkspaceDemo
         var scopes = new[] { branchCode is null
             ? new WorkflowOrganizationScope(OrgLevels.Cbu, location.CbuCode, location.ClusterCode, location.CbuCode)
             : new WorkflowOrganizationScope(OrgLevels.Branch, branchCode, location.ClusterCode, location.CbuCode) };
-        var taskType = (await services.GetRequiredService<IWorkflowTaskTypeCatalog>().ListAsync(default))
-            .SingleOrDefault(t => t.Code == "DEMO_LEAK_INSPECTION")
-            ?? throw new InvalidOperationException("WorkflowDemo needs the seeded DEMO_LEAK_INSPECTION task type.");
+        var demoForm = await WorkflowDemoForms.EnsureAsync(services);
         var activityType = (await services.GetRequiredService<IWorkflowReferenceData>().ListAsync("field-activity-types", null, default))
             .Single(t => t.Code == "ISOLATION");
         var childSettings = new WorkflowWorkspaceDefinition("Child")
         {
             SchemaVersion = 2,
             OrganizationScopes = scopes,
-            TaskTypeId = taskType.Id
+            TaskTypeId = demoForm.TaskTypeId
         };
         var mainSettings = new WorkflowWorkspaceDefinition(WorkflowWorkspaceDefinition.MainKind)
         {
@@ -191,7 +189,7 @@ public static class WorkflowWorkspaceDemo
         var fa = new[] { "DEMO-REVIEW", "ISOLATION", "DEMO-CLOSURE" };
         var children = new List<(WorkflowDefinition Definition, WorkflowVersion Version)>();
         for (var i = 0; i < 3; i++)
-            children.Add(await Publish("DEMO-CHILD-" + i, "Demo — " + names[i] + " steps", childSettings, [Node("review", "UserTask", names[i] + " checklist", new { departmentCode = department.Code, fieldActivityCode = fa[i], slaDurationHours = 8, rejectTargetNodeKey = "review" }, groups[i].Id)]));
+            children.Add(await Publish("DEMO-CHILD-" + i, "Demo — " + names[i] + " steps", childSettings, [Node("review", "UserTask", names[i] + " checklist", new { taskTypeId = demoForm.TaskTypeId, formDefinitionId = demoForm.FormId, formVersionNo = demoForm.VersionNo, departmentCode = department.Code, fieldActivityCode = fa[i], slaDurationHours = 8, rejectTargetNodeKey = "review" }, groups[i].Id)]));
         object Event(string id, string trigger, string kind, bool required, object config) => new { id, name = "Demo — " + id, trigger, kind, required, configuration = config };
         async Task<(WorkflowDefinition Definition, WorkflowVersion Version)> Main(string suffix, double hours = 24, bool failure = false, bool callback = false)
         {
@@ -208,7 +206,7 @@ public static class WorkflowWorkspaceDemo
                 }
                 activityEvents.Add(Event("reminder", "OnSlaReminder", "Email", false, new { connectionId = smtp.Id, channels = "Email", to = "supervisor@example.test", subject = "Demo SLA reminder", body = names[i] + " is approaching its deadline.", failurePolicy = "Retry" }));
                 activityEvents.Add(Event("sla", "OnSlaBreach", "Email", false, new { connectionId = smtp.Id, channels = "Email", to = "supervisor@example.test", subject = "Demo SLA overdue", body = names[i] + " is overdue.", failurePolicy = "Retry" }));
-                nodes.Add(Node("stage-" + i, "MainActivity", names[i], new { taskTypeId = taskType.Id, departmentCode = department.Code, fieldActivityCode = suffix == "OVERDUE" ? "DEMO-OVERDUE" : fa[i], slaDurationHours = hours, definitionKey = children[i].Definition.DefinitionKey, versionId = children[i].Version.Id, rejectTargetNodeKey = "stage-" + Math.Max(0, i - 1), events = activityEvents }, groups[i].Id));
+                nodes.Add(Node("stage-" + i, "MainActivity", names[i], new { taskTypeId = demoForm.TaskTypeId, formDefinitionId = demoForm.FormId, formVersionNo = demoForm.VersionNo, departmentCode = department.Code, fieldActivityCode = suffix == "OVERDUE" ? "DEMO-OVERDUE" : fa[i], slaDurationHours = hours, definitionKey = children[i].Definition.DefinitionKey, versionId = children[i].Version.Id, rejectTargetNodeKey = "stage-" + Math.Max(0, i - 1), events = activityEvents }, groups[i].Id));
             }
             var audit = Node("delivery", "ServiceTask", "Send completion record", new { connectionId = http.Id, protocol = "Rest", method = "POST", path = "/rest", body = "{}", required = true });
             audit.SetAttributeValue("actionKey", "http.request");

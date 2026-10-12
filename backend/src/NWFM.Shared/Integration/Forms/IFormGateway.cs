@@ -10,6 +10,8 @@ namespace NWFM.Shared.Integration.Forms;
 /// </summary>
 public interface IFormGateway
 {
+    /// <summary>Metadata for explicitly associated forms, including unavailable forms and forms without classification.</summary>
+    Task<IReadOnlyList<FieldActivityFormInfo>> ListByIdsAsync(IReadOnlyList<Guid> ids, CancellationToken cancellationToken);
     /// <summary>A form that has a published version, or null when there is none.</summary>
     Task<PublishedFormInfo?> FindPublishedAsync(Guid formId, CancellationToken cancellationToken);
 

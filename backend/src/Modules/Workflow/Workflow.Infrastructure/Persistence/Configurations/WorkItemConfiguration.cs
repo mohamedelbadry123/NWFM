@@ -26,6 +26,7 @@ public sealed class WorkItemConfiguration : IEntityTypeConfiguration<WorkItem>
             .HasDefaultValue(WorkItemStatus.Pending);
         builder.Property(x => x.ActionTaken).HasMaxLength(200);
         builder.Property(x => x.CommentText).HasMaxLength(4000);
+        builder.Property(x => x.FormProgressJson).HasColumnType("nvarchar(max)");
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.UpdatedAt);
         builder.Property(x => x.RowVersion).IsRowVersion();

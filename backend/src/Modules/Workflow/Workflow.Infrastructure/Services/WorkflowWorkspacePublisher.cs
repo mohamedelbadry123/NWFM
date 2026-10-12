@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Integration.Organization;
 using NWFM.Shared.Integration.Workflow;
 using NWFM.Shared.Results;
 using Workflow.Application.DTOs;
-using Workflow.Application.Workspace;
 using Workflow.Application.Integrations;
+using Workflow.Application.Workspace;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
@@ -14,11 +15,32 @@ using Workflow.Infrastructure.Persistence;
 namespace Workflow.Infrastructure.Services;
 
 internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
-    IWorkflowVersionRepository versions, IOrgDirectory directory, IWorkflowTaskTypeCatalog? taskTypes = null) : IWorkflowWorkspacePublisher
+    IWorkflowVersionRepository versions, IOrgDirectory directory, IWorkflowTaskTypeCatalog? taskTypes = null, IFormGateway? forms = null) : IWorkflowWorkspacePublisher
 {
     public async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateAsync(WorkflowVersion version, CancellationToken ct)
     {
         var errors = new List<WorkflowValidationIssueDto>();
+        if (version.IsDraft)
+            foreach (var activity in version.Activities.Where(a => a.ActivityType is ActivityType.UserTask or ActivityType.MainActivity))
+            {
+                BusinessActivityConfiguration config;
+                try { config = IntegrationJson.Read<BusinessActivityConfiguration>(activity.ConfigurationJson); }
+                catch (JsonException) { errors.Add(new("ACTIVITY_CONFIG", "Activity settings are invalid.", activity.NodeKey)); continue; }
+                void Error(string code, string message) => errors.Add(new(code, message, activity.NodeKey));
+
+                if (config.TaskTypeId is not Guid typeId || taskTypes is null || !await taskTypes.IsActiveAsync(typeId, ct))
+                    Error("ACTIVITY_TASK_TYPE", "Select an active Task Type for this activity.");
+                else if (config.FormSteps.Count > 0)
+                    await ValidateFormStepsAsync(version, activity, config, typeId, errors, ct);
+                else if (config.FormDefinitionId is not Guid formId || config.FormVersionNo is not > 0)
+                    Error("ACTIVITY_FORM_REQUIRED", "Select one published form in the Form tab.");
+                else if (!(await taskTypes.FormIdsAsync(typeId, ct)).Contains(formId))
+                    Error("ACTIVITY_FORM_MEMBERSHIP", "The selected form no longer belongs to this Task Type. Select a form in the Form tab.");
+                else if (forms is null || await forms.FindPublishedAsync(formId, ct) is not { AcceptsSubmissions: true }
+                    || await forms.GetVersionSchemaAsync(formId, config.FormVersionNo.Value, ct) is null)
+                    Error("ACTIVITY_FORM_UNAVAILABLE", "The selected form version is unavailable. Select a usable published form.");
+            }
+        if (version.IsDraft) ValidateFormRouteTermination(version, errors);
         if (string.IsNullOrWhiteSpace(version.WorkspaceJson))
         {
             if (version.Activities.Any(a => a.ActivityType == ActivityType.MainActivity))
@@ -63,7 +85,7 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
             if (activity.ActivityType is ActivityType.UserTask or ActivityType.MainActivity)
             {
                 if (!await references.IsValidFieldActivityAsync(config.DepartmentCode ?? "", config.FieldActivityCode ?? "", ct))
-                    Error("ACTIVITY_FIELD_TYPE", "Select an active department and one of its Field Activity Types.");
+                    Error("ACTIVITY_FIELD_TYPE", "The activity needs an active SLA classification. Select a form with a Department and Field Activity Type.");
                 foreach (var rule in activity.AssignmentRules.Where(r => r.IsActive))
                     if (rule.ReferenceId is Guid group && !await db.AssignmentGroups.AnyAsync(g => g.Id == group && g.IsActive, ct))
                         Error("ACTIVITY_GROUP", "Select an active assigned group in this tenant.");

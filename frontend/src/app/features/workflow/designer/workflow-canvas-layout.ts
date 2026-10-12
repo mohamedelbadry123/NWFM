@@ -17,6 +17,8 @@ export type LayoutNodeType =
 export interface LayoutNode {
   id: string;
   type: LayoutNodeType;
+  width?: number;
+  height?: number;
 }
 
 export interface LayoutEdge {
@@ -34,10 +36,12 @@ const COL_GAP = 140;
 const COLLAPSE_DISTANCE = 56;
 
 function isGateway(type: LayoutNodeType): boolean {
-  return type === 'ExclusiveGateway'
-    || type === 'InclusiveGateway'
-    || type === 'ParallelGateway'
-    || type === 'JoinGateway';
+  return (
+    type === 'ExclusiveGateway' ||
+    type === 'InclusiveGateway' ||
+    type === 'ParallelGateway' ||
+    type === 'JoinGateway'
+  );
 }
 
 function nodeWidth(type: LayoutNodeType): number {
@@ -55,7 +59,7 @@ export function layoutWorkflowGraph(
   nodes: LayoutNode[],
   edges: LayoutEdge[],
 ): Record<string, { x: number; y: number }> {
-  const ids = nodes.map(n => n.id);
+  const ids = nodes.map((n) => n.id);
   const typeById: Record<string, LayoutNodeType> = {};
   for (const n of nodes) typeById[n.id] = n.type;
 
@@ -75,15 +79,15 @@ export function layoutWorkflowGraph(
 
   const layers: string[][] = [];
   const visited = new Set<string>();
-  let queue = ids.filter(id => inDegree[id] === 0);
-  const start = ids.find(id => typeById[id] === 'Start');
+  let queue = ids.filter((id) => inDegree[id] === 0);
+  const start = ids.find((id) => typeById[id] === 'Start');
   if (start && queue.includes(start)) {
-    queue = [start, ...queue.filter(id => id !== start)];
+    queue = [start, ...queue.filter((id) => id !== start)];
   }
 
   while (queue.length > 0) {
     layers.push([...queue]);
-    queue.forEach(id => visited.add(id));
+    queue.forEach((id) => visited.add(id));
     const next: string[] = [];
     const seenNext = new Set<string>();
     for (const id of queue) {
@@ -99,7 +103,7 @@ export function layoutWorkflowGraph(
     queue = next;
   }
 
-  const leftover = ids.filter(id => !visited.has(id));
+  const leftover = ids.filter((id) => !visited.has(id));
   if (leftover.length > 0) layers.push(leftover);
 
   for (let pass = 0; pass < 3; pass++) {
@@ -112,10 +116,19 @@ export function layoutWorkflowGraph(
   const startY = 100;
   const pos: Record<string, { x: number; y: number }> = {};
 
-  layers.forEach((layer, li) => {
-    const widths = layer.map(id => nodeWidth(typeById[id]));
+  let layerY = startY;
+  layers.forEach((layer) => {
+    const widths = layer.map(
+      (id) => nodes.find((n) => n.id === id)?.width ?? nodeWidth(typeById[id]),
+    );
     let x = 120;
-    const y = startY + li * LAYER_GAP;
+    const y = layerY;
+    layerY += Math.max(
+      LAYER_GAP,
+      ...layer.map(
+        (id) => (nodes.find((n) => n.id === id)?.height ?? nodeHeight(typeById[id])) + 120,
+      ),
+    );
     layer.forEach((id, i) => {
       const w = widths[i];
       const h = nodeHeight(typeById[id]);
@@ -132,12 +145,11 @@ export function layoutWorkflowGraph(
   return pos;
 }
 
-function barycenter(
-  id: string,
-  prevIndex: Map<string, number>,
-  edges: LayoutEdge[],
-): number {
-  const parents = edges.filter(e => e.toNodeId === id).map(e => prevIndex.get(e.fromNodeId)).filter((v): v is number => v !== undefined);
+function barycenter(id: string, prevIndex: Map<string, number>, edges: LayoutEdge[]): number {
+  const parents = edges
+    .filter((e) => e.toNodeId === id)
+    .map((e) => prevIndex.get(e.fromNodeId))
+    .filter((v): v is number => v !== undefined);
   if (parents.length === 0) return 0;
   return parents.reduce((s, n) => s + n, 0) / parents.length;
 }
@@ -182,13 +194,13 @@ export function mapCanvasIdsToActivities(
 }
 
 export function canvasWorldSize(
-  nodes: Array<{ x: number; y: number; type: LayoutNodeType }>,
+  nodes: Array<{ x: number; y: number; type: LayoutNodeType; width?: number; height?: number }>,
 ): { width: number; height: number } {
   let maxX = MIN_WORLD_W;
   let maxY = MIN_WORLD_H;
   for (const n of nodes) {
-    maxX = Math.max(maxX, n.x + nodeWidth(n.type) + 480);
-    maxY = Math.max(maxY, n.y + nodeHeight(n.type) + 480);
+    maxX = Math.max(maxX, n.x + (n.width ?? nodeWidth(n.type)) + 480);
+    maxY = Math.max(maxY, n.y + (n.height ?? nodeHeight(n.type)) + 480);
   }
   return { width: Math.ceil(maxX), height: Math.ceil(maxY) };
 }

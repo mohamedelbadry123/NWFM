@@ -19,6 +19,7 @@ import { WorkflowBindingsService } from '../workflow-bindings.service';
 import { WorkflowSlaPoliciesService } from '../workflow-sla-policies.service';
 import { ToastService } from '@core/notifications/toast.service';
 import { ThemeService } from '@core/theme/theme.service';
+import { WorkflowWorkspaceService } from '../workspace/workflow-workspace.service';
 import { LocaleService } from '@core/i18n/locale.service';
 
 /**
@@ -87,19 +88,22 @@ describe('WorkflowDesignerComponent scale', () => {
         },
         { provide: ToastService, useValue: { success: () => undefined, error: () => undefined } },
         { provide: ThemeService, useValue: { isDark: () => false } },
-        { provide: LocaleService, useValue: { current: () => 'en', isRtl: () => false } },
+        {
+          provide: LocaleService,
+          useValue: { current: () => 'en', locale: () => 'en', isRtl: () => false },
+        },
+        {
+          provide: WorkflowWorkspaceService,
+          useValue: { references: () => of([]), children: () => of([]) },
+        },
       ],
     });
 
     fixture = TestBed.createComponent(WorkflowDesignerComponent);
     component = fixture.componentInstance;
     const c = component as unknown as {
-      isLoading: {
-        set: (v: boolean) => void;
-      };
-      version: {
-        set: (v: { id: string; status: string; versionNumber: number }) => void;
-      };
+      isLoading: { set: (v: boolean) => void };
+      version: { set: (v: { id: string; status: string; versionNumber: number }) => void };
     };
     c.isLoading.set(false);
     c.version.set({ id: 'v1', status: 'Draft', versionNumber: 1 });
@@ -107,9 +111,7 @@ describe('WorkflowDesignerComponent scale', () => {
 
   function fillNodes(count: number): void {
     const add = (
-      component as unknown as {
-        addNode: (t: string, x: number, y: number) => void;
-      }
+      component as unknown as { addNode: (t: string, x: number, y: number) => void }
     ).addNode.bind(component);
     for (let i = 0; i < count; i++) {
       add('UserTask', 40 + (i % 20) * 80, 40 + Math.floor(i / 20) * 70);
@@ -118,13 +120,15 @@ describe('WorkflowDesignerComponent scale', () => {
 
   it('creates a task activity and preserves its identity through undo, duplication and XML save', () => {
     const c = component as unknown as {
-      workspace: WritableSignal<Parameters<typeof buildNWFMXml>[0]['workspace']>;
+      workspace: WritableSignal<
+        import('../workspace/workflow-workspace.service').WorkspaceSettings
+      >;
+      addTaskActivity(task: { id: string; code: string; nameEn: string; nameAr: string }): void;
       nodes: WritableSignal<CanvasNode[]>;
       selectedNodeId: WritableSignal<string | null>;
-      addTaskActivity: (task: { id: string; code: string; nameEn: string; nameAr: string }) => void;
-      undo: () => void;
-      redo: () => void;
-      duplicateSelected: () => void;
+      undo(): void;
+      redo(): void;
+      duplicateSelected(): void;
     };
     c.workspace.set({
       kind: 'Main',
@@ -134,7 +138,7 @@ describe('WorkflowDesignerComponent scale', () => {
     c.addTaskActivity({ id: 'task-id', code: 'SURVEY', nameEn: 'Survey', nameAr: 'مسح' });
     let node = c.nodes().find((n: CanvasNode) => n.type === 'MainActivity')!;
     expect(node.name).toBe('Survey');
-    expect(JSON.parse(node.configurationJson!).taskTypeId).toBe('task-id');
+    expect(JSON.parse(node.configurationJson).taskTypeId).toBe('task-id');
     c.undo();
     expect(c.nodes().some((n: CanvasNode) => n.type === 'MainActivity')).toBe(false);
     c.redo();
@@ -144,7 +148,7 @@ describe('WorkflowDesignerComponent scale', () => {
     const activities = c.nodes().filter((n: CanvasNode) => n.type === 'MainActivity');
     expect(activities.length).toBe(2);
     for (const activity of activities)
-      expect(JSON.parse(activity.configurationJson!).taskTypeId).toBe('task-id');
+      expect(JSON.parse(activity.configurationJson).taskTypeId).toBe('task-id');
     const doc = new DOMParser().parseFromString(
       buildNWFMXml({ nodes: c.nodes(), edges: [], variables: [], workspace: c.workspace() }),
       'application/xml',
@@ -158,11 +162,7 @@ describe('WorkflowDesignerComponent scale', () => {
   });
 
   function nodeCount(): number {
-    return (
-      component as unknown as {
-        nodes: () => unknown[];
-      }
-    ).nodes().length;
+    return (component as unknown as { nodes: () => unknown[] }).nodes().length;
   }
 
   it('adds 100 nodes under 2s', () => {
@@ -193,14 +193,8 @@ describe('WorkflowDesignerComponent scale', () => {
   }
 
   it('loads a cloned draft when route parameters change on the existing designer', () => {
-    const params = new Subject<{
-      get(key: string): string;
-    }>();
-    (
-      TestBed.inject(ActivatedRoute) as unknown as {
-        paramMap: unknown;
-      }
-    ).paramMap = params;
+    const params = new Subject<{ get(key: string): string }>();
+    (TestBed.inject(ActivatedRoute) as unknown as { paramMap: unknown }).paramMap = params;
     const versions = TestBed.inject(WorkflowVersionsService);
     const load = vi.spyOn(versions, 'getById').mockImplementation((_definition, version) =>
       of({
@@ -214,9 +208,7 @@ describe('WorkflowDesignerComponent scale', () => {
     component.ngOnInit();
     params.next({ get: (key) => (key === 'definitionId' ? 'definition' : 'published') });
     const editor = component as unknown as {
-      version: () => {
-        status: string;
-      };
+      version: () => { status: string };
       isReadonly: () => boolean;
     };
     expect(editor.isReadonly()).toBe(true);
@@ -307,10 +299,10 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(designer.nodes().some((n) => n.id === node.id)).toBe(false);
   });
 
-  it('shows Form instead of Actions on user tasks, and no Form on main activities or other nodes', () => {
+  it('shows Form on both business activity types and no tabs on other nodes', () => {
     const ids = (type: NodeType) => WorkflowDesignerComponent.tabsFor(type).map((t) => t.id);
-    expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'sla']);
-    expect(ids('MainActivity')).toEqual(['general', 'assignment', 'sla']);
+    expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
+    expect(ids('MainActivity')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
     for (const type of [
       'Start',
       'End',
@@ -323,12 +315,12 @@ describe('WorkflowDesignerComponent scale', () => {
     ] as NodeType[]) {
       expect(ids(type), type).toEqual([]);
     }
-    expect(WorkflowDesignerComponent.tabsFor('UserTask').map((t) => t.labelKey)).not.toContain(
+    expect(WorkflowDesignerComponent.tabsFor('UserTask').map((t) => t.labelKey)).toContain(
       'workflow.designer.tab_actions',
     );
   });
 
-  it('falls back to General when the selected activity has no Form tab', () => {
+  it('keeps Form selected when moving between business activities', () => {
     const designer = component as unknown as {
       addNode(type: NodeType, x: number, y: number): void;
       nodes: WritableSignal<CanvasNode[]>;
@@ -346,12 +338,12 @@ describe('WorkflowDesignerComponent scale', () => {
     designer.onNodeClick(new MouseEvent('click'), task.id);
     designer.inspectorTab.set('form');
     expect(designer.activeInspectorTab()).toBe('form');
-    // Even before the click handler runs, a MainActivity never renders the Form panel.
+    // Both activity types expose the same form selection panel.
     designer.selectedNodeId.set(main.id);
-    expect(designer.activeInspectorTab()).toBe('general');
+    expect(designer.activeInspectorTab()).toBe('form');
     designer.selectedNodeId.set(task.id);
     designer.onNodeClick(new MouseEvent('click'), main.id);
-    expect(designer.inspectorTab()).toBe('general');
+    expect(designer.inspectorTab()).toBe('form');
     designer.inspectorTab.set('sla');
     designer.onNodeClick(new MouseEvent('click'), task.id);
     expect(designer.inspectorTab(), 'a tab both have is kept').toBe('sla');
@@ -361,6 +353,9 @@ describe('WorkflowDesignerComponent scale', () => {
     const editor = configure('UserTask', {
       departmentCode: '10',
       fieldActivityCode: 'LEAK_REPAIR',
+      taskTypeId: 'type',
+      formDefinitionId: 'form',
+      formVersionNo: 2,
       rejectTargetNodeKey: 'earlier_review',
       formFields: [
         { key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false },
@@ -373,21 +368,18 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(saved.rejectTargetNodeKey).toBe('earlier_review');
     expect(saved.departmentCode).toBe('10');
     expect(saved.fieldActivityCode).toBe('LEAK_REPAIR');
+    expect(saved.formDefinitionId).toBe('form');
+    expect(saved.formVersionNo).toBe(2);
+    expect(saved.taskTypeId).toBe('type');
     expect(saved.formFields.map((f: { key: string }) => f.key)).toEqual(['note']);
   });
 
   it('does not render an Accept and Reject section on the General tab', () => {
     fixture.detectChanges();
     const state = component as unknown as {
-      isLoading: {
-        set: (v: boolean) => void;
-      };
-      loadError: {
-        set: (v: string | null) => void;
-      };
-      version: {
-        set: (v: { id: string; status: string; versionNumber: number }) => void;
-      };
+      isLoading: { set: (v: boolean) => void };
+      loadError: { set: (v: string | null) => void };
+      version: { set: (v: { id: string; status: string; versionNumber: number }) => void };
     };
     state.isLoading.set(false);
     state.loadError.set(null);
@@ -401,6 +393,9 @@ describe('WorkflowDesignerComponent scale', () => {
       fixture.detectChanges();
       const panel = (fixture.nativeElement as HTMLElement).querySelector('#wf-activity-panel');
       expect(panel, type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-task-type'), type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-department'), type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-field-type'), type).toBeNull();
       expect(panel!.querySelector('#wf-activity-outcomes'), type).toBeNull();
       expect(panel!.querySelector('#wf-activity-reject-target'), type).toBeNull();
       expect(panel!.textContent, type).not.toMatch(/Accept and Reject|Return to/);
@@ -435,12 +430,7 @@ describe('WorkflowDesignerComponent scale', () => {
     const merge = (status: string) =>
       (
         component as unknown as {
-          mergeWithBackend(
-            state: unknown,
-            v: unknown,
-          ): {
-            nodes: CanvasNode[];
-          };
+          mergeWithBackend(state: unknown, v: unknown): { nodes: CanvasNode[] };
         }
       ).mergeWithBackend(
         {

@@ -1,4 +1,7 @@
+import { WorkflowFormProgressComponent } from '../workspace/workflow-form-progress.component';
+import { WorkflowSelectedFormComponent } from '../workspace/workflow-selected-form.component';
 import {
+  ViewChild,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -10,8 +13,16 @@ import { DatePipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe } from '@ngx-translate/core';
-import { WorkflowWorkItemsService, type WorkflowWorkItemView } from '../workflow-work-items.service';
-import { dueRelativeLabel, formatRemainingSla, formatSlaDuration, isOverdue } from '../workflow-sla.util';
+import {
+  WorkflowWorkItemsService,
+  type WorkflowWorkItemView,
+} from '../workflow-work-items.service';
+import {
+  dueRelativeLabel,
+  formatRemainingSla,
+  formatSlaDuration,
+  isOverdue,
+} from '../workflow-sla.util';
 import { workflowApiErrorKey } from '../workflow-api-error';
 import type { WorkflowActivityOutcomeView } from '@core/models/workflow-ops.models';
 import { LocaleService } from '@core/i18n/locale.service';
@@ -38,6 +49,8 @@ type TaskDetailTab = 'action' | 'details' | 'steps';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    WorkflowFormProgressComponent,
+    WorkflowSelectedFormComponent,
     DatePipe,
     ReactiveFormsModule,
     FormsModule,
@@ -74,8 +87,11 @@ export class WorkflowTaskDetailComponent implements OnInit {
   protected readonly request = signal<WorkflowRequestView | null>(null);
   protected readonly timeline = signal<WorkflowHistoryEvent[]>([]);
   protected readonly liveGraphOpen = signal(false);
-  protected formValues: Record<string, any> = {};
-  protected formLabel(field: { labelEn: string; labelAr: string; key: string }) { return (this.locale.isRtl() ? field.labelAr : field.labelEn) || field.labelEn || field.key; }
+  @ViewChild(WorkflowSelectedFormComponent) selectedForm?: WorkflowSelectedFormComponent;
+  protected formValues: Record<string, unknown> = {};
+  protected formLabel(field: { labelEn: string; labelAr: string; key: string }) {
+    return (this.locale.isRtl() ? field.labelAr : field.labelEn) || field.labelEn || field.key;
+  }
 
   protected readonly isOverdue = isOverdue;
   protected readonly dueRelativeLabel = dueRelativeLabel;
@@ -97,14 +113,13 @@ export class WorkflowTaskDetailComponent implements OnInit {
   });
   protected readonly canReassign = computed(() => {
     const status = this.item()?.status;
-    return status !== 'Completed'
-      && status !== 'Cancelled';
+    return status !== 'Completed' && status !== 'Cancelled';
   });
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.workItemsService.getById(id).subscribe({
-      next: item => {
+      next: (item) => {
         this.item.set(item);
         this.formValues = { ...(item.formValues ?? {}) };
         this.isLoading.set(false);
@@ -114,11 +129,11 @@ export class WorkflowTaskDetailComponent implements OnInit {
       error: () => this.isLoading.set(false),
     });
     this.groupsService.getPaged(1, 100).subscribe({
-      next: page => this.groups.set(page.items ?? []),
+      next: (page) => this.groups.set(page.items ?? []),
       error: () => this.groups.set([]),
     });
     this.departmentsService.getPaged(1, 100).subscribe({
-      next: page => this.departments.set((page.items ?? []).filter(d => d.isActive !== false)),
+      next: (page) => this.departments.set((page.items ?? []).filter((d) => d.isActive !== false)),
       error: () => this.departments.set([]),
     });
   }
@@ -129,7 +144,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.isSubmitting.set(true);
     this.submitError.set(null);
     this.workItemsService.claim(id).subscribe({
-      next: updated => {
+      next: (updated) => {
         this.item.set(updated);
         this.isSubmitting.set(false);
       },
@@ -169,53 +184,83 @@ export class WorkflowTaskDetailComponent implements OnInit {
 
   protected onRedirectGroupChange(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
-    this.completeForm.patchValue({ redirectGroupId: value, redirectDepartmentId: value ? '' : this.completeForm.controls.redirectDepartmentId.value });
+    this.completeForm.patchValue({
+      redirectGroupId: value,
+      redirectDepartmentId: value ? '' : this.completeForm.controls.redirectDepartmentId.value,
+    });
   }
 
   protected onRedirectDepartmentChange(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;
-    this.completeForm.patchValue({ redirectDepartmentId: value, redirectGroupId: value ? '' : this.completeForm.controls.redirectGroupId.value });
+    this.completeForm.patchValue({
+      redirectDepartmentId: value,
+      redirectGroupId: value ? '' : this.completeForm.controls.redirectGroupId.value,
+    });
   }
 
   protected departmentLabel(dept: WorkflowDepartmentDto): string {
     return this.locale.isRtl()
-      ? (dept.nameAr || dept.name || dept.code || '—')
-      : (dept.name || dept.nameAr || dept.code || '—');
+      ? dept.nameAr || dept.name || dept.code || '—'
+      : dept.name || dept.nameAr || dept.code || '—';
   }
 
   protected outcomeLabel(outcome: WorkflowActivityOutcomeView): string {
     return this.locale.isRtl()
-      ? (outcome.nameAr || outcome.name || outcome.outcomeKey || '—')
-      : (outcome.name || outcome.nameAr || outcome.outcomeKey || '—');
+      ? outcome.nameAr || outcome.name || outcome.outcomeKey || '—'
+      : outcome.name || outcome.nameAr || outcome.outcomeKey || '—';
   }
 
   protected complete(): void {
     if (!this.canSubmitComplete()) return;
     const id = this.item()?.id;
     if (!id) return;
-    const { actionTaken, comment, redirectGroupId, redirectDepartmentId } = this.completeForm.getRawValue();
+    const { actionTaken, comment, redirectGroupId, redirectDepartmentId } =
+      this.completeForm.getRawValue();
+    if (
+      this.item()?.selectedForm &&
+      !this.isRedirectSelected() &&
+      actionTaken?.toUpperCase() !== 'REJECT' &&
+      !this.selectedForm?.validate()
+    )
+      return;
     this.isSubmitting.set(true);
     this.submitError.set(null);
-    this.workItemsService.complete(id, {
-      actionTaken: actionTaken!,
-      formValues: Object.fromEntries(Object.entries(this.formValues).map(([key, value]) => {
-        const field = this.item()?.formFields?.find(f => f.key === key);
-        return [key, field?.type === 'number' && value !== '' && value != null ? Number(value) : value];
-      })),
-      comment,
-      redirectAssignmentGroupId: this.isRedirectSelected() ? (redirectGroupId || null) : null,
-      redirectDepartmentId: this.isRedirectSelected() ? (redirectDepartmentId || null) : null,
-    }).subscribe({
-      next: () => {
-        this.isSubmitting.set(false);
-        const view = this.isRedirectSelected() ? 'available' : 'claimedByMe';
-        this.router.navigate(['/org/workflow/tasks'], { queryParams: { view } });
-      },
-      error: (err: unknown) => {
-        this.submitError.set(workflowApiErrorKey(err));
-        this.isSubmitting.set(false);
-      },
-    });
+    this.workItemsService
+      .complete(id, {
+        actionTaken: actionTaken!,
+        formVisitId: this.item()?.formVisitId,
+        formValues: this.item()?.selectedForm
+          ? this.selectedForm?.payload()
+          : Object.fromEntries(
+              Object.entries(this.formValues).map(([key, value]) => {
+                const field = this.item()?.formFields?.find((f) => f.key === key);
+                return [
+                  key,
+                  field?.type === 'number' && value !== '' && value != null ? Number(value) : value,
+                ];
+              }),
+            ),
+        comment,
+        redirectAssignmentGroupId: this.isRedirectSelected() ? redirectGroupId || null : null,
+        redirectDepartmentId: this.isRedirectSelected() ? redirectDepartmentId || null : null,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.isSubmitting.set(false);
+          if (updated.status !== 'Completed' && updated.formVisitId) {
+            this.item.set(updated);
+            this.formValues = { ...(updated.formValues ?? {}) };
+            this.completeForm.patchValue({ comment: '' });
+            return;
+          }
+          const view = this.isRedirectSelected() ? 'available' : 'claimedByMe';
+          this.router.navigate(['/org/workflow/tasks'], { queryParams: { view } });
+        },
+        error: (err: unknown) => {
+          this.submitError.set(workflowApiErrorKey(err));
+          this.isSubmitting.set(false);
+        },
+      });
   }
 
   protected release(): void {
@@ -238,7 +283,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.isSubmitting.set(true);
     this.submitError.set(null);
     this.workItemsService.reassign(id, groupId).subscribe({
-      next: updated => {
+      next: (updated) => {
         this.item.set(updated);
         this.isSubmitting.set(false);
         this.reassignGroupId.set('');
@@ -256,14 +301,14 @@ export class WorkflowTaskDetailComponent implements OnInit {
 
   protected groupLabel(group: WorkflowAssignmentGroupDto): string {
     return this.locale.isRtl()
-      ? (group.nameAr || group.name || group.code || '—')
-      : (group.name || group.nameAr || group.code || '—');
+      ? group.nameAr || group.name || group.code || '—'
+      : group.name || group.nameAr || group.code || '—';
   }
 
   protected serviceName(item: WorkflowWorkItemView): string {
     return this.locale.isRtl()
-      ? (item.serviceNameAr || item.serviceNameEn || '—')
-      : (item.serviceNameEn || item.serviceNameAr || '—');
+      ? item.serviceNameAr || item.serviceNameEn || '—'
+      : item.serviceNameEn || item.serviceNameAr || '—';
   }
 
   protected openLiveGraph(): void {
@@ -284,27 +329,35 @@ export class WorkflowTaskDetailComponent implements OnInit {
     return stepActivities(this.progress()?.activities);
   }
 
-  protected activityName(activity: { name?: string | null; activityNodeKey?: string | null }): string {
+  protected activityName(activity: {
+    name?: string | null;
+    activityNodeKey?: string | null;
+  }): string {
     return activityDisplayName(activity);
   }
 
   protected activityStatusClass(status: string | undefined): string {
     switch (status) {
-      case 'Completed': return 'bg-green-500';
-      case 'Active':    return 'bg-primary animate-pulse';
-      case 'Skipped':   return 'bg-ink-400';
-      case 'Failed':    return 'bg-red-500';
-      default:          return 'bg-ink-300 dark:bg-dark-600';
+      case 'Completed':
+        return 'bg-green-500';
+      case 'Active':
+        return 'bg-primary animate-pulse';
+      case 'Skipped':
+        return 'bg-ink-400';
+      case 'Failed':
+        return 'bg-red-500';
+      default:
+        return 'bg-ink-300 dark:bg-dark-600';
     }
   }
 
   private loadWorkflowContext(instanceId: string | undefined): void {
     if (!instanceId) return;
     this.runtimeService.getProgress(instanceId).subscribe({
-      next: progress => this.progress.set(progress),
+      next: (progress) => this.progress.set(progress),
     });
     this.runtimeService.getTimeline(instanceId).subscribe({
-      next: events => {
+      next: (events) => {
         const ordered = [...(events ?? [])].sort(
           (a, b) => Date.parse(a.occurredAt ?? '') - Date.parse(b.occurredAt ?? ''),
         );
@@ -312,17 +365,21 @@ export class WorkflowTaskDetailComponent implements OnInit {
       },
     });
     this.runtimeService.getRequestByInstanceId(instanceId).subscribe({
-      next: req => this.request.set(req),
+      next: (req) => this.request.set(req),
       error: () => this.request.set(null),
     });
   }
 
   protected statusTone(status: string | undefined): PrvTone {
     switch (status) {
-      case 'Claimed':    return 'info';
-      case 'Completed':  return 'success';
-      case 'Cancelled':  return 'danger';
-      default:           return 'warning';
+      case 'Claimed':
+        return 'info';
+      case 'Completed':
+        return 'success';
+      case 'Cancelled':
+        return 'danger';
+      default:
+        return 'warning';
     }
   }
 }

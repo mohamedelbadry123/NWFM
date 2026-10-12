@@ -53,14 +53,14 @@ public static class NwfmPolicies
     public const string FormPickers = AnyPrefix + ViewForms + "," + SubmitForms;
 
     /// <summary>Uploading form media: filling a form directly, or filling one as part of a task.</summary>
-    public const string FormUploaders = AnyPrefix + SubmitForms + "," + SubmitTasks;
+    public const string FormUploaders = AnyPrefix + SubmitForms + "," + SubmitTasks + "," + ClaimTasks;
 
     /// <summary>
     /// Downloading form media: the person filling the form, someone reviewing its submissions, or
     /// someone working on or viewing the task the fill belongs to.
     /// </summary>
     public const string SubmitOrViewSubmissions =
-        AnyPrefix + SubmitForms + "," + ViewSubmissions + "," + SubmitTasks + "," + ViewTasks;
+        AnyPrefix + SubmitForms + "," + ViewSubmissions + "," + SubmitTasks + "," + ViewTasks + "," + ClaimTasks;
 
     /// <summary>Listing teams: to manage them, or to put a user on one.</summary>
     public const string TeamReaders = AnyPrefix + ManageTeams + "," + ManageUsers;

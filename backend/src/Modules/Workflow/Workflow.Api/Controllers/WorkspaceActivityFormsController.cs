@@ -10,6 +10,13 @@ namespace Workflow.Api.Controllers;
 [ApiController, Authorize(Policy = NwfmPolicies.ActivityFormReaders), Route("api/workflow/workspace/activity-forms")]
 public sealed class WorkspaceActivityFormsController(IWorkspaceActivityForms forms) : ControllerBase
 {
+    [HttpGet("task-types/{taskTypeId:guid}")]
+    public async Task<IActionResult> ListForTaskType(Guid taskTypeId, CancellationToken ct)
+        => Reply(await forms.ListForTaskTypeAsync(taskTypeId, ct));
+
+    [HttpGet("task-types/{taskTypeId:guid}/{formId:guid}/versions/{versionNo:int}")]
+    public async Task<IActionResult> PreviewForTaskType(Guid taskTypeId, Guid formId, int versionNo, CancellationToken ct)
+        => Reply(await forms.PreviewForTaskTypeAsync(taskTypeId, formId, versionNo, ct));
     [HttpGet]
     public async Task<IActionResult> List(string? departmentCode, string? fieldActivityCode, int pageNumber = 1, int pageSize = 20, CancellationToken ct = default)
         => Reply(await forms.ListAsync(departmentCode, fieldActivityCode, pageNumber, pageSize, ct));

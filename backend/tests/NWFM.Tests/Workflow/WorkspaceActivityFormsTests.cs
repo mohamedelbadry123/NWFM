@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Moq;
 using NWFM.Shared.Constants;
 using NWFM.Shared.Integration.Forms;
+using NWFM.Shared.Integration.Workflow;
 using Workflow.Api.Controllers;
 using Workflow.Application.Workspace;
 
@@ -11,6 +12,42 @@ namespace NWFM.Tests.Workflow;
 /// <summary>The designer's Form tab reads a form only through its activity's Department + FA Type, and checks that on the server.</summary>
 public sealed class WorkspaceActivityFormsTests
 {
+    [Fact]
+    public async Task TaskTypeForms_ReturnOnlyAssociatedFormsIncludingUnavailableOnes()
+    {
+        var type = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var tasks = new Mock<IWorkflowTaskTypeCatalog>();
+        tasks.Setup(t => t.IsActiveAsync(type, default)).ReturnsAsync(true);
+        tasks.Setup(t => t.FormIdsAsync(type, default)).ReturnsAsync([FormId, other]);
+        _gateway.Setup(g => g.ListByIdsAsync(It.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { FormId, other })), default))
+            .ReturnsAsync([Form(), Form(usable: false) with { Id = other }]);
+        var result = await new WorkspaceActivityForms(_gateway.Object, tasks.Object).ListForTaskTypeAsync(type, default);
+        result.Value.Items.Select(f => f.Id).Should().Equal(FormId, other);
+        result.Value.UsableCount.Should().Be(1);
+        _gateway.Verify(g => g.ListForFieldActivityAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task TaskTypePreview_RejectsAFormOutsideTheTypeEvenIfClientKnowsItsId()
+    {
+        var type = Guid.NewGuid();
+        var tasks = new Mock<IWorkflowTaskTypeCatalog>();
+        tasks.Setup(t => t.IsActiveAsync(type, default)).ReturnsAsync(true);
+        tasks.Setup(t => t.FormIdsAsync(type, default)).ReturnsAsync(Array.Empty<Guid>());
+        _gateway.Setup(g => g.ListByIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), default)).ReturnsAsync(Array.Empty<FieldActivityFormInfo>());
+        var result = await new WorkspaceActivityForms(_gateway.Object, tasks.Object).PreviewForTaskTypeAsync(type, FormId, 1, default);
+        result.Error.Should().Be(WorkspaceActivityForms.NotFound);
+        _gateway.Verify(g => g.GetVersionSchemaAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task InactiveTaskType_DoesNotReadForms()
+    {
+        var result = await new WorkspaceActivityForms(_gateway.Object, Mock.Of<IWorkflowTaskTypeCatalog>()).ListForTaskTypeAsync(Guid.NewGuid(), default);
+        result.IsFailure.Should().BeTrue();
+        _gateway.VerifyNoOtherCalls();
+    }
     private static readonly Guid FormId = Guid.NewGuid();
     private readonly Mock<IFormGateway> _gateway = new(MockBehavior.Strict);
     private WorkspaceActivityForms Sut => new(_gateway.Object);

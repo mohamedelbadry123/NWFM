@@ -11,4 +11,11 @@ internal sealed class WorkflowTaskTypeCatalog(TasksDbContext db) : IWorkflowTask
             .Select(t => new WorkflowLookupItem(t.Id, t.Code, t.NameEn, t.NameAr, null)).ToListAsync(ct);
 
     public Task<bool> IsActiveAsync(Guid id, CancellationToken ct) => db.TaskTypes.AnyAsync(t => t.Id == id && t.IsActive, ct);
+
+    public async Task<IReadOnlyList<Guid>> FormIdsAsync(Guid id, CancellationToken ct)
+    {
+        var type = await db.TaskTypes.AsNoTracking().Include(t => t.Forms)
+            .SingleOrDefaultAsync(t => t.Id == id && t.IsActive, ct);
+        return type?.FormIds ?? [];
+    }
 }

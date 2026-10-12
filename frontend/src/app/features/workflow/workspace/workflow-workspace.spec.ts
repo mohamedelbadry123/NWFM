@@ -1,11 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Subject } from 'rxjs';
 import { LocaleService } from '@core/i18n/locale.service';
 import { WorkflowLocationComponent } from './workflow-location.component';
 import { WorkflowBusinessActivityComponent } from './workflow-business-activity.component';
 import {
-  ReferenceItem,
   WorkflowWorkspaceService,
   WorkspaceSettings,
   hasLegacyLocationConflict,
@@ -14,30 +12,60 @@ import {
   workspaceLocation,
 } from './workflow-workspace.service';
 import { buildNWFMXml } from '../designer/workflow-designer.component';
+import { workflowWorkspaceGuard } from '@core/guards/workflow-workspace.guard';
+import { Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 
 describe('Workflow workspace contracts', () => {
-  it('clears a selected FA and ignores the old department response when department changes', () => {
-    const previous = new Subject<ReferenceItem[]>();
-    const next = new Subject<ReferenceItem[]>();
+  it('allows the task detail screen without exposing other legacy workflow pages', () => {
+    const previous = environment.workflowWorkspace;
+    environment.workflowWorkspace = true;
+    const blocked = { blocked: true };
+    const parseUrl = vi.fn().mockReturnValue(blocked);
+    TestBed.configureTestingModule({ providers: [{ provide: Router, useValue: { parseUrl } }] });
+    try {
+      expect(
+        TestBed.runInInjectionContext(() =>
+          workflowWorkspaceGuard(
+            {} as ActivatedRouteSnapshot,
+            { url: '/org/workflow/tasks/qa-task' } as RouterStateSnapshot,
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        TestBed.runInInjectionContext(() =>
+          workflowWorkspaceGuard(
+            {} as ActivatedRouteSnapshot,
+            { url: '/org/workflow/participants' } as RouterStateSnapshot,
+          ),
+        ),
+      ).toBe(blocked);
+    } finally {
+      environment.workflowWorkspace = previous;
+    }
+  });
+  it('clears only the form binding when Task Type changes, preserving SLA and child association', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: LocaleService, useValue: { locale: () => 'en' } },
-        {
-          provide: WorkflowWorkspaceService,
-          useValue: {
-            references: (_kind: string, parent?: string) => (parent === 'old' ? previous : next),
-          },
-        },
+        { provide: WorkflowWorkspaceService, useValue: {} },
       ],
     });
     const component = TestBed.runInInjectionContext(() => new WorkflowBusinessActivityComponent());
-    component.config = { departmentCode: 'old', fieldActivityCode: 'OLD-FA' };
-    component.loadFields();
-    component.department('new');
-    expect(component.config.fieldActivityCode).toBe('');
-    next.next([{ id: '2', code: 'NEW-FA', nameEn: 'New', nameAr: '', parentCode: 'new' }]);
-    previous.next([{ id: '1', code: 'OLD-FA', nameEn: 'Old', nameAr: '', parentCode: 'old' }]);
-    expect(component.fieldTypes().map((x) => x.code)).toEqual(['NEW-FA']);
+    component.config = {
+      taskTypeId: 'old',
+      formDefinitionId: 'form',
+      formVersionNo: 2,
+      departmentCode: 'D',
+      fieldActivityCode: 'FA',
+      versionId: 'child',
+    };
+    component.taskType('new');
+    expect(component.config.taskTypeId).toBe('new');
+    expect(component.config['formDefinitionId']).toBeUndefined();
+    expect(component.config['formVersionNo']).toBeUndefined();
+    expect(component.config.departmentCode).toBe('D');
+    expect(component.config.versionId).toBe('child');
   });
   it('preserves workspace metadata when the full designer saves XML', () => {
     const workspace: WorkspaceSettings = {

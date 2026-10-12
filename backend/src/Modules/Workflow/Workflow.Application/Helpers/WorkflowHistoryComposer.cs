@@ -59,10 +59,10 @@ public static class WorkflowHistoryComposer
             actorAr = actor.NameAr;
         }
 
-        var comment = FirstNonEmpty(
+        var comment = evt.EventType == WorkflowEventType.FormSubmitted ? ReadString(payload, "comment") : FirstNonEmpty(
             workItem?.CommentText,
             ReadString(payload, "comment", "commentText", "Comment"));
-        var action = FirstNonEmpty(
+        var action = evt.EventType == WorkflowEventType.FormSubmitted ? null : FirstNonEmpty(
             workItem?.ActionTaken,
             ReadString(payload, "outcome", "actionTaken", "ActionTaken"));
         var attachmentName = ReadString(payload, "attachmentName", "attachmentFileName", "fileName");
@@ -91,6 +91,9 @@ public static class WorkflowHistoryComposer
         IReadOnlyList<ActivityInstance> activities,
         IReadOnlyList<WorkItem> workItems)
     {
+        if (evt.EventType == WorkflowEventType.FormSubmitted && ParsePayload(evt.PayloadJson) is { } formPayload
+            && Guid.TryParse(ReadString(formPayload, "workItemId"), out var formWorkItemId))
+            return workItems.FirstOrDefault(w => w.Id == formWorkItemId);
         var nodeIds = activities
             .Where(a => !string.IsNullOrWhiteSpace(evt.ActivityNodeKey)
                         && string.Equals(a.ActivityNodeKey, evt.ActivityNodeKey, StringComparison.OrdinalIgnoreCase))

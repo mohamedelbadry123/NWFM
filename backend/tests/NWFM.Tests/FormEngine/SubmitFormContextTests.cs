@@ -20,6 +20,8 @@ public sealed class SubmitFormContextTests
     [Theory]
     [InlineData("Task")]
     [InlineData(" task ")]
+    [InlineData("WorkItem")]
+    [InlineData(" workitem ")]
     public void A_fill_posted_for_a_task_is_refused(string contextType)
     {
         var result = new SubmitFormCommandValidator().Validate(Fill(contextType, Guid.NewGuid().ToString()));
@@ -30,7 +32,7 @@ public sealed class SubmitFormContextTests
 
     [Theory]
     [InlineData(null, null)]
-    [InlineData("WorkItem", "42")]
+    [InlineData("External", "42")]
     public void A_standalone_fill_or_another_context_is_accepted(string? contextType, string? contextId)
     {
         new SubmitFormCommandValidator().Validate(Fill(contextType, contextId)).IsValid.Should().BeTrue();

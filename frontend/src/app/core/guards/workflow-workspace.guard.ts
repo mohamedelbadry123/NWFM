@@ -22,24 +22,26 @@ const WORKSPACE_ROUTES: readonly string[] = [
   '/admin/workflow/definitions',
   '/admin/workflow/instances',
   '/workflow/start',
+  '/org/workflow/tasks',
   ...WORKSPACE_SHARED_ROUTES,
 ];
 
 export const workflowHomeGuard: CanActivateFn = () => {
   const auth = inject(AuthStore);
   const isAdmin = auth.roles().includes('Administrator');
-  const path = isAdmin || auth.hasAnyPermission(PERMISSIONS.manageDefinitions)
-    ? '/admin/workflow/definitions'
-    : auth.hasAnyPermission(PERMISSIONS.viewInstances)
-      ? '/admin/workflow/instances'
-      : auth.hasAnyPermission(PERMISSIONS.startWorkflows)
-        ? '/workflow/start'
-        // Field and form users have no workflow permission; their home is their own work.
-        : auth.hasAnyPermission(PERMISSIONS.viewTasks)
-          ? '/tasks'
-          : auth.hasAnyPermission(PERMISSIONS.viewForms)
-            ? '/forms'
-            : '/auth/access-denied';
+  const path =
+    isAdmin || auth.hasAnyPermission(PERMISSIONS.manageDefinitions)
+      ? '/admin/workflow/definitions'
+      : auth.hasAnyPermission(PERMISSIONS.viewInstances)
+        ? '/admin/workflow/instances'
+        : auth.hasAnyPermission(PERMISSIONS.startWorkflows)
+          ? '/workflow/start'
+          : // Field and form users have no workflow permission; their home is their own work.
+            auth.hasAnyPermission(PERMISSIONS.viewTasks)
+            ? '/tasks'
+            : auth.hasAnyPermission(PERMISSIONS.viewForms)
+              ? '/forms'
+              : '/auth/access-denied';
   return inject(Router).parseUrl(path);
 };
 
@@ -47,6 +49,8 @@ export const workflowWorkspaceGuard: CanActivateChildFn = (_route, state) => {
   if (!environment.workflowWorkspace) return true;
   const path = state.url.split('?')[0];
   if (path === '/') return true;
-  return WORKSPACE_ROUTES.some(prefix => path === prefix || path.startsWith(prefix + '/'))
-    || inject(Router).parseUrl('/admin/workflow/definitions');
+  return (
+    WORKSPACE_ROUTES.some((prefix) => path === prefix || path.startsWith(prefix + '/')) ||
+    inject(Router).parseUrl('/admin/workflow/definitions')
+  );
 };

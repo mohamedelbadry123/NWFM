@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.MultiTenancy;
 using Workflow.Application.Commands.CreateWorkflowDraft;
+using Workflow.Application.Commands.PublishWorkflowVersion;
 using Workflow.Application.Commands.SaveWorkflowDraftXml;
 using Workflow.Application.Commands.ValidateWorkflowVersion;
-using Workflow.Application.Commands.PublishWorkflowVersion;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Infrastructure.Persistence;
@@ -26,13 +26,15 @@ public static class DatabaseInitializer
         await db.SaveChangesAsync();
         if (!services.GetRequiredService<IConfiguration>().GetValue<bool>("WorkflowDemo:Enabled"))
         { await tx.CommitAsync(); return; }
+        var demoForm = await WorkflowDemoForms.EnsureAsync(services);
         var actors = new[] { Guid.Parse("20000000-0000-0000-0000-000000000001"), Guid.Parse("20000000-0000-0000-0000-000000000002") };
         for (var i = 0; i < actors.Length; i++)
             if (!await db.Participants.AnyAsync(p => p.UserId == actors[i]))
                 db.Participants.Add(WorkflowParticipant.Create(options.TenantId, actors[i], $"Reviewer {i + 1}", $"reviewer{i + 1}@example.test", now, $"مراجع {i + 1}"));
         await db.SaveChangesAsync();
         var group = await db.AssignmentGroups.SingleOrDefaultAsync(g => g.Code == "REVIEWERS");
-        if (group is null) {
+        if (group is null)
+        {
             group = WorkflowAssignmentGroup.Create(options.TenantId, "REVIEWERS", "Reviewers", AssignmentStrategy.RoundRobin, now, "المراجعون");
             db.AssignmentGroups.Add(group);
             await db.SaveChangesAsync();
@@ -41,7 +43,8 @@ public static class DatabaseInitializer
             if (!await db.GroupMembers.AnyAsync(m => m.AssignmentGroupId == group.Id && m.ParticipantId == p.Id))
                 db.GroupMembers.Add(WorkflowGroupMember.Create(group.Id, p.Id, true, p.UserId == actors[0], now));
         await db.SaveChangesAsync();
-        if (!await db.WorkflowDefinitions.AnyAsync(d => d.DefinitionKey == "SIMPLE_APPROVAL")) {
+        if (!await db.WorkflowDefinitions.AnyAsync(d => d.DefinitionKey == "SIMPLE_APPROVAL"))
+        {
             var definition = WorkflowDefinition.Create(options.TenantId, "SIMPLE_APPROVAL", "Simple approval", now, "موافقة بسيطة");
             db.WorkflowDefinitions.Add(definition);
             await db.SaveChangesAsync();
@@ -52,7 +55,7 @@ public static class DatabaseInitializer
             <Workflow xmlns="https://privora.io/workflow/v1">
               <Activities>
                 <Activity nodeKey="start" type="Start" name="Start" positionX="80" positionY="160" />
-                <Activity nodeKey="review" type="UserTask" name="Review request" positionX="260" positionY="140" assignmentGroupId="{{group.Id}}" />
+                <Activity nodeKey="review" type="UserTask" name="Review request" positionX="260" positionY="140" assignmentGroupId="{{group.Id}}" configurationJson="{&quot;taskTypeId&quot;:&quot;{{demoForm.TaskTypeId}}&quot;,&quot;formDefinitionId&quot;:&quot;{{demoForm.FormId}}&quot;,&quot;formVersionNo&quot;:{{demoForm.VersionNo}}}" />
                 <Activity nodeKey="end" type="End" name="Completed" positionX="620" positionY="160" />
               </Activities>
               <Transitions>

@@ -5,4 +5,5 @@ public interface IWorkflowTaskTypeCatalog
 {
     Task<IReadOnlyList<WorkflowLookupItem>> ListAsync(CancellationToken ct);
     Task<bool> IsActiveAsync(Guid id, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> FormIdsAsync(Guid id, CancellationToken ct);
 }
