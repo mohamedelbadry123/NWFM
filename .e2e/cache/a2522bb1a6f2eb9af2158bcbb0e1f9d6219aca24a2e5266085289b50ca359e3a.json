@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-12T04:17:57.753Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Accept\" in \"Request Review\"",
+        "target": {
+          "role": "button",
+          "name": "Accept",
+          "within": "Request Review"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/workflow-lifecycle.e2e.ts::a%20workflow%20progresses%20through%20child%20approvals%20to%20persisted%20completion",
+      "targetId": "chromium",
+      "instructionDigest": "7f8189bbfd27f05961fd579c2d6d6f9266ccd75eb74ed8c0d1b65b70f1680d99",
+      "paramsDigest": "0d7c756654afb586800f0844d6fc287db91798d8e0d8bf8820e9713c1c9f40f5",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Accepted the parent Request Review activity after its checklist was completed. The parent now shows Completed; the workflow advanced to Isolation Execution.",
+    "startPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endAnchors": [
+      {
+        "text": "Task is completed or claimed by another user."
+      },
+      {
+        "role": "heading",
+        "name": "Isolation Execution"
+      },
+      {
+        "text": "Waiting for child workflow"
+      },
+      {
+        "text": "Assigned group: Demo — Isolation team"
+      },
+      {
+        "text": "Complete the child workflow before approving this activity."
+      },
+      {
+        "text": "Demo — Isolation Execution steps — Visual · Running"
+      },
+      {
+        "role": "heading",
+        "name": "Isolation Execution checklist"
+      },
+      {
+        "text": "Assigned to another group."
+      }
+    ],
+    "goneAnchors": [
+      {
+        "role": "textbox",
+        "name": "Comment"
+      },
+      {
+        "role": "button",
+        "name": "Accept"
+      },
+      {
+        "role": "button",
+        "name": "Reject"
+      },
+      {
+        "role": "button",
+        "name": "Add comment"
+      },
+      {
+        "text": "Comment"
+      }
+    ],
+    "endWaitMs": 14052,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "631c6881b8a0bf692d328f5599cda29787551d35eb61d876546567bb7b81b604",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "96bb74140c497b1e9b484f905e3e12bb533b95d50b9d7e17832f76889447fd0a",
+      "agentContextDigest": "b42883aaaffa5ebe4f759748acdd78d7e6a8e75654bb89d1b15a6126e6424e55"
+    }
+  }
+}

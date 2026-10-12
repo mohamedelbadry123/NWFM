@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-12T04:17:57.754Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Accept\" in \"Closure checklist\"",
+        "target": {
+          "role": "button",
+          "name": "Accept",
+          "within": "Closure checklist"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/workflow-lifecycle.e2e.ts::a%20workflow%20progresses%20through%20child%20approvals%20to%20persisted%20completion",
+      "targetId": "chromium",
+      "instructionDigest": "efdbd6ba5ab9a87f4cb64a052111fd2415384838f4f565814d5f3428a9d7e180",
+      "paramsDigest": "2a9e13af7d64e3059d205b41c9de6e5a0a129c0c72f93860ef67b77092ec6085",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Accepted the Closure checklist child task. The child workflow now shows Completed; the parent Closure activity was left waiting for approval.",
+    "startPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endAnchors": [
+      {
+        "text": "Demo — Closure steps — Visual · Completed"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "Demo — Closure steps — Visual · Running"
+      },
+      {
+        "text": "Awaiting approval"
+      }
+    ],
+    "endWaitMs": 13425,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "631c6881b8a0bf692d328f5599cda29787551d35eb61d876546567bb7b81b604",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "96bb74140c497b1e9b484f905e3e12bb533b95d50b9d7e17832f76889447fd0a",
+      "agentContextDigest": "b42883aaaffa5ebe4f759748acdd78d7e6a8e75654bb89d1b15a6126e6424e55"
+    }
+  }
+}
