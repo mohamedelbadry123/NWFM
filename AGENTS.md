@@ -1,6 +1,6 @@
 # Repository workflow
 
-- Never merge pull requests, enable auto-merge, or push directly to main or develop. The user performs merges in GitHub after an independent reviewer approves.
+- Never merge pull requests, enable auto-merge, or push directly to main or develop. The user reviews the changes and performs the final merge in GitHub after all required checks pass. The owner explicitly chose zero required independent approvals.
 - Never bypass hooks, required checks, reviews, or branch protections; never weaken protections to finish a task.
 - Use a feature branch. Preserve unrelated and partially staged changes.
 - Run the repository quality checks, complete unit suites, and builds before presenting a PR. Report failures honestly.

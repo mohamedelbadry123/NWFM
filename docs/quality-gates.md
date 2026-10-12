@@ -86,9 +86,17 @@ type, link an issue (or provide a concrete Not applicable explanation), and
 complete testing/review checkboxes only when true.
 
 Required checks: PR policy, Code quality, Frontend, Backend, Security, E2E.
-Protection covers main and future develop: PRs, an independent approval, resolved
-conversations, current base, and passing checks, with no administrator bypass.
-New changes dismiss previous approval. Force pushes and branch deletion are blocked.
+Protection covers main and future develop: PRs, resolved conversations, current
+base, and all six passing checks, with no administrator bypass. On 2026-10-12,
+the owner explicitly chose solo review: zero required independent approvals and
+no requirement for another person to approve the latest push or unattributed
+changes. Optional reviews remain available; stale approvals are dismissed after
+new changes. Force pushes and branch deletion remain blocked.
+
+GitHub does not let a PR author approve their own PR. Under this policy the owner
+reviews Files changed, then manually confirms the merge in GitHub when the PR is
+ready and checks pass. This is an owner decision, not a recorded self-approval.
+No separate approval comment or chat confirmation is enforced by GitHub.
 
 Only the owner merges in GitHub. Agents must never merge, enable auto-merge,
 push to protected branches, or weaken protections. Local hooks are bypassable;

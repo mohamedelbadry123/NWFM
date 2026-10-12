@@ -22,4 +22,4 @@
 ## Review
 
 - [ ] I reviewed the diff and excluded credentials and unrelated changes.
-- [ ] An independent GitHub approval is required; the owner performs the merge.
+- [ ] The owner reviews the changes and performs the final merge in GitHub after all required checks pass; agents never merge or enable auto-merge.
