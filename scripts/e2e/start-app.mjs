@@ -146,7 +146,37 @@ try {
       ).status === 0,
     'SQL Server',
   );
-  start('node', ['scripts/workflow-demo-transports.mjs']);
+  start('node', ['scripts/workflow-demo-transports.mjs'], {
+    DEMO_HTTP_PORT: '5091',
+    DEMO_SMTP_PORT: '2525',
+  });
+  await ready(async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:5091/health', {
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok && (await response.text()) === 'ok';
+    } catch {
+      return false;
+    }
+  }, 'Local HTTP transport');
+  await ready(
+    () =>
+      new Promise((resolve) => {
+        const socket = net.connect(2525, '127.0.0.1');
+        socket.setTimeout(2000);
+        socket.once('data', (banner) => {
+          socket.destroy();
+          resolve(banner.toString().startsWith('220 '));
+        });
+        socket.once('error', () => resolve(false));
+        socket.once('timeout', () => {
+          socket.destroy();
+          resolve(false);
+        });
+      }),
+    'Local SMTP transport',
+  );
   start(
     'dotnet',
     [
@@ -169,6 +199,8 @@ try {
       DatabaseStartup__SeedData: 'true',
       DatabaseStartup__ApplySqlObjects: 'true',
       WorkflowDemo__Enabled: 'true',
+      WorkflowDemo__HttpAddress: 'http://127.0.0.1:5091',
+      WorkflowDemo__SmtpPort: '2525',
       WorkflowDemo__CallbackKey: randomBytes(32).toString('hex'),
       WorkflowSettings__AllowPrivateConnections: 'true',
       Sso__Enabled: 'false',
