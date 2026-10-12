@@ -125,6 +125,35 @@ test('designer shows independent child previews and blocks invalid form routes b
     'href',
     `/admin/workflow/definitions/${fixture.child.definitionId}/versions/${fixture.child.versionId}/designer`,
   );
+  await screen.getByRole('button', 'Add ' + fixture.name, { exact: false }).click();
+  await expect(screen.getByRole('tablist', 'Activity settings')).toBeVisible();
+  await screen.getByRole('tab', 'Form', { exact: true }).click();
+  await expect(screen.getByRole('heading', 'Configure activity forms')).toBeVisible();
+  const relatedForms = screen.getByRole('group', 'Related forms');
+  const firstForm = relatedForms.getByRole('article').filter({ hasText: fixture.forms[0].nameEn });
+  const secondForm = relatedForms.getByRole('article').filter({ hasText: fixture.forms[1].nameEn });
+  await firstForm.getByRole('button', 'Add form', { exact: true }).click();
+  await secondForm.getByRole('button', 'Add form', { exact: true }).click();
+  const sequence = screen.getByRole('list', 'Form sequence');
+  await expect(sequence.getByRole('listitem')).toHaveCount(2);
+  await expect(sequence).toContainText(fixture.forms[0].nameEn);
+  await expect(sequence).toContainText(fixture.forms[1].nameEn);
+  await sequence.getByRole('listitem').nth(1).getByRole('button', 'Move form earlier').click();
+  await expect(sequence.getByRole('listitem')).toContainText([
+    fixture.forms[1].nameEn,
+    fixture.forms[0].nameEn,
+  ]);
+  await sequence.getByRole('button', 'Preview', { exact: true }).first().click();
+  const formPreview = screen.getByRole('dialog');
+  await expect(formPreview).toContainText(
+    'Preview only. You can try the fields, but nothing is submitted or saved, and your workflow is not changed.',
+  );
+  await expect(formPreview.getByRole('textbox', 'Routing choice', { exact: false })).toBeVisible();
+  await formPreview.getByRole('button', 'Close', { exact: true }).click();
+  await screen.getByRole('tab', 'Actions', { exact: true }).click();
+  await expect(screen.getByRole('heading', 'Form actions and routing')).toBeVisible();
+  await expect(screen.getByRole('button', 'Add routing rule')).toBeVisible();
+  await expect(screen.getByText('Otherwise go to')).toBeVisible();
   const xml = await fixture.api<string>(fixture.mainPath + '/xml');
   expect(xml).not.toContain('name="Child review"');
   const invalid = fixture.mainXml.replaceAll(
@@ -142,6 +171,141 @@ test('designer shows independent child previews and blocks invalid form routes b
   await fixture.api(fixture.mainPath + '/publish', 'POST', {}, 400);
   await fixture.api(fixture.mainPath + '/xml', 'PUT', { xmlContent: fixture.mainXml });
   await fixture.publish();
+});
+
+test('form builder edits, saves, and publishes a new immutable form version', async ({
+  app,
+  browser,
+  screen,
+}) => {
+  const fixture = await createActivityForms(browser);
+  const formId = fixture.forms[0].id;
+  const previous = await fixture.api<{ value: { schemaJson: string; currentVersionNo: number } }>(
+    `v1/form-engine/forms/${formId}`,
+  );
+  expect(previous.value.currentVersionNo).toBe(1);
+
+  await app.open(`/forms/${formId}/designer`);
+  await screen.getByRole('button', 'Numeric', { exact: true }).click();
+  const editor = screen.getByRole('dialog', 'Field Properties');
+  await browser.locator('p-dialog input[formcontrolname="label_en"]').fill('Additional measure');
+  await browser.locator('p-dialog input[formcontrolname="label_ar"]').fill('قياس إضافي');
+  await editor.getByRole('combobox').first().fill('additional_measure');
+  await screen.getByLabel('Required field?').check();
+  await editor.getByRole('button', 'Save', { exact: true }).click();
+  await expect(editor).toBeHidden();
+  await expect(screen.getByText('Additional measure')).toBeVisible();
+  await screen.getByRole('button', 'Save', { exact: true }).first().click();
+  await expect(screen.getByText('Form saved.')).toBeVisible();
+
+  const draft = await fixture.api<{
+    value: { schemaJson: string; status: string; currentVersionNo: number };
+  }>(`v1/form-engine/forms/${formId}`);
+  expect(draft.value.status).toBe('DRAFT');
+  expect(draft.value.currentVersionNo).toBe(1);
+  const draftSchema = JSON.parse(draft.value.schemaJson);
+  expect(
+    draftSchema.elements.some(
+      (element: { data_name: string; required: boolean }) =>
+        element.data_name === 'additional_measure' && element.required,
+    ),
+  ).toBe(true);
+
+  await screen.getByRole('button', 'Publish', { exact: true }).click();
+  await expect(screen.getByText('Form published.')).toBeVisible();
+  const published = await fixture.api<{ value: { status: string; currentVersionNo: number } }>(
+    `v1/form-engine/forms/${formId}`,
+  );
+  expect(published.value.status).toBe('PUBLISHED');
+  expect(published.value.currentVersionNo).toBe(2);
+  const oldVersion = await fixture.api<{ value: { schemaJson: string } }>(
+    `v1/form-engine/forms/${formId}/versions/1`,
+  );
+  const newVersion = await fixture.api<{ value: { schemaJson: string } }>(
+    `v1/form-engine/forms/${formId}/versions/2`,
+  );
+  expect(oldVersion.value.schemaJson).toBe(previous.value.schemaJson);
+  const versionTwoSchema = JSON.parse(newVersion.value.schemaJson);
+  expect(
+    versionTwoSchema.elements.some(
+      (element: { data_name: string; required: boolean }) =>
+        element.data_name === 'additional_measure' && element.required,
+    ),
+  ).toBe(true);
+});
+
+test('form builder preview validates required answers, shows the payload, and resets it', async ({
+  app,
+  browser,
+  screen,
+}) => {
+  const fixture = await createActivityForms(browser);
+  await app.open(`/forms/${fixture.forms[0].id}/designer`);
+  await screen.getByRole('button', 'Preview').click();
+  const route = screen.getByRole('textbox', 'Routing choice', { exact: false, disabled: false });
+  const validity = browser.locator('[role="dialog"].preview-dialog .status-pill');
+  await screen.getByRole('button', 'Submit').click();
+  await expect(validity).toContainText('need attention');
+  await expect(
+    screen.getByText('Please fix the highlighted fields before submitting.'),
+  ).toBeVisible();
+
+  await route.fill('PREVIEW');
+  await expect(validity).toContainText('Valid');
+  await screen.getByRole('button', 'Submit').click();
+  await expect(screen.getByText('Form is valid — this is the submitted payload.')).toBeVisible();
+  await expect(browser.locator('[role="dialog"].preview-dialog pre')).toContainText(
+    '"route": "PREVIEW"',
+  );
+
+  await screen.getByRole('button', 'Reset').click();
+  await expect(route).toHaveValue('');
+  await screen.getByRole('button', 'Submit').click();
+  await expect(validity).toContainText('need attention');
+});
+
+test('task detail rejects an empty form and displays saved answers as submission history', async ({
+  app,
+  browser,
+  screen,
+}) => {
+  const fixture = await createActivityForms(browser);
+  await fixture.publish();
+  const id = await fixture.start();
+  const detail = () => fixture.api<Detail>('workflow/workspace/instances/' + id);
+  const first = activeTasks(await detail())[0];
+  await app.open('/org/workflow/tasks/' + first.id);
+  await screen.getByRole('button', 'Claim', { exact: true }).click();
+  await screen.getByRole('button', 'Approve', { exact: true }).click();
+  const route = screen.getByRole('textbox', 'Routing choice', { exact: false, disabled: false });
+  const submit = screen.getByRole('button', 'Submit and continue');
+
+  await submit.click();
+  let task = activeTasks(await detail())[0];
+  expect(task.id).toBe(first.id);
+  expect(task.status).toBe('Claimed');
+  expect(task.formHistory).toHaveLength(0);
+  await expect(route).toHaveValue('');
+
+  await route.fill('FORM3');
+  await submit.click();
+  await expect(browser.locator('[aria-current="step"]')).toContainText('Form 3');
+  await screen.getByRole('tab', 'Request details', { exact: true }).click();
+  const history = screen.getByText('Form submission history (1)');
+  await expect(history).toBeVisible();
+  await history.click();
+  const visit = screen.getByText(/Form 1 · v1/);
+  await expect(visit).toBeVisible();
+  await visit.click();
+  const readOnlyRoutes = screen.getByRole('textbox', 'Routing choice', {
+    exact: false,
+    disabled: true,
+  });
+  await expect(readOnlyRoutes).toHaveCount(2);
+  await expect(readOnlyRoutes.first()).toHaveValue('FORM3');
+  task = activeTasks(await detail())[0];
+  expect(task.formHistory).toHaveLength(1);
+  expect(task.formHistory[0].answers.route).toBe('FORM3');
 });
 
 test('task detail claims and submits the pinned form sequence then survives a reload', async ({
