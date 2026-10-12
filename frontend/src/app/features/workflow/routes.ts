@@ -10,29 +10,27 @@ export const WORKFLOW_ROUTES: Routes = [
     path: '',
     pathMatch: 'full',
     loadComponent: () =>
-      import('./hub/org-workflow-hub-page.component').then(
-        m => m.OrgWorkflowHubPageComponent
-      ),
+      import('./hub/org-workflow-hub-page.component').then((m) => m.OrgWorkflowHubPageComponent),
   },
   {
     path: 'participants',
     loadComponent: () =>
       import('./participants/workflow-participants.component').then(
-        m => m.WorkflowParticipantsComponent
+        (m) => m.WorkflowParticipantsComponent,
       ),
   },
   {
     path: 'assignment-groups',
     loadComponent: () =>
       import('./assignment-groups/workflow-assignment-groups.component').then(
-        m => m.WorkflowAssignmentGroupsComponent
+        (m) => m.WorkflowAssignmentGroupsComponent,
       ),
   },
   {
     path: 'departments',
     loadComponent: () =>
       import('./departments/workflow-departments.component').then(
-        m => m.WorkflowDepartmentsComponent
+        (m) => m.WorkflowDepartmentsComponent,
       ),
   },
   // ── Runtime screens ──────────────────────────────────────────────────────
@@ -40,22 +38,20 @@ export const WORKFLOW_ROUTES: Routes = [
     path: 'tasks',
     canActivate: [permissionGuard(PERMISSIONS.claimTasks)],
     loadComponent: () =>
-      import('./tasks/workflow-tasks.component').then(
-        m => m.WorkflowTasksComponent
-      ),
+      import('./tasks/workflow-tasks.component').then((m) => m.WorkflowTasksComponent),
   },
   {
     path: 'my-tasks',
     loadComponent: () =>
       import('./tasks/workflow-tasks-redirect.component').then(
-        m => m.WorkflowTasksRedirectComponent
+        (m) => m.WorkflowTasksRedirectComponent,
       ),
   },
   {
     path: 'group-inbox',
     loadComponent: () =>
       import('./tasks/workflow-tasks-redirect.component').then(
-        m => m.WorkflowTasksRedirectComponent
+        (m) => m.WorkflowTasksRedirectComponent,
       ),
   },
   {
@@ -64,42 +60,36 @@ export const WORKFLOW_ROUTES: Routes = [
     providers: [provideDynamicForms()],
     loadComponent: () =>
       import('./task-detail/workflow-task-detail.component').then(
-        m => m.WorkflowTaskDetailComponent
+        (m) => m.WorkflowTaskDetailComponent,
       ),
   },
   {
     path: 'requests',
     loadComponent: () =>
-      import('./requests/workflow-requests.component').then(
-        m => m.WorkflowRequestsComponent
-      ),
+      import('./requests/workflow-requests.component').then((m) => m.WorkflowRequestsComponent),
   },
   {
     path: 'requests/:instanceId',
     loadComponent: () =>
       import('./request-progress/workflow-request-progress.component').then(
-        m => m.WorkflowRequestProgressComponent
+        (m) => m.WorkflowRequestProgressComponent,
       ),
   },
   {
     path: 'workload',
     loadComponent: () =>
-      import('./workload/workflow-workload.component').then(
-        m => m.WorkflowWorkloadComponent
-      ),
+      import('./workload/workflow-workload.component').then((m) => m.WorkflowWorkloadComponent),
   },
   {
     path: 'help',
     loadComponent: () =>
-      import('./help/workflow-help-center.component').then(
-        m => m.WorkflowHelpCenterComponent
-      ),
+      import('./help/workflow-help-center.component').then((m) => m.WorkflowHelpCenterComponent),
   },
   {
     path: 'notifications',
     loadComponent: () =>
       import('./notifications/workflow-notifications.component').then(
-        m => m.WorkflowNotificationsComponent
+        (m) => m.WorkflowNotificationsComponent,
       ),
   },
 ];

@@ -3,15 +3,14 @@ namespace NWFM.Tests.Modules.Workflow;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Moq;
-using NWFM.Shared.Integration.Organization;
-using NWFM.Shared.Integration.Workflow;
-using NWFM.Shared.Integration.Forms;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Infrastructure.Persistence.Repositories;
 using global::Workflow.Infrastructure.Services;
+using Moq;
+using NWFM.Shared.Integration.Forms;
+using NWFM.Shared.Integration.Organization;
+using NWFM.Shared.Integration.Workflow;
 
 public sealed partial class WorkflowRuntimeEnginePathTests
 {
@@ -34,13 +33,18 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         var field = new WorkflowLookupItem(Guid.NewGuid(), "REPAIR", "Repair", "", "WATER");
         var settings = new WorkflowWorkspaceDefinition("Main") { SchemaVersion = 2, OrganizationScopes = [scope], FieldActivityTypeId = field.Id, DepartmentCode = field.ParentCode, FieldActivityCode = field.Code };
         parent.SetWorkspace(JsonSerializer.Serialize(settings, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        var childSettings = settings with { Kind = "Child", TaskTypeId = scenario == "type" ? Guid.NewGuid() : taskId,
-            OrganizationScopes = scenario switch {
+        var childSettings = settings with
+        {
+            Kind = "Child",
+            TaskTypeId = scenario == "type" ? Guid.NewGuid() : taskId,
+            OrganizationScopes = scenario switch
+            {
                 "cluster" => [new("Cluster", "CC", "CC")],
                 "branch" => [new("Branch", "C1", "CC", "R1")],
                 "extra" => [scope, new("Cluster", "OTHER", "OTHER")],
                 _ => [scope]
-            } };
+            }
+        };
         child.SetWorkspace(JsonSerializer.Serialize(childSettings, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         var node = parent.Activities.Single(a => a.ActivityType == ActivityType.MainActivity);
         _db.ActivityOutcomeDefinitions.Add(ActivityOutcomeDefinition.Create(parent.Id, node.Id, "approve", "Approve", 1, DateTime.UtcNow));
@@ -66,7 +70,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         var issues = await publisher.ValidateAsync(parent, default);
         issues.Any(i => i.Code is "MAIN_CHILD_MATCH" or "MAIN_TASK_TYPE").Should().Be(!allowed);
         if (!allowed) (await publisher.PreparePublicationAsync(parent, default)).IsFailure.Should().BeTrue();
-        else (await publisher.PreparePublicationAsync(parent, default)).IsSuccess.Should().BeTrue(string.Join(", ", issues.Select(i=>i.Message)));
+        else (await publisher.PreparePublicationAsync(parent, default)).IsSuccess.Should().BeTrue(string.Join(", ", issues.Select(i => i.Message)));
     }
 
     [Fact]
@@ -74,11 +78,11 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     {
         var a = new WorkflowOrganizationScope("Cbu", "RCBU", "CC", "RCBU");
         var b = new WorkflowOrganizationScope("OperationArea", "OA", "EC", "E1");
-        var parent = new WorkflowWorkspaceDefinition("Main") { SchemaVersion = 2, OrganizationScopes = [a,b] };
-        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [b,a,a] }).Should().BeTrue();
+        var parent = new WorkflowWorkspaceDefinition("Main") { SchemaVersion = 2, OrganizationScopes = [a, b] };
+        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [b, a, a] }).Should().BeTrue();
         WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [a] }).Should().BeFalse();
-        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [a,b with { ClusterCode = "OTHER" }] }).Should().BeFalse();
-        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [a,b with { Level = "Branch" }] }).Should().BeFalse();
+        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [a, b with { ClusterCode = "OTHER" }] }).Should().BeFalse();
+        WorkflowChildMatch.SameScope(parent, parent with { OrganizationScopes = [a, b with { Level = "Branch" }] }).Should().BeFalse();
         WorkflowChildMatch.SameScope(parent, new("Child")).Should().BeFalse();
     }
 
@@ -90,9 +94,9 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         var next = WorkflowVersion.CreateDraft(previous.WorkflowDefinitionId, 2, Guid.NewGuid(), DateTime.UtcNow);
         next.SetWorkspace(previous.WorkspaceJson);
         next.Publish(Guid.NewGuid(), DateTime.UtcNow);
-        _db.WorkflowVersions.Add(next);await _db.SaveChangesAsync();
+        _db.WorkflowVersions.Add(next); await _db.SaveChangesAsync();
         var workspace = Workspace(NWFM.Shared.Organization.OrgScopeSet.Unrestricted());
-        (await workspace.ChildrenAsync(default)).Select(c=>c.VersionId).Should().Contain(next.Id).And.NotContain(previous.Id);
-        (await workspace.ChildrenAsync(default,previous.Id)).Select(c=>c.VersionId).Should().Contain([next.Id,previous.Id]);
+        (await workspace.ChildrenAsync(default)).Select(c => c.VersionId).Should().Contain(next.Id).And.NotContain(previous.Id);
+        (await workspace.ChildrenAsync(default, previous.Id)).Select(c => c.VersionId).Should().Contain([next.Id, previous.Id]);
     }
 }

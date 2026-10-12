@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 
-import { buildNWFMXml, CanvasNode, NodeType, WorkflowDesignerComponent } from './workflow-designer.component';
+import {
+  buildNWFMXml,
+  CanvasNode,
+  NodeType,
+  WorkflowDesignerComponent,
+} from './workflow-designer.component';
 import { WritableSignal } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { WorkflowVersionsService } from '../workflow-versions.service';
@@ -68,14 +73,29 @@ describe('WorkflowDesignerComponent scale', () => {
             getPublishPreview: () => of({}),
           },
         },
-        { provide: WorkflowDefinitionsService, useValue: { getById: () => of({ id: 'd1', name: 'Perf' }) } },
+        {
+          provide: WorkflowDefinitionsService,
+          useValue: { getById: () => of({ id: 'd1', name: 'Perf' }) },
+        },
         { provide: WorkflowActionsCatalogService, useValue: { getAll: () => of([]) } },
-        { provide: WorkflowBindingsService, useValue: { listByDefinition: () => of([]), listOrgGroups: () => of([]) } },
-        { provide: WorkflowSlaPoliciesService, useValue: { getAll: () => of([]), getPaged: () => of({ items: [] }) } },
+        {
+          provide: WorkflowBindingsService,
+          useValue: { listByDefinition: () => of([]), listOrgGroups: () => of([]) },
+        },
+        {
+          provide: WorkflowSlaPoliciesService,
+          useValue: { getAll: () => of([]), getPaged: () => of({ items: [] }) },
+        },
         { provide: ToastService, useValue: { success: () => undefined, error: () => undefined } },
         { provide: ThemeService, useValue: { isDark: () => false } },
-        { provide: LocaleService, useValue: { current: () => 'en', locale: () => 'en', isRtl: () => false } },
-        { provide: WorkflowWorkspaceService, useValue: { references: () => of([]), children: () => of([]) } },
+        {
+          provide: LocaleService,
+          useValue: { current: () => 'en', locale: () => 'en', isRtl: () => false },
+        },
+        {
+          provide: WorkflowWorkspaceService,
+          useValue: { references: () => of([]), children: () => of([]) },
+        },
       ],
     });
 
@@ -99,19 +119,46 @@ describe('WorkflowDesignerComponent scale', () => {
   }
 
   it('creates a task activity and preserves its identity through undo, duplication and XML save', () => {
-    const c = component as any;
-    c.workspace.set({kind:'Main',schemaVersion:2,organizationScopes:[{level:'Cluster',code:'CC',clusterCode:'CC'}]});
-    c.addTaskActivity({id:'task-id',code:'SURVEY',nameEn:'Survey',nameAr:'مسح'});
-    let node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');
-    expect(node.name).toBe('Survey');expect(JSON.parse(node.configurationJson).taskTypeId).toBe('task-id');
-    c.undo();expect(c.nodes().some((n:CanvasNode)=>n.type==='MainActivity')).toBe(false);
-    c.redo();node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');c.selectedNodeId.set(node.id);
+    const c = component as unknown as {
+      workspace: WritableSignal<
+        import('../workspace/workflow-workspace.service').WorkspaceSettings
+      >;
+      addTaskActivity(task: { id: string; code: string; nameEn: string; nameAr: string }): void;
+      nodes: WritableSignal<CanvasNode[]>;
+      selectedNodeId: WritableSignal<string | null>;
+      undo(): void;
+      redo(): void;
+      duplicateSelected(): void;
+    };
+    c.workspace.set({
+      kind: 'Main',
+      schemaVersion: 2,
+      organizationScopes: [{ level: 'Cluster', code: 'CC', clusterCode: 'CC' }],
+    });
+    c.addTaskActivity({ id: 'task-id', code: 'SURVEY', nameEn: 'Survey', nameAr: 'مسح' });
+    let node = c.nodes().find((n: CanvasNode) => n.type === 'MainActivity')!;
+    expect(node.name).toBe('Survey');
+    expect(JSON.parse(node.configurationJson).taskTypeId).toBe('task-id');
+    c.undo();
+    expect(c.nodes().some((n: CanvasNode) => n.type === 'MainActivity')).toBe(false);
+    c.redo();
+    node = c.nodes().find((n: CanvasNode) => n.type === 'MainActivity')!;
+    c.selectedNodeId.set(node.id);
     c.duplicateSelected();
-    const activities=c.nodes().filter((n:CanvasNode)=>n.type==='MainActivity');expect(activities.length).toBe(2);
-    for(const activity of activities)expect(JSON.parse(activity.configurationJson).taskTypeId).toBe('task-id');
-    const doc=new DOMParser().parseFromString(buildNWFMXml({nodes:c.nodes(),edges:[],variables:[],workspace:c.workspace()}),'application/xml');
-    const saved=Array.from(doc.querySelectorAll('Activity')).filter(n=>n.getAttribute('type')==='MainActivity');
-    expect(saved.length).toBe(2);for(const activity of saved)expect(JSON.parse(activity.getAttribute('configurationJson')!).taskTypeId).toBe('task-id');
+    const activities = c.nodes().filter((n: CanvasNode) => n.type === 'MainActivity');
+    expect(activities.length).toBe(2);
+    for (const activity of activities)
+      expect(JSON.parse(activity.configurationJson).taskTypeId).toBe('task-id');
+    const doc = new DOMParser().parseFromString(
+      buildNWFMXml({ nodes: c.nodes(), edges: [], variables: [], workspace: c.workspace() }),
+      'application/xml',
+    );
+    const saved = Array.from(doc.querySelectorAll('Activity')).filter(
+      (n) => n.getAttribute('type') === 'MainActivity',
+    );
+    expect(saved.length).toBe(2);
+    for (const activity of saved)
+      expect(JSON.parse(activity.getAttribute('configurationJson')!).taskTypeId).toBe('task-id');
   });
 
   function nodeCount(): number {
@@ -147,41 +194,64 @@ describe('WorkflowDesignerComponent scale', () => {
 
   it('loads a cloned draft when route parameters change on the existing designer', () => {
     const params = new Subject<{ get(key: string): string }>();
-    (TestBed.inject(ActivatedRoute) as unknown as {paramMap: unknown}).paramMap = params;
+    (TestBed.inject(ActivatedRoute) as unknown as { paramMap: unknown }).paramMap = params;
     const versions = TestBed.inject(WorkflowVersionsService);
-    const load = vi.spyOn(versions, 'getById').mockImplementation((_definition, version) => of({id:version,status:version === 'published' ? 'Published' : 'Draft',activities:[],transitions:[],variables:[]}));
+    const load = vi.spyOn(versions, 'getById').mockImplementation((_definition, version) =>
+      of({
+        id: version,
+        status: version === 'published' ? 'Published' : 'Draft',
+        activities: [],
+        transitions: [],
+        variables: [],
+      }),
+    );
     component.ngOnInit();
-    params.next({get:key => key === 'definitionId' ? 'definition' : 'published'});
-    const editor = component as unknown as {version:()=>{status:string};isReadonly:()=>boolean};
+    params.next({ get: (key) => (key === 'definitionId' ? 'definition' : 'published') });
+    const editor = component as unknown as {
+      version: () => { status: string };
+      isReadonly: () => boolean;
+    };
     expect(editor.isReadonly()).toBe(true);
-    params.next({get:key => key === 'definitionId' ? 'definition' : 'cloned'});
+    params.next({ get: (key) => (key === 'definitionId' ? 'definition' : 'cloned') });
     expect(editor.version().status).toBe('Draft');
     expect(editor.isReadonly()).toBe(false);
-    expect(load).toHaveBeenCalledWith('definition','cloned');
+    expect(load).toHaveBeenCalledWith('definition', 'cloned');
     fixture.destroy();
   });
 
   function configure(type: NodeType, configuration: Record<string, unknown>) {
     const editor = access();
     editor.addNode(type, 100, 100);
-    const node = { ...editor.nodes()[editor.nodes().length - 1], configurationJson: JSON.stringify(configuration) };
-    editor.nodes.update(nodes => nodes.map(n => n.id === node.id ? node : n));
+    const node = {
+      ...editor.nodes()[editor.nodes().length - 1],
+      configurationJson: JSON.stringify(configuration),
+    };
+    editor.nodes.update((nodes) => nodes.map((n) => (n.id === node.id ? node : n)));
     editor.selectedNodeId.set(node.id);
     editor.patchPropsFromNode(node);
     return editor;
   }
 
   it('keeps notification channels and recipients when editing its template', () => {
-    const editor = configure('NotificationTask', { templateKey: 'before', channels: 'Email', recipientUserIds: ['recipient-id'] });
+    const editor = configure('NotificationTask', {
+      templateKey: 'before',
+      channels: 'Email',
+      recipientUserIds: ['recipient-id'],
+    });
     editor.propsForm.patchValue({ templateKey: 'after' });
-    const saved = JSON.parse(editor.buildConfigurationJson('NotificationTask', editor.propsForm.value));
+    const saved = JSON.parse(
+      editor.buildConfigurationJson('NotificationTask', editor.propsForm.value),
+    );
     expect(saved.templateKey).toBe('after');
     expect(saved.channels).toBe('Email');
     expect(saved.recipientUserIds).toEqual(['recipient-id']);
   });
 
   it('loads legacy signal keys and saves the canonical event key without losing extension fields', () => {
-    const editor = configure('WaitEvent', { signalKey: 'order.ready', extension: { source: 'orders' } });
+    const editor = configure('WaitEvent', {
+      signalKey: 'order.ready',
+      extension: { source: 'orders' },
+    });
     expect(editor.propsForm.value.eventKey).toBe('order.ready');
     const saved = JSON.parse(editor.buildConfigurationJson('WaitEvent', editor.propsForm.value));
     expect(saved.eventKey).toBe('order.ready');
@@ -190,7 +260,11 @@ describe('WorkflowDesignerComponent scale', () => {
   });
 
   it('round trips a due date without shifting its timezone', () => {
-    const editor = configure('Timer', { timerType: 'DueDate', dueAt: '2026-09-19T12:30:45.000Z', extension: true });
+    const editor = configure('Timer', {
+      timerType: 'DueDate',
+      dueAt: '2026-09-19T12:30:45.000Z',
+      extension: true,
+    });
     const saved = JSON.parse(editor.buildConfigurationJson('Timer', editor.propsForm.value));
     expect(saved.dueAt).toBe('2026-09-19T12:30:45.000Z');
     expect(saved.extension).toBe(true);
@@ -206,39 +280,61 @@ describe('WorkflowDesignerComponent scale', () => {
 
   it('suspends canvas shortcuts while the SLA editor is open', () => {
     const designer = component as unknown as {
-      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
-      slaEditor: WritableSignal<unknown>; onKeyDown(event: KeyboardEvent): void;
+      addNode(type: NodeType, x: number, y: number): void;
+      nodes: WritableSignal<CanvasNode[]>;
+      selectedNodeId: WritableSignal<string | null>;
+      slaEditor: WritableSignal<unknown>;
+      onKeyDown(event: KeyboardEvent): void;
     };
     designer.addNode('UserTask', 100, 100);
-    const node = designer.nodes().find(n => n.type === 'UserTask')!;
+    const node = designer.nodes().find((n) => n.type === 'UserTask')!;
     designer.selectedNodeId.set(node.id);
     designer.slaEditor.set({ locked: true, departmentCode: 'D1', fieldActivityCode: 'FA1' });
-    for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBe(true);
+    for (const key of ['Delete', 'Backspace', 'Escape'])
+      designer.onKeyDown(new KeyboardEvent('keydown', { key }));
+    expect(designer.nodes().some((n) => n.id === node.id)).toBe(true);
     expect(designer.selectedNodeId()).toBe(node.id);
     designer.slaEditor.set(null);
     designer.onKeyDown(new KeyboardEvent('keydown', { key: 'Delete' }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBe(false);
+    expect(designer.nodes().some((n) => n.id === node.id)).toBe(false);
   });
 
   it('shows Form on both business activity types and no tabs on other nodes', () => {
-    const ids = (type: NodeType) => WorkflowDesignerComponent.tabsFor(type).map(t => t.id);
+    const ids = (type: NodeType) => WorkflowDesignerComponent.tabsFor(type).map((t) => t.id);
     expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
     expect(ids('MainActivity')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
-    for (const type of ['Start', 'End', 'ExclusiveGateway', 'ParallelGateway', 'Timer', 'ServiceTask', 'NotificationTask', 'WaitEvent'] as NodeType[]) {
+    for (const type of [
+      'Start',
+      'End',
+      'ExclusiveGateway',
+      'ParallelGateway',
+      'Timer',
+      'ServiceTask',
+      'NotificationTask',
+      'WaitEvent',
+    ] as NodeType[]) {
       expect(ids(type), type).toEqual([]);
     }
-    expect(WorkflowDesignerComponent.tabsFor('UserTask').map(t => t.labelKey)).toContain('workflow.designer.tab_actions');
+    expect(WorkflowDesignerComponent.tabsFor('UserTask').map((t) => t.labelKey)).toContain(
+      'workflow.designer.tab_actions',
+    );
   });
 
   it('keeps Form selected when moving between business activities', () => {
     const designer = component as unknown as {
-      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
-      inspectorTab: WritableSignal<string>; activeInspectorTab: () => string; onNodeClick(event: MouseEvent, id: string): void;
+      addNode(type: NodeType, x: number, y: number): void;
+      nodes: WritableSignal<CanvasNode[]>;
+      selectedNodeId: WritableSignal<string | null>;
+      inspectorTab: WritableSignal<string>;
+      activeInspectorTab: () => string;
+      onNodeClick(event: MouseEvent, id: string): void;
     };
     designer.addNode('UserTask', 100, 100);
     designer.addNode('MainActivity', 400, 100);
-    const [task, main] = [designer.nodes().find(n => n.type === 'UserTask')!, designer.nodes().find(n => n.type === 'MainActivity')!];
+    const [task, main] = [
+      designer.nodes().find((n) => n.type === 'UserTask')!,
+      designer.nodes().find((n) => n.type === 'MainActivity')!,
+    ];
     designer.onNodeClick(new MouseEvent('click'), task.id);
     designer.inspectorTab.set('form');
     expect(designer.activeInspectorTab()).toBe('form');
@@ -254,29 +350,46 @@ describe('WorkflowDesignerComponent scale', () => {
   });
 
   it('keeps the rejection destination and legacy task questions through General edits', () => {
-    const editor = configure('UserTask', { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', taskTypeId: 'type', formDefinitionId: 'form', formVersionNo: 2, rejectTargetNodeKey: 'earlier_review', formFields: [{ key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false }] });
-    const node = editor.nodes().find(n => n.id === editor.selectedNodeId())!;
+    const editor = configure('UserTask', {
+      departmentCode: '10',
+      fieldActivityCode: 'LEAK_REPAIR',
+      taskTypeId: 'type',
+      formDefinitionId: 'form',
+      formVersionNo: 2,
+      rejectTargetNodeKey: 'earlier_review',
+      formFields: [
+        { key: 'note', labelEn: 'Note', labelAr: 'ملاحظة', type: 'text', required: false },
+      ],
+    });
+    const node = editor.nodes().find((n) => n.id === editor.selectedNodeId())!;
     editor.patchPropsFromNode(node);
     editor.propsForm.patchValue({ name: 'Renamed' });
     const saved = JSON.parse(editor.buildConfigurationJson('UserTask', editor.propsForm.value));
     expect(saved.rejectTargetNodeKey).toBe('earlier_review');
     expect(saved.departmentCode).toBe('10');
     expect(saved.fieldActivityCode).toBe('LEAK_REPAIR');
-    expect(saved.formDefinitionId).toBe('form');expect(saved.formVersionNo).toBe(2);expect(saved.taskTypeId).toBe('type');
+    expect(saved.formDefinitionId).toBe('form');
+    expect(saved.formVersionNo).toBe(2);
+    expect(saved.taskTypeId).toBe('type');
     expect(saved.formFields.map((f: { key: string }) => f.key)).toEqual(['note']);
   });
 
   it('does not render an Accept and Reject section on the General tab', () => {
     fixture.detectChanges();
     const state = component as unknown as {
-      isLoading: { set: (v: boolean) => void }; loadError: { set: (v: string | null) => void };
+      isLoading: { set: (v: boolean) => void };
+      loadError: { set: (v: string | null) => void };
       version: { set: (v: { id: string; status: string; versionNumber: number }) => void };
     };
     state.isLoading.set(false);
     state.loadError.set(null);
     state.version.set({ id: 'v1', status: 'Draft', versionNumber: 1 });
     for (const type of ['UserTask', 'MainActivity'] as NodeType[]) {
-      configure(type, { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', rejectTargetNodeKey: 'earlier_review' });
+      configure(type, {
+        departmentCode: '10',
+        fieldActivityCode: 'LEAK_REPAIR',
+        rejectTargetNodeKey: 'earlier_review',
+      });
       fixture.detectChanges();
       const panel = (fixture.nativeElement as HTMLElement).querySelector('#wf-activity-panel');
       expect(panel, type).not.toBeNull();
@@ -291,24 +404,63 @@ describe('WorkflowDesignerComponent scale', () => {
 
   it('suspends canvas shortcuts while a form preview is open', () => {
     const designer = component as unknown as {
-      addNode(type: NodeType, x: number, y: number): void; nodes: WritableSignal<CanvasNode[]>; selectedNodeId: WritableSignal<string | null>;
-      formPreview: WritableSignal<unknown>; onKeyDown(event: KeyboardEvent): void;
+      addNode(type: NodeType, x: number, y: number): void;
+      nodes: WritableSignal<CanvasNode[]>;
+      selectedNodeId: WritableSignal<string | null>;
+      formPreview: WritableSignal<unknown>;
+      onKeyDown(event: KeyboardEvent): void;
     };
     designer.addNode('UserTask', 100, 100);
-    const node = designer.nodes().find(n => n.type === 'UserTask')!;
+    const node = designer.nodes().find((n) => n.type === 'UserTask')!;
     designer.selectedNodeId.set(node.id);
-    designer.formPreview.set({ form: { id: 'f' }, departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', versionNo: 1 });
-    for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
+    designer.formPreview.set({
+      form: { id: 'f' },
+      departmentCode: '10',
+      fieldActivityCode: 'LEAK_REPAIR',
+      versionNo: 1,
+    });
+    for (const key of ['Delete', 'Backspace', 'Escape'])
+      designer.onKeyDown(new KeyboardEvent('keydown', { key }));
     designer.onKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBe(true);
+    expect(designer.nodes().some((n) => n.id === node.id)).toBe(true);
     expect(designer.selectedNodeId()).toBe(node.id);
   });
 
   it('shows the published configuration, with its SLA snapshot, on read-only versions', () => {
-    const merge = (status: string) => (component as unknown as { mergeWithBackend(state: unknown, v: unknown): { nodes: CanvasNode[] } }).mergeWithBackend(
-      { nodes: [{ id: 'canvas-1', nodeKey: 'review', type: 'UserTask', configurationJson: '{"departmentCode":"D1"}' }], edges: [], variables: [] },
-      { status, activities: [{ id: 'a1', nodeKey: 'review', activityType: 'UserTask', configurationJson: '{"departmentCode":"D1","publishedSla":{"name":"Captured"}}' }], transitions: [] });
-    expect(JSON.parse(merge('Published').nodes[0].configurationJson).publishedSla.name).toBe('Captured');
+    const merge = (status: string) =>
+      (
+        component as unknown as {
+          mergeWithBackend(state: unknown, v: unknown): { nodes: CanvasNode[] };
+        }
+      ).mergeWithBackend(
+        {
+          nodes: [
+            {
+              id: 'canvas-1',
+              nodeKey: 'review',
+              type: 'UserTask',
+              configurationJson: '{"departmentCode":"D1"}',
+            },
+          ],
+          edges: [],
+          variables: [],
+        },
+        {
+          status,
+          activities: [
+            {
+              id: 'a1',
+              nodeKey: 'review',
+              activityType: 'UserTask',
+              configurationJson: '{"departmentCode":"D1","publishedSla":{"name":"Captured"}}',
+            },
+          ],
+          transitions: [],
+        },
+      );
+    expect(JSON.parse(merge('Published').nodes[0].configurationJson).publishedSla.name).toBe(
+      'Captured',
+    );
     expect(JSON.parse(merge('Draft').nodes[0].configurationJson).publishedSla).toBeUndefined();
   });
 

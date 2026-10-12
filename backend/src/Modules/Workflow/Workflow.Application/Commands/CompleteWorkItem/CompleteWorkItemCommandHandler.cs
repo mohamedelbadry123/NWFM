@@ -1,17 +1,17 @@
 namespace Workflow.Application.Commands.CompleteWorkItem;
 
 using MediatR;
+using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Results;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
 using Workflow.Application.Helpers;
+using Workflow.Application.Integrations;
+using Workflow.Application.Workspace;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
-using NWFM.Shared.Integration.Forms;
-using Workflow.Application.Workspace;
-using Workflow.Application.Integrations;
 
 public sealed class CompleteWorkItemCommandHandler
     : IRequestHandler<CompleteWorkItemCommand, Result<WorkItemDto>>
@@ -44,18 +44,18 @@ public sealed class CompleteWorkItemCommandHandler
         IWorkflowCandidateFactory candidateFactory,
         IWorkItemCandidateRepository candidateRepo, IFormGateway? forms = null)
     {
-        _gate             = gate;
-        _workItemRepo     = workItemRepo;
-        _engine           = engine;
-        _events           = events;
-        _assembler        = assembler;
-        _instances        = instances;
-        _versions         = versions;
-        _activities       = activities;
-        _groupRepo        = groupRepo;
-        _departmentRepo   = departmentRepo;
+        _gate = gate;
+        _workItemRepo = workItemRepo;
+        _engine = engine;
+        _events = events;
+        _assembler = assembler;
+        _instances = instances;
+        _versions = versions;
+        _activities = activities;
+        _groupRepo = groupRepo;
+        _departmentRepo = departmentRepo;
         _candidateFactory = candidateFactory;
-        _candidateRepo    = candidateRepo;
+        _candidateRepo = candidateRepo;
         _forms = forms;
     }
 
@@ -129,8 +129,11 @@ public sealed class CompleteWorkItemCommandHandler
                         return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The selected form version is unavailable."));
                     var submitted = await _forms.SubmitAsync(new FormSubmitRequest
                     {
-                        FormId = formId, VersionNo = binding.FormVersionNo.Value,
-                        ContextType = "WorkItem", ContextId = item.Id.ToString(), ClientSubmissionId = item.Id,
+                        FormId = formId,
+                        VersionNo = binding.FormVersionNo.Value,
+                        ContextType = "WorkItem",
+                        ContextId = item.Id.ToString(),
+                        ClientSubmissionId = item.Id,
                         Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
                     }, cancellationToken);
                     if (submitted.IsFailure) return Result.Failure<WorkItemDto>(submitted.Error);
@@ -201,8 +204,12 @@ public sealed class CompleteWorkItemCommandHandler
         var context = item.Id + ":" + visitId;
         var submitted = await _forms.SubmitAsync(new FormSubmitRequest
         {
-            FormId = step.FormId, VersionNo = step.VersionNo, ContextType = "WorkItem", ContextId = context,
-            ClientSubmissionId = visitId, Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
+            FormId = step.FormId,
+            VersionNo = step.VersionNo,
+            ContextType = "WorkItem",
+            ContextId = context,
+            ClientSubmissionId = visitId,
+            Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
         }, ct);
         if (submitted.IsFailure) return Result.Failure<bool>(submitted.Error);
         var recorded = await _forms.GetLatestByContextAsync(step.FormId, "WorkItem", context, ct);
@@ -212,8 +219,15 @@ public sealed class CompleteWorkItemCommandHandler
         var now = DateTime.UtcNow;
         progress.Visits.Add(new ActivityFormVisit
         {
-            VisitId = visitId, StepId = step.Id, FormId = step.FormId, VersionNo = step.VersionNo, SubmissionId = recorded.SubmissionId,
-            ActorId = request.UserId, SubmittedAt = now, RuleId = decision.RuleId, Destination = decision.Destination,
+            VisitId = visitId,
+            StepId = step.Id,
+            FormId = step.FormId,
+            VersionNo = step.VersionNo,
+            SubmissionId = recorded.SubmissionId,
+            ActorId = request.UserId,
+            SubmittedAt = now,
+            RuleId = decision.RuleId,
+            Destination = decision.Destination,
             Answers = recorded.Answers.ToDictionary(x => x.Key, x => x.Value)
         });
         if (target.FormStepId is not null) { progress.ActiveStepId = target.FormStepId; progress.VisitId = Guid.NewGuid(); }

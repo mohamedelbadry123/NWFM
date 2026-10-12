@@ -2,23 +2,23 @@ namespace NWFM.Tests.Modules.Workflow;
 
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Moq;
-using NWFM.Shared.Integration.Forms;
-using NWFM.Shared.Results;
 using global::Workflow.Application.Abstractions;
 using global::Workflow.Application.Commands.CompleteWorkItem;
 using global::Workflow.Application.Workspace;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Domain.Repositories;
+using global::Workflow.Infrastructure.Persistence;
 using global::Workflow.Infrastructure.Persistence.Repositories;
 using global::Workflow.Infrastructure.Services;
-using global::Workflow.Infrastructure.Persistence;
-using NWFM.Shared.Integration.Workflow;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Moq;
+using NWFM.Shared.Integration.Forms;
 using NWFM.Shared.Integration.Organization;
+using NWFM.Shared.Integration.Workflow;
+using NWFM.Shared.Results;
 
 public sealed partial class WorkflowRuntimeEnginePathTests
 {
@@ -30,13 +30,17 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         foreach (var target in new[] { "one", "two", "three", "other", "activity" })
             rules.Add(new()
             {
-                Id = target, Name = target,
+                Id = target,
+                Name = target,
                 When = new() { Conditions = [new() { Field = "route", Operator = "equal", Value = JsonSerializer.SerializeToElement(target) }] },
                 Destination = new() { Kind = target is "other" or "activity" ? "Activity" : "Form", Target = target }
             });
         var steps = new[] { "one", "two", "three" }.Select(id => new ActivityFormStep
         {
-            Id = id, FormId = form, VersionNo = 1, Rules = rules,
+            Id = id,
+            FormId = form,
+            VersionNo = 1,
+            Rules = rules,
             Otherwise = new() { Kind = "Activity", Target = "end" }
         }).ToList();
         var seeded = SeedSingleActivity(ActivityType.UserTask, Config(new { formSteps = steps }), now);
@@ -128,18 +132,18 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     [InlineData("loop", "ROUTING_NO_END")]
     public async Task Publication_ChecksEveryFormAndItsRoutes(string scenario, string? expected)
     {
-        var type = Guid.NewGuid();var form = Guid.NewGuid();
+        var type = Guid.NewGuid(); var form = Guid.NewGuid();
         var step = new ActivityFormStep { Id = "one", FormId = form, VersionNo = 1, Name = "First", ReviewRequired = scenario == "review" };
         if (scenario == "target") step.Otherwise = new() { Kind = "Form", Target = "removed" };
         if (scenario == "loop") step.Otherwise = new() { Kind = "Activity", Target = "activity" };
         if (scenario == "field") step.Rules.Add(new() { Id = "rule", Name = "Rule", When = new() { Conditions = [new() { Field = "removed", Operator = "equal", Value = JsonSerializer.SerializeToElement("x") }] } });
         var seeded = SeedSingleActivity(ActivityType.UserTask, Config(new { taskTypeId = type, formSteps = new[] { step } }), DateTime.UtcNow);
-        var versions = new WorkflowVersionRepository(_db);var version = (await versions.GetByIdWithProjectionAsync(seeded.Version))!;
+        var versions = new WorkflowVersionRepository(_db); var version = (await versions.GetByIdWithProjectionAsync(seeded.Version))!;
         _db.Entry(version).Property(v => v.Status).CurrentValue = WorkflowVersionStatus.Draft;
-        var types = new Mock<IWorkflowTaskTypeCatalog>();types.Setup(t => t.IsActiveAsync(type, default)).ReturnsAsync(true);
+        var types = new Mock<IWorkflowTaskTypeCatalog>(); types.Setup(t => t.IsActiveAsync(type, default)).ReturnsAsync(true);
         types.Setup(t => t.FormIdsAsync(type, default)).ReturnsAsync(scenario == "membership" ? [] : new[] { form });
-        var forms = new Mock<IFormGateway>();forms.Setup(f => f.FindPublishedAsync(form, default)).ReturnsAsync(new PublishedFormInfo(form, "FORM", "Form", "", "", "PUBLISHED", 1, scenario != "unavailable"));
-        forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}");forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([]);
+        var forms = new Mock<IFormGateway>(); forms.Setup(f => f.FindPublishedAsync(form, default)).ReturnsAsync(new PublishedFormInfo(form, "FORM", "Form", "", "", "PUBLISHED", 1, scenario != "unavailable"));
+        forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}"); forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([]);
         var publisher = new WorkflowWorkspacePublisher(_db, Mock.Of<IWorkflowReferenceData>(), versions, Mock.Of<IOrgDirectory>(), types.Object, forms.Object);
         var issues = await publisher.ValidateAsync(version, default);
         if (expected is null) issues.Should().NotContain(i => i.Code.StartsWith("ROUTING_") || i.Code.StartsWith("ACTIVITY_FORM_"));
@@ -149,13 +153,13 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     [Fact]
     public async Task MainActivity_FormMovesPreserveChildAndSla_RestartCreatesFreshChild()
     {
-        var now = DateTime.UtcNow;var actor = Guid.NewGuid();var form = Guid.NewGuid();var seeded = SeedWorkspace(now);
+        var now = DateTime.UtcNow; var actor = Guid.NewGuid(); var form = Guid.NewGuid(); var seeded = SeedWorkspace(now);
         var definition = await _db.ActivityDefinitions.SingleAsync(a => a.WorkflowVersionId == seeded.Version && a.ActivityType == ActivityType.MainActivity);
         var config = JsonSerializer.Deserialize<BusinessActivityConfiguration>(definition.ConfigurationJson!, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
         config.FormSteps = [new() { Id = "one", FormId = form, VersionNo = 1 }, new() { Id = "two", FormId = form, VersionNo = 1, Otherwise = new() { Kind = "Activity", Target = "activity" } }];
         config.FormSteps[0].Name = new string('x', 5000); // Larger than the SQL history payload column.
-        _db.Entry(definition).Property(a => a.ConfigurationJson).CurrentValue = Config(config);await _db.SaveChangesAsync();
-        var engine = BuildEngine(_db);var root = (await engine.StartAsync(_orgId, seeded.Binding.Id, "case", "main-forms", now, pinnedWorkflowVersionId: seeded.Version)).Value;
+        _db.Entry(definition).Property(a => a.ConfigurationJson).CurrentValue = Config(config); await _db.SaveChangesAsync();
+        var engine = BuildEngine(_db); var root = (await engine.StartAsync(_orgId, seeded.Binding.Id, "case", "main-forms", now, pinnedWorkflowVersionId: seeded.Version)).Value;
         var startEvent = await _db.WorkflowEvents.SingleAsync(e => e.WorkflowInstanceId == root.Id && e.EventType == WorkflowEventType.ActivityStarted && e.ActivityNodeKey == "activity");
         startEvent.PayloadJson!.Length.Should().BeLessThan(4000);
         using (var payload = JsonDocument.Parse(startEvent.PayloadJson))
@@ -163,21 +167,21 @@ public sealed partial class WorkflowRuntimeEnginePathTests
             payload.RootElement.GetProperty("workflowVersionId").GetGuid().Should().Be(seeded.Version);
             payload.RootElement.GetProperty("childWorkflowVersionId").GetGuid().Should().NotBeEmpty();
         }
-        var childTimer = await _db.WorkflowTimers.SingleAsync();await engine.ResumeFromTimerAsync(childTimer.Id, now.AddSeconds(5));await engine.ResumeFromCallActivityAsync(root.Id, "activity", now.AddSeconds(5));
-        var item = await _db.WorkItems.SingleAsync();item.Claim(actor, now);var deadline = item.DueAt;
-        var forms = new Mock<IFormGateway>();forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}");forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([]);
+        var childTimer = await _db.WorkflowTimers.SingleAsync(); await engine.ResumeFromTimerAsync(childTimer.Id, now.AddSeconds(5)); await engine.ResumeFromCallActivityAsync(root.Id, "activity", now.AddSeconds(5));
+        var item = await _db.WorkItems.SingleAsync(); item.Claim(actor, now); var deadline = item.DueAt;
+        var forms = new Mock<IFormGateway>(); forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}"); forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([]);
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 1, false)));
-        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string,object?>()));
-        var gate = new Mock<IWorkflowFeatureGate>();gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
-        var groups = new Mock<IWorkflowAssignmentGroupRepository>();groups.Setup(g => g.IsUserMemberOfGroupAsync(item.AssignmentGroupId, actor, _orgId, default)).ReturnsAsync(true);
+        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?>()));
+        var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
+        var groups = new Mock<IWorkflowAssignmentGroupRepository>(); groups.Setup(g => g.IsUserMemberOfGroupAsync(item.AssignmentGroupId, actor, _orgId, default)).ReturnsAsync(true);
         var handler = new CompleteWorkItemCommandHandler(gate.Object, new WorkItemRepository(_db), engine, new WorkflowEventAppender(new WorkflowEventRepository(_db)),
             Mock.Of<IWorkItemDtoAssembler>(), new WorkflowInstanceRepository(_db), new WorkflowVersionRepository(_db), new ActivityInstanceRepository(_db), groups.Object,
             Mock.Of<IWorkflowDepartmentRepository>(), _candidateFactory.Object, new WorkItemCandidateRepository(_db), forms.Object);
-        (await handler.Handle(new(item.Id,actor,_orgId,"APPROVE",FormVisitId:item.Id),default)).IsSuccess.Should().BeTrue();
-        item.Status.Should().Be(WorkItemStatus.Claimed);item.DueAt.Should().Be(deadline);
+        (await handler.Handle(new(item.Id, actor, _orgId, "APPROVE", FormVisitId: item.Id), default)).IsSuccess.Should().BeTrue();
+        item.Status.Should().Be(WorkItemStatus.Claimed); item.DueAt.Should().Be(deadline);
         (await _db.WorkflowInstances.CountAsync(i => i.ParentInstanceId == root.Id)).Should().Be(1);
         var progress = JsonSerializer.Deserialize<ActivityFormProgress>(item.FormProgressJson!)!;
-        (await handler.Handle(new(item.Id,actor,_orgId,"APPROVE",FormVisitId:progress.VisitId),default)).IsSuccess.Should().BeTrue();
+        (await handler.Handle(new(item.Id, actor, _orgId, "APPROVE", FormVisitId: progress.VisitId), default)).IsSuccess.Should().BeTrue();
         (await _db.WorkflowInstances.CountAsync(i => i.ParentInstanceId == root.Id)).Should().Be(2);
         (await _db.ActivityInstances.CountAsync(a => a.WorkflowInstanceId == root.Id && a.Phase == "WaitingForChild")).Should().Be(1);
         (await _db.WorkItems.CountAsync(w => w.WorkflowInstanceId == root.Id)).Should().Be(1, "the fresh parent execution awaits its child");
@@ -200,31 +204,31 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         };
         if (scenario is "Activity" or "Restart") steps[0].Otherwise = new() { Kind = "Activity", Target = scenario == "Restart" ? "activity" : "end" };
         var seeded = SeedSingleActivity(ActivityType.UserTask, Config(new { formSteps = steps, rejectTargetNodeKey = "activity" }), now);
-        var versions = new WorkflowVersionRepository(_db); var version = (await versions.GetByIdWithProjectionAsync(seeded.Version))!;version.SetWorkspace(null);
+        var versions = new WorkflowVersionRepository(_db); var version = (await versions.GetByIdWithProjectionAsync(seeded.Version))!; version.SetWorkspace(null);
         var instance = WorkflowInstance.Start(_orgId, seeded.Binding.Id, version.Id, "sequence", "case", "activity", now);
         var execution = ActivityInstance.Start(_orgId, instance.Id, "activity", ActivityType.UserTask, "Activity", now);
-        var item = WorkItem.Create(_orgId, instance.Id, execution.Id, Guid.NewGuid(), now);item.Claim(actor, now);
-        _db.WorkflowInstances.Add(instance);_db.ActivityInstances.Add(execution);_db.WorkItems.Add(item);await _db.SaveChangesAsync();
+        var item = WorkItem.Create(_orgId, instance.Id, execution.Id, Guid.NewGuid(), now); item.Claim(actor, now);
+        _db.WorkflowInstances.Add(instance); _db.ActivityInstances.Add(execution); _db.WorkItems.Add(item); await _db.SaveChangesAsync();
         var forms = new Mock<IFormGateway>();
         forms.Setup(f => f.GetVersionSchemaAsync(form, It.IsAny<int>(), default)).ReturnsAsync("{}");
         forms.Setup(f => f.GetFieldsAsync(form, It.IsAny<int>(), default)).ReturnsAsync([]);
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 1, false)));
-        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string,object?> { ["answer"] = "canonical" }));
-        var gate = new Mock<IWorkflowFeatureGate>();gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
+        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?> { ["answer"] = "canonical" }));
+        var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
         var engine = BuildEngine(_db);
         var handler = new CompleteWorkItemCommandHandler(gate.Object, new WorkItemRepository(_db), engine,
             new WorkflowEventAppender(new WorkflowEventRepository(_db)), Mock.Of<IWorkItemDtoAssembler>(), new WorkflowInstanceRepository(_db), versions,
             new ActivityInstanceRepository(_db), Mock.Of<IWorkflowAssignmentGroupRepository>(), Mock.Of<IWorkflowDepartmentRepository>(),
             Mock.Of<IWorkflowCandidateFactory>(), Mock.Of<IWorkItemCandidateRepository>(), forms.Object);
         _assignmentResolver.Setup(a => a.ResolveGroupAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success(item.AssignmentGroupId));
-        _candidateFactory.Setup(c => c.CreateCandidatesAsync(It.IsAny<Guid>(),It.IsAny<Guid>(),It.IsAny<Guid>(),It.IsAny<DateTime>(),It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<WorkItemCandidate>());
+        _candidateFactory.Setup(c => c.CreateCandidatesAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<WorkItemCandidate>());
         var action = scenario == "Reject" ? "REJECT" : "APPROVE";
         var command = new CompleteWorkItemCommand(item.Id, actor, _orgId, action, FormValues: new() { ["answer"] = JsonSerializer.SerializeToElement("client") }, FormVisitId: item.Id);
         var result = await handler.Handle(command, default);
         result.IsSuccess.Should().BeTrue();
         if (scenario == "Reject") { forms.Verify(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default), Times.Never); return; }
         var progress = JsonSerializer.Deserialize<ActivityFormProgress>(item.FormProgressJson!)!;
-        progress.Visits.Should().ContainSingle();progress.Visits[0].Answers["answer"]!.ToString().Should().Be("canonical");
+        progress.Visits.Should().ContainSingle(); progress.Visits[0].Answers["answer"]!.ToString().Should().Be("canonical");
         if (scenario is "Activity" or "Restart")
         {
             item.Status.Should().Be(WorkItemStatus.Completed);
@@ -233,7 +237,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         }
         else
         {
-            item.Status.Should().Be(WorkItemStatus.Claimed);progress.ActiveStepId.Should().Be("two");
+            item.Status.Should().Be(WorkItemStatus.Claimed); progress.ActiveStepId.Should().Be("two");
             (await _db.ActivityInstances.CountAsync(a => a.WorkflowInstanceId == instance.Id)).Should().Be(1);
             (await handler.Handle(command, default)).IsSuccess.Should().BeTrue();
             forms.Verify(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default), Times.Once);
@@ -241,11 +245,11 @@ public sealed partial class WorkflowRuntimeEnginePathTests
             var next = command with { FormVisitId = progress.VisitId };
             (await handler.Handle(next, default)).IsSuccess.Should().BeTrue();
             progress = JsonSerializer.Deserialize<ActivityFormProgress>(item.FormProgressJson!)!;
-            progress.ActiveStepId.Should().Be(scenario == "Return" ? "one" : "three");progress.Visits.Should().HaveCount(2);
+            progress.ActiveStepId.Should().Be(scenario == "Return" ? "one" : "three"); progress.Visits.Should().HaveCount(2);
             if (scenario == "Next") (await handler.Handle(command with { FormVisitId = progress.VisitId }, default)).IsSuccess.Should().BeTrue();
             else progress.VisitId.Should().NotBe(item.Id);
         }
-        await _db.SaveChangesAsync();_db.ChangeTracker.Clear();
+        await _db.SaveChangesAsync(); _db.ChangeTracker.Clear();
         (await _db.WorkItems.FindAsync(item.Id))!.FormProgressJson.Should().NotBeNull();
     }
 }

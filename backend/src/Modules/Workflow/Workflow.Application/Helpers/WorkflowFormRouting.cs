@@ -141,9 +141,12 @@ public static class WorkflowFormRouting
         var comparison = Compare(field.FieldType, answer, c.Value);
         return c.Operator switch
         {
-            "equal" => comparison == 0, "not_equal" => comparison != 0,
-            "greater_than" => comparison > 0, "greater_or_equal" => comparison >= 0,
-            "less_than" => comparison < 0, "less_or_equal" => comparison <= 0,
+            "equal" => comparison == 0,
+            "not_equal" => comparison != 0,
+            "greater_than" => comparison > 0,
+            "greater_or_equal" => comparison >= 0,
+            "less_than" => comparison < 0,
+            "less_or_equal" => comparison <= 0,
             "between" => comparison >= 0 && Compare(field.FieldType, answer, c.To) <= 0,
             _ => throw new FormatException("Unsupported comparison.")
         };

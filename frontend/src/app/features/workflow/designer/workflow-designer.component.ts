@@ -2,13 +2,21 @@ import { WorkflowFormActionsComponent } from '../workspace/workflow-form-actions
 import { activityFormSteps } from '../workspace/workflow-form-routing.types';
 import { WorkflowChildPreviewComponent } from './workflow-child-preview.component';
 import { WorkflowTaskPaletteComponent } from './workflow-task-palette.component';
-import { WorkflowActivitySlaComponent, SlaManageRequest } from '../workspace/workflow-activity-sla.component';
-import { WorkflowSlaEditorComponent, SlaEditorRequest } from '../workspace/workflow-sla-editor.component';
-import { WorkflowActivityFormsComponent, ActivityFormPreviewRequest } from '../workspace/workflow-activity-forms.component';
+import {
+  WorkflowActivitySlaComponent,
+  SlaManageRequest,
+} from '../workspace/workflow-activity-sla.component';
+import {
+  WorkflowSlaEditorComponent,
+  SlaEditorRequest,
+} from '../workspace/workflow-sla-editor.component';
+import {
+  WorkflowActivityFormsComponent,
+  ActivityFormPreviewRequest,
+} from '../workspace/workflow-activity-forms.component';
 import { WorkflowFormPreviewComponent } from '../workspace/workflow-form-preview.component';
 import type { SlaRule } from '../workspace/workflow-sla-rules.service';
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -30,11 +38,20 @@ import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
 import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
 import { WorkflowBusinessActivityComponent } from '../workspace/workflow-business-activity.component';
 import { WorkflowLocationComponent } from '../workspace/workflow-location.component';
-import { WorkspaceSettings, ReferenceItem, normalizeWorkspaceSettings } from '../workspace/workflow-workspace.service';
+import {
+  WorkspaceSettings,
+  ReferenceItem,
+  normalizeWorkspaceSettings,
+} from '../workspace/workflow-workspace.service';
 import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
 import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { canvasWorldSize, layoutWorkflowGraph, mapCanvasIdsToActivities, nodesAreCollapsed } from './workflow-canvas-layout';
+import {
+  canvasWorldSize,
+  layoutWorkflowGraph,
+  mapCanvasIdsToActivities,
+  nodesAreCollapsed,
+} from './workflow-canvas-layout';
 import { isRedirectOutcome, REDIRECT_OUTCOME_KEY } from './workflow-outcome.util';
 import { workflowApiErrorMessage } from '../workflow-api-error';
 import { WorkflowVersionsService } from '../workflow-versions.service';
@@ -85,7 +102,8 @@ export interface FormFieldRow {
 
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
 export type NotificationFailurePolicyOption = 'Continue' | 'Retry' | 'FailWorkflow';
-export type InspectorTab = 'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'actions' | 'advanced';
+export type InspectorTab =
+  'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'actions' | 'advanced';
 export type BottomTab = 'variables' | 'validation';
 
 export interface CanvasOutcome {
@@ -124,7 +142,8 @@ export interface CanvasVariable {
   variableKey: string;
   name: string;
   nameAr: string;
-  dataType: 'String' | 'Number' | 'Integer' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime' | 'Guid' | 'Json';
+  dataType:
+    'String' | 'Number' | 'Integer' | 'Decimal' | 'Boolean' | 'Date' | 'DateTime' | 'Guid' | 'Json';
   defaultValue: string;
   isRequired: boolean;
   isSensitive: boolean;
@@ -171,114 +190,137 @@ export interface CanvasState {
 }
 
 // ── Node dimensions ──────────────────────────────────────────────────────────
-const NODE_W    = 210;
-const NODE_H    = 84;
+const NODE_W = 210;
+const NODE_H = 84;
 const GATEWAY_R = 34;
 
 // ── XML builder ──────────────────────────────────────────────────────────────
 export function buildNWFMXml(state: CanvasState): string {
-  const nodes = state.nodes.map(n => {
-    const attrs = [
-      `nodeKey="${n.nodeKey}"`,
-      `type="${n.type}"`,
-      `name="${escXml(n.name)}"`,
-      n.nameAr ? `nameAr="${escXml(n.nameAr)}"` : '',
-      n.actionKey ? `actionKey="${escXml(n.actionKey)}"` : '',
-      n.assignmentKey ? `assignmentKey="${escXml(n.assignmentKey)}"` : '',
-      n.assignmentGroupId ? `assignmentGroupId="${escXml(n.assignmentGroupId)}"` : '',
-      n.assignmentPurpose ? `assignmentPurpose="${escXml(n.assignmentPurpose)}"` : '',
-      n.configurationJson ? `configurationJson="${escXml(n.configurationJson)}"` : '',
-      `positionX="${Math.round(n.x)}"`,
-      `positionY="${Math.round(n.y)}"`,
-    ].filter(Boolean).join(' ');
+  const nodes = state.nodes
+    .map((n) => {
+      const attrs = [
+        `nodeKey="${n.nodeKey}"`,
+        `type="${n.type}"`,
+        `name="${escXml(n.name)}"`,
+        n.nameAr ? `nameAr="${escXml(n.nameAr)}"` : '',
+        n.actionKey ? `actionKey="${escXml(n.actionKey)}"` : '',
+        n.assignmentKey ? `assignmentKey="${escXml(n.assignmentKey)}"` : '',
+        n.assignmentGroupId ? `assignmentGroupId="${escXml(n.assignmentGroupId)}"` : '',
+        n.assignmentPurpose ? `assignmentPurpose="${escXml(n.assignmentPurpose)}"` : '',
+        n.configurationJson ? `configurationJson="${escXml(n.configurationJson)}"` : '',
+        `positionX="${Math.round(n.x)}"`,
+        `positionY="${Math.round(n.y)}"`,
+      ]
+        .filter(Boolean)
+        .join(' ');
 
-    const outcomeLines = (n.outcomes ?? []).map(o => {
-      const oAttrs = [
-        `key="${escXml(o.key)}"`,
-        `name="${escXml(o.label)}"`,
-        o.labelAr ? `nameAr="${escXml(o.labelAr)}"` : '',
-        `order="${o.sortOrder}"`,
-        o.isDefault ? 'isDefault="true"' : '',
-        o.requiresComment ? 'requiresComment="true"' : '',
-        o.requiresAttachment ? 'requiresAttachment="true"' : '',
-        o.resultValue ? `resultValue="${escXml(o.resultValue)}"` : '',
-      ].filter(Boolean).join(' ');
-      return `        <Outcome ${oAttrs} />`;
-    });
+      const outcomeLines = (n.outcomes ?? []).map((o) => {
+        const oAttrs = [
+          `key="${escXml(o.key)}"`,
+          `name="${escXml(o.label)}"`,
+          o.labelAr ? `nameAr="${escXml(o.labelAr)}"` : '',
+          `order="${o.sortOrder}"`,
+          o.isDefault ? 'isDefault="true"' : '',
+          o.requiresComment ? 'requiresComment="true"' : '',
+          o.requiresAttachment ? 'requiresAttachment="true"' : '',
+          o.resultValue ? `resultValue="${escXml(o.resultValue)}"` : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return `        <Outcome ${oAttrs} />`;
+      });
 
-    const actionLines = (n.actions ?? []).filter(a => a.isActive !== false).map(a => {
-      const aAttrs = [
-        `key="${escXml(a.actionKey)}"`,
-        `trigger="${escXml(a.executionTrigger)}"`,
-        `sequence="${a.sequence}"`,
-        a.outcomeKey ? `outcomeKey="${escXml(a.outcomeKey)}"` : '',
-        a.conditionExpression ? `condition="${escXml(a.conditionExpression)}"` : '',
-        a.failurePolicy ? `failurePolicy="${escXml(a.failurePolicy)}"` : '',
-        a.retryCount ? `retryCount="${a.retryCount}"` : '',
-        a.retryDelaySeconds ? `retryDelaySeconds="${a.retryDelaySeconds}"` : '',
-        a.timeoutSeconds ? `timeoutSeconds="${a.timeoutSeconds}"` : '',
-        a.inputMappingJson ? `inputMapping="${escXml(a.inputMappingJson)}"` : '',
-        a.outputMappingJson ? `outputMapping="${escXml(a.outputMappingJson)}"` : '',
-      ].filter(Boolean).join(' ');
-      return `        <Action ${aAttrs} />`;
-    });
+      const actionLines = (n.actions ?? [])
+        .filter((a) => a.isActive !== false)
+        .map((a) => {
+          const aAttrs = [
+            `key="${escXml(a.actionKey)}"`,
+            `trigger="${escXml(a.executionTrigger)}"`,
+            `sequence="${a.sequence}"`,
+            a.outcomeKey ? `outcomeKey="${escXml(a.outcomeKey)}"` : '',
+            a.conditionExpression ? `condition="${escXml(a.conditionExpression)}"` : '',
+            a.failurePolicy ? `failurePolicy="${escXml(a.failurePolicy)}"` : '',
+            a.retryCount ? `retryCount="${a.retryCount}"` : '',
+            a.retryDelaySeconds ? `retryDelaySeconds="${a.retryDelaySeconds}"` : '',
+            a.timeoutSeconds ? `timeoutSeconds="${a.timeoutSeconds}"` : '',
+            a.inputMappingJson ? `inputMapping="${escXml(a.inputMappingJson)}"` : '',
+            a.outputMappingJson ? `outputMapping="${escXml(a.outputMappingJson)}"` : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          return `        <Action ${aAttrs} />`;
+        });
 
-    const assignmentLines = (n.assignmentGroupId || n.assignmentKey)
-      ? [`        <AssignmentRule assigneeType="AssignmentGroup"${n.assignmentGroupId ? ` assignmentGroupId="${escXml(n.assignmentGroupId)}"` : ''}${n.assignmentKey ? ` assignmentKey="${escXml(n.assignmentKey)}"` : ''}${n.assignmentPurpose ? ` assignmentPurpose="${escXml(n.assignmentPurpose)}"` : ''} />`]
-      : [];
+      const assignmentLines =
+        n.assignmentGroupId || n.assignmentKey
+          ? [
+              `        <AssignmentRule assigneeType="AssignmentGroup"${n.assignmentGroupId ? ` assignmentGroupId="${escXml(n.assignmentGroupId)}"` : ''}${n.assignmentKey ? ` assignmentKey="${escXml(n.assignmentKey)}"` : ''}${n.assignmentPurpose ? ` assignmentPurpose="${escXml(n.assignmentPurpose)}"` : ''} />`,
+            ]
+          : [];
 
-    const hasChildren = outcomeLines.length > 0 || actionLines.length > 0 || assignmentLines.length > 0;
-    if (!hasChildren) return `    <Activity ${attrs} />`;
+      const hasChildren =
+        outcomeLines.length > 0 || actionLines.length > 0 || assignmentLines.length > 0;
+      if (!hasChildren) return `    <Activity ${attrs} />`;
 
-    const children: string[] = [];
-    if (assignmentLines.length > 0) {
-      children.push(assignmentLines.join('\n'));
-    }
-    if (outcomeLines.length > 0) {
-      children.push(`      <Outcomes>\n${outcomeLines.join('\n')}\n      </Outcomes>`);
-    }
-    if (actionLines.length > 0) {
-      children.push(`      <Actions>\n${actionLines.join('\n')}\n      </Actions>`);
-    }
-    return `    <Activity ${attrs}>\n${children.join('\n')}\n    </Activity>`;
-  }).join('\n');
+      const children: string[] = [];
+      if (assignmentLines.length > 0) {
+        children.push(assignmentLines.join('\n'));
+      }
+      if (outcomeLines.length > 0) {
+        children.push(`      <Outcomes>\n${outcomeLines.join('\n')}\n      </Outcomes>`);
+      }
+      if (actionLines.length > 0) {
+        children.push(`      <Actions>\n${actionLines.join('\n')}\n      </Actions>`);
+      }
+      return `    <Activity ${attrs}>\n${children.join('\n')}\n    </Activity>`;
+    })
+    .join('\n');
 
-  const transitions = state.edges.map(e => {
-    const from = state.nodes.find(n => n.id === e.fromNodeId);
-    const to   = state.nodes.find(n => n.id === e.toNodeId);
-    if (!from || !to) return '';
-    const attrs = [
-      `key="${e.transitionKey}"`,
-      `from="${from.nodeKey}"`,
-      `to="${to.nodeKey}"`,
-      e.isDefault ? 'isDefault="true"' : '',
-      e.outcomeKey && e.outcomeKey !== e.transitionKey ? `outcomeKey="${escXml(e.outcomeKey)}"` : '',
-      e.conditionExpression ? `condition="${escXml(e.conditionExpression)}"` : '',
-      e.labelEn ? `label="${escXml(e.labelEn)}"` : '',
-      e.labelAr ? `labelAr="${escXml(e.labelAr)}"` : '',
-      `priority="${e.priority}"`,
-    ].filter(Boolean).join(' ');
-    return `    <Transition ${attrs} />`;
-  }).filter(Boolean).join('\n');
+  const transitions = state.edges
+    .map((e) => {
+      const from = state.nodes.find((n) => n.id === e.fromNodeId);
+      const to = state.nodes.find((n) => n.id === e.toNodeId);
+      if (!from || !to) return '';
+      const attrs = [
+        `key="${e.transitionKey}"`,
+        `from="${from.nodeKey}"`,
+        `to="${to.nodeKey}"`,
+        e.isDefault ? 'isDefault="true"' : '',
+        e.outcomeKey && e.outcomeKey !== e.transitionKey
+          ? `outcomeKey="${escXml(e.outcomeKey)}"`
+          : '',
+        e.conditionExpression ? `condition="${escXml(e.conditionExpression)}"` : '',
+        e.labelEn ? `label="${escXml(e.labelEn)}"` : '',
+        e.labelAr ? `labelAr="${escXml(e.labelAr)}"` : '',
+        `priority="${e.priority}"`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return `    <Transition ${attrs} />`;
+    })
+    .filter(Boolean)
+    .join('\n');
 
-  const variableLines = (state.variables ?? []).map(v => {
-    const attrs = [
-      `key="${escXml(v.variableKey)}"`,
-      v.name ? `name="${escXml(v.name)}"` : '',
-      v.nameAr ? `nameAr="${escXml(v.nameAr)}"` : '',
-      `dataType="${v.dataType}"`,
-      v.defaultValue ? `defaultValue="${escXml(v.defaultValue)}"` : '',
-      v.isRequired  ? 'isRequired="true"'  : '',
-      v.isSensitive ? 'isSensitive="true"' : '',
-      v.description ? `description="${escXml(v.description)}"` : '',
-      v.descriptionAr ? `descriptionAr="${escXml(v.descriptionAr)}"` : '',
-    ].filter(Boolean).join(' ');
-    return `    <Variable ${attrs} />`;
-  }).join('\n');
+  const variableLines = (state.variables ?? [])
+    .map((v) => {
+      const attrs = [
+        `key="${escXml(v.variableKey)}"`,
+        v.name ? `name="${escXml(v.name)}"` : '',
+        v.nameAr ? `nameAr="${escXml(v.nameAr)}"` : '',
+        `dataType="${v.dataType}"`,
+        v.defaultValue ? `defaultValue="${escXml(v.defaultValue)}"` : '',
+        v.isRequired ? 'isRequired="true"' : '',
+        v.isSensitive ? 'isSensitive="true"' : '',
+        v.description ? `description="${escXml(v.description)}"` : '',
+        v.descriptionAr ? `descriptionAr="${escXml(v.descriptionAr)}"` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return `    <Variable ${attrs} />`;
+    })
+    .join('\n');
 
-  const variablesBlock = variableLines
-    ? `  <Variables>\n${variableLines}\n  </Variables>\n`
-    : '';
+  const variablesBlock = variableLines ? `  <Variables>\n${variableLines}\n  </Variables>\n` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <WorkflowDefinition xmlns="https://privora.io/workflow/v1"${state.workspace ? ` workspaceJson="${escXml(JSON.stringify(state.workspace))}"` : ''}>
@@ -292,7 +334,11 @@ ${variablesBlock}</WorkflowDefinition>`;
 }
 
 function escXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -301,73 +347,104 @@ function escXml(s: string): string {
   selector: 'app-workflow-designer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [WorkflowFormActionsComponent, WorkflowChildPreviewComponent, WorkflowTaskPaletteComponent, WorkflowActivitySlaComponent, WorkflowSlaEditorComponent, WorkflowActivityFormsComponent, WorkflowFormPreviewComponent, ReactiveFormsModule, TranslateModule, RouterLink, WorkflowIntegrationEditorComponent, WorkflowVariableEditorComponent, WorkflowBusinessActivityComponent, WorkflowLocationComponent],
+  imports: [
+    WorkflowFormActionsComponent,
+    WorkflowChildPreviewComponent,
+    WorkflowTaskPaletteComponent,
+    WorkflowActivitySlaComponent,
+    WorkflowSlaEditorComponent,
+    WorkflowActivityFormsComponent,
+    WorkflowFormPreviewComponent,
+    ReactiveFormsModule,
+    TranslateModule,
+    RouterLink,
+    WorkflowIntegrationEditorComponent,
+    WorkflowVariableEditorComponent,
+    WorkflowBusinessActivityComponent,
+    WorkflowLocationComponent,
+  ],
   templateUrl: './workflow-designer.component.html',
   styleUrls: ['./workflow-designer.component.css'],
 })
-export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestroy {
+export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   @ViewChild('canvasSvg') canvasSvgRef!: ElementRef<SVGSVGElement>;
   @ViewChild('canvasScroll') canvasScrollRef?: ElementRef<HTMLDivElement>;
 
-  private readonly route              = inject(ActivatedRoute);
-  private readonly router             = inject(Router);
-  private readonly versionsService    = inject(WorkflowVersionsService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly versionsService = inject(WorkflowVersionsService);
   private readonly definitionsService = inject(WorkflowDefinitionsService);
-  private readonly catalogService     = inject(WorkflowActionsCatalogService);
-  private readonly bindingsService    = inject(WorkflowBindingsService);
+  private readonly catalogService = inject(WorkflowActionsCatalogService);
+  private readonly bindingsService = inject(WorkflowBindingsService);
   private readonly slaPoliciesService = inject(WorkflowSlaPoliciesService);
-  private readonly toast              = inject(ToastService);
-  private readonly translate          = inject(TranslateService);
-  private readonly fb                 = inject(FormBuilder);
-  private readonly destroyRef         = inject(DestroyRef);
-  protected readonly theme            = inject(ThemeService);
-  protected readonly locale           = inject(LocaleService);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
+  private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly theme = inject(ThemeService);
+  protected readonly locale = inject(LocaleService);
 
   // ── Route params
   protected readonly definitionId = signal('');
-  protected readonly versionId    = signal('');
+  protected readonly versionId = signal('');
 
   // ── Version state
-  protected readonly version        = signal<WorkflowVersionDetailDto | null>(null);
+  protected readonly version = signal<WorkflowVersionDetailDto | null>(null);
   protected readonly definitionName = signal('');
-  protected readonly isLoading      = signal(true);
-  protected readonly loadError      = signal<string | null>(null);
-  protected readonly isReadonly     = computed(() => this.version()?.status !== 'Draft');
+  protected readonly isLoading = signal(true);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly isReadonly = computed(() => this.version()?.status !== 'Draft');
 
   // ── Lifecycle actions
   protected readonly publishing = signal(false);
-  protected readonly cloning    = signal(false);
-  protected readonly retiring   = signal(false);
+  protected readonly cloning = signal(false);
+  protected readonly retiring = signal(false);
 
   // ── Save state
   protected readonly saveStatus = signal<'saved' | 'unsaved' | 'saving'>('saved');
-  private readonly autosave$    = new Subject<void>();
+  private readonly autosave$ = new Subject<void>();
 
   // ── Canvas state
   protected readonly workspace = signal<WorkspaceSettings | undefined>(undefined);
-  protected updateWorkspace(settings: WorkspaceSettings): void { if (!this.isReadonly()) { this.workspace.set(settings); this.markUnsaved(); } }
-  protected readonly nodes     = signal<CanvasNode[]>([]);
-  protected readonly edges     = signal<CanvasEdge[]>([]);
+  protected updateWorkspace(settings: WorkspaceSettings): void {
+    if (!this.isReadonly()) {
+      this.workspace.set(settings);
+      this.markUnsaved();
+    }
+  }
+  protected readonly nodes = signal<CanvasNode[]>([]);
+  protected readonly edges = signal<CanvasEdge[]>([]);
   protected readonly variables = signal<CanvasVariable[]>([]);
-  protected readonly canvasWorld = computed(() => canvasWorldSize(this.nodes().map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)}))));
+  protected readonly canvasWorld = computed(() =>
+    canvasWorldSize(
+      this.nodes().map((n) => ({ ...n, width: this.nodeWidth(n), height: this.nodeHeight(n) })),
+    ),
+  );
 
   // ── Selection
   protected readonly selectedNodeId = signal<string | null>(null);
   protected readonly selectedEdgeId = signal<string | null>(null);
-  protected readonly selectedNode   = computed(() =>
-    this.nodes().find(n => n.id === this.selectedNodeId()) ?? null);
-  protected readonly selectedEdge   = computed(() =>
-    this.edges().find(e => e.id === this.selectedEdgeId()) ?? null);
+  protected readonly selectedNode = computed(
+    () => this.nodes().find((n) => n.id === this.selectedNodeId()) ?? null,
+  );
+  protected readonly selectedEdge = computed(
+    () => this.edges().find((e) => e.id === this.selectedEdgeId()) ?? null,
+  );
 
   // ── Inspector state
   protected readonly inspectorTab = signal<InspectorTab>('general');
 
   // ── Bottom drawer
-  protected readonly bottomTab        = signal<BottomTab>('validation');
+  protected readonly bottomTab = signal<BottomTab>('validation');
   protected readonly showBottomDrawer = signal(false);
 
   // ── Drag state (not signal — updated at 60fps)
-  private dragging: { nodeId: string; startX: number; startY: number; origPositions: Record<string, { x: number; y: number }> } | null = null;
+  private dragging: {
+    nodeId: string;
+    startX: number;
+    startY: number;
+    origPositions: Record<string, { x: number; y: number }>;
+  } | null = null;
 
   // ── Connection drawing
   protected readonly drawingEdge = signal<{
@@ -385,174 +462,316 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly panX = signal(0);
   protected readonly panY = signal(0);
   protected readonly zoom = signal(1);
-  private panning: { startX: number; startY: number; origPanX: number; origPanY: number } | null = null;
+  private panning: { startX: number; startY: number; origPanX: number; origPanY: number } | null =
+    null;
 
   // ── Node properties form
   protected readonly propsForm = this.fb.group({
-    name:                   ['', Validators.required],
-    nameAr:                 [''],
-    description:            [''],
-    descriptionAr:          [''],
-    instructionsEn:         [''],
-    instructionsAr:         [''],
-    nodePriority:           [0],
-    actionKey:              [''],
-    assignmentKey:          [''],
-    assignmentGroupId:      [''],
-    assignmentPurpose:      [''],
-    fallbackAssignmentKey:  [''],
-    requiresClaim:          [false],
-    allowSelfClaim:         [false],
-    configJson:             [''],
-    timerType:              ['Duration' as TimerTypeOption],
-    dueAt:                  [''],
-    duration:               [''],
-    signalKey:              [''],
-    templateKey:            [''],
-    failurePolicy:          ['Continue' as NotificationFailurePolicyOption],
-    slaPolicyId:            [''],
-    slaDurationHours:       [0],
-    slaEscalationKey:       [''],
-    inputMappingJson:       [''],
-    outputMappingJson:      [''],
-    formKey:                [''],
-    formSchemaJson:         [''],
-    setVariablesJson:       [''],
-    eventKey:               [''],
-    correlationVariable:    [''],
-    definitionKey:          [''],
-    waitForCompletion:      [true],
-    callVersionId:          [''],
-    callInputMappingsJson:  ['{}'],
+    name: ['', Validators.required],
+    nameAr: [''],
+    description: [''],
+    descriptionAr: [''],
+    instructionsEn: [''],
+    instructionsAr: [''],
+    nodePriority: [0],
+    actionKey: [''],
+    assignmentKey: [''],
+    assignmentGroupId: [''],
+    assignmentPurpose: [''],
+    fallbackAssignmentKey: [''],
+    requiresClaim: [false],
+    allowSelfClaim: [false],
+    configJson: [''],
+    timerType: ['Duration' as TimerTypeOption],
+    dueAt: [''],
+    duration: [''],
+    signalKey: [''],
+    templateKey: [''],
+    failurePolicy: ['Continue' as NotificationFailurePolicyOption],
+    slaPolicyId: [''],
+    slaDurationHours: [0],
+    slaEscalationKey: [''],
+    inputMappingJson: [''],
+    outputMappingJson: [''],
+    formKey: [''],
+    formSchemaJson: [''],
+    setVariablesJson: [''],
+    eventKey: [''],
+    correlationVariable: [''],
+    definitionKey: [''],
+    waitForCompletion: [true],
+    callVersionId: [''],
+    callInputMappingsJson: ['{}'],
     callOutputMappingsJson: ['{}'],
   });
 
-  protected readonly formFieldTypes: FormFieldType[] = ['text', 'textarea', 'number', 'date', 'select'];
+  protected readonly formFieldTypes: FormFieldType[] = [
+    'text',
+    'textarea',
+    'number',
+    'date',
+    'select',
+  ];
   protected readonly formFields = signal<FormFieldRow[]>([]);
 
   // ── Transition (edge) form
   protected readonly edgeForm = this.fb.group({
-    transitionKey:       [''],
-    labelEn:             [''],
-    labelAr:             [''],
-    descriptionEn:       [''],
-    outcomeKey:          [''],
+    transitionKey: [''],
+    labelEn: [''],
+    labelAr: [''],
+    descriptionEn: [''],
+    outcomeKey: [''],
     conditionExpression: [''],
-    isDefault:           [false],
-    priority:            [0],
+    isDefault: [false],
+    priority: [0],
   });
 
   // ── Enums / options
   protected readonly timerTypeOptions: TimerTypeOption[] = ['DueDate', 'Duration'];
-  protected readonly notifFailurePolicyOptions: NotificationFailurePolicyOption[] = ['Continue', 'Retry', 'FailWorkflow'];
+  protected readonly notifFailurePolicyOptions: NotificationFailurePolicyOption[] = [
+    'Continue',
+    'Retry',
+    'FailWorkflow',
+  ];
   protected readonly executionTriggerOptions = ['OnEnter', 'OnComplete', 'OnOutcome', 'OnFailure'];
-  protected readonly actionFailurePolicyOptions = ['Continue', 'Retry', 'FailActivity', 'FailWorkflow', 'CreateIncident'];
-  protected readonly variableTypes: CanvasVariable['dataType'][] = ['String', 'Integer', 'Decimal', 'Boolean', 'Date', 'DateTime', 'Guid', 'Json'];
+  protected readonly actionFailurePolicyOptions = [
+    'Continue',
+    'Retry',
+    'FailActivity',
+    'FailWorkflow',
+    'CreateIncident',
+  ];
+  protected readonly variableTypes: CanvasVariable['dataType'][] = [
+    'String',
+    'Integer',
+    'Decimal',
+    'Boolean',
+    'Date',
+    'DateTime',
+    'Guid',
+    'Json',
+  ];
 
   // ── Inspector tab definitions
   // Both business activity types configure ordered versioned forms from their own Task Type.
-  private static readonly ACTIVITY_TABS: { id: InspectorTab; labelKey: string; helpKey: string }[] = [
-    { id: 'general',    labelKey: 'workflow.designer.tab_general',    helpKey: 'workflow.designer.tab_help_general'    },
-    { id: 'assignment', labelKey: 'workflow.designer.tab_assignment', helpKey: 'workflow.designer.tab_help_assignment' },
-    { id: 'form',       labelKey: 'workflow.designer.tab_form',       helpKey: 'workflow.designer.tab_help_form'       },
-    { id: 'actions', labelKey: 'workflow.designer.tab_actions', helpKey: 'workflow.designer.tab_help_actions' },
-    { id: 'sla',        labelKey: 'workflow.designer.tab_sla',        helpKey: 'workflow.designer.tab_help_sla'        },
-  ];
+  private static readonly ACTIVITY_TABS: { id: InspectorTab; labelKey: string; helpKey: string }[] =
+    [
+      {
+        id: 'general',
+        labelKey: 'workflow.designer.tab_general',
+        helpKey: 'workflow.designer.tab_help_general',
+      },
+      {
+        id: 'assignment',
+        labelKey: 'workflow.designer.tab_assignment',
+        helpKey: 'workflow.designer.tab_help_assignment',
+      },
+      {
+        id: 'form',
+        labelKey: 'workflow.designer.tab_form',
+        helpKey: 'workflow.designer.tab_help_form',
+      },
+      {
+        id: 'actions',
+        labelKey: 'workflow.designer.tab_actions',
+        helpKey: 'workflow.designer.tab_help_actions',
+      },
+      {
+        id: 'sla',
+        labelKey: 'workflow.designer.tab_sla',
+        helpKey: 'workflow.designer.tab_help_sla',
+      },
+    ];
   /** The tabs an activity of this type shows; empty for nodes that have a single settings panel. */
-  static tabsFor(type: NodeType | undefined | null): { id: InspectorTab; labelKey: string; helpKey: string }[] {
+  static tabsFor(
+    type: NodeType | undefined | null,
+  ): { id: InspectorTab; labelKey: string; helpKey: string }[] {
     if (type === 'UserTask') return WorkflowDesignerComponent.ACTIVITY_TABS;
     if (type === 'MainActivity') return WorkflowDesignerComponent.ACTIVITY_TABS;
     return [];
   }
-  protected readonly userTaskTabs = computed(() => WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type));
+  protected readonly userTaskTabs = computed(() =>
+    WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type),
+  );
   /** Non-business nodes fall back to General. */
   protected readonly activeInspectorTab = computed<InspectorTab>(() =>
-    this.userTaskTabs().some(t => t.id === this.inspectorTab()) ? this.inspectorTab() : 'general');
-  protected readonly activeTabHelpKey = computed(() =>
-    this.userTaskTabs().find(t => t.id === this.activeInspectorTab())?.helpKey
-    ?? 'workflow.designer.tab_help_general',
+    this.userTaskTabs().some((t) => t.id === this.inspectorTab()) ? this.inspectorTab() : 'general',
+  );
+  protected readonly activeTabHelpKey = computed(
+    () =>
+      this.userTaskTabs().find((t) => t.id === this.activeInspectorTab())?.helpKey ??
+      'workflow.designer.tab_help_general',
   );
 
   // ── Palette
-  protected readonly paletteNodes: { type: NodeType; protocol?: string; labelKey: string; label: string; category: string; descKey: string }[] = [
-    { type: 'Start',            labelKey: 'workflow.designer.node_start',             label: 'Start',          category: 'flow',       descKey: 'workflow.designer.node_desc_start'            },
-    { type: 'End',              labelKey: 'workflow.designer.node_end',               label: 'End',            category: 'flow',       descKey: 'workflow.designer.node_desc_end'              },
-    { type: 'ExclusiveGateway', labelKey: 'workflow.designer.node_exclusive_gateway', label: 'Decision',           category: 'flow',       descKey: 'workflow.designer.node_desc_exclusive_gateway'},
-    { type: 'InclusiveGateway', labelKey: 'workflow.designer.node_inclusive_gateway', label: 'Inclusive Gateway',  category: 'flow',       descKey: 'workflow.designer.node_desc_inclusive_gateway'},
-    { type: 'ParallelGateway',  labelKey: 'workflow.designer.node_parallel_gateway',  label: 'Parallel Fork',      category: 'flow',       descKey: 'workflow.designer.node_desc_parallel_gateway' },
-    { type: 'JoinGateway',      labelKey: 'workflow.designer.node_join_gateway',      label: 'Join',               category: 'flow',       descKey: 'workflow.designer.node_desc_join_gateway'     },
-    { type: 'MainActivity', labelKey: 'workflow.designer.node_main_activity', label: 'Main Activity', category: 'tasks', descKey: 'workflow.designer.node_desc_main_activity' },
-    { type: 'UserTask',         labelKey: 'workflow.designer.node_user_task',         label: 'User Task',          category: 'tasks',      descKey: 'workflow.designer.node_desc_user_task'        },
-    { type: 'ServiceTask', protocol: 'Sms', labelKey: 'workflow.designer.node_sms', label: 'SMS', category: 'events', descKey: 'workflow.designer.node_desc_sms' },
-    { type: 'ServiceTask',      labelKey: 'workflow.designer.node_service_task',      label: 'API Request',       category: 'automation', descKey: 'workflow.designer.node_desc_service_task'     },
-    { type: 'NotificationTask', labelKey: 'workflow.designer.node_notification_task', label: 'Email',       category: 'automation', descKey: 'workflow.designer.node_desc_notification_task'},
-    { type: 'Timer',            labelKey: 'workflow.designer.node_timer',             label: 'Timer',              category: 'events',     descKey: 'workflow.designer.node_desc_timer'            },
-    { type: 'WaitEvent',        labelKey: 'workflow.designer.node_wait_event',        label: 'Wait for Event',     category: 'events',     descKey: 'workflow.designer.node_desc_wait_event'       },
+  protected readonly paletteNodes: {
+    type: NodeType;
+    protocol?: string;
+    labelKey: string;
+    label: string;
+    category: string;
+    descKey: string;
+  }[] = [
+    {
+      type: 'Start',
+      labelKey: 'workflow.designer.node_start',
+      label: 'Start',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_start',
+    },
+    {
+      type: 'End',
+      labelKey: 'workflow.designer.node_end',
+      label: 'End',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_end',
+    },
+    {
+      type: 'ExclusiveGateway',
+      labelKey: 'workflow.designer.node_exclusive_gateway',
+      label: 'Decision',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_exclusive_gateway',
+    },
+    {
+      type: 'InclusiveGateway',
+      labelKey: 'workflow.designer.node_inclusive_gateway',
+      label: 'Inclusive Gateway',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_inclusive_gateway',
+    },
+    {
+      type: 'ParallelGateway',
+      labelKey: 'workflow.designer.node_parallel_gateway',
+      label: 'Parallel Fork',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_parallel_gateway',
+    },
+    {
+      type: 'JoinGateway',
+      labelKey: 'workflow.designer.node_join_gateway',
+      label: 'Join',
+      category: 'flow',
+      descKey: 'workflow.designer.node_desc_join_gateway',
+    },
+    {
+      type: 'MainActivity',
+      labelKey: 'workflow.designer.node_main_activity',
+      label: 'Main Activity',
+      category: 'tasks',
+      descKey: 'workflow.designer.node_desc_main_activity',
+    },
+    {
+      type: 'UserTask',
+      labelKey: 'workflow.designer.node_user_task',
+      label: 'User Task',
+      category: 'tasks',
+      descKey: 'workflow.designer.node_desc_user_task',
+    },
+    {
+      type: 'ServiceTask',
+      protocol: 'Sms',
+      labelKey: 'workflow.designer.node_sms',
+      label: 'SMS',
+      category: 'events',
+      descKey: 'workflow.designer.node_desc_sms',
+    },
+    {
+      type: 'ServiceTask',
+      labelKey: 'workflow.designer.node_service_task',
+      label: 'API Request',
+      category: 'automation',
+      descKey: 'workflow.designer.node_desc_service_task',
+    },
+    {
+      type: 'NotificationTask',
+      labelKey: 'workflow.designer.node_notification_task',
+      label: 'Email',
+      category: 'automation',
+      descKey: 'workflow.designer.node_desc_notification_task',
+    },
+    {
+      type: 'Timer',
+      labelKey: 'workflow.designer.node_timer',
+      label: 'Timer',
+      category: 'events',
+      descKey: 'workflow.designer.node_desc_timer',
+    },
+    {
+      type: 'WaitEvent',
+      labelKey: 'workflow.designer.node_wait_event',
+      label: 'Wait for Event',
+      category: 'events',
+      descKey: 'workflow.designer.node_desc_wait_event',
+    },
   ];
 
   protected readonly paletteCategories = [
-    { id: 'flow',       labelKey: 'workflow.designer.palette_cat_flow'       },
-    { id: 'tasks',      labelKey: 'workflow.designer.palette_cat_tasks'      },
+    { id: 'flow', labelKey: 'workflow.designer.palette_cat_flow' },
+    { id: 'tasks', labelKey: 'workflow.designer.palette_cat_tasks' },
     { id: 'automation', labelKey: 'workflow.designer.palette_cat_automation' },
-    { id: 'events',     labelKey: 'workflow.designer.palette_cat_events'     },
+    { id: 'events', labelKey: 'workflow.designer.palette_cat_events' },
   ];
 
   protected readonly paletteSearch = signal('');
   protected readonly filteredPalette = computed(() => {
     const q = this.paletteSearch().toLowerCase().trim();
     if (!q) return this.paletteNodes;
-    return this.paletteNodes.filter(p =>
-      p.label.toLowerCase().includes(q) || p.type.toLowerCase().includes(q)
+    return this.paletteNodes.filter(
+      (p) => p.label.toLowerCase().includes(q) || p.type.toLowerCase().includes(q),
     );
   });
   protected readonly filteredPaletteByCategory = computed(() => {
     const nodes = this.filteredPalette();
-    return this.paletteCategories.map(cat => ({
-      ...cat,
-      nodes: nodes.filter(n => n.category === cat.id),
-    })).filter(c => c.nodes.length > 0);
+    return this.paletteCategories
+      .map((cat) => ({
+        ...cat,
+        nodes: nodes.filter((n) => n.category === cat.id),
+      }))
+      .filter((c) => c.nodes.length > 0);
   });
 
   // ── Validation
   protected readonly validationResult = signal<WorkflowValidationResultDto | null>(null);
-  protected readonly validating       = signal(false);
+  protected readonly validating = signal(false);
 
   // ── Active main tab (designer | xml)
-  protected readonly activeTab  = signal<'designer' | 'xml'>('designer');
+  protected readonly activeTab = signal<'designer' | 'xml'>('designer');
   protected readonly xmlContent = signal('');
-  protected readonly xmlWrap    = signal(true);
-  protected readonly xmlCopied  = signal(false);
-  protected readonly xmlLines   = computed(() => highlightXml(this.xmlContent()));
-  protected readonly xmlStats   = computed(() => ({
-    activities:  this.nodes().length,
+  protected readonly xmlWrap = signal(true);
+  protected readonly xmlCopied = signal(false);
+  protected readonly xmlLines = computed(() => highlightXml(this.xmlContent()));
+  protected readonly xmlStats = computed(() => ({
+    activities: this.nodes().length,
     transitions: this.edges().length,
-    variables:   this.variables().length,
+    variables: this.variables().length,
   }));
   protected readonly connectGuideDismissed = signal(false);
-  protected readonly showConnectGuide = computed(() =>
-    !this.isReadonly()
-    && this.activeTab() === 'designer'
-    && this.nodes().length >= 2
-    && this.edges().length === 0
-    && !this.connectGuideDismissed()
-    && !this.drawingEdge()
-    && !this.showOnboarding()
-    && !this.showTour()
+  protected readonly showConnectGuide = computed(
+    () =>
+      !this.isReadonly() &&
+      this.activeTab() === 'designer' &&
+      this.nodes().length >= 2 &&
+      this.edges().length === 0 &&
+      !this.connectGuideDismissed() &&
+      !this.drawingEdge() &&
+      !this.showOnboarding() &&
+      !this.showTour(),
   );
 
   // ── Delete confirmation
   protected readonly deleteTarget = signal<CanvasNode | null>(null);
 
   // ── Action catalog
-  protected readonly actionCatalog    = signal<WorkflowActionCatalogEntryDto[]>([]);
-  protected readonly catalogLoading   = signal(false);
+  protected readonly actionCatalog = signal<WorkflowActionCatalogEntryDto[]>([]);
+  protected readonly catalogLoading = signal(false);
 
-  protected readonly assignmentGroups        = signal<WorkflowAssignmentGroupDto[]>([]);
+  protected readonly assignmentGroups = signal<WorkflowAssignmentGroupDto[]>([]);
   protected readonly assignmentGroupsLoading = signal(false);
-  protected readonly organizationId          = signal('');
+  protected readonly organizationId = signal('');
 
   // ── SLA policies
-  protected readonly slaPolicies        = signal<SlaPolicyDto[]>([]);
+  protected readonly slaPolicies = signal<SlaPolicyDto[]>([]);
   protected readonly slaPoliciesLoading = signal(false);
 
   // ── Undo/redo stacks
@@ -564,12 +783,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Multi-select
   protected readonly selectedNodeIds = signal<string[]>([]);
-  protected readonly selectedNodes   = computed(() =>
-    this.nodes().filter(n => this.selectedNodeIds().includes(n.id)));
+  protected readonly selectedNodes = computed(() =>
+    this.nodes().filter((n) => this.selectedNodeIds().includes(n.id)),
+  );
 
   // ── Marquee
   protected readonly marquee = signal<{ x: number; y: number; w: number; h: number } | null>(null);
-  private marqueeStartPos: { clientX: number; clientY: number; canvasX: number; canvasY: number } | null = null;
+  private marqueeStartPos: {
+    clientX: number;
+    clientY: number;
+    canvasX: number;
+    canvasY: number;
+  } | null = null;
 
   // ── Context menu
   protected readonly contextMenu = signal<{
@@ -595,11 +820,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly tourStep = signal(0);
   protected readonly tourTotal = 6;
   protected readonly tourDots = [0, 1, 2, 3, 4, 5] as const;
-  protected readonly showOnboarding = computed(() =>
-    this.nodes().length === 0 && !this.isLoading() && !this.onboardingDismissed()
+  protected readonly showOnboarding = computed(
+    () => this.nodes().length === 0 && !this.isLoading() && !this.onboardingDismissed(),
   );
   protected readonly tourProgressPct = computed(() =>
-    Math.round(((this.tourStep() + 1) / this.tourTotal) * 100)
+    Math.round(((this.tourStep() + 1) / this.tourTotal) * 100),
   );
 
   // ── Inspector
@@ -616,47 +841,75 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Bottom drawer height (resizable)
   protected readonly drawerHeight = signal(260);
-  protected readonly MIN_DRAWER_H    = 120;
-  protected readonly MAX_DRAWER_H    = 500;
+  protected readonly MIN_DRAWER_H = 120;
+  protected readonly MAX_DRAWER_H = 500;
   protected readonly MIN_INSPECTOR_W = 400;
   protected readonly MAX_INSPECTOR_W = 640;
 
   // ── Resize state (mutable – updated at 60fps, not signals)
-  private inspectorResizing     = false;
+  private inspectorResizing = false;
   private inspectorResizeStartX = 0;
   private inspectorResizeStartW = 0;
-  private drawerResizing        = false;
-  private drawerResizeStartY    = 0;
-  private drawerResizeStartH    = 0;
+  private drawerResizing = false;
+  private drawerResizeStartY = 0;
+  private drawerResizeStartH = 0;
 
   // ── Seed IDs (for GUID panel)
 
   // ── Expose constants to template
-  protected readonly collapsedChildren = signal<Record<string,string>>({});
-  protected childVersion(n:CanvasNode):string { return n.type==='MainActivity' ? String(this.parseConfig(n.configurationJson||'{}')['versionId'] || '') : ''; }
-  protected childExpanded(n:CanvasNode):boolean { const version=this.childVersion(n);return !!version&&this.collapsedChildren()[n.id]!==version; }
-  protected nodeWidth(n:CanvasNode):number { return this.childExpanded(n)?560:NODE_W; }
-  protected nodeHeight(n:CanvasNode):number { return this.childExpanded(n)?440:this.childVersion(n)?112:NODE_H; }
-  protected toggleChild(n:CanvasNode):void {
-    this.collapsedChildren.update(c=>({...c,[n.id]:this.childExpanded(n)?this.childVersion(n):''}));
+  protected readonly collapsedChildren = signal<Record<string, string>>({});
+  protected childVersion(n: CanvasNode): string {
+    return n.type === 'MainActivity'
+      ? String(this.parseConfig(n.configurationJson || '{}')['versionId'] || '')
+      : '';
+  }
+  protected childExpanded(n: CanvasNode): boolean {
+    const version = this.childVersion(n);
+    return !!version && this.collapsedChildren()[n.id] !== version;
+  }
+  protected nodeWidth(n: CanvasNode): number {
+    return this.childExpanded(n) ? 560 : NODE_W;
+  }
+  protected nodeHeight(n: CanvasNode): number {
+    return this.childExpanded(n) ? 440 : this.childVersion(n) ? 112 : NODE_H;
+  }
+  protected toggleChild(n: CanvasNode): void {
+    this.collapsedChildren.update((c) => ({
+      ...c,
+      [n.id]: this.childExpanded(n) ? this.childVersion(n) : '',
+    }));
     this.makeRoomForChildren();
   }
-  private makeRoomForChildren():void {
-    const nodes=this.nodes();
-    const overlaps=nodes.some(a=>this.childExpanded(a)&&nodes.some(b=>{
-      if(a.id===b.id)return false;const x=this.nodeBounds(a),y=this.nodeBounds(b);
-      return x.x<y.x+y.w+24&&x.x+x.w+24>y.x&&x.y<y.y+y.h+24&&x.y+x.h+24>y.y;
-    }));
-    if(!overlaps)return;
-    const positions=layoutWorkflowGraph(nodes.map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})),this.edges());
-    this.nodes.update(all=>all.map(n=>({...n,...positions[n.id]})));
+  private makeRoomForChildren(): void {
+    const nodes = this.nodes();
+    const overlaps = nodes.some(
+      (a) =>
+        this.childExpanded(a) &&
+        nodes.some((b) => {
+          if (a.id === b.id) return false;
+          const x = this.nodeBounds(a),
+            y = this.nodeBounds(b);
+          return (
+            x.x < y.x + y.w + 24 &&
+            x.x + x.w + 24 > y.x &&
+            x.y < y.y + y.h + 24 &&
+            x.y + x.h + 24 > y.y
+          );
+        }),
+    );
+    if (!overlaps) return;
+    const positions = layoutWorkflowGraph(
+      nodes.map((n) => ({ ...n, width: this.nodeWidth(n), height: this.nodeHeight(n) })),
+      this.edges(),
+    );
+    this.nodes.update((all) => all.map((n) => ({ ...n, ...positions[n.id] })));
   }
-  protected readonly NODE_W    = NODE_W;
-  protected readonly NODE_H    = NODE_H;
+  protected readonly NODE_W = NODE_W;
+  protected readonly NODE_H = NODE_H;
   protected readonly GATEWAY_R = GATEWAY_R;
 
   ngOnInit(): void {
-    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.definitionId.set(params.get('definitionId') ?? '');
       this.versionId.set(params.get('versionId') ?? '');
       this.selectedNodeId.set(null);
@@ -672,15 +925,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.loadActionCatalog();
     this.loadSlaPolicies();
 
-    this.autosave$.pipe(
-      debounceTime(2000),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe(() => {
+    this.autosave$.pipe(debounceTime(2000), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.saveToBackend().subscribe();
     });
   }
 
-  ngAfterViewInit(): void {}
   ngOnDestroy(): void {
     this.setFullscreen(false);
   }
@@ -704,20 +953,38 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private loadVersion(): void {
     this.isLoading.set(true);
     const requestedVersion = this.versionId();
-    this.versionsService.getById(this.definitionId(), requestedVersion)
+    this.versionsService
+      .getById(this.definitionId(), requestedVersion)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: v => {
+        next: (v) => {
           if (this.versionId() !== requestedVersion) return;
           this.version.set(v);
-          try { this.workspace.set(v.workspaceJson ? normalizeWorkspaceSettings(JSON.parse(v.workspaceJson)) : undefined); } catch { this.workspace.set(undefined); }
+          try {
+            this.workspace.set(
+              v.workspaceJson ? normalizeWorkspaceSettings(JSON.parse(v.workspaceJson)) : undefined,
+            );
+          } catch {
+            this.workspace.set(undefined);
+          }
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
-          if (v.status === 'Draft' && this.workspace()) { this.workspace.update(w => ({...w!, designerVersion: 2})); this.ensureSimpleActions(); this.convertEmbeddedEvents(); }
+          if (v.status === 'Draft' && this.workspace()) {
+            this.workspace.update((w) => ({ ...w!, designerVersion: 2 }));
+            this.ensureSimpleActions();
+            this.convertEmbeddedEvents();
+          }
           this.relayoutIfCollapsed();
           this.makeRoomForChildren();
           if (v.status !== 'Draft') {
-            this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
+            this.xmlContent.set(
+              buildNWFMXml({
+                nodes: this.nodes(),
+                edges: this.edges(),
+                variables: this.variables(),
+                workspace: this.workspace(),
+              }),
+            );
           }
         },
         error: (err: { error?: { message?: string } }) => {
@@ -732,25 +999,31 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       try {
         const state = JSON.parse(v.designerJson) as CanvasState;
         const merged = this.mergeWithBackend(state, v);
-        this.nodes.set(merged.nodes.map(n => ({
-          ...n,
-          configurationJson: n.configurationJson ?? '',
-          actionKey:         n.actionKey ?? '',
-          assignmentKey:     n.assignmentKey ?? '',
-          assignmentGroupId: n.assignmentGroupId ?? '',
-          assignmentPurpose: n.assignmentPurpose ?? '',
-          outcomes:          n.outcomes ?? [],
-          actions:           n.actions ?? [],
-        })));
-        this.edges.set(merged.edges.map(e => ({
-          ...e,
-          labelEn:      e.labelEn      ?? '',
-          labelAr:      e.labelAr      ?? '',
-          descriptionEn: e.descriptionEn ?? '',
-        })));
+        this.nodes.set(
+          merged.nodes.map((n) => ({
+            ...n,
+            configurationJson: n.configurationJson ?? '',
+            actionKey: n.actionKey ?? '',
+            assignmentKey: n.assignmentKey ?? '',
+            assignmentGroupId: n.assignmentGroupId ?? '',
+            assignmentPurpose: n.assignmentPurpose ?? '',
+            outcomes: n.outcomes ?? [],
+            actions: n.actions ?? [],
+          })),
+        );
+        this.edges.set(
+          merged.edges.map((e) => ({
+            ...e,
+            labelEn: e.labelEn ?? '',
+            labelAr: e.labelAr ?? '',
+            descriptionEn: e.descriptionEn ?? '',
+          })),
+        );
         this.variables.set(state.variables?.length ? state.variables : this.projectVariables(v));
         return;
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
 
     this.nodes.set((v.activities ?? []).map((a, i) => this.activityToCanvasNode(a, i)));
@@ -759,92 +1032,103 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   private projectVariables(v: WorkflowVersionDetailDto): CanvasVariable[] {
-    return (v.variables ?? []).map(variable => ({ id: variable.id || crypto.randomUUID(), variableKey: variable.variableKey || '',
-      name: variable.name || '', nameAr: variable.nameAr || '', dataType: (variable.dataType || 'String') as CanvasVariable['dataType'],
-      defaultValue: variable.defaultValue || '', isRequired: !!variable.isRequired, isSensitive: !!variable.isSensitive,
-      description: variable.description || '', descriptionAr: variable.descriptionAr || '' }));
+    return (v.variables ?? []).map((variable) => ({
+      id: variable.id || crypto.randomUUID(),
+      variableKey: variable.variableKey || '',
+      name: variable.name || '',
+      nameAr: variable.nameAr || '',
+      dataType: (variable.dataType || 'String') as CanvasVariable['dataType'],
+      defaultValue: variable.defaultValue || '',
+      isRequired: !!variable.isRequired,
+      isSensitive: !!variable.isSensitive,
+      description: variable.description || '',
+      descriptionAr: variable.descriptionAr || '',
+    }));
   }
 
   private activityToCanvasNode(a: ActivityDefinitionDto, i: number): CanvasNode {
     const fallbackX = 120 + (i % 3) * 280;
     const fallbackY = 100 + Math.floor(i / 3) * 260;
     return {
-      id:                a.id ?? `activity-${i}`,
-      nodeKey:           a.nodeKey ?? `node-${i}`,
-      type:              (a.activityType as NodeType) ?? 'UserTask',
-      name:              a.name ?? '',
-      nameAr:            a.nameAr ?? '',
-      actionKey:         a.actionKey ?? '',
-      assignmentKey:     a.assignmentRules?.[0]?.assignmentKey ?? '',
+      id: a.id ?? `activity-${i}`,
+      nodeKey: a.nodeKey ?? `node-${i}`,
+      type: (a.activityType as NodeType) ?? 'UserTask',
+      name: a.name ?? '',
+      nameAr: a.nameAr ?? '',
+      actionKey: a.actionKey ?? '',
+      assignmentKey: a.assignmentRules?.[0]?.assignmentKey ?? '',
       assignmentGroupId: a.assignmentRules?.[0]?.referenceId ?? '',
-      assignmentPurpose: (a.assignmentRules?.[0] as { assignmentPurpose?: string } | undefined)?.assignmentPurpose ?? '',
+      assignmentPurpose:
+        (a.assignmentRules?.[0] as { assignmentPurpose?: string } | undefined)?.assignmentPurpose ??
+        '',
       configurationJson: a.configurationJson ?? '',
-      x:                 a.positionX ?? fallbackX,
-      y:                 a.positionY ?? fallbackY,
-      outcomes: (a.outcomes ?? []).map(o => ({
-        id:                 o.id ?? '',
-        key:                o.outcomeKey ?? '',
-        label:              o.name ?? '',
-        labelAr:            o.nameAr ?? '',
-        description:        o.description ?? '',
-        descriptionAr:      o.descriptionAr ?? '',
-        sortOrder:          o.sortOrder ?? 0,
-        isDefault:          o.isDefault ?? false,
-        requiresComment:    o.requiresComment ?? false,
+      x: a.positionX ?? fallbackX,
+      y: a.positionY ?? fallbackY,
+      outcomes: (a.outcomes ?? []).map((o) => ({
+        id: o.id ?? '',
+        key: o.outcomeKey ?? '',
+        label: o.name ?? '',
+        labelAr: o.nameAr ?? '',
+        description: o.description ?? '',
+        descriptionAr: o.descriptionAr ?? '',
+        sortOrder: o.sortOrder ?? 0,
+        isDefault: o.isDefault ?? false,
+        requiresComment: o.requiresComment ?? false,
         requiresAttachment: o.requiresAttachment ?? false,
-        isActive:           o.isActive ?? true,
-        resultValue:        o.resultValue ?? '',
+        isActive: o.isActive ?? true,
+        resultValue: o.resultValue ?? '',
       })),
-      actions: (a.actions ?? []).map(ac => ({
-        id:                  ac.id ?? '',
-        actionKey:           ac.actionKey ?? '',
-        executionTrigger:    String(ac.executionTrigger ?? 'OnComplete'),
-        outcomeKey:          ac.outcomeKey ?? '',
+      actions: (a.actions ?? []).map((ac) => ({
+        id: ac.id ?? '',
+        actionKey: ac.actionKey ?? '',
+        executionTrigger: String(ac.executionTrigger ?? 'OnComplete'),
+        outcomeKey: ac.outcomeKey ?? '',
         conditionExpression: ac.conditionExpression ?? '',
-        sequence:            ac.sequence ?? 0,
-        inputMappingJson:    ac.inputMappingJson ?? '',
-        outputMappingJson:   ac.outputMappingJson ?? '',
-        failurePolicy:       String(ac.failurePolicy ?? 'Continue'),
-        retryCount:          ac.retryCount ?? 0,
-        retryDelaySeconds:   ac.retryDelaySeconds ?? 0,
-        timeoutSeconds:      ac.timeoutSeconds ?? 0,
-        isActive:            ac.isActive ?? true,
+        sequence: ac.sequence ?? 0,
+        inputMappingJson: ac.inputMappingJson ?? '',
+        outputMappingJson: ac.outputMappingJson ?? '',
+        failurePolicy: String(ac.failurePolicy ?? 'Continue'),
+        retryCount: ac.retryCount ?? 0,
+        retryDelaySeconds: ac.retryDelaySeconds ?? 0,
+        timeoutSeconds: ac.timeoutSeconds ?? 0,
+        isActive: ac.isActive ?? true,
       })),
     };
   }
 
   private transitionsToEdges(v: WorkflowVersionDetailDto): CanvasEdge[] {
     return (v.transitions ?? []).map((t, i) => ({
-      id:                  t.id ?? `transition-${i}`,
-      fromNodeId:          t.fromActivityDefinitionId ?? '',
-      toNodeId:            t.toActivityDefinitionId ?? '',
-      transitionKey:       t.transitionKey ?? `t-${i}`,
-      labelEn:             '',
-      labelAr:             '',
-      descriptionEn:       '',
-      outcomeKey:          t.transitionKey ?? `t-${i}`,
+      id: t.id ?? `transition-${i}`,
+      fromNodeId: t.fromActivityDefinitionId ?? '',
+      toNodeId: t.toActivityDefinitionId ?? '',
+      transitionKey: t.transitionKey ?? `t-${i}`,
+      labelEn: '',
+      labelAr: '',
+      descriptionEn: '',
+      outcomeKey: t.transitionKey ?? `t-${i}`,
       conditionExpression: t.conditionExpression ?? '',
-      isDefault:           t.isDefault ?? false,
-      priority:            t.priority ?? 0,
+      isDefault: t.isDefault ?? false,
+      priority: t.priority ?? 0,
     }));
   }
 
   private mergeWithBackend(state: CanvasState, v: WorkflowVersionDetailDto): CanvasState {
     const activities = v.activities ?? [];
     const idMap = mapCanvasIdsToActivities(state.nodes, activities);
-    const keptKeys = new Set(
-      state.nodes.filter(n => idMap.has(n.id)).map(n => n.nodeKey),
-    );
+    const keptKeys = new Set(state.nodes.filter((n) => idMap.has(n.id)).map((n) => n.nodeKey));
 
     // A published version shows what was published: publication adds the SLA snapshot to each activity's
     // configuration, which the saved canvas never contained.
-    const published = v.status !== 'Draft' ? new Map(activities.map(a => [a.id, a.configurationJson])) : null;
+    const published =
+      v.status !== 'Draft' ? new Map(activities.map((a) => [a.id, a.configurationJson])) : null;
     const nodes: CanvasNode[] = [];
     for (const n of state.nodes) {
       const backendId = idMap.get(n.id);
       if (!backendId) continue;
       const configurationJson = published?.get(backendId);
-      nodes.push(configurationJson ? { ...n, id: backendId, configurationJson } : { ...n, id: backendId });
+      nodes.push(
+        configurationJson ? { ...n, id: backendId, configurationJson } : { ...n, id: backendId },
+      );
     }
 
     activities.forEach((a, i) => {
@@ -852,12 +1136,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       nodes.push(this.activityToCanvasNode(a, i));
     });
 
-    const nodeIds = new Set(nodes.map(n => n.id));
-    const remapped = state.edges.map(e => ({
-      ...e,
-      fromNodeId: idMap.get(e.fromNodeId) ?? e.fromNodeId,
-      toNodeId:   idMap.get(e.toNodeId) ?? e.toNodeId,
-    })).filter(e => nodeIds.has(e.fromNodeId) && nodeIds.has(e.toNodeId));
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const remapped = state.edges
+      .map((e) => ({
+        ...e,
+        fromNodeId: idMap.get(e.fromNodeId) ?? e.fromNodeId,
+        toNodeId: idMap.get(e.toNodeId) ?? e.toNodeId,
+      }))
+      .filter((e) => nodeIds.has(e.fromNodeId) && nodeIds.has(e.toNodeId));
 
     const edges = remapped.length > 0 ? remapped : this.transitionsToEdges(v);
     return { nodes, edges, variables: state.variables ?? [] };
@@ -865,8 +1151,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private relayoutIfCollapsed(): void {
     if (!nodesAreCollapsed(this.nodes())) return;
-    const posMap = layoutWorkflowGraph(this.nodes().map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})), this.edges());
-    this.nodes.update(all => all.map(n => posMap[n.id] ? { ...n, ...posMap[n.id] } : n));
+    const posMap = layoutWorkflowGraph(
+      this.nodes().map((n) => ({ ...n, width: this.nodeWidth(n), height: this.nodeHeight(n) })),
+      this.edges(),
+    );
+    this.nodes.update((all) => all.map((n) => (posMap[n.id] ? { ...n, ...posMap[n.id] } : n)));
     this.resetView();
     if (!this.isReadonly()) this.markUnsaved();
   }
@@ -875,10 +1164,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private loadActionCatalog(): void {
     this.catalogLoading.set(true);
-    this.catalogService.getAll()
+    this.catalogService
+      .getAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: entries => { this.actionCatalog.set(entries); this.catalogLoading.set(false); },
+        next: (entries) => {
+          this.actionCatalog.set(entries);
+          this.catalogLoading.set(false);
+        },
         error: () => this.catalogLoading.set(false),
       });
   }
@@ -886,10 +1179,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private loadDefinitionName(): void {
     const defId = this.definitionId();
     if (!defId) return;
-    this.definitionsService.getById(defId)
+    this.definitionsService
+      .getById(defId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: d => {
+        next: (d) => {
           this.definitionName.set(d.name ?? '');
           const orgId = d.organizationId ?? '';
           this.organizationId.set(orgId);
@@ -901,11 +1195,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private loadAssignmentGroups(orgId: string): void {
     this.assignmentGroupsLoading.set(true);
-    this.bindingsService.listOrgGroups(orgId)
+    this.bindingsService
+      .listOrgGroups(orgId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: groups => {
-          this.assignmentGroups.set(groups.filter(g => g.isActive !== false));
+        next: (groups) => {
+          this.assignmentGroups.set(groups.filter((g) => g.isActive !== false));
           this.assignmentGroupsLoading.set(false);
         },
         error: () => this.assignmentGroupsLoading.set(false),
@@ -918,12 +1213,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected selectedAssignmentGroupName(groupId: string | null | undefined): string {
     if (!groupId) return '';
-    const g = this.assignmentGroups().find(x => x.id === groupId);
+    const g = this.assignmentGroups().find((x) => x.id === groupId);
     return g ? this.assignmentGroupLabel(g) : '';
   }
 
   protected onAssignmentGroupChange(groupId: string): void {
-    const g = this.assignmentGroups().find(x => x.id === groupId);
+    const g = this.assignmentGroups().find((x) => x.id === groupId);
     this.propsForm.patchValue({
       assignmentGroupId: groupId,
       assignmentKey: g?.code ?? '',
@@ -932,10 +1227,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private loadSlaPolicies(): void {
     this.slaPoliciesLoading.set(true);
-    this.slaPoliciesService.getAll()
+    this.slaPoliciesService
+      .getAll()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: policies => { this.slaPolicies.set(policies.filter(p => p.isActive)); this.slaPoliciesLoading.set(false); },
+        next: (policies) => {
+          this.slaPolicies.set(policies.filter((p) => p.isActive));
+          this.slaPoliciesLoading.set(false);
+        },
         error: () => this.slaPoliciesLoading.set(false),
       });
   }
@@ -964,11 +1263,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   protected nextTourStep(): void {
-    if (this.tourStep() < this.tourTotal - 1) this.tourStep.update(s => s + 1);
+    if (this.tourStep() < this.tourTotal - 1) this.tourStep.update((s) => s + 1);
   }
 
   protected prevTourStep(): void {
-    if (this.tourStep() > 0) this.tourStep.update(s => s - 1);
+    if (this.tourStep() > 0) this.tourStep.update((s) => s - 1);
   }
 
   protected goToTourStep(step: number): void {
@@ -979,13 +1278,23 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.isReadonly()) return;
     const id = crypto.randomUUID();
     const node: CanvasNode = {
-      id, nodeKey: 'start',
-      type: 'Start', name: 'Start', nameAr: 'البداية',
-      actionKey: '', assignmentKey: '', assignmentGroupId: '', assignmentPurpose: '', configurationJson: '',
-      x: 200, y: 200, outcomes: [], actions: [],
+      id,
+      nodeKey: 'start',
+      type: 'Start',
+      name: 'Start',
+      nameAr: 'البداية',
+      actionKey: '',
+      assignmentKey: '',
+      assignmentGroupId: '',
+      assignmentPurpose: '',
+      configurationJson: '',
+      x: 200,
+      y: 200,
+      outcomes: [],
+      actions: [],
     };
     this.pushUndo();
-    this.nodes.update(ns => [...ns, node]);
+    this.nodes.update((ns) => [...ns, node]);
     this.ensureSimpleActions();
     this.markUnsaved();
   }
@@ -997,44 +1306,49 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const v = this.version();
     if (!v) return;
     this.publishing.set(true);
-    this.saveToBackend().pipe(
-      switchMap(() => this.versionsService.validate(this.definitionId(), this.versionId())),
-      switchMap(result => {
-        this.validationResult.set(result);
-        this.bottomTab.set('validation');
-        this.showBottomDrawer.set(true);
-        if (!result.isValid) {
+    this.saveToBackend()
+      .pipe(
+        switchMap(() => this.versionsService.validate(this.definitionId(), this.versionId())),
+        switchMap((result) => {
+          this.validationResult.set(result);
+          this.bottomTab.set('validation');
+          this.showBottomDrawer.set(true);
+          if (!result.isValid) {
+            this.toast.error(
+              this.translate.instant('workflow.designer.publish_blocked', {
+                count: result.errors?.length ?? 0,
+              }),
+            );
+            return throwError(() => result);
+          }
+          return this.versionsService.publish(this.definitionId(), this.versionId());
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (published) => {
+          this.version.set({ ...v, status: published.status });
+          this.publishing.set(false);
+          this.toast.success(this.translate.instant('workflow.designer.publish_ok'));
+        },
+        error: (err: unknown) => {
+          this.publishing.set(false);
+          if (err && typeof err === 'object' && 'isValid' in err) return;
           this.toast.error(
-            this.translate.instant('workflow.designer.publish_blocked', {
-              count: result.errors?.length ?? 0,
-            }),
+            workflowApiErrorMessage(err, this.translate, 'workflow.designer.publish_failed'),
           );
-          return throwError(() => result);
-        }
-        return this.versionsService.publish(this.definitionId(), this.versionId());
-      }),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: published => {
-        this.version.set({ ...v, status: published.status });
-        this.publishing.set(false);
-        this.toast.success(this.translate.instant('workflow.designer.publish_ok'));
-      },
-      error: (err: unknown) => {
-        this.publishing.set(false);
-        if (err && typeof err === 'object' && 'isValid' in err) return;
-        this.toast.error(workflowApiErrorMessage(err, this.translate, 'workflow.designer.publish_failed'));
-      },
-    });
+        },
+      });
   }
 
   protected cloneVersion(): void {
     if (this.cloning()) return;
     this.cloning.set(true);
-    this.versionsService.clone(this.definitionId(), this.versionId())
+    this.versionsService
+      .clone(this.definitionId(), this.versionId())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: cloned => {
+        next: (cloned) => {
           this.cloning.set(false);
           this.toast.success('Draft clone created. Opening…');
           this.router.navigate([
@@ -1056,11 +1370,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.retiring()) return;
     if (!confirm('Retire this version? It will no longer be usable for new bindings.')) return;
     this.retiring.set(true);
-    this.versionsService.retire(this.definitionId(), this.versionId())
+    this.versionsService
+      .retire(this.definitionId(), this.versionId())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: retired => {
-          this.version.update(v => v ? { ...v, status: retired.status } : v);
+        next: (retired) => {
+          this.version.update((v) => (v ? { ...v, status: retired.status } : v));
           this.retiring.set(false);
           this.toast.success('Version retired.');
         },
@@ -1073,52 +1388,63 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Toolbar actions ──────────────────────────────────────────────────────
 
-  protected save(): void { this.saveToBackend().subscribe(); }
+  protected save(): void {
+    this.saveToBackend().subscribe();
+  }
 
   private saveToBackend(): Observable<WorkflowVersionDto | null> {
     if (this.isReadonly()) return of(null);
     this.ensureSimpleActions();
     this.saveStatus.set('saving');
-    const state: CanvasState = { nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() };
+    const state: CanvasState = {
+      nodes: this.nodes(),
+      edges: this.edges(),
+      variables: this.variables(),
+      workspace: this.workspace(),
+    };
     const xml = buildNWFMXml(state);
     const designerJson = JSON.stringify(state);
-    return this.versionsService.saveXml(this.definitionId(), this.versionId(), xml, designerJson).pipe(
-      tap(() => this.saveStatus.set('saved')),
-      catchError(() => {
-        this.saveStatus.set('unsaved');
-        this.toast.error(this.translate.instant('workflow.designer.save_failed'));
-        return throwError(() => new Error('save-failed'));
-      }),
-    );
+    return this.versionsService
+      .saveXml(this.definitionId(), this.versionId(), xml, designerJson)
+      .pipe(
+        tap(() => this.saveStatus.set('saved')),
+        catchError(() => {
+          this.saveStatus.set('unsaved');
+          this.toast.error(this.translate.instant('workflow.designer.save_failed'));
+          return throwError(() => new Error('save-failed'));
+        }),
+      );
   }
 
   protected validate(): void {
     if (this.validating()) return;
     this.validating.set(true);
-    this.saveToBackend().pipe(
-      switchMap(() => this.versionsService.validate(this.definitionId(), this.versionId())),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: result => {
-        this.validating.set(false);
-        this.validationResult.set(result);
-        this.bottomTab.set('validation');
-        this.showBottomDrawer.set(true);
-        if (result.isValid) {
-          this.toast.success(this.translate.instant('workflow.designer.validate_ok'));
-        } else {
-          this.toast.error(
-            this.translate.instant('workflow.designer.validate_failed', {
-              count: result.errors?.length ?? 0,
-            }),
-          );
-        }
-      },
-      error: () => {
-        this.validating.set(false);
-        this.toast.error(this.translate.instant('workflow.designer.validate_failed_generic'));
-      },
-    });
+    this.saveToBackend()
+      .pipe(
+        switchMap(() => this.versionsService.validate(this.definitionId(), this.versionId())),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (result) => {
+          this.validating.set(false);
+          this.validationResult.set(result);
+          this.bottomTab.set('validation');
+          this.showBottomDrawer.set(true);
+          if (result.isValid) {
+            this.toast.success(this.translate.instant('workflow.designer.validate_ok'));
+          } else {
+            this.toast.error(
+              this.translate.instant('workflow.designer.validate_failed', {
+                count: result.errors?.length ?? 0,
+              }),
+            );
+          }
+        },
+        error: () => {
+          this.validating.set(false);
+          this.toast.error(this.translate.instant('workflow.designer.validate_failed_generic'));
+        },
+      });
   }
 
   protected openVariablesDrawer(): void {
@@ -1128,7 +1454,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected switchTab(tab: 'designer' | 'xml'): void {
     if (tab === 'xml') {
-      this.xmlContent.set(buildNWFMXml({ nodes: this.nodes(), edges: this.edges(), variables: this.variables(), workspace: this.workspace() }));
+      this.xmlContent.set(
+        buildNWFMXml({
+          nodes: this.nodes(),
+          edges: this.edges(),
+          variables: this.variables(),
+          workspace: this.workspace(),
+        }),
+      );
     }
     this.activeTab.set(tab);
   }
@@ -1152,27 +1485,99 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   // ── Canvas interactions ──────────────────────────────────────────────────
 
-  private convertEmbeddedEvents():void {
-    const added:CanvasNode[]=[];
-    this.nodes.update(nodes=>nodes.map(n=>{const c=this.parseConfig(n.configurationJson) as any;if(!Array.isArray(c.events)||!c.events.length)return n;const remaining=[];
-      for(const ev of c.events){if(!['Http','Soap','Sms','Email'].includes(ev.kind)){remaining.push(ev);continue;}
-        const key='event_'+n.id.replaceAll('-','')+'_'+String(ev.id).replaceAll('-','');
-        added.push({id:key,nodeKey:key,type:ev.kind==='Email'?'NotificationTask':'ServiceTask',name:ev.name||ev.kind,nameAr:'',actionKey:ev.kind==='Email'?'':'http.request',assignmentKey:'',assignmentGroupId:'',assignmentPurpose:'',outcomes:[],actions:[],x:n.x+300,y:n.y+140+added.length*120,configurationJson:JSON.stringify({...ev.configuration,protocol:ev.kind==='Http'?'Rest':ev.kind,required:ev.required??['Http','Soap'].includes(ev.kind),...(ev.kind==='Email'?{channels:'Email',failurePolicy:'Retry'}:{}),triggerBinding:{sourceNodeKey:n.nodeKey,trigger:ev.trigger}})});
-      }return {...n,configurationJson:JSON.stringify({...c,events:remaining})};}));
-    if(added.length){this.nodes.update(nodes=>[...nodes,...added]);this.markUnsaved();}
+  private convertEmbeddedEvents(): void {
+    const added: CanvasNode[] = [];
+    this.nodes.update((nodes) =>
+      nodes.map((n) => {
+        const c = this.parseConfig(n.configurationJson) as DesignerActivityConfiguration;
+        if (!Array.isArray(c.events) || !c.events.length) return n;
+        const remaining = [];
+        for (const ev of c.events) {
+          if (!['Http', 'Soap', 'Sms', 'Email'].includes(ev.kind)) {
+            remaining.push(ev);
+            continue;
+          }
+          const key = 'event_' + n.id.replaceAll('-', '') + '_' + String(ev.id).replaceAll('-', '');
+          added.push({
+            id: key,
+            nodeKey: key,
+            type: ev.kind === 'Email' ? 'NotificationTask' : 'ServiceTask',
+            name: ev.name || ev.kind,
+            nameAr: '',
+            actionKey: ev.kind === 'Email' ? '' : 'http.request',
+            assignmentKey: '',
+            assignmentGroupId: '',
+            assignmentPurpose: '',
+            outcomes: [],
+            actions: [],
+            x: n.x + 300,
+            y: n.y + 140 + added.length * 120,
+            configurationJson: JSON.stringify({
+              ...ev.configuration,
+              protocol: ev.kind === 'Http' ? 'Rest' : ev.kind,
+              required: ev.required ?? ['Http', 'Soap'].includes(ev.kind),
+              ...(ev.kind === 'Email' ? { channels: 'Email', failurePolicy: 'Retry' } : {}),
+              triggerBinding: { sourceNodeKey: n.nodeKey, trigger: ev.trigger },
+            }),
+          });
+        }
+        return { ...n, configurationJson: JSON.stringify({ ...c, events: remaining }) };
+      }),
+    );
+    if (added.length) {
+      this.nodes.update((nodes) => [...nodes, ...added]);
+      this.markUnsaved();
+    }
   }
   private ensureSimpleActions(): void {
     if (!this.workspace() || this.isReadonly()) return;
-    this.nodes.update(nodes => nodes.map(n => {
-      if(n.type!=='UserTask'&&n.type!=='MainActivity') return n;
-      if(n.outcomes.some(o=>!['APPROVE','REJECT'].includes(o.key))) return n;
-      const outcomes: CanvasOutcome[] = ['APPROVE','REJECT'].map((key,i)=>({...n.outcomes.find(o=>o.key===key),id:n.outcomes.find(o=>o.key===key)?.id||crypto.randomUUID(),key,label:i?'Reject':'Accept',labelAr:i?'رفض':'قبول',description:'',descriptionAr:'',sortOrder:i,isDefault:i===0,requiresComment:i===1,requiresAttachment:false,isActive:true,resultValue:key}));
-      return {...n,outcomes};
-    }));
+    this.nodes.update((nodes) =>
+      nodes.map((n) => {
+        if (n.type !== 'UserTask' && n.type !== 'MainActivity') return n;
+        if (n.outcomes.some((o) => !['APPROVE', 'REJECT'].includes(o.key))) return n;
+        const outcomes: CanvasOutcome[] = ['APPROVE', 'REJECT'].map((key, i) => ({
+          ...n.outcomes.find((o) => o.key === key),
+          id: n.outcomes.find((o) => o.key === key)?.id || crypto.randomUUID(),
+          key,
+          label: i ? 'Reject' : 'Accept',
+          labelAr: i ? 'رفض' : 'قبول',
+          description: '',
+          descriptionAr: '',
+          sortOrder: i,
+          isDefault: i === 0,
+          requiresComment: i === 1,
+          requiresAttachment: false,
+          isActive: true,
+          resultValue: key,
+        }));
+        return { ...n, outcomes };
+      }),
+    );
   }
-  protected businessNodes(){return this.nodes().filter(n=>n.type==='UserTask'||n.type==='MainActivity');}
-  protected activityTabKey(event:KeyboardEvent,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const step=(event.key==='ArrowRight'?1:-1)*(this.locale.isRtl()?-1:1);const tabs=this.userTaskTabs();const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+step+tabs.length)%tabs.length;this.inspectorTab.set(tabs[next].id);(event.target as HTMLElement).parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();}
-  protected selectedConfig(): any {return this.parseConfig(this.selectedNode()?.configurationJson||'{}');}
+  protected businessNodes() {
+    return this.nodes().filter((n) => n.type === 'UserTask' || n.type === 'MainActivity');
+  }
+  protected activityTabKey(event: KeyboardEvent, index: number) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const step = (event.key === 'ArrowRight' ? 1 : -1) * (this.locale.isRtl() ? -1 : 1);
+    const tabs = this.userTaskTabs();
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (index + step + tabs.length) % tabs.length;
+    this.inspectorTab.set(tabs[next].id);
+    (event.target as HTMLElement).parentElement
+      ?.querySelectorAll<HTMLButtonElement>('button')
+      [next]?.focus();
+  }
+  protected selectedConfig(): DesignerActivityConfiguration {
+    return this.parseConfig(
+      this.selectedNode()?.configurationJson || '{}',
+    ) as DesignerActivityConfiguration;
+  }
 
   // ── In-place SLA editing ──
   // The editor is modal over the canvas, so the selected activity, pan/zoom and the unsaved draft cannot change underneath it.
@@ -1180,16 +1585,29 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected readonly slaEditor = signal<SlaEditorRequest | null>(null);
   protected legacySlaPolicyName(): string {
     const id = this.selectedConfig()?.slaPolicyId as string | undefined;
-    return id ? this.slaPolicies().find(p => p.id === id)?.name ?? id : '';
+    return id ? (this.slaPolicies().find((p) => p.id === id)?.name ?? id) : '';
   }
   protected openSlaEditor(request: SlaManageRequest): void {
     const node = this.selectedNode();
     if (!node || this.isReadonly() || !this.workspace()) return;
-    const matches = this.nodes().filter(n => (n.type === 'UserTask' || n.type === 'MainActivity') && (() => {
-      const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
-      return c['departmentCode'] === request.departmentCode && c['fieldActivityCode'] === request.fieldActivityCode;
-    })()).length;
-    this.slaEditor.set({ locked: true, ...request, activityName: node.name || node.nodeKey, currentWorkflowMatches: Math.max(matches, 1), versionId: this.versionId() });
+    const matches = this.nodes().filter(
+      (n) =>
+        (n.type === 'UserTask' || n.type === 'MainActivity') &&
+        (() => {
+          const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
+          return (
+            c['departmentCode'] === request.departmentCode &&
+            c['fieldActivityCode'] === request.fieldActivityCode
+          );
+        })(),
+    ).length;
+    this.slaEditor.set({
+      locked: true,
+      ...request,
+      activityName: node.name || node.nodeKey,
+      currentWorkflowMatches: Math.max(matches, 1),
+      versionId: this.versionId(),
+    });
   }
   protected closeSlaEditor(saved: SlaRule | null): void {
     this.slaEditor.set(null);
@@ -1200,7 +1618,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private restoreSlaFocus(attempts: number): void {
     setTimeout(() => {
       const action = document.getElementById('wf-activity-sla-action');
-      if (action || attempts <= 0) (action ?? document.getElementById('wf-activity-sla-title'))?.focus();
+      if (action || attempts <= 0)
+        (action ?? document.getElementById('wf-activity-sla-title'))?.focus();
       else this.restoreSlaFocus(attempts - 1);
     }, 50);
   }
@@ -1211,26 +1630,48 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private dropResolvedSlaIssues(rule: SlaRule): void {
     const result = this.validationResult();
     if (!result?.errors?.length || !rule.isActive) return;
-    const covered = new Set(this.nodes().filter(n => {
-      const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
-      return c['departmentCode'] === rule.departmentCode && c['fieldActivityCode'] === rule.fieldActivityCode;
-    }).map(n => n.nodeKey));
-    const errors = result.errors.filter(e => !(e.code === 'SLA_MATCH_REQUIRED' && e.nodeKey && covered.has(e.nodeKey)));
-    if (errors.length !== result.errors.length) this.validationResult.set({ ...result, errors, isValid: errors.length === 0 });
+    const covered = new Set(
+      this.nodes()
+        .filter((n) => {
+          const c = this.parseConfig(n.configurationJson || '{}') as Record<string, unknown>;
+          return (
+            c['departmentCode'] === rule.departmentCode &&
+            c['fieldActivityCode'] === rule.fieldActivityCode
+          );
+        })
+        .map((n) => n.nodeKey),
+    );
+    const errors = result.errors.filter(
+      (e) => !(e.code === 'SLA_MATCH_REQUIRED' && e.nodeKey && covered.has(e.nodeKey)),
+    );
+    if (errors.length !== result.errors.length)
+      this.validationResult.set({ ...result, errors, isValid: errors.length === 0 });
   }
   // ── Form tab preview ──
   // Modal over the canvas like the SLA editor: previewing never touches the draft, the selection or pan/zoom.
   protected readonly formPreview = signal<ActivityFormPreviewRequest | null>(null);
-  protected openFormPreview(request: ActivityFormPreviewRequest): void { this.formPreview.set(request); }
+  protected openFormPreview(request: ActivityFormPreviewRequest): void {
+    this.formPreview.set(request);
+  }
   protected closeFormPreview(): void {
     const formId = this.formPreview()?.form.id;
     this.formPreview.set(null);
-    setTimeout(() => (document.getElementById(`wf-form-preview-${formId}`) ?? document.getElementById('wf-activity-forms-title'))?.focus());
+    setTimeout(() =>
+      (
+        document.getElementById(`wf-form-preview-${formId}`) ??
+        document.getElementById('wf-activity-forms-title')
+      )?.focus(),
+    );
   }
   /** From the SLA or Form tab's "missing context" state to the General field that still needs a value. */
-  protected goToActivityContext(field: 'departmentCode' | 'fieldActivityCode' | 'taskTypeId'): void {
+  protected goToActivityContext(
+    field: 'departmentCode' | 'fieldActivityCode' | 'taskTypeId',
+  ): void {
     this.inspectorTab.set(field === 'taskTypeId' ? 'general' : 'form');
-    this.focusWhenRendered(field === 'taskTypeId' ? 'wf-activity-task-type' : 'wf-activity-forms-title', 10);
+    this.focusWhenRendered(
+      field === 'taskTypeId' ? 'wf-activity-task-type' : 'wf-activity-forms-title',
+      10,
+    );
   }
   /** General renders after the tab switch, so the field may not exist yet on the first try. */
   private focusWhenRendered(id: string, attempts: number): void {
@@ -1240,26 +1681,117 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       else this.focusWhenRendered(id, attempts - 1);
     }, 50);
   }
-  protected eventTriggerLabel(trigger:string){const labels:Record<string,[string,string]>={OnEnter:['Entry','الدخول'],OnApprove:['Accept','القبول'],OnReject:['Reject','الرفض'],OnComment:['Comment','تعليق'],OnComplete:['Completion','الاكتمال'],OnFailure:['Failure','الفشل'],OnSlaReminder:['SLA reminder','تذكير الخدمة'],OnSlaBreach:['Overdue','تجاوز المدة']};return labels[trigger]?.[this.locale.locale()==='ar'?1:0]||trigger;}
-  protected routingNodes(){return this.nodes().filter(n=>['UserTask','MainActivity','End'].includes(n.type));}
-  protected formRouteLinks(){
-    const links:{id:string;path:string;label:string;x:number;y:number;source:string}[]=[];
-    for(const n of this.nodes())for(const step of activityFormSteps(this.parseConfig(n.configurationJson))) {
-      const destinations=[...step.rules.map(r=>({id:r.id,label:r.name,destination:r.destination})),{id:'otherwise',label:this.locale.isRtl()?'وإلا':'Otherwise',destination:step.otherwise}];
-      for(const route of destinations){
-        if(route.destination.kind!=='Activity')continue;
-        const target=this.nodes().find(t=>t.nodeKey===route.destination.target);if(!target)continue;
-        const x=n.x+105,y=n.y+84,tx=target.x+105,ty=target.y;
-        links.push({id:n.id+':'+step.id+':'+route.id,path:n.id===target.id?`M ${x} ${y} C ${x+250} ${y+100}, ${tx+250} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+80}, ${tx} ${ty-80}, ${tx} ${ty}`,label:(step.name||step.id)+' / '+route.label,x:(x+tx)/2,y:(y+ty)/2+16,source:n.id});
-      }
-    }return links;
+  protected eventTriggerLabel(trigger: string) {
+    const labels: Record<string, [string, string]> = {
+      OnEnter: ['Entry', 'الدخول'],
+      OnApprove: ['Accept', 'القبول'],
+      OnReject: ['Reject', 'الرفض'],
+      OnComment: ['Comment', 'تعليق'],
+      OnComplete: ['Completion', 'الاكتمال'],
+      OnFailure: ['Failure', 'الفشل'],
+      OnSlaReminder: ['SLA reminder', 'تذكير الخدمة'],
+      OnSlaBreach: ['Overdue', 'تجاوز المدة'],
+    };
+    return labels[trigger]?.[this.locale.locale() === 'ar' ? 1 : 0] || trigger;
   }
-  protected openFormRoute(event:MouseEvent,source:string){this.onNodeClick(event,source);this.inspectorTab.set('actions');}
-  protected visualLinks(){const links:{id:string;path:string;label:string;x:number;y:number;target:string}[]=[];for(const n of this.nodes()){const c=this.parseConfig(n.configurationJson) as any;const b=c.triggerBinding;const source=b?this.nodes().find(x=>x.nodeKey===b.sourceNodeKey):n;const target=b?n:this.nodes().find(x=>x.nodeKey===c.rejectTargetNodeKey);if(!source||!target)continue;const x=source.x+105,y=source.y+84,tx=target.x+105,ty=target.y;links.push({id:n.id,path:source.id===target.id?`M ${x} ${y} C ${x+220} ${y+100}, ${tx+220} ${ty-100}, ${tx} ${ty}`:`M ${x} ${y} C ${x} ${y+60}, ${tx} ${ty-60}, ${tx} ${ty}`,label:b?this.eventTriggerLabel(b.trigger):(this.locale.locale()==='ar'?'رفض':'Reject'),x:(x+tx)/2,y:(y+ty)/2,target:b?n.id:source.id});}return links;}
+  protected routingNodes() {
+    return this.nodes().filter((n) => ['UserTask', 'MainActivity', 'End'].includes(n.type));
+  }
+  protected formRouteLinks() {
+    const links: {
+      id: string;
+      path: string;
+      label: string;
+      x: number;
+      y: number;
+      source: string;
+    }[] = [];
+    for (const n of this.nodes())
+      for (const step of activityFormSteps(this.parseConfig(n.configurationJson))) {
+        const destinations = [
+          ...step.rules.map((r) => ({ id: r.id, label: r.name, destination: r.destination })),
+          {
+            id: 'otherwise',
+            label: this.locale.isRtl() ? 'وإلا' : 'Otherwise',
+            destination: step.otherwise,
+          },
+        ];
+        for (const route of destinations) {
+          if (route.destination.kind !== 'Activity') continue;
+          const target = this.nodes().find((t) => t.nodeKey === route.destination.target);
+          if (!target) continue;
+          const x = n.x + 105,
+            y = n.y + 84,
+            tx = target.x + 105,
+            ty = target.y;
+          links.push({
+            id: n.id + ':' + step.id + ':' + route.id,
+            path:
+              n.id === target.id
+                ? `M ${x} ${y} C ${x + 250} ${y + 100}, ${tx + 250} ${ty - 100}, ${tx} ${ty}`
+                : `M ${x} ${y} C ${x} ${y + 80}, ${tx} ${ty - 80}, ${tx} ${ty}`,
+            label: (step.name || step.id) + ' / ' + route.label,
+            x: (x + tx) / 2,
+            y: (y + ty) / 2 + 16,
+            source: n.id,
+          });
+        }
+      }
+    return links;
+  }
+  protected openFormRoute(event: MouseEvent, source: string) {
+    this.onNodeClick(event, source);
+    this.inspectorTab.set('actions');
+  }
+  protected visualLinks() {
+    const links: {
+      id: string;
+      path: string;
+      label: string;
+      x: number;
+      y: number;
+      target: string;
+    }[] = [];
+    for (const n of this.nodes()) {
+      const c = this.parseConfig(n.configurationJson) as DesignerActivityConfiguration;
+      const b = c.triggerBinding;
+      const source = b ? this.nodes().find((x) => x.nodeKey === b.sourceNodeKey) : n;
+      const target = b ? n : this.nodes().find((x) => x.nodeKey === c.rejectTargetNodeKey);
+      if (!source || !target) continue;
+      const x = source.x + 105,
+        y = source.y + 84,
+        tx = target.x + 105,
+        ty = target.y;
+      links.push({
+        id: n.id,
+        path:
+          source.id === target.id
+            ? `M ${x} ${y} C ${x + 220} ${y + 100}, ${tx + 220} ${ty - 100}, ${tx} ${ty}`
+            : `M ${x} ${y} C ${x} ${y + 60}, ${tx} ${ty - 60}, ${tx} ${ty}`,
+        label: b
+          ? this.eventTriggerLabel(b.trigger)
+          : this.locale.locale() === 'ar'
+            ? 'رفض'
+            : 'Reject',
+        x: (x + tx) / 2,
+        y: (y + ty) / 2,
+        target: b ? n.id : source.id,
+      });
+    }
+    return links;
+  }
 
-  protected addTaskActivity(task: ReferenceItem): void { this.addNode('MainActivity', undefined, undefined, undefined, task); }
+  protected addTaskActivity(task: ReferenceItem): void {
+    this.addNode('MainActivity', undefined, undefined, undefined, task);
+  }
 
-  protected addNode(type: NodeType, x?: number, y?: number, protocol?: string, task?: ReferenceItem): void {
+  protected addNode(
+    type: NodeType,
+    x?: number,
+    y?: number,
+    protocol?: string,
+    task?: ReferenceItem,
+  ): void {
     if (this.isReadonly()) return;
     if (task && (this.workspace()?.kind !== 'Main' || type !== 'MainActivity' || !task.id)) return;
     const count = this.nodes().length;
@@ -1267,17 +1799,48 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const py = y ?? 140 + (count % 4) * 48;
     const key = `${type.toLowerCase()}_${Date.now()}`;
     const node: CanvasNode = {
-      id: crypto.randomUUID(), nodeKey: key, type,
-      name: this.defaultNodeName(type), nameAr: '',
-      actionKey: '', assignmentKey: '', assignmentGroupId: '', assignmentPurpose: '', configurationJson: '',
-      x: px, y: py, outcomes: [], actions: [],
+      id: crypto.randomUUID(),
+      nodeKey: key,
+      type,
+      name: this.defaultNodeName(type),
+      nameAr: '',
+      actionKey: '',
+      assignmentKey: '',
+      assignmentGroupId: '',
+      assignmentPurpose: '',
+      configurationJson: '',
+      x: px,
+      y: py,
+      outcomes: [],
+      actions: [],
     };
     this.pushUndo();
-    if(task) { node.name=task.nameEn; node.nameAr=task.nameAr || ''; node.configurationJson=JSON.stringify({taskTypeId:task.id}); }
-    if(type==='ServiceTask') { node.actionKey='http.request'; node.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
-    if(protocol==='Sms') node.name='SMS';
-    if(type==='NotificationTask') node.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
-    this.nodes.update(ns => [...ns, node]);
+    if (task) {
+      node.name = task.nameEn;
+      node.nameAr = task.nameAr || '';
+      node.configurationJson = JSON.stringify({ taskTypeId: task.id });
+    }
+    if (type === 'ServiceTask') {
+      node.actionKey = 'http.request';
+      node.configurationJson = JSON.stringify({
+        protocol: protocol || 'Rest',
+        required: protocol !== 'Sms',
+        method: 'GET',
+        path: '/',
+        timeoutSeconds: 30,
+        maxAttempts: 3,
+        retryDelaySeconds: 10,
+      });
+    }
+    if (protocol === 'Sms') node.name = 'SMS';
+    if (type === 'NotificationTask')
+      node.configurationJson = JSON.stringify({
+        channels: 'Email',
+        required: false,
+        failurePolicy: 'Retry',
+        maxAttempts: 3,
+      });
+    this.nodes.update((ns) => [...ns, node]);
     this.ensureSimpleActions();
     this.selectedNodeId.set(node.id);
     this.selectedEdgeId.set(null);
@@ -1286,9 +1849,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.markUnsaved();
   }
 
-  protected onPaletteDragStart(event: DragEvent, type: NodeType, protocol?:string): void {
+  protected onPaletteDragStart(event: DragEvent, type: NodeType, protocol?: string): void {
     event.dataTransfer?.setData('nodeType', type);
-    event.dataTransfer?.setData('nodeProtocol', protocol||'');
+    event.dataTransfer?.setData('nodeProtocol', protocol || '');
   }
 
   protected onCanvasDrop(event: DragEvent): void {
@@ -1299,31 +1862,43 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const x = (event.clientX - rect.left - this.panX()) / this.zoom();
-    const y = (event.clientY - rect.top  - this.panY()) / this.zoom();
+    const y = (event.clientY - rect.top - this.panY()) / this.zoom();
     let task: ReferenceItem | undefined;
-    const payload=event.dataTransfer?.getData('workflowTaskType');
-    if(payload) { try { task=JSON.parse(payload); if(!task || typeof task.id!=='string' || typeof task.nameEn!=='string') return; } catch { return; } }
+    const payload = event.dataTransfer?.getData('workflowTaskType');
+    if (payload) {
+      try {
+        task = JSON.parse(payload);
+        if (!task || typeof task.id !== 'string' || typeof task.nameEn !== 'string') return;
+      } catch {
+        return;
+      }
+    }
     this.addNode(type, x, y, event.dataTransfer?.getData('nodeProtocol'), task);
   }
 
-  protected onCanvasDragOver(event: DragEvent): void { event.preventDefault(); }
+  protected onCanvasDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
 
   protected onNodeClick(event: MouseEvent, nodeId: string): void {
     event.stopPropagation();
     this.contextMenu.set(null);
-    if (this.drawingEdge()) { this.finishEdge(nodeId); return; }
+    if (this.drawingEdge()) {
+      this.finishEdge(nodeId);
+      return;
+    }
 
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
 
     if (event.shiftKey) {
       // Shift+click: toggle in multi-select
       const current = this.selectedNodeIds();
       if (current.includes(nodeId)) {
-        const next = current.filter(id => id !== nodeId);
+        const next = current.filter((id) => id !== nodeId);
         this.selectedNodeIds.set(next);
         if (next.length > 0) {
           this.selectedNodeId.set(next[next.length - 1]);
-          const lastNode = this.nodes().find(n => n.id === next[next.length - 1]);
+          const lastNode = this.nodes().find((n) => n.id === next[next.length - 1]);
           if (lastNode) this.patchPropsFromNode(lastNode);
         } else {
           this.selectedNodeId.set(null);
@@ -1338,7 +1913,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     // Normal click: single-select (clear multi-select)
-    if (this.selectedNodeId() !== nodeId && !WorkflowDesignerComponent.tabsFor(node?.type).some(t => t.id === this.inspectorTab())) {
+    if (
+      this.selectedNodeId() !== nodeId &&
+      !WorkflowDesignerComponent.tabsFor(node?.type).some((t) => t.id === this.inspectorTab())
+    ) {
       this.inspectorTab.set('general');
     }
     this.selectedNodeIds.set([nodeId]);
@@ -1376,7 +1954,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.selectedEdgeId.set(edgeId);
     this.selectedNodeId.set(null);
     this.selectedNodeIds.set([]);
-    const edge = this.edges().find(e => e.id === edgeId);
+    const edge = this.edges().find((e) => e.id === edgeId);
     if (edge) this.patchEdgeForm(edge);
   }
 
@@ -1390,7 +1968,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!this.selectedNodeIds().includes(nodeId)) {
       this.selectedNodeIds.set([nodeId]);
       this.selectedNodeId.set(nodeId);
-      const node = this.nodes().find(n => n.id === nodeId);
+      const node = this.nodes().find((n) => n.id === nodeId);
       if (node) this.patchPropsFromNode(node);
     } else {
       this.selectedNodeId.set(nodeId);
@@ -1413,17 +1991,19 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (svg) {
       const rect = svg.getBoundingClientRect();
       canvasX = (event.clientX - rect.left - this.panX()) / this.zoom();
-      canvasY = (event.clientY - rect.top  - this.panY()) / this.zoom();
+      canvasY = (event.clientY - rect.top - this.panY()) / this.zoom();
     }
     this.contextMenu.set({ x: event.clientX, y: event.clientY, canvasX, canvasY });
   }
 
-  protected closeContextMenu(): void { this.contextMenu.set(null); }
+  protected closeContextMenu(): void {
+    this.contextMenu.set(null);
+  }
 
   protected contextNodeCanConnect(): boolean {
     const id = this.contextMenu()?.nodeId;
     if (!id) return false;
-    const n = this.nodes().find(x => x.id === id);
+    const n = this.nodes().find((x) => x.id === id);
     return !!n && this.canHaveEdge(n.type);
   }
 
@@ -1438,17 +2018,15 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.drawingEdge()) return;
     event.stopPropagation();
     const ns = this.nodes();
-    const node = ns.find(n => n.id === nodeId);
+    const node = ns.find((n) => n.id === nodeId);
     if (!node) return;
 
     // Determine which nodes to drag: if this node is in the multi-select set, drag all; else drag only this one
-    const dragIds = this.selectedNodeIds().includes(nodeId)
-      ? this.selectedNodeIds()
-      : [nodeId];
+    const dragIds = this.selectedNodeIds().includes(nodeId) ? this.selectedNodeIds() : [nodeId];
 
     const origPositions: Record<string, { x: number; y: number }> = {};
     for (const id of dragIds) {
-      const n = ns.find(x => x.id === id);
+      const n = ns.find((x) => x.id === id);
       if (n) origPositions[id] = { x: n.x, y: n.y };
     }
     this.dragging = { nodeId, startX: event.clientX, startY: event.clientY, origPositions };
@@ -1458,13 +2036,19 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   onMouseMove(event: MouseEvent): void {
     if (this.inspectorResizing) {
       const dx = event.clientX - this.inspectorResizeStartX;
-      const newW = Math.min(this.MAX_INSPECTOR_W, Math.max(this.MIN_INSPECTOR_W, this.inspectorResizeStartW - dx));
+      const newW = Math.min(
+        this.MAX_INSPECTOR_W,
+        Math.max(this.MIN_INSPECTOR_W, this.inspectorResizeStartW - dx),
+      );
       this.inspectorWidth.set(newW);
       return;
     }
     if (this.drawerResizing) {
       const dy = event.clientY - this.drawerResizeStartY;
-      const newH = Math.min(this.MAX_DRAWER_H, Math.max(this.MIN_DRAWER_H, this.drawerResizeStartH - dy));
+      const newH = Math.min(
+        this.MAX_DRAWER_H,
+        Math.max(this.MIN_DRAWER_H, this.drawerResizeStartH - dy),
+      );
       this.drawerHeight.set(newH);
       return;
     }
@@ -1477,10 +2061,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       const dx = (event.clientX - this.dragging.startX) / this.zoom();
       const dy = (event.clientY - this.dragging.startY) / this.zoom();
       const orig = this.dragging.origPositions;
-      this.nodes.update(ns => ns.map(n => {
-        const o = orig[n.id];
-        return o ? { ...n, x: o.x + dx, y: o.y + dy } : n;
-      }));
+      this.nodes.update((ns) =>
+        ns.map((n) => {
+          const o = orig[n.id];
+          return o ? { ...n, x: o.x + dx, y: o.y + dy } : n;
+        }),
+      );
       this.autoScrollWhileDragging(event);
       return;
     }
@@ -1489,12 +2075,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       if (!svg) return;
       const rect = svg.getBoundingClientRect();
       const cx = (event.clientX - rect.left - this.panX()) / this.zoom();
-      const cy = (event.clientY - rect.top  - this.panY()) / this.zoom();
+      const cy = (event.clientY - rect.top - this.panY()) / this.zoom();
       const sx = this.marqueeStartPos.canvasX;
       const sy = this.marqueeStartPos.canvasY;
       this.marquee.set({
-        x: Math.min(sx, cx), y: Math.min(sy, cy),
-        w: Math.abs(cx - sx), h: Math.abs(cy - sy),
+        x: Math.min(sx, cx),
+        y: Math.min(sy, cy),
+        w: Math.abs(cx - sx),
+        h: Math.abs(cy - sy),
       });
       return;
     }
@@ -1508,8 +2096,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   @HostListener('document:mouseup', ['$event'])
   onMouseUp(event: MouseEvent): void {
-    if (this.inspectorResizing) { this.inspectorResizing = false; return; }
-    if (this.drawerResizing)    { this.drawerResizing    = false; return; }
+    if (this.inspectorResizing) {
+      this.inspectorResizing = false;
+      return;
+    }
+    if (this.drawerResizing) {
+      this.drawerResizing = false;
+      return;
+    }
     if (this.drawingEdge()) {
       const targetId = this.hitTestNodeId(event.clientX, event.clientY);
       if (targetId && targetId !== this.drawingEdge()!.fromNodeId) {
@@ -1520,18 +2114,23 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       }
       return;
     }
-    if (this.dragging) { this.dragging = null; this.markUnsaved(); }
-    if (this.panning)  { this.panning  = null; }
+    if (this.dragging) {
+      this.dragging = null;
+      this.markUnsaved();
+    }
+    if (this.panning) {
+      this.panning = null;
+    }
     if (this.marqueeStartPos) {
       const m = this.marquee();
       if (m && (m.w > 4 || m.h > 4)) {
         const ids = this.nodes()
-          .filter(n => this.nodeInMarquee(n, m))
-          .map(n => n.id);
+          .filter((n) => this.nodeInMarquee(n, m))
+          .map((n) => n.id);
         this.selectedNodeIds.set(ids);
         if (ids.length === 1) {
           this.selectedNodeId.set(ids[0]);
-          const nd = this.nodes().find(n => n.id === ids[0]);
+          const nd = this.nodes().find((n) => n.id === ids[0]);
           if (nd) this.patchPropsFromNode(nd);
         } else if (ids.length > 1) {
           this.selectedNodeId.set(ids[0]);
@@ -1556,22 +2155,33 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   // ── Canvas pan ────────────────────────────────────────────────────────────
 
   protected onCanvasMouseDown(event: MouseEvent): void {
-    const onSvgRoot = (event.target as SVGElement).tagName === 'svg' ||
+    const onSvgRoot =
+      (event.target as SVGElement).tagName === 'svg' ||
       ((event.target as SVGElement).closest('.node') === null &&
-       (event.target as SVGElement).tagName !== 'circle' &&
-       (event.target as SVGElement).tagName !== 'rect' &&
-       (event.target as SVGElement).tagName !== 'polygon' &&
-       (event.target as SVGElement).tagName !== 'path' &&
-       !(event.target as SVGElement).classList?.contains('edge-group'));
+        (event.target as SVGElement).tagName !== 'circle' &&
+        (event.target as SVGElement).tagName !== 'rect' &&
+        (event.target as SVGElement).tagName !== 'polygon' &&
+        (event.target as SVGElement).tagName !== 'path' &&
+        !(event.target as SVGElement).classList?.contains('edge-group'));
 
     if (event.button === 1) {
       // Middle mouse always pans
-      this.panning = { startX: event.clientX, startY: event.clientY, origPanX: this.panX(), origPanY: this.panY() };
+      this.panning = {
+        startX: event.clientX,
+        startY: event.clientY,
+        origPanX: this.panX(),
+        origPanY: this.panY(),
+      };
       return;
     }
     if (event.button === 0 && !this.drawingEdge()) {
       if (this.activeTool() === 'pan' || event.altKey) {
-        this.panning = { startX: event.clientX, startY: event.clientY, origPanX: this.panX(), origPanY: this.panY() };
+        this.panning = {
+          startX: event.clientX,
+          startY: event.clientY,
+          origPanX: this.panX(),
+          origPanY: this.panY(),
+        };
       } else {
         // Select mode: start marquee on empty canvas area
         if (onSvgRoot) {
@@ -1579,8 +2189,13 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           if (!svg) return;
           const rect = svg.getBoundingClientRect();
           const cx = (event.clientX - rect.left - this.panX()) / this.zoom();
-          const cy = (event.clientY - rect.top  - this.panY()) / this.zoom();
-          this.marqueeStartPos = { clientX: event.clientX, clientY: event.clientY, canvasX: cx, canvasY: cy };
+          const cy = (event.clientY - rect.top - this.panY()) / this.zoom();
+          this.marqueeStartPos = {
+            clientX: event.clientX,
+            clientY: event.clientY,
+            canvasX: cx,
+            canvasY: cy,
+          };
         }
       }
     }
@@ -1600,35 +2215,55 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       const oldZoom = this.zoom();
       const newZoom = Math.min(2, Math.max(0.25, oldZoom * factor));
       this.zoom.set(newZoom);
-      this.panX.update(px => mx - (mx - px) * (newZoom / oldZoom));
-      this.panY.update(py => my - (my - py) * (newZoom / oldZoom));
+      this.panX.update((px) => mx - (mx - px) * (newZoom / oldZoom));
+      this.panY.update((py) => my - (my - py) * (newZoom / oldZoom));
     } else {
-      this.zoom.update(z => Math.min(2, Math.max(0.25, z * factor)));
+      this.zoom.update((z) => Math.min(2, Math.max(0.25, z * factor)));
     }
   }
 
-  protected zoomIn():    void { this.zoom.update(z => Math.min(2, z * 1.2)); }
-  protected zoomOut():   void { this.zoom.update(z => Math.max(0.25, z * 0.8)); }
-  protected resetView(): void { this.panX.set(0); this.panY.set(0); this.zoom.set(1); }
+  protected zoomIn(): void {
+    this.zoom.update((z) => Math.min(2, z * 1.2));
+  }
+  protected zoomOut(): void {
+    this.zoom.update((z) => Math.max(0.25, z * 0.8));
+  }
+  protected resetView(): void {
+    this.panX.set(0);
+    this.panY.set(0);
+    this.zoom.set(1);
+  }
 
   protected fitScreen(): void {
     const ns = this.nodes();
-    if (ns.length === 0) { this.resetView(); return; }
+    if (ns.length === 0) {
+      this.resetView();
+      return;
+    }
     const scroller = this.canvasScrollRef?.nativeElement;
     const viewW = scroller?.clientWidth || this.canvasSvgRef?.nativeElement.clientWidth || 800;
     const viewH = scroller?.clientHeight || this.canvasSvgRef?.nativeElement.clientHeight || 600;
     const padding = 60;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const n of ns) {
       if (this.isGateway(n.type)) {
-        minX = Math.min(minX, n.x - GATEWAY_R); minY = Math.min(minY, n.y - GATEWAY_R);
-        maxX = Math.max(maxX, n.x + GATEWAY_R); maxY = Math.max(maxY, n.y + GATEWAY_R);
+        minX = Math.min(minX, n.x - GATEWAY_R);
+        minY = Math.min(minY, n.y - GATEWAY_R);
+        maxX = Math.max(maxX, n.x + GATEWAY_R);
+        maxY = Math.max(maxY, n.y + GATEWAY_R);
       } else if (n.type === 'Start' || n.type === 'End') {
-        minX = Math.min(minX, n.x - 24); minY = Math.min(minY, n.y - 24);
-        maxX = Math.max(maxX, n.x + 24); maxY = Math.max(maxY, n.y + 24);
+        minX = Math.min(minX, n.x - 24);
+        minY = Math.min(minY, n.y - 24);
+        maxX = Math.max(maxX, n.x + 24);
+        maxY = Math.max(maxY, n.y + 24);
       } else {
-        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-        maxX = Math.max(maxX, n.x + this.nodeWidth(n)); maxY = Math.max(maxY, n.y + this.nodeHeight(n));
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + this.nodeWidth(n));
+        maxY = Math.max(maxY, n.y + this.nodeHeight(n));
       }
     }
     const contentW = maxX - minX + padding * 2;
@@ -1650,16 +2285,17 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.isReadonly()) return;
     const nodeId = this.selectedNodeId();
     if (!nodeId) return;
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (!node) return;
     this.pushUndo();
     const newNode: CanvasNode = {
       ...structuredClone(node),
       id: crypto.randomUUID(),
       nodeKey: `${node.type.toLowerCase()}_${Date.now()}`,
-      x: node.x + 40, y: node.y + 40,
+      x: node.x + 40,
+      y: node.y + 40,
     };
-    this.nodes.update(ns => [...ns, newNode]);
+    this.nodes.update((ns) => [...ns, newNode]);
     this.selectedNodeId.set(newNode.id);
     this.patchPropsFromNode(newNode);
     this.markUnsaved();
@@ -1668,7 +2304,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected copySelected(): void {
     const nodeId = this.selectedNodeId();
     if (!nodeId) return;
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (node) this.clipboard.set(structuredClone(node));
   }
 
@@ -1680,9 +2316,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       ...structuredClone(cb),
       id: crypto.randomUUID(),
       nodeKey: `${cb.type.toLowerCase()}_${Date.now()}`,
-      x: cb.x + 60, y: cb.y + 60,
+      x: cb.x + 60,
+      y: cb.y + 60,
     };
-    this.nodes.update(ns => [...ns, newNode]);
+    this.nodes.update((ns) => [...ns, newNode]);
     this.selectedNodeId.set(newNode.id);
     this.patchPropsFromNode(newNode);
     this.markUnsaved();
@@ -1706,23 +2343,25 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     event.preventDefault();
     event.stopPropagation();
     if (this.isReadonly() || event.button !== 0) return;
-    const node = this.nodes().find(n => n.id === fromNodeId);
+    const node = this.nodes().find((n) => n.id === fromNodeId);
     if (!node || !this.canHaveEdge(node.type)) return;
     this.dragging = null;
     this.panning = null;
     this.marqueeStartPos = null;
     this.marquee.set(null);
     const port = outcomeKey
-      ? this.decisionOutcomePorts(node).find(p => p.key === outcomeKey)
+      ? this.decisionOutcomePorts(node).find((p) => p.key === outcomeKey)
       : undefined;
     const p = port ?? this.portOutPos(node);
     this.connectHoverNodeId.set(null);
     this.drawingEdge.set({ fromNodeId, x1: p.x, y1: p.y, x2: p.x, y2: p.y, outcomeKey });
   }
 
-  protected decisionOutcomePorts(n: CanvasNode): { key: string; label: string; x: number; y: number }[] {
+  protected decisionOutcomePorts(
+    n: CanvasNode,
+  ): { key: string; label: string; x: number; y: number }[] {
     if (n.type !== 'ExclusiveGateway') return [];
-    const outcomes = this.incomingUserTask(n.id)?.outcomes.filter(o => !!o.key) ?? [];
+    const outcomes = this.incomingUserTask(n.id)?.outcomes.filter((o) => !!o.key) ?? [];
     if (outcomes.length === 0) return [];
     const spread = 22;
     return outcomes.map((o, i) => ({
@@ -1735,15 +2374,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected beginOutcomeConnect(gatewayId: string, outcomeKey: string): void {
     if (this.isReadonly()) return;
-    const node = this.nodes().find(n => n.id === gatewayId);
+    const node = this.nodes().find((n) => n.id === gatewayId);
     if (!node) return;
-    const port = this.decisionOutcomePorts(node).find(p => p.key === outcomeKey);
+    const port = this.decisionOutcomePorts(node).find((p) => p.key === outcomeKey);
     const p = port ?? this.portOutPos(node);
     this.contextMenu.set(null);
     this.quickAddSourceId.set(null);
     this.drawingEdge.set({
       fromNodeId: gatewayId,
-      x1: p.x, y1: p.y, x2: p.x + 48, y2: p.y,
+      x1: p.x,
+      y1: p.y,
+      x2: p.x + 48,
+      y2: p.y,
       outcomeKey,
     });
   }
@@ -1760,7 +2402,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const x = (event.clientX - rect.left - this.panX()) / this.zoom();
-    const y = (event.clientY - rect.top  - this.panY()) / this.zoom();
+    const y = (event.clientY - rect.top - this.panY()) / this.zoom();
     this.drawingEdge.set({ ...de, x2: x, y2: y });
     const hit = this.hitTestNodeId(event.clientX, event.clientY);
     this.connectHoverNodeId.set(hit && hit !== de.fromNodeId ? hit : null);
@@ -1772,7 +2414,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
     const x = (clientX - rect.left - this.panX()) / this.zoom();
-    const y = (clientY - rect.top  - this.panY()) / this.zoom();
+    const y = (clientY - rect.top - this.panY()) / this.zoom();
     const pad = 12;
     // Prefer topmost / last-drawn node
     const ns = this.nodes();
@@ -1787,8 +2429,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         const dy = y - n.y;
         if (dx * dx + dy * dy <= (26 + pad) * (26 + pad)) return n.id;
       } else if (
-        x >= n.x - pad && x <= n.x + this.nodeWidth(n) + pad &&
-        y >= n.y - pad && y <= n.y + this.nodeHeight(n) + pad
+        x >= n.x - pad &&
+        x <= n.x + this.nodeWidth(n) + pad &&
+        y >= n.y - pad &&
+        y <= n.y + this.nodeHeight(n) + pad
       ) {
         return n.id;
       }
@@ -1803,7 +2447,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       this.connectHoverNodeId.set(null);
       return;
     }
-    const exists = this.edges().some(e => e.fromNodeId === de.fromNodeId && e.toNodeId === toNodeId);
+    const exists = this.edges().some(
+      (e) => e.fromNodeId === de.fromNodeId && e.toNodeId === toNodeId,
+    );
     if (exists) {
       this.drawingEdge.set(null);
       this.connectHoverNodeId.set(null);
@@ -1813,14 +2459,19 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const key = `transition_${Date.now()}`;
     const outcomeKey = de.outcomeKey ?? '';
     const outcome = outcomeKey
-      ? this.incomingUserTask(de.fromNodeId)?.outcomes.find(o => o.key === outcomeKey)
+      ? this.incomingUserTask(de.fromNodeId)?.outcomes.find((o) => o.key === outcomeKey)
       : undefined;
-    const fromNode = this.nodes().find(n => n.id === de.fromNodeId);
-    const existingFrom = this.edges().filter(e => e.fromNodeId === de.fromNodeId);
-    const shouldDefault = !!fromNode && this.isGateway(fromNode.type) && existingFrom.every(e => !e.isDefault)
-      && (outcome?.isDefault || existingFrom.length === 0);
+    const fromNode = this.nodes().find((n) => n.id === de.fromNodeId);
+    const existingFrom = this.edges().filter((e) => e.fromNodeId === de.fromNodeId);
+    const shouldDefault =
+      !!fromNode &&
+      this.isGateway(fromNode.type) &&
+      existingFrom.every((e) => !e.isDefault) &&
+      (outcome?.isDefault || existingFrom.length === 0);
     const edge: CanvasEdge = {
-      id: crypto.randomUUID(), fromNodeId: de.fromNodeId, toNodeId,
+      id: crypto.randomUUID(),
+      fromNodeId: de.fromNodeId,
+      toNodeId,
       transitionKey: key,
       labelEn: outcome?.label ?? '',
       labelAr: outcome?.labelAr ?? '',
@@ -1830,7 +2481,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       isDefault: shouldDefault || (outcome?.isDefault ?? false),
       priority: existingFrom.length,
     };
-    this.edges.update(es => [...es, edge]);
+    this.edges.update((es) => [...es, edge]);
     this.drawingEdge.set(null);
     this.connectHoverNodeId.set(null);
     this.markUnsaved();
@@ -1853,16 +2504,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.deleteTarget.set(node);
   }
 
-  protected cancelDelete(): void { this.deleteTarget.set(null); }
+  protected cancelDelete(): void {
+    this.deleteTarget.set(null);
+  }
 
   protected confirmDeleteNode(): void {
     const node = this.deleteTarget();
     if (!node) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.filter(n => n.id !== node.id));
-    this.edges.update(es => es.filter(e => e.fromNodeId !== node.id && e.toNodeId !== node.id));
+    this.nodes.update((ns) => ns.filter((n) => n.id !== node.id));
+    this.edges.update((es) => es.filter((e) => e.fromNodeId !== node.id && e.toNodeId !== node.id));
     if (this.selectedNodeId() === node.id) this.selectedNodeId.set(null);
-    this.selectedNodeIds.update(ids => ids.filter(id => id !== node.id));
+    this.selectedNodeIds.update((ids) => ids.filter((id) => id !== node.id));
     this.deleteTarget.set(null);
     this.markUnsaved();
   }
@@ -1888,11 +2541,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
     const sel = this.selectedNodeId() ?? (multiIds.length === 1 ? multiIds[0] : null);
     if (!sel) return;
-    const node = this.nodes().find(n => n.id === sel);
+    const node = this.nodes().find((n) => n.id === sel);
     if (!node) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.filter(n => n.id !== node.id));
-    this.edges.update(es => es.filter(e => e.fromNodeId !== node.id && e.toNodeId !== node.id));
+    this.nodes.update((ns) => ns.filter((n) => n.id !== node.id));
+    this.edges.update((es) => es.filter((e) => e.fromNodeId !== node.id && e.toNodeId !== node.id));
     this.selectedNodeId.set(null);
     this.selectedNodeIds.set([]);
     this.selectedEdgeId.set(null);
@@ -1905,7 +2558,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected deleteEdge(edgeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    this.edges.update(es => es.filter(e => e.id !== edgeId));
+    this.edges.update((es) => es.filter((e) => e.id !== edgeId));
     if (this.selectedEdgeId() === edgeId) this.selectedEdgeId.set(null);
     this.markUnsaved();
   }
@@ -1913,7 +2566,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   // ── Multi-select operations ───────────────────────────────────────────────
 
   protected selectAll(): void {
-    const ids = this.nodes().map(n => n.id);
+    const ids = this.nodes().map((n) => n.id);
     this.selectedNodeIds.set(ids);
     if (ids.length > 0) this.selectedNodeId.set(ids[0]);
     this.selectedEdgeId.set(null);
@@ -1930,8 +2583,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const ids = this.selectedNodeIds();
     if (ids.length === 0) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.filter(n => !ids.includes(n.id)));
-    this.edges.update(es => es.filter(e => !ids.includes(e.fromNodeId) && !ids.includes(e.toNodeId)));
+    this.nodes.update((ns) => ns.filter((n) => !ids.includes(n.id)));
+    this.edges.update((es) =>
+      es.filter((e) => !ids.includes(e.fromNodeId) && !ids.includes(e.toNodeId)),
+    );
     this.selectedNodeIds.set([]);
     this.selectedNodeId.set(null);
     this.markUnsaved();
@@ -1943,30 +2598,53 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.isReadonly()) return;
     const ids = this.selectedNodeIds();
     if (ids.length < 2) return;
-    const ns = this.nodes().filter(n => ids.includes(n.id));
+    const ns = this.nodes().filter((n) => ids.includes(n.id));
     this.pushUndo();
     let ref = 0;
     switch (axis) {
-      case 'left':    ref = Math.min(...ns.map(n => n.x)); break;
-      case 'right':   ref = Math.max(...ns.map(n => n.x + (this.isGateway(n.type) ? 0 : NODE_W))); break;
-      case 'top':     ref = Math.min(...ns.map(n => n.y)); break;
-      case 'bottom':  ref = Math.max(...ns.map(n => n.y + (this.isGateway(n.type) ? 0 : NODE_H))); break;
-      case 'centerH': ref = ns.reduce((s, n) => s + n.y + (this.isGateway(n.type) ? 0 : NODE_H / 2), 0) / ns.length; break;
-      case 'centerV': ref = ns.reduce((s, n) => s + n.x + (this.isGateway(n.type) ? 0 : NODE_W / 2), 0) / ns.length; break;
+      case 'left':
+        ref = Math.min(...ns.map((n) => n.x));
+        break;
+      case 'right':
+        ref = Math.max(...ns.map((n) => n.x + (this.isGateway(n.type) ? 0 : NODE_W)));
+        break;
+      case 'top':
+        ref = Math.min(...ns.map((n) => n.y));
+        break;
+      case 'bottom':
+        ref = Math.max(...ns.map((n) => n.y + (this.isGateway(n.type) ? 0 : NODE_H)));
+        break;
+      case 'centerH':
+        ref =
+          ns.reduce((s, n) => s + n.y + (this.isGateway(n.type) ? 0 : NODE_H / 2), 0) / ns.length;
+        break;
+      case 'centerV':
+        ref =
+          ns.reduce((s, n) => s + n.x + (this.isGateway(n.type) ? 0 : NODE_W / 2), 0) / ns.length;
+        break;
     }
-    this.nodes.update(all => all.map(n => {
-      if (!ids.includes(n.id)) return n;
-      const gw = this.isGateway(n.type);
-      switch (axis) {
-        case 'left':    return { ...n, x: ref };
-        case 'right':   return { ...n, x: ref - (gw ? 0 : NODE_W) };
-        case 'top':     return { ...n, y: ref };
-        case 'bottom':  return { ...n, y: ref - (gw ? 0 : NODE_H) };
-        case 'centerH': return { ...n, y: ref - (gw ? 0 : NODE_H / 2) };
-        case 'centerV': return { ...n, x: ref - (gw ? 0 : NODE_W / 2) };
-        default: return n;
-      }
-    }));
+    this.nodes.update((all) =>
+      all.map((n) => {
+        if (!ids.includes(n.id)) return n;
+        const gw = this.isGateway(n.type);
+        switch (axis) {
+          case 'left':
+            return { ...n, x: ref };
+          case 'right':
+            return { ...n, x: ref - (gw ? 0 : NODE_W) };
+          case 'top':
+            return { ...n, y: ref };
+          case 'bottom':
+            return { ...n, y: ref - (gw ? 0 : NODE_H) };
+          case 'centerH':
+            return { ...n, y: ref - (gw ? 0 : NODE_H / 2) };
+          case 'centerV':
+            return { ...n, x: ref - (gw ? 0 : NODE_W / 2) };
+          default:
+            return n;
+        }
+      }),
+    );
     this.markUnsaved();
   }
 
@@ -1974,7 +2652,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.isReadonly()) return;
     const ids = this.selectedNodeIds();
     if (ids.length < 3) return;
-    const ns = this.nodes().filter(n => ids.includes(n.id));
+    const ns = this.nodes().filter((n) => ids.includes(n.id));
     this.pushUndo();
     if (dir === 'horizontal') {
       const sorted = [...ns].sort((a, b) => a.x - b.x);
@@ -1983,8 +2661,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       const maxX = lastN.x + (this.isGateway(lastN.type) ? 0 : NODE_W);
       const gap = (maxX - minX) / (sorted.length - 1);
       const posMap: Record<string, number> = {};
-      sorted.forEach((n, i) => { posMap[n.id] = minX + i * gap; });
-      this.nodes.update(all => all.map(n => posMap[n.id] !== undefined ? { ...n, x: posMap[n.id] } : n));
+      sorted.forEach((n, i) => {
+        posMap[n.id] = minX + i * gap;
+      });
+      this.nodes.update((all) =>
+        all.map((n) => (posMap[n.id] !== undefined ? { ...n, x: posMap[n.id] } : n)),
+      );
     } else {
       const sorted = [...ns].sort((a, b) => a.y - b.y);
       const minY = sorted[0].y;
@@ -1992,8 +2674,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       const maxY = lastN.y + (this.isGateway(lastN.type) ? 0 : NODE_H);
       const gap = (maxY - minY) / (sorted.length - 1);
       const posMap: Record<string, number> = {};
-      sorted.forEach((n, i) => { posMap[n.id] = minY + i * gap; });
-      this.nodes.update(all => all.map(n => posMap[n.id] !== undefined ? { ...n, y: posMap[n.id] } : n));
+      sorted.forEach((n, i) => {
+        posMap[n.id] = minY + i * gap;
+      });
+      this.nodes.update((all) =>
+        all.map((n) => (posMap[n.id] !== undefined ? { ...n, y: posMap[n.id] } : n)),
+      );
     }
     this.markUnsaved();
   }
@@ -2004,8 +2690,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const ns = this.nodes();
     if (ns.length === 0) return;
     if (!this.isReadonly()) this.pushUndo();
-    const posMap = layoutWorkflowGraph(ns.map(n=>({...n,width:this.nodeWidth(n),height:this.nodeHeight(n)})), this.edges());
-    this.nodes.update(all => all.map(n => posMap[n.id] ? { ...n, ...posMap[n.id] } : n));
+    const posMap = layoutWorkflowGraph(
+      ns.map((n) => ({ ...n, width: this.nodeWidth(n), height: this.nodeHeight(n) })),
+      this.edges(),
+    );
+    this.nodes.update((all) => all.map((n) => (posMap[n.id] ? { ...n, ...posMap[n.id] } : n)));
     this.resetView();
     const scroller = this.canvasScrollRef?.nativeElement;
     if (scroller) {
@@ -2030,7 +2719,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   // ── Center on node ────────────────────────────────────────────────────────
 
   protected centerOnNode(nodeId: string): void {
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (!node) return;
     const svg = this.canvasSvgRef?.nativeElement;
     if (!svg) return;
@@ -2049,26 +2738,60 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const menu = this.contextMenu();
     this.contextMenu.set(null);
     switch (action) {
-      case 'copy':          this.copySelected(); break;
-      case 'cut':           this.cutSelected(); break;
-      case 'paste':         this.pasteClipboardAt(menu?.canvasX, menu?.canvasY); break;
-      case 'duplicate':     this.duplicateSelected(); break;
-      case 'delete-multi':  this.deleteSelectedMulti(); break;
-      case 'delete':
-        if (nodeId) { const nd = this.nodes().find(n => n.id === nodeId); if (nd) this.requestDeleteNode(new MouseEvent('click'), nd); }
-        else if (edgeId) this.deleteEdge(edgeId);
+      case 'copy':
+        this.copySelected();
         break;
-      case 'auto-layout':   this.autoLayout(); break;
-      case 'fit':           this.fitScreen(); break;
-      case 'select-all':    this.selectAll(); break;
-      case 'align-left':    this.alignNodes('left'); break;
-      case 'align-right':   this.alignNodes('right'); break;
-      case 'align-top':     this.alignNodes('top'); break;
-      case 'align-bottom':  this.alignNodes('bottom'); break;
-      case 'align-centerH': this.alignNodes('centerH'); break;
-      case 'align-centerV': this.alignNodes('centerV'); break;
-      case 'distribute-h':  this.distributeNodes('horizontal'); break;
-      case 'distribute-v':  this.distributeNodes('vertical'); break;
+      case 'cut':
+        this.cutSelected();
+        break;
+      case 'paste':
+        this.pasteClipboardAt(menu?.canvasX, menu?.canvasY);
+        break;
+      case 'duplicate':
+        this.duplicateSelected();
+        break;
+      case 'delete-multi':
+        this.deleteSelectedMulti();
+        break;
+      case 'delete':
+        if (nodeId) {
+          const nd = this.nodes().find((n) => n.id === nodeId);
+          if (nd) this.requestDeleteNode(new MouseEvent('click'), nd);
+        } else if (edgeId) this.deleteEdge(edgeId);
+        break;
+      case 'auto-layout':
+        this.autoLayout();
+        break;
+      case 'fit':
+        this.fitScreen();
+        break;
+      case 'select-all':
+        this.selectAll();
+        break;
+      case 'align-left':
+        this.alignNodes('left');
+        break;
+      case 'align-right':
+        this.alignNodes('right');
+        break;
+      case 'align-top':
+        this.alignNodes('top');
+        break;
+      case 'align-bottom':
+        this.alignNodes('bottom');
+        break;
+      case 'align-centerH':
+        this.alignNodes('centerH');
+        break;
+      case 'align-centerV':
+        this.alignNodes('centerV');
+        break;
+      case 'distribute-h':
+        this.distributeNodes('horizontal');
+        break;
+      case 'distribute-v':
+        this.distributeNodes('vertical');
+        break;
       case 'connect-from':
         if (nodeId) this.beginConnectFromNode(nodeId);
         break;
@@ -2077,7 +2800,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         break;
       case 'properties':
         if (nodeId) {
-          const node = this.nodes().find(n => n.id === nodeId);
+          const node = this.nodes().find((n) => n.id === nodeId);
           if (node) {
             this.selectedNodeIds.set([nodeId]);
             this.selectedNodeId.set(nodeId);
@@ -2088,7 +2811,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
           this.selectedEdgeId.set(edgeId);
           this.selectedNodeId.set(null);
           this.selectedNodeIds.set([]);
-          const edge = this.edges().find(e => e.id === edgeId);
+          const edge = this.edges().find((e) => e.id === edgeId);
           if (edge) this.patchEdgeForm(edge);
         }
         break;
@@ -2102,23 +2825,29 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         if (!this.isReadonly()) this.addNode('Start', menu?.canvasX ?? 120, menu?.canvasY ?? 120);
         break;
       case 'add-user-task':
-        if (!this.isReadonly()) this.addNode('UserTask', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
+        if (!this.isReadonly())
+          this.addNode('UserTask', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
         break;
       case 'add-decision':
-        if (!this.isReadonly()) this.addNode('ExclusiveGateway', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
+        if (!this.isReadonly())
+          this.addNode('ExclusiveGateway', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
         break;
       case 'add-end':
         if (!this.isReadonly()) this.addNode('End', menu?.canvasX ?? 280, menu?.canvasY ?? 120);
         break;
-      case 'undo': this.undo(); break;
-      case 'redo': this.redo(); break;
+      case 'undo':
+        this.undo();
+        break;
+      case 'redo':
+        this.redo();
+        break;
     }
   }
 
   /** Start a connection drag from a node (used by right-click). */
   protected beginConnectFromNode(nodeId: string): void {
     if (this.isReadonly()) return;
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (!node || !this.canHaveEdge(node.type)) return;
     this.dragging = null;
     this.selectedNodeIds.set([nodeId]);
@@ -2131,14 +2860,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected setEdgeDefault(edgeId: string): void {
     if (this.isReadonly()) return;
-    const edge = this.edges().find(e => e.id === edgeId);
+    const edge = this.edges().find((e) => e.id === edgeId);
     if (!edge) return;
     this.pushUndo();
-    this.edges.update(es => es.map(e =>
-      e.fromNodeId === edge.fromNodeId
-        ? { ...e, isDefault: e.id === edgeId }
-        : e
-    ));
+    this.edges.update((es) =>
+      es.map((e) => (e.fromNodeId === edge.fromNodeId ? { ...e, isDefault: e.id === edgeId } : e)),
+    );
     this.markUnsaved();
   }
 
@@ -2152,9 +2879,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       ...structuredClone(cb),
       id: crypto.randomUUID(),
       nodeKey: `${cb.type.toLowerCase()}_${Date.now()}`,
-      x, y,
+      x,
+      y,
     };
-    this.nodes.update(ns => [...ns, newNode]);
+    this.nodes.update((ns) => [...ns, newNode]);
     this.selectedNodeId.set(newNode.id);
     this.selectedNodeIds.set([newNode.id]);
     this.patchPropsFromNode(newNode);
@@ -2169,14 +2897,24 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.slaEditor() || this.formPreview()) return;
     const target = event.target as HTMLElement | null;
     const tag = target?.tagName ?? '';
-    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
+    const inInput =
+      tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
     const ctrl = event.ctrlKey || event.metaKey;
 
-    if (ctrl && event.key === '0') { event.preventDefault(); this.fitScreen(); return; }
+    if (ctrl && event.key === '0') {
+      event.preventDefault();
+      this.fitScreen();
+      return;
+    }
 
     // Escape: cancel draw / menus first
     if (event.key === 'Escape') {
-      if (this.drawingEdge() || this.contextMenu() || this.quickAddSourceId() || this.deleteTarget()) {
+      if (
+        this.drawingEdge() ||
+        this.contextMenu() ||
+        this.quickAddSourceId() ||
+        this.deleteTarget()
+      ) {
         event.preventDefault();
         this.drawingEdge.set(null);
         this.connectHoverNodeId.set(null);
@@ -2189,7 +2927,8 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
         this.setFullscreen(false);
         return;
       }
-      this.selectedNodeId.set(null); this.selectedEdgeId.set(null);
+      this.selectedNodeId.set(null);
+      this.selectedEdgeId.set(null);
       this.selectedNodeIds.set([]);
       return;
     }
@@ -2218,15 +2957,51 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }
 
     if (inInput) return;
-    if (ctrl && event.key === 'z') { event.preventDefault(); if (!this.isReadonly()) this.undo(); return; }
-    if (ctrl && event.key === 'y') { event.preventDefault(); if (!this.isReadonly()) this.redo(); return; }
-    if (ctrl && event.shiftKey && event.key === 'Z') { event.preventDefault(); if (!this.isReadonly()) this.redo(); return; }
-    if (ctrl && event.key === 's') { event.preventDefault(); this.save(); return; }
-    if (ctrl && event.key === 'c') { event.preventDefault(); this.copySelected(); return; }
-    if (ctrl && event.key === 'v') { event.preventDefault(); this.pasteClipboard(); return; }
-    if (ctrl && event.key === 'd') { event.preventDefault(); this.duplicateSelected(); return; }
-    if (ctrl && event.key === 'a') { event.preventDefault(); this.selectAll(); return; }
-    if (ctrl && event.key === 'x') { event.preventDefault(); if (!this.isReadonly()) this.cutSelected(); return; }
+    if (ctrl && event.key === 'z') {
+      event.preventDefault();
+      if (!this.isReadonly()) this.undo();
+      return;
+    }
+    if (ctrl && event.key === 'y') {
+      event.preventDefault();
+      if (!this.isReadonly()) this.redo();
+      return;
+    }
+    if (ctrl && event.shiftKey && event.key === 'Z') {
+      event.preventDefault();
+      if (!this.isReadonly()) this.redo();
+      return;
+    }
+    if (ctrl && event.key === 's') {
+      event.preventDefault();
+      this.save();
+      return;
+    }
+    if (ctrl && event.key === 'c') {
+      event.preventDefault();
+      this.copySelected();
+      return;
+    }
+    if (ctrl && event.key === 'v') {
+      event.preventDefault();
+      this.pasteClipboard();
+      return;
+    }
+    if (ctrl && event.key === 'd') {
+      event.preventDefault();
+      this.duplicateSelected();
+      return;
+    }
+    if (ctrl && event.key === 'a') {
+      event.preventDefault();
+      this.selectAll();
+      return;
+    }
+    if (ctrl && event.key === 'x') {
+      event.preventDefault();
+      if (!this.isReadonly()) this.cutSelected();
+      return;
+    }
     if (event.key === 'F11') {
       event.preventDefault();
       this.toggleFullscreen();
@@ -2278,23 +3053,27 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected applyProps(): void {
     const nodeId = this.selectedNodeId();
     if (!nodeId) return;
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (!node) return;
     const v = this.propsForm.value;
     const configurationJson = this.buildConfigurationJson(node.type, v);
     this.pushUndo();
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId
-        ? { ...n,
-            name:          v.name ?? n.name,
-            nameAr:        v.nameAr ?? '',
-            actionKey:     v.actionKey ?? '',
-            assignmentKey: v.assignmentKey ?? '',
-            assignmentGroupId: v.assignmentGroupId ?? '',
-            assignmentPurpose: v.assignmentPurpose ?? '',
-            configurationJson }
-        : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              name: v.name ?? n.name,
+              nameAr: v.nameAr ?? '',
+              actionKey: v.actionKey ?? '',
+              assignmentKey: v.assignmentKey ?? '',
+              assignmentGroupId: v.assignmentGroupId ?? '',
+              assignmentPurpose: v.assignmentPurpose ?? '',
+              configurationJson,
+            }
+          : n,
+      ),
+    );
     this.markUnsaved();
   }
 
@@ -2302,17 +3081,31 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (this.isReadonly()) return;
     const nodeId = this.selectedNodeId();
     this.pushUndo();
-    this.nodes.update(nodes => nodes.map(n => n.id === nodeId
-      ? { ...n, configurationJson, actionKey: n.type === 'ServiceTask' ? 'http.request' : n.actionKey } : n));
-    const node = this.nodes().find(n => n.id === nodeId);
+    this.nodes.update((nodes) =>
+      nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              configurationJson,
+              actionKey: n.type === 'ServiceTask' ? 'http.request' : n.actionKey,
+            }
+          : n,
+      ),
+    );
+    const node = this.nodes().find((n) => n.id === nodeId);
     if (node) this.patchPropsFromNode(node);
     this.makeRoomForChildren();
     this.markUnsaved();
   }
 
   protected applyTypedVariables(values: string): void {
-    this.applyIntegrationConfiguration(JSON.stringify({ ...this.parseConfig(this.selectedNode()?.configurationJson || '{}'),
-      assignmentFormat: 'typed', setVariables: JSON.parse(values) }));
+    this.applyIntegrationConfiguration(
+      JSON.stringify({
+        ...this.parseConfig(this.selectedNode()?.configurationJson || '{}'),
+        assignmentFormat: 'typed',
+        setVariables: JSON.parse(values),
+      }),
+    );
   }
 
   // ── Edge props form ───────────────────────────────────────────────────────
@@ -2322,60 +3115,66 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!edgeId) return;
     const v = this.edgeForm.value;
     this.pushUndo();
-    this.edges.update(es => es.map(e =>
-      e.id === edgeId
-        ? { ...e,
-            transitionKey:       v.transitionKey       ?? e.transitionKey,
-            labelEn:             v.labelEn             ?? e.labelEn,
-            labelAr:             v.labelAr             ?? e.labelAr,
-            descriptionEn:       v.descriptionEn       ?? e.descriptionEn,
-            outcomeKey:          v.outcomeKey          ?? e.outcomeKey,
-            conditionExpression: v.conditionExpression ?? e.conditionExpression,
-            isDefault:           v.isDefault           ?? e.isDefault,
-            priority:            v.priority            ?? e.priority }
-        : e
-    ));
+    this.edges.update((es) =>
+      es.map((e) =>
+        e.id === edgeId
+          ? {
+              ...e,
+              transitionKey: v.transitionKey ?? e.transitionKey,
+              labelEn: v.labelEn ?? e.labelEn,
+              labelAr: v.labelAr ?? e.labelAr,
+              descriptionEn: v.descriptionEn ?? e.descriptionEn,
+              outcomeKey: v.outcomeKey ?? e.outcomeKey,
+              conditionExpression: v.conditionExpression ?? e.conditionExpression,
+              isDefault: v.isDefault ?? e.isDefault,
+              priority: v.priority ?? e.priority,
+            }
+          : e,
+      ),
+    );
     this.markUnsaved();
   }
 
   protected incomingUserTask(nodeId: string): CanvasNode | null {
-    const incoming = this.edges().find(e => e.toNodeId === nodeId);
+    const incoming = this.edges().find((e) => e.toNodeId === nodeId);
     if (!incoming) return null;
-    const src = this.nodes().find(n => n.id === incoming.fromNodeId) ?? null;
-    return (src?.type === 'UserTask' || src?.type === 'MainActivity') ? src : null;
+    const src = this.nodes().find((n) => n.id === incoming.fromNodeId) ?? null;
+    return src?.type === 'UserTask' || src?.type === 'MainActivity' ? src : null;
   }
 
   protected outgoingEdgesOf(nodeId: string): CanvasEdge[] {
-    return this.edges().filter(e => e.fromNodeId === nodeId);
+    return this.edges().filter((e) => e.fromNodeId === nodeId);
   }
 
   protected decisionSourceOutcomes(): CanvasOutcome[] {
     const edge = this.selectedEdge();
     if (edge) {
-      const from = this.nodes().find(n => n.id === edge.fromNodeId);
-      if ((from?.type === 'UserTask' || from?.type === 'MainActivity')) return from.outcomes.filter(o => !!o.key);
+      const from = this.nodes().find((n) => n.id === edge.fromNodeId);
+      if (from?.type === 'UserTask' || from?.type === 'MainActivity')
+        return from.outcomes.filter((o) => !!o.key);
       if (from && this.isGateway(from.type)) {
-        return this.incomingUserTask(from.id)?.outcomes.filter(o => !!o.key) ?? [];
+        return this.incomingUserTask(from.id)?.outcomes.filter((o) => !!o.key) ?? [];
       }
       return [];
     }
     const node = this.selectedNode();
     if (node?.type === 'ExclusiveGateway') {
-      return this.incomingUserTask(node.id)?.outcomes.filter(o => !!o.key) ?? [];
+      return this.incomingUserTask(node.id)?.outcomes.filter((o) => !!o.key) ?? [];
     }
     return [];
   }
 
   protected edgeForOutcome(gatewayId: string, outcomeKey: string): CanvasEdge | undefined {
     const key = outcomeKey.toUpperCase();
-    return this.outgoingEdgesOf(gatewayId).find(e =>
-      e.outcomeKey.toUpperCase() === key
-      || e.conditionExpression.toUpperCase().includes(`'${key}'`),
+    return this.outgoingEdgesOf(gatewayId).find(
+      (e) =>
+        e.outcomeKey.toUpperCase() === key ||
+        e.conditionExpression.toUpperCase().includes(`'${key}'`),
     );
   }
 
   protected pickEdgeOutcome(key: string): void {
-    const outcome = this.decisionSourceOutcomes().find(o => o.key === key);
+    const outcome = this.decisionSourceOutcomes().find((o) => o.key === key);
     this.edgeForm.patchValue({
       outcomeKey: key,
       labelEn: outcome?.label || key,
@@ -2389,7 +3188,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.selectedNodeId.set(null);
     this.selectedNodeIds.set([]);
     this.selectedEdgeId.set(edgeId);
-    const edge = this.edges().find(e => e.id === edgeId);
+    const edge = this.edges().find((e) => e.id === edgeId);
     if (edge) this.patchEdgeForm(edge);
   }
 
@@ -2398,52 +3197,81 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected addOutcome(nodeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     const outcome: CanvasOutcome = {
-      id: crypto.randomUUID(), key: '', label: '', labelAr: '',
-      description: '', descriptionAr: '',
+      id: crypto.randomUUID(),
+      key: '',
+      label: '',
+      labelAr: '',
+      description: '',
+      descriptionAr: '',
       sortOrder: node?.outcomes.length ?? 0,
-      isDefault: false, requiresComment: false,
-      requiresAttachment: false, isActive: true, resultValue: '',
+      isDefault: false,
+      requiresComment: false,
+      requiresAttachment: false,
+      isActive: true,
+      resultValue: '',
     };
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId ? { ...n, outcomes: [...n.outcomes, outcome] } : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) => (n.id === nodeId ? { ...n, outcomes: [...n.outcomes, outcome] } : n)),
+    );
     this.markUnsaved();
   }
 
   protected addStandardOutcomes(nodeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    const presets: Array<Pick<CanvasOutcome, 'key' | 'label' | 'labelAr' | 'resultValue' | 'isDefault'>> = [
-      { key: 'APPROVE', label: 'Approve', labelAr: 'اعتماد', resultValue: 'APPROVED', isDefault: true },
+    const presets: Array<
+      Pick<CanvasOutcome, 'key' | 'label' | 'labelAr' | 'resultValue' | 'isDefault'>
+    > = [
+      {
+        key: 'APPROVE',
+        label: 'Approve',
+        labelAr: 'اعتماد',
+        resultValue: 'APPROVED',
+        isDefault: true,
+      },
       { key: 'REJECT', label: 'Reject', labelAr: 'رفض', resultValue: 'REJECTED', isDefault: false },
-      { key: REDIRECT_OUTCOME_KEY, label: 'Redirect', labelAr: 'إعادة توجيه', resultValue: REDIRECT_OUTCOME_KEY, isDefault: false },
+      {
+        key: REDIRECT_OUTCOME_KEY,
+        label: 'Redirect',
+        labelAr: 'إعادة توجيه',
+        resultValue: REDIRECT_OUTCOME_KEY,
+        isDefault: false,
+      },
     ];
-    this.nodes.update(ns => ns.map(n => {
-      if (n.id !== nodeId) return n;
-      const existing = new Set(n.outcomes.map(o => o.key.toUpperCase()));
-      const extras: CanvasOutcome[] = [];
-      presets.forEach((p, i) => {
-        if (existing.has(p.key)) return;
-        extras.push({
-          id: crypto.randomUUID(), key: p.key, label: p.label, labelAr: p.labelAr,
-          description: '', descriptionAr: '',
-          sortOrder: n.outcomes.length + extras.length + i,
-          isDefault: p.isDefault && !n.outcomes.some(o => o.isDefault),
-          requiresComment: p.key !== 'APPROVE',
-          requiresAttachment: false, isActive: true, resultValue: p.resultValue,
+    this.nodes.update((ns) =>
+      ns.map((n) => {
+        if (n.id !== nodeId) return n;
+        const existing = new Set(n.outcomes.map((o) => o.key.toUpperCase()));
+        const extras: CanvasOutcome[] = [];
+        presets.forEach((p, i) => {
+          if (existing.has(p.key)) return;
+          extras.push({
+            id: crypto.randomUUID(),
+            key: p.key,
+            label: p.label,
+            labelAr: p.labelAr,
+            description: '',
+            descriptionAr: '',
+            sortOrder: n.outcomes.length + extras.length + i,
+            isDefault: p.isDefault && !n.outcomes.some((o) => o.isDefault),
+            requiresComment: p.key !== 'APPROVE',
+            requiresAttachment: false,
+            isActive: true,
+            resultValue: p.resultValue,
+          });
         });
-      });
-      return extras.length ? { ...n, outcomes: [...n.outcomes, ...extras] } : n;
-    }));
+        return extras.length ? { ...n, outcomes: [...n.outcomes, ...extras] } : n;
+      }),
+    );
     this.markUnsaved();
   }
 
   protected addRedirectOutcome(nodeId: string): void {
     if (this.isReadonly()) return;
-    const node = this.nodes().find(n => n.id === nodeId);
-    if (node?.outcomes.some(o => isRedirectOutcome(o.key, o.resultValue))) return;
+    const node = this.nodes().find((n) => n.id === nodeId);
+    if (node?.outcomes.some((o) => isRedirectOutcome(o.key, o.resultValue))) return;
     this.pushUndo();
     const outcome: CanvasOutcome = {
       id: crypto.randomUUID(),
@@ -2453,46 +3281,63 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       description: 'Send this task to another department or group',
       descriptionAr: '',
       sortOrder: node?.outcomes.length ?? 0,
-      isDefault: false, requiresComment: true,
-      requiresAttachment: false, isActive: true, resultValue: REDIRECT_OUTCOME_KEY,
+      isDefault: false,
+      requiresComment: true,
+      requiresAttachment: false,
+      isActive: true,
+      resultValue: REDIRECT_OUTCOME_KEY,
     };
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId ? { ...n, outcomes: [...n.outcomes, outcome] } : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) => (n.id === nodeId ? { ...n, outcomes: [...n.outcomes, outcome] } : n)),
+    );
     this.markUnsaved();
   }
 
   protected removeOutcome(nodeId: string, outcomeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId ? { ...n, outcomes: n.outcomes.filter(o => o.id !== outcomeId) } : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) =>
+        n.id === nodeId ? { ...n, outcomes: n.outcomes.filter((o) => o.id !== outcomeId) } : n,
+      ),
+    );
     this.markUnsaved();
   }
 
-  protected updateOutcomeField(nodeId: string, outcomeId: string, field: keyof CanvasOutcome, value: unknown): void {
+  protected updateOutcomeField(
+    nodeId: string,
+    outcomeId: string,
+    field: keyof CanvasOutcome,
+    value: unknown,
+  ): void {
     if (this.isReadonly()) return;
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId
-        ? { ...n, outcomes: n.outcomes.map(o => o.id === outcomeId ? { ...o, [field]: value } : o) }
-        : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              outcomes: n.outcomes.map((o) => (o.id === outcomeId ? { ...o, [field]: value } : o)),
+            }
+          : n,
+      ),
+    );
     this.markUnsaved();
   }
 
   protected moveOutcome(nodeId: string, outcomeId: string, direction: 'up' | 'down'): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.map(n => {
-      if (n.id !== nodeId) return n;
-      const arr = [...n.outcomes];
-      const idx = arr.findIndex(o => o.id === outcomeId);
-      const swap = direction === 'up' ? idx - 1 : idx + 1;
-      if (idx < 0 || swap < 0 || swap >= arr.length) return n;
-      [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
-      return { ...n, outcomes: arr };
-    }));
+    this.nodes.update((ns) =>
+      ns.map((n) => {
+        if (n.id !== nodeId) return n;
+        const arr = [...n.outcomes];
+        const idx = arr.findIndex((o) => o.id === outcomeId);
+        const swap = direction === 'up' ? idx - 1 : idx + 1;
+        if (idx < 0 || swap < 0 || swap >= arr.length) return n;
+        [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+        return { ...n, outcomes: arr };
+      }),
+    );
     this.markUnsaved();
   }
 
@@ -2501,52 +3346,73 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected addAction(nodeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    const node = this.nodes().find(n => n.id === nodeId);
+    const node = this.nodes().find((n) => n.id === nodeId);
     const action: CanvasAction = {
-      id: crypto.randomUUID(), actionKey: '', executionTrigger: 'OnComplete',
-      outcomeKey: '', conditionExpression: '',
+      id: crypto.randomUUID(),
+      actionKey: '',
+      executionTrigger: 'OnComplete',
+      outcomeKey: '',
+      conditionExpression: '',
       sequence: node?.actions.length ?? 0,
-      inputMappingJson: '', outputMappingJson: '',
-      failurePolicy: 'Continue', retryCount: 0, retryDelaySeconds: 0, timeoutSeconds: 0,
+      inputMappingJson: '',
+      outputMappingJson: '',
+      failurePolicy: 'Continue',
+      retryCount: 0,
+      retryDelaySeconds: 0,
+      timeoutSeconds: 0,
       isActive: true,
     };
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId ? { ...n, actions: [...n.actions, action] } : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) => (n.id === nodeId ? { ...n, actions: [...n.actions, action] } : n)),
+    );
     this.markUnsaved();
   }
 
   protected removeAction(nodeId: string, actionId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId ? { ...n, actions: n.actions.filter(a => a.id !== actionId) } : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) =>
+        n.id === nodeId ? { ...n, actions: n.actions.filter((a) => a.id !== actionId) } : n,
+      ),
+    );
     this.markUnsaved();
   }
 
-  protected updateActionField(nodeId: string, actionId: string, field: keyof CanvasAction, value: unknown): void {
+  protected updateActionField(
+    nodeId: string,
+    actionId: string,
+    field: keyof CanvasAction,
+    value: unknown,
+  ): void {
     if (this.isReadonly()) return;
-    this.nodes.update(ns => ns.map(n =>
-      n.id === nodeId
-        ? { ...n, actions: n.actions.map(a => a.id === actionId ? { ...a, [field]: value } : a) }
-        : n
-    ));
+    this.nodes.update((ns) =>
+      ns.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              actions: n.actions.map((a) => (a.id === actionId ? { ...a, [field]: value } : a)),
+            }
+          : n,
+      ),
+    );
     this.markUnsaved();
   }
 
   protected moveAction(nodeId: string, actionId: string, direction: 'up' | 'down'): void {
     if (this.isReadonly()) return;
     this.pushUndo();
-    this.nodes.update(ns => ns.map(n => {
-      if (n.id !== nodeId) return n;
-      const arr = [...n.actions];
-      const idx = arr.findIndex(a => a.id === actionId);
-      const swap = direction === 'up' ? idx - 1 : idx + 1;
-      if (idx < 0 || swap < 0 || swap >= arr.length) return n;
-      [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
-      return { ...n, actions: arr };
-    }));
+    this.nodes.update((ns) =>
+      ns.map((n) => {
+        if (n.id !== nodeId) return n;
+        const arr = [...n.actions];
+        const idx = arr.findIndex((a) => a.id === actionId);
+        const swap = direction === 'up' ? idx - 1 : idx + 1;
+        if (idx < 0 || swap < 0 || swap >= arr.length) return n;
+        [arr[idx], arr[swap]] = [arr[swap], arr[idx]];
+        return { ...n, actions: arr };
+      }),
+    );
     this.markUnsaved();
   }
 
@@ -2555,24 +3421,35 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected addVariable(): void {
     if (this.isReadonly()) return;
     const v: CanvasVariable = {
-      id: crypto.randomUUID(), variableKey: '', name: '', nameAr: '',
-      dataType: 'String', defaultValue: '',
-      isRequired: false, isSensitive: false, description: '', descriptionAr: '',
+      id: crypto.randomUUID(),
+      variableKey: '',
+      name: '',
+      nameAr: '',
+      dataType: 'String',
+      defaultValue: '',
+      isRequired: false,
+      isSensitive: false,
+      description: '',
+      descriptionAr: '',
     };
-    this.variables.update(vs => [...vs, v]);
+    this.variables.update((vs) => [...vs, v]);
     this.markUnsaved();
   }
 
   protected removeVariable(variableId: string): void {
     if (this.isReadonly()) return;
-    this.variables.update(vs => vs.filter(v => v.id !== variableId));
+    this.variables.update((vs) => vs.filter((v) => v.id !== variableId));
     this.markUnsaved();
   }
 
-  protected updateVariableField(variableId: string, field: keyof CanvasVariable, value: unknown): void {
+  protected updateVariableField(
+    variableId: string,
+    field: keyof CanvasVariable,
+    value: unknown,
+  ): void {
     if (this.isReadonly()) return;
-    this.variables.update(vs =>
-      vs.map(v => v.id === variableId ? { ...v, [field]: value } : v)
+    this.variables.update((vs) =>
+      vs.map((v) => (v.id === variableId ? { ...v, [field]: value } : v)),
     );
     this.markUnsaved();
   }
@@ -2581,7 +3458,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected navigateToError(nodeKey: string | undefined | null, errorCode?: string | null): void {
     if (!nodeKey) return;
-    const node = this.nodes().find(n => n.nodeKey === nodeKey);
+    const node = this.nodes().find((n) => n.nodeKey === nodeKey);
     if (!node) return;
     this.selectedNodeId.set(node.id);
     this.selectedNodeIds.set([node.id]);
@@ -2590,7 +3467,9 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.centerOnNode(node.id);
 
     const tab = this.inferTabFromCode(errorCode);
-    this.inspectorTab.set(WorkflowDesignerComponent.tabsFor(node.type).some(t => t.id === tab) ? tab : 'general');
+    this.inspectorTab.set(
+      WorkflowDesignerComponent.tabsFor(node.type).some((t) => t.id === tab) ? tab : 'general',
+    );
   }
 
   private inferTabFromCode(code?: string | null): InspectorTab {
@@ -2611,76 +3490,116 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   protected isGateway(type: NodeType): boolean {
-    return type === 'ExclusiveGateway'
-      || type === 'InclusiveGateway'
-      || type === 'ParallelGateway'
-      || type === 'JoinGateway';
+    return (
+      type === 'ExclusiveGateway' ||
+      type === 'InclusiveGateway' ||
+      type === 'ParallelGateway' ||
+      type === 'JoinGateway'
+    );
   }
 
   protected getNodeName(nodeId: string | undefined | null): string {
     if (!nodeId) return '—';
-    return this.nodes().find(n => n.id === nodeId)?.name || nodeId;
+    return this.nodes().find((n) => n.id === nodeId)?.name || nodeId;
   }
 
   private defaultNodeName(type: NodeType): string {
     switch (type) {
-      case 'Start':             return 'Start';
-      case 'End':               return 'End';
-      case 'ExclusiveGateway':  return 'Decision';
-      case 'InclusiveGateway':  return 'Inclusive Gateway';
-      case 'ParallelGateway':   return 'Parallel';
-      case 'JoinGateway':       return 'Join';
-      case 'Timer':             return 'Timer';
-      case 'WaitEvent':         return 'Wait for Event';
-      case 'ServiceTask':       return 'Service Task';
-      case 'CallActivity':      return 'Call Activity';
-      case 'ScriptTask':        return 'Set Variables';
-      case 'NotificationTask':  return 'Notification';
-      default:                  return 'New Task';
+      case 'Start':
+        return 'Start';
+      case 'End':
+        return 'End';
+      case 'ExclusiveGateway':
+        return 'Decision';
+      case 'InclusiveGateway':
+        return 'Inclusive Gateway';
+      case 'ParallelGateway':
+        return 'Parallel';
+      case 'JoinGateway':
+        return 'Join';
+      case 'Timer':
+        return 'Timer';
+      case 'WaitEvent':
+        return 'Wait for Event';
+      case 'ServiceTask':
+        return 'Service Task';
+      case 'CallActivity':
+        return 'Call Activity';
+      case 'ScriptTask':
+        return 'Set Variables';
+      case 'NotificationTask':
+        return 'Notification';
+      default:
+        return 'New Task';
     }
   }
 
   private patchPropsFromNode(node: CanvasNode): void {
     const cfg = this.parseConfig(node.configurationJson);
     this.propsForm.patchValue({
-      name:                  node.name,
-      nameAr:                node.nameAr,
-      description:           typeof cfg['description'] === 'string' ? cfg['description'] as string : '',
-      descriptionAr:         typeof cfg['descriptionAr'] === 'string' ? cfg['descriptionAr'] as string : '',
-      instructionsEn:        typeof cfg['instructionsEn'] === 'string' ? cfg['instructionsEn'] as string : '',
-      instructionsAr:        typeof cfg['instructionsAr'] === 'string' ? cfg['instructionsAr'] as string : '',
-      nodePriority:          typeof cfg['nodePriority'] === 'number' ? cfg['nodePriority'] as number : 0,
-      actionKey:             node.actionKey,
-      assignmentKey:         node.assignmentKey,
-      assignmentGroupId:     node.assignmentGroupId ?? '',
-      assignmentPurpose:     node.assignmentPurpose ?? '',
-      fallbackAssignmentKey: typeof cfg['fallbackAssignmentKey'] === 'string' ? cfg['fallbackAssignmentKey'] as string : '',
-      requiresClaim:         typeof cfg['requiresClaim'] === 'boolean' ? cfg['requiresClaim'] as boolean : false,
-      allowSelfClaim:        typeof cfg['allowSelfClaim'] === 'boolean' ? cfg['allowSelfClaim'] as boolean : false,
-      configJson:            node.configurationJson || '',
-      timerType:             (cfg['timerType'] as TimerTypeOption) || 'Duration',
-      dueAt:                 typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
-      duration:              typeof cfg['duration'] === 'string' ? cfg['duration'] as string : '',
-      signalKey:             typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] as string : '',
-      templateKey:           typeof cfg['templateKey'] === 'string' ? cfg['templateKey'] as string : '',
-      failurePolicy:         (cfg['failurePolicy'] as NotificationFailurePolicyOption) || 'Continue',
-      slaPolicyId:           typeof cfg['slaPolicyId'] === 'string' ? cfg['slaPolicyId'] as string : '',
-      slaDurationHours:      typeof cfg['slaDurationHours'] === 'number' ? cfg['slaDurationHours'] as number : 0,
-      slaEscalationKey:      typeof cfg['slaEscalationKey'] === 'string' ? cfg['slaEscalationKey'] as string : '',
-      inputMappingJson:      typeof cfg['inputMappingJson'] === 'string' ? cfg['inputMappingJson'] as string : '',
-      outputMappingJson:     typeof cfg['outputMappingJson'] === 'string' ? cfg['outputMappingJson'] as string : '',
-      formKey:               typeof cfg['formKey'] === 'string' ? cfg['formKey'] as string : '',
-      formSchemaJson:        typeof cfg['formSchemaJson'] === 'string'
-        ? cfg['formSchemaJson'] as string
-        : (cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
-          ? JSON.stringify(cfg['formSchemaJson'], null, 2)
-          : ''),
-      setVariablesJson:      this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
-      eventKey:              typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] : typeof cfg['signalKey'] === 'string' ? cfg['signalKey'] : '',
-      correlationVariable:   typeof cfg['correlationVariable'] === 'string' ? cfg['correlationVariable'] as string : '',
-      definitionKey:         typeof cfg['definitionKey'] === 'string' ? cfg['definitionKey'] as string : '',
-      waitForCompletion:     typeof cfg['waitForCompletion'] === 'boolean' ? cfg['waitForCompletion'] as boolean : true,
-      callVersionId:         typeof cfg['versionId'] === 'string' ? cfg['versionId'] as string : '',
+      name: node.name,
+      nameAr: node.nameAr,
+      description: typeof cfg['description'] === 'string' ? (cfg['description'] as string) : '',
+      descriptionAr:
+        typeof cfg['descriptionAr'] === 'string' ? (cfg['descriptionAr'] as string) : '',
+      instructionsEn:
+        typeof cfg['instructionsEn'] === 'string' ? (cfg['instructionsEn'] as string) : '',
+      instructionsAr:
+        typeof cfg['instructionsAr'] === 'string' ? (cfg['instructionsAr'] as string) : '',
+      nodePriority: typeof cfg['nodePriority'] === 'number' ? (cfg['nodePriority'] as number) : 0,
+      actionKey: node.actionKey,
+      assignmentKey: node.assignmentKey,
+      assignmentGroupId: node.assignmentGroupId ?? '',
+      assignmentPurpose: node.assignmentPurpose ?? '',
+      fallbackAssignmentKey:
+        typeof cfg['fallbackAssignmentKey'] === 'string'
+          ? (cfg['fallbackAssignmentKey'] as string)
+          : '',
+      requiresClaim:
+        typeof cfg['requiresClaim'] === 'boolean' ? (cfg['requiresClaim'] as boolean) : false,
+      allowSelfClaim:
+        typeof cfg['allowSelfClaim'] === 'boolean' ? (cfg['allowSelfClaim'] as boolean) : false,
+      configJson: node.configurationJson || '',
+      timerType: (cfg['timerType'] as TimerTypeOption) || 'Duration',
+      dueAt: typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
+      duration: typeof cfg['duration'] === 'string' ? (cfg['duration'] as string) : '',
+      signalKey: typeof cfg['signalKey'] === 'string' ? (cfg['signalKey'] as string) : '',
+      templateKey: typeof cfg['templateKey'] === 'string' ? (cfg['templateKey'] as string) : '',
+      failurePolicy: (cfg['failurePolicy'] as NotificationFailurePolicyOption) || 'Continue',
+      slaPolicyId: typeof cfg['slaPolicyId'] === 'string' ? (cfg['slaPolicyId'] as string) : '',
+      slaDurationHours:
+        typeof cfg['slaDurationHours'] === 'number' ? (cfg['slaDurationHours'] as number) : 0,
+      slaEscalationKey:
+        typeof cfg['slaEscalationKey'] === 'string' ? (cfg['slaEscalationKey'] as string) : '',
+      inputMappingJson:
+        typeof cfg['inputMappingJson'] === 'string' ? (cfg['inputMappingJson'] as string) : '',
+      outputMappingJson:
+        typeof cfg['outputMappingJson'] === 'string' ? (cfg['outputMappingJson'] as string) : '',
+      formKey: typeof cfg['formKey'] === 'string' ? (cfg['formKey'] as string) : '',
+      formSchemaJson:
+        typeof cfg['formSchemaJson'] === 'string'
+          ? (cfg['formSchemaJson'] as string)
+          : cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
+            ? JSON.stringify(cfg['formSchemaJson'], null, 2)
+            : '',
+      setVariablesJson: this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
+      eventKey:
+        typeof cfg['eventKey'] === 'string'
+          ? cfg['eventKey']
+          : typeof cfg['signalKey'] === 'string'
+            ? cfg['signalKey']
+            : '',
+      correlationVariable:
+        typeof cfg['correlationVariable'] === 'string'
+          ? (cfg['correlationVariable'] as string)
+          : '',
+      definitionKey:
+        typeof cfg['definitionKey'] === 'string' ? (cfg['definitionKey'] as string) : '',
+      waitForCompletion:
+        typeof cfg['waitForCompletion'] === 'boolean'
+          ? (cfg['waitForCompletion'] as boolean)
+          : true,
+      callVersionId: typeof cfg['versionId'] === 'string' ? (cfg['versionId'] as string) : '',
       callInputMappingsJson: JSON.stringify(cfg['inputMappings'] || {}, null, 2),
       callOutputMappingsJson: JSON.stringify(cfg['outputMappings'] || {}, null, 2),
     });
@@ -2691,9 +3610,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (!Array.isArray(value)) return [];
     return value.map((raw, index) => {
       const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-      const type = typeof row['type'] === 'string' && this.formFieldTypes.includes(row['type'] as FormFieldType)
-        ? row['type'] as FormFieldType
-        : 'text';
+      const type =
+        typeof row['type'] === 'string' &&
+        this.formFieldTypes.includes(row['type'] as FormFieldType)
+          ? (row['type'] as FormFieldType)
+          : 'text';
       return {
         id: typeof row['id'] === 'string' ? row['id'] : crypto.randomUUID(),
         key: typeof row['key'] === 'string' ? row['key'] : `field_${index + 1}`,
@@ -2708,7 +3629,7 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected addFormField(): void {
     if (this.isReadonly()) return;
-    this.formFields.update(fields => [
+    this.formFields.update((fields) => [
       ...fields,
       {
         id: crypto.randomUUID(),
@@ -2723,36 +3644,40 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected removeFormField(id: string): void {
     if (this.isReadonly()) return;
-    this.formFields.update(fields => fields.filter(f => f.id !== id));
+    this.formFields.update((fields) => fields.filter((f) => f.id !== id));
   }
 
   protected updateFormField(
     id: string,
     field: keyof Omit<FormFieldRow, 'id'>,
-    value: string | boolean
+    value: string | boolean,
   ): void {
     if (this.isReadonly()) return;
-    this.formFields.update(fields =>
-      fields.map(f => (f.id === id ? { ...f, [field]: value } : f))
+    this.formFields.update((fields) =>
+      fields.map((f) => (f.id === id ? { ...f, [field]: value } : f)),
     );
   }
 
   private formatSetVariables(value: unknown): string {
     if (value == null) return '';
     if (typeof value === 'string') return value;
-    try { return JSON.stringify(value, null, 2); } catch { return ''; }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return '';
+    }
   }
 
   private patchEdgeForm(edge: CanvasEdge): void {
     this.edgeForm.patchValue({
-      transitionKey:       edge.transitionKey,
-      labelEn:             edge.labelEn,
-      labelAr:             edge.labelAr,
-      descriptionEn:       edge.descriptionEn,
-      outcomeKey:          edge.outcomeKey,
+      transitionKey: edge.transitionKey,
+      labelEn: edge.labelEn,
+      labelAr: edge.labelAr,
+      descriptionEn: edge.descriptionEn,
+      outcomeKey: edge.outcomeKey,
       conditionExpression: edge.conditionExpression,
-      isDefault:           edge.isDefault,
-      priority:            edge.priority,
+      isDefault: edge.isDefault,
+      priority: edge.priority,
     });
   }
 
@@ -2761,31 +3686,40 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     try {
       const parsed = JSON.parse(json) as unknown;
       return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? parsed as Record<string, unknown>
+        ? (parsed as Record<string, unknown>)
         : {};
-    } catch { return {}; }
+    } catch {
+      return {};
+    }
   }
 
   private buildConfigurationJson(type: NodeType, v: typeof this.propsForm.value): string {
     const existing = this.parseConfig(
-      this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
+      this.nodes().find((n) => n.id === this.selectedNodeId())?.configurationJson ?? '',
     );
     if (type === 'Timer') {
-      const cfg: Record<string, unknown> = { ...existing, timerType: (v.timerType as string) || 'Duration' };
+      const cfg: Record<string, unknown> = {
+        ...existing,
+        timerType: (v.timerType as string) || 'Duration',
+      };
       delete cfg['dueAt'];
       delete cfg['duration'];
       delete cfg['signalKey'];
-      if (v.timerType === 'DueDate' && v.dueAt)     cfg['dueAt'] = toUtcDateTime(v.dueAt);
-      if (v.timerType === 'Duration' && v.duration)  cfg['duration'] = v.duration;
+      if (v.timerType === 'DueDate' && v.dueAt) cfg['dueAt'] = toUtcDateTime(v.dueAt);
+      if (v.timerType === 'Duration' && v.duration) cfg['duration'] = v.duration;
       if (v.timerType === 'ExternalSignal' && v.signalKey) cfg['signalKey'] = v.signalKey;
       return JSON.stringify(cfg);
     }
     if (type === 'NotificationTask') {
-      return JSON.stringify({ ...existing, templateKey: v.templateKey ?? '', failurePolicy: v.failurePolicy ?? 'Continue' });
+      return JSON.stringify({
+        ...existing,
+        templateKey: v.templateKey ?? '',
+        failurePolicy: v.failurePolicy ?? 'Continue',
+      });
     }
     if (type === 'UserTask' || type === 'MainActivity') {
       const existing = this.parseConfig(
-        this.nodes().find(n => n.id === this.selectedNodeId())?.configurationJson ?? ''
+        this.nodes().find((n) => n.id === this.selectedNodeId())?.configurationJson ?? '',
       );
       const cfg: Record<string, unknown> = { ...existing };
       const setOrDelete = (key: string, value: unknown, present: boolean): void => {
@@ -2797,41 +3731,61 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
       setOrDelete('instructionsEn', v.instructionsEn, !!v.instructionsEn?.trim());
       setOrDelete('instructionsAr', v.instructionsAr, !!v.instructionsAr?.trim());
       setOrDelete('nodePriority', v.nodePriority, (v.nodePriority ?? 0) > 0);
-      setOrDelete('fallbackAssignmentKey', v.fallbackAssignmentKey, !!v.fallbackAssignmentKey?.trim());
+      setOrDelete(
+        'fallbackAssignmentKey',
+        v.fallbackAssignmentKey,
+        !!v.fallbackAssignmentKey?.trim(),
+      );
       setOrDelete('requiresClaim', true, !!v.requiresClaim);
       setOrDelete('allowSelfClaim', true, !!v.allowSelfClaim);
       if (!this.workspace()) {
-      setOrDelete('slaPolicyId', v.slaPolicyId, !!v.slaPolicyId?.trim());
-      setOrDelete('slaDurationHours', v.slaDurationHours, (v.slaDurationHours ?? 0) > 0);
-      setOrDelete('slaEscalationKey', v.slaEscalationKey, !!v.slaEscalationKey?.trim());
-      setOrDelete('inputMappingJson', v.inputMappingJson, !!v.inputMappingJson?.trim());
-      setOrDelete('outputMappingJson', v.outputMappingJson, !!v.outputMappingJson?.trim());
-      setOrDelete('formKey', v.formKey, !!v.formKey?.trim());
+        setOrDelete('slaPolicyId', v.slaPolicyId, !!v.slaPolicyId?.trim());
+        setOrDelete('slaDurationHours', v.slaDurationHours, (v.slaDurationHours ?? 0) > 0);
+        setOrDelete('slaEscalationKey', v.slaEscalationKey, !!v.slaEscalationKey?.trim());
+        setOrDelete('inputMappingJson', v.inputMappingJson, !!v.inputMappingJson?.trim());
+        setOrDelete('outputMappingJson', v.outputMappingJson, !!v.outputMappingJson?.trim());
+        setOrDelete('formKey', v.formKey, !!v.formKey?.trim());
       }
       if (!this.workspace()) {
-      const fields = this.formFields()
-        .map(({ key, labelEn, labelAr, type: fieldType, required, options }) => ({
-          key: key.trim(),
-          labelEn: labelEn.trim(),
-          labelAr: labelAr.trim(),
-          type: fieldType,
-          required: !!required,
-          ...(fieldType === 'select' ? { options: (options || '').split(',').map(s => s.trim()).filter(Boolean) } : {}),
-        }))
-        .filter(f => f.key.length > 0);
-      if (fields.length > 0) cfg['formFields'] = fields;
-      else delete cfg['formFields'];
-      if (v.formSchemaJson?.trim()) {
-        try { cfg['formSchemaJson'] = JSON.parse(v.formSchemaJson) as unknown; }
-        catch { cfg['formSchemaJson'] = v.formSchemaJson; }
-      } else {
-        delete cfg['formSchemaJson'];
-      }
+        const fields = this.formFields()
+          .map(({ key, labelEn, labelAr, type: fieldType, required, options }) => ({
+            key: key.trim(),
+            labelEn: labelEn.trim(),
+            labelAr: labelAr.trim(),
+            type: fieldType,
+            required: !!required,
+            ...(fieldType === 'select'
+              ? {
+                  options: (options || '')
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                }
+              : {}),
+          }))
+          .filter((f) => f.key.length > 0);
+        if (fields.length > 0) cfg['formFields'] = fields;
+        else delete cfg['formFields'];
+        if (v.formSchemaJson?.trim()) {
+          try {
+            cfg['formSchemaJson'] = JSON.parse(v.formSchemaJson) as unknown;
+          } catch {
+            cfg['formSchemaJson'] = v.formSchemaJson;
+          }
+        } else {
+          delete cfg['formSchemaJson'];
+        }
       }
       return Object.keys(cfg).length ? JSON.stringify(cfg) : '';
     }
     if (type === 'CallActivity') {
-      const parseMapping = (text: string | null | undefined) => { try { return JSON.parse(text || '{}') as unknown; } catch { return text; } };
+      const parseMapping = (text: string | null | undefined) => {
+        try {
+          return JSON.parse(text || '{}') as unknown;
+        } catch {
+          return text;
+        }
+      };
       return JSON.stringify({
         ...existing,
         definitionKey: v.definitionKey ?? '',
@@ -2863,7 +3817,11 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     if (type === 'ServiceTask') {
       const raw = (v.configJson ?? '').trim();
       if (!raw) return '';
-      try { return JSON.stringify(JSON.parse(raw) as unknown); } catch { return raw; }
+      try {
+        return JSON.stringify(JSON.parse(raw) as unknown);
+      } catch {
+        return raw;
+      }
     }
     return (v.configJson ?? '').trim();
   }
@@ -2896,15 +3854,22 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     return { x: n.x, y: n.y, w: this.nodeWidth(n), h: this.nodeHeight(n) };
   }
 
-  private anchorOnSide(n: CanvasNode, side: 'left' | 'right' | 'top' | 'bottom'): { x: number; y: number } {
+  private anchorOnSide(
+    n: CanvasNode,
+    side: 'left' | 'right' | 'top' | 'bottom',
+  ): { x: number; y: number } {
     const b = this.nodeBounds(n);
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;
     switch (side) {
-      case 'left':   return { x: b.x, y: cy };
-      case 'right':  return { x: b.x + b.w, y: cy };
-      case 'top':    return { x: cx, y: b.y };
-      case 'bottom': return { x: cx, y: b.y + b.h };
+      case 'left':
+        return { x: b.x, y: cy };
+      case 'right':
+        return { x: b.x + b.w, y: cy };
+      case 'top':
+        return { x: cx, y: b.y };
+      case 'bottom':
+        return { x: cx, y: b.y + b.h };
     }
   }
 
@@ -2914,7 +3879,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   private pickEdgeSides(
     from: CanvasNode,
     to: CanvasNode,
-  ): { fromSide: 'left' | 'right' | 'top' | 'bottom'; toSide: 'left' | 'right' | 'top' | 'bottom' } {
+  ): {
+    fromSide: 'left' | 'right' | 'top' | 'bottom';
+    toSide: 'left' | 'right' | 'top' | 'bottom';
+  } {
     const a = this.nodeCenter(from);
     const b = this.nodeCenter(to);
     const dx = b.x - a.x;
@@ -2935,20 +3903,24 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   private sideNormal(side: 'left' | 'right' | 'top' | 'bottom'): { x: number; y: number } {
     switch (side) {
-      case 'left':   return { x: -1, y: 0 };
-      case 'right':  return { x: 1, y: 0 };
-      case 'top':    return { x: 0, y: -1 };
-      case 'bottom': return { x: 0, y: 1 };
+      case 'left':
+        return { x: -1, y: 0 };
+      case 'right':
+        return { x: 1, y: 0 };
+      case 'top':
+        return { x: 0, y: -1 };
+      case 'bottom':
+        return { x: 0, y: 1 };
     }
   }
 
   /** Fan parallel edges so overlapping routes separate slightly. */
   private edgeLaneOffset(e: CanvasEdge): number {
     const siblings = this.edges().filter(
-      x => x.fromNodeId === e.fromNodeId && x.toNodeId === e.toNodeId,
+      (x) => x.fromNodeId === e.fromNodeId && x.toNodeId === e.toNodeId,
     );
     if (siblings.length <= 1) return 0;
-    const idx = siblings.findIndex(x => x.id === e.id);
+    const idx = siblings.findIndex((x) => x.id === e.id);
     return (idx - (siblings.length - 1) / 2) * 14;
   }
 
@@ -2956,8 +3928,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
    * Flexible orthogonal route with rounded elbows (adapts after drag/drop).
    */
   private buildOrthogonalPath(
-    x1: number, y1: number, fromSide: 'left' | 'right' | 'top' | 'bottom',
-    x2: number, y2: number, toSide: 'left' | 'right' | 'top' | 'bottom',
+    x1: number,
+    y1: number,
+    fromSide: 'left' | 'right' | 'top' | 'bottom',
+    x2: number,
+    y2: number,
+    toSide: 'left' | 'right' | 'top' | 'bottom',
     lane = 0,
   ): string {
     const stub = 28;
@@ -2969,7 +3945,10 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const ey = y2 + n2.y * stub;
 
     // Mid routing: prefer H-V-H or V-H-V based on start direction
-    const points: { x: number; y: number }[] = [{ x: x1, y: y1 }, { x: sx, y: sy }];
+    const points: { x: number; y: number }[] = [
+      { x: x1, y: y1 },
+      { x: sx, y: sy },
+    ];
 
     if (fromSide === 'left' || fromSide === 'right') {
       // Horizontal first
@@ -3035,12 +4014,15 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   protected edgeAnchors(e: CanvasEdge): {
-    x1: number; y1: number; x2: number; y2: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
     fromSide: 'left' | 'right' | 'top' | 'bottom';
     toSide: 'left' | 'right' | 'top' | 'bottom';
   } | null {
-    const from = this.nodes().find(n => n.id === e.fromNodeId);
-    const to   = this.nodes().find(n => n.id === e.toNodeId);
+    const from = this.nodes().find((n) => n.id === e.fromNodeId);
+    const to = this.nodes().find((n) => n.id === e.toNodeId);
     if (!from || !to) return null;
     const { fromSide, toSide } = this.pickEdgeSides(from, to);
     const a = this.anchorOnSide(from, fromSide);
@@ -3068,12 +4050,12 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   protected drawingEdgePath(): string {
     const de = this.drawingEdge();
     if (!de) return '';
-    const from = this.nodes().find(n => n.id === de.fromNodeId);
+    const from = this.nodes().find((n) => n.id === de.fromNodeId);
     if (!from) {
       return `M ${de.x1} ${de.y1} L ${de.x2} ${de.y2}`;
     }
     const hoverId = this.connectHoverNodeId();
-    const to = hoverId ? this.nodes().find(n => n.id === hoverId) : null;
+    const to = hoverId ? this.nodes().find((n) => n.id === hoverId) : null;
     if (to) {
       const { fromSide, toSide } = this.pickEdgeSides(from, to);
       const a = this.anchorOnSide(from, fromSide);
@@ -3085,28 +4067,47 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     const dx = de.x2 - c.x;
     const dy = de.y2 - c.y;
     const fromSide: 'left' | 'right' | 'top' | 'bottom' =
-      Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : (dy >= 0 ? 'bottom' : 'top');
+      Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : dy >= 0 ? 'bottom' : 'top';
     const a = this.anchorOnSide(from, fromSide);
     const toSide: 'left' | 'right' | 'top' | 'bottom' =
-      fromSide === 'right' ? 'left' : fromSide === 'left' ? 'right' : fromSide === 'bottom' ? 'top' : 'bottom';
+      fromSide === 'right'
+        ? 'left'
+        : fromSide === 'left'
+          ? 'right'
+          : fromSide === 'bottom'
+            ? 'top'
+            : 'bottom';
     return this.buildOrthogonalPath(a.x, a.y, fromSide, de.x2, de.y2, toSide);
   }
 
   protected nodeColor(type: NodeType): string {
     switch (type) {
-      case 'Start':             return '#16a34a';
-      case 'End':               return '#dc2626';
-      case 'ExclusiveGateway':  return '#d97706';
-      case 'InclusiveGateway':  return '#db2777';
-      case 'ParallelGateway':   return '#0891b2';
-      case 'JoinGateway':       return '#0e7490';
-      case 'Timer':             return '#ca8a04';
-      case 'WaitEvent':         return '#ea580c';
-      case 'ServiceTask':       return '#2563eb';
-      case 'CallActivity':      return '#4f46e5';
-      case 'ScriptTask':        return '#0d9488';
-      case 'NotificationTask':  return '#7c3aed';
-      default:                  return '#5040D6';
+      case 'Start':
+        return '#16a34a';
+      case 'End':
+        return '#dc2626';
+      case 'ExclusiveGateway':
+        return '#d97706';
+      case 'InclusiveGateway':
+        return '#db2777';
+      case 'ParallelGateway':
+        return '#0891b2';
+      case 'JoinGateway':
+        return '#0e7490';
+      case 'Timer':
+        return '#ca8a04';
+      case 'WaitEvent':
+        return '#ea580c';
+      case 'ServiceTask':
+        return '#2563eb';
+      case 'CallActivity':
+        return '#4f46e5';
+      case 'ScriptTask':
+        return '#0d9488';
+      case 'NotificationTask':
+        return '#7c3aed';
+      default:
+        return '#5040D6';
     }
   }
 
@@ -3119,44 +4120,78 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     return selected ? 'var(--ds-node-task-stroke-sel)' : 'var(--ds-node-task-stroke)';
   }
 
-  protected nodeLabelFill(): string { return 'var(--ds-node-label)'; }
-  protected nodeSubLabelFill(): string { return 'var(--ds-node-sublabel)'; }
-  protected edgeStroke(): string { return 'var(--ds-edge)'; }
-  protected edgeSelectedStroke(): string { return 'var(--ds-edge-selected)'; }
-  protected edgeDefaultStroke(): string { return 'var(--ds-edge-default)'; }
-  protected gridDotFill(): string { return 'var(--ds-grid-dot)'; }
+  protected nodeLabelFill(): string {
+    return 'var(--ds-node-label)';
+  }
+  protected nodeSubLabelFill(): string {
+    return 'var(--ds-node-sublabel)';
+  }
+  protected edgeStroke(): string {
+    return 'var(--ds-edge)';
+  }
+  protected edgeSelectedStroke(): string {
+    return 'var(--ds-edge-selected)';
+  }
+  protected edgeDefaultStroke(): string {
+    return 'var(--ds-edge-default)';
+  }
+  protected gridDotFill(): string {
+    return 'var(--ds-grid-dot)';
+  }
 
   protected startFill(selected: boolean): string {
     return this.theme.isDark()
-      ? (selected ? '#15803d' : '#166534')
-      : (selected ? '#16a34a' : '#22c55e');
+      ? selected
+        ? '#15803d'
+        : '#166534'
+      : selected
+        ? '#16a34a'
+        : '#22c55e';
   }
 
   protected startStroke(selected: boolean): string {
     return this.theme.isDark()
-      ? (selected ? '#4ade80' : '#16a34a')
-      : (selected ? '#14532d' : '#15803d');
+      ? selected
+        ? '#4ade80'
+        : '#16a34a'
+      : selected
+        ? '#14532d'
+        : '#15803d';
   }
 
   protected endFill(selected: boolean): string {
     return this.theme.isDark()
-      ? (selected ? '#7f1d1d' : '#450a0a')
-      : (selected ? '#dc2626' : '#ef4444');
+      ? selected
+        ? '#7f1d1d'
+        : '#450a0a'
+      : selected
+        ? '#dc2626'
+        : '#ef4444';
   }
 
   protected endStroke(selected: boolean): string {
     return this.theme.isDark()
-      ? (selected ? '#f87171' : '#dc2626')
-      : (selected ? '#7f1d1d' : '#b91c1c');
+      ? selected
+        ? '#f87171'
+        : '#dc2626'
+      : selected
+        ? '#7f1d1d'
+        : '#b91c1c';
   }
 
   protected gatewayFill(selected: boolean): string {
     return this.theme.isDark()
-      ? (selected ? '#422006' : '#1c0f02')
-      : (selected ? '#fffbeb' : '#ffffff');
+      ? selected
+        ? '#422006'
+        : '#1c0f02'
+      : selected
+        ? '#fffbeb'
+        : '#ffffff';
   }
 
-  protected trackById(_i: number, item: { id: string }): string { return item.id; }
+  protected trackById(_i: number, item: { id: string }): string {
+    return item.id;
+  }
 
   protected goBack(): void {
     this.router.navigate(['/admin/workflow/definitions', this.definitionId(), 'versions']);
@@ -3170,13 +4205,13 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   protected nodeSubLabel(n: CanvasNode): string {
-    if ((n.type === 'UserTask' || n.type === 'MainActivity')) {
+    if (n.type === 'UserTask' || n.type === 'MainActivity') {
       return this.selectedAssignmentGroupName(n.assignmentGroupId) || n.assignmentKey || '';
     }
     if (n.type === 'ServiceTask' && n.actionKey) return n.actionKey;
     if (n.type === 'CallActivity') {
       const cfg = this.parseConfig(n.configurationJson);
-      return typeof cfg['definitionKey'] === 'string' ? cfg['definitionKey'] as string : '';
+      return typeof cfg['definitionKey'] === 'string' ? (cfg['definitionKey'] as string) : '';
     }
     if (n.type === 'ScriptTask') {
       const cfg = this.parseConfig(n.configurationJson);
@@ -3184,20 +4219,21 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     }
     if (n.type === 'WaitEvent') {
       const cfg = this.parseConfig(n.configurationJson);
-      return typeof cfg['eventKey'] === 'string' ? cfg['eventKey'] as string : '';
+      return typeof cfg['eventKey'] === 'string' ? (cfg['eventKey'] as string) : '';
     }
     if (n.type === 'Timer') {
       const cfg = this.parseConfig(n.configurationJson);
-      return typeof cfg['timerType'] === 'string' ? cfg['timerType'] as string : '';
+      return typeof cfg['timerType'] === 'string' ? (cfg['timerType'] as string) : '';
     }
     return '';
   }
 
   protected paletteNodesInCategory(categoryId: string): typeof this.paletteNodes {
     const q = this.paletteSearch().toLowerCase().trim();
-    return this.paletteNodes.filter(p =>
-      p.category === categoryId &&
-      (!q || p.label.toLowerCase().includes(q) || p.type.toLowerCase().includes(q))
+    return this.paletteNodes.filter(
+      (p) =>
+        p.category === categoryId &&
+        (!q || p.label.toLowerCase().includes(q) || p.type.toLowerCase().includes(q)),
     );
   }
 
@@ -3205,14 +4241,14 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
 
   protected startInspectorResize(event: MouseEvent): void {
     event.preventDefault();
-    this.inspectorResizing     = true;
+    this.inspectorResizing = true;
     this.inspectorResizeStartX = event.clientX;
     this.inspectorResizeStartW = this.inspectorWidth();
   }
 
   protected startDrawerResize(event: MouseEvent): void {
     event.preventDefault();
-    this.drawerResizing     = true;
+    this.drawerResizing = true;
     this.drawerResizeStartY = event.clientY;
     this.drawerResizeStartH = this.drawerHeight();
   }
@@ -3226,37 +4262,70 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     return { x: n.x + this.nodeWidth(n) + 10, y: n.y + this.nodeHeight(n) / 2 + 26 };
   }
 
-  protected quickAddNode(type: NodeType, protocol?:string): void {
+  protected quickAddNode(type: NodeType, protocol?: string): void {
     if (this.isReadonly()) return;
     const sourceId = this.quickAddSourceId();
     if (!sourceId) return;
-    const source = this.nodes().find(n => n.id === sourceId);
+    const source = this.nodes().find((n) => n.id === sourceId);
     if (!source) return;
     const gap = this.isGateway(source.type) ? GATEWAY_R * 2 + 100 : NODE_W + 100;
     const x = source.x + gap;
     const y = source.y;
-    const id  = crypto.randomUUID();
+    const id = crypto.randomUUID();
     const key = `${type.toLowerCase()}_${Date.now()}`;
     const newNode: CanvasNode = {
-      id, nodeKey: key, type,
-      name: this.defaultNodeName(type), nameAr: '',
-      actionKey: '', assignmentKey: '', assignmentGroupId: '', assignmentPurpose: '', configurationJson: '',
-      x, y, outcomes: [], actions: [],
+      id,
+      nodeKey: key,
+      type,
+      name: this.defaultNodeName(type),
+      nameAr: '',
+      actionKey: '',
+      assignmentKey: '',
+      assignmentGroupId: '',
+      assignmentPurpose: '',
+      configurationJson: '',
+      x,
+      y,
+      outcomes: [],
+      actions: [],
     };
     const edge: CanvasEdge = {
-      id: crypto.randomUUID(), fromNodeId: sourceId, toNodeId: id,
+      id: crypto.randomUUID(),
+      fromNodeId: sourceId,
+      toNodeId: id,
       transitionKey: `transition_${Date.now()}`,
-      labelEn: '', labelAr: '', descriptionEn: '', outcomeKey: '',
-      conditionExpression: '', isDefault: false,
-      priority: this.edges().filter(e => e.fromNodeId === sourceId).length,
+      labelEn: '',
+      labelAr: '',
+      descriptionEn: '',
+      outcomeKey: '',
+      conditionExpression: '',
+      isDefault: false,
+      priority: this.edges().filter((e) => e.fromNodeId === sourceId).length,
     };
     this.pushUndo();
-    if(type==='ServiceTask') { newNode.actionKey='http.request'; newNode.configurationJson=JSON.stringify({protocol:protocol||'Rest',required:protocol!=='Sms',method:'GET',path:'/',timeoutSeconds:30,maxAttempts:3,retryDelaySeconds:10}); }
-    if(protocol==='Sms') newNode.name='SMS';
-    if(type==='NotificationTask') newNode.configurationJson=JSON.stringify({channels:'Email',required:false,failurePolicy:'Retry',maxAttempts:3});
-    this.nodes.update(ns => [...ns, newNode]);
+    if (type === 'ServiceTask') {
+      newNode.actionKey = 'http.request';
+      newNode.configurationJson = JSON.stringify({
+        protocol: protocol || 'Rest',
+        required: protocol !== 'Sms',
+        method: 'GET',
+        path: '/',
+        timeoutSeconds: 30,
+        maxAttempts: 3,
+        retryDelaySeconds: 10,
+      });
+    }
+    if (protocol === 'Sms') newNode.name = 'SMS';
+    if (type === 'NotificationTask')
+      newNode.configurationJson = JSON.stringify({
+        channels: 'Email',
+        required: false,
+        failurePolicy: 'Retry',
+        maxAttempts: 3,
+      });
+    this.nodes.update((ns) => [...ns, newNode]);
     this.ensureSimpleActions();
-    this.edges.update(es => [...es, edge]);
+    this.edges.update((es) => [...es, edge]);
     this.quickAddSourceId.set(null);
     this.selectedNodeId.set(id);
     this.selectedNodeIds.set([id]);
@@ -3265,4 +4334,18 @@ export class WorkflowDesignerComponent implements OnInit, AfterViewInit, OnDestr
     this.patchPropsFromNode(newNode);
     this.markUnsaved();
   }
+}
+
+interface DesignerActivityConfiguration extends Record<string, unknown> {
+  slaPolicyId?: string;
+  rejectTargetNodeKey?: string;
+  triggerBinding?: { sourceNodeKey: string; trigger: string };
+  events?: {
+    id: string;
+    kind: string;
+    name?: string;
+    required?: boolean;
+    trigger: string;
+    configuration: Record<string, unknown>;
+  }[];
 }

@@ -2,9 +2,9 @@ namespace NWFM.Tests.Modules.Workflow;
 
 using System.Text.Json;
 using FluentAssertions;
-using NWFM.Shared.Integration.Forms;
 using global::Workflow.Application.Helpers;
 using global::Workflow.Application.Workspace;
+using NWFM.Shared.Integration.Forms;
 
 public sealed class WorkflowFormRoutingTests
 {
@@ -24,7 +24,8 @@ public sealed class WorkflowFormRoutingTests
         => new() { Field = field, Operator = op, Value = JsonSerializer.SerializeToElement(value), To = JsonSerializer.SerializeToElement(to) };
     private static ActivityFormStep Step(params FormRoutingCondition[] conditions) => new()
     {
-        Id = "first", Otherwise = new() { Kind = "Activity", Target = "end" },
+        Id = "first",
+        Otherwise = new() { Kind = "Activity", Target = "end" },
         Rules = [new() { Id = "rule", When = new() { Conditions = conditions.ToList() }, Destination = new() { Kind = "Form", Target = "second" } }]
     };
 
@@ -55,7 +56,7 @@ public sealed class WorkflowFormRoutingTests
     public void RangesAndSqlValues_AreComparedAtTheirPublishedGranularity()
     {
         var step = Step(Condition("date", "between", "2026-10-09", "2026-10-10"), Condition("time", "equal", "09:30"));
-        WorkflowFormRouting.Decide(step, Fields, new Dictionary<string, object?> { ["date"] = new DateTime(2026,10,10), ["time"] = new TimeSpan(9,30,0) }).RuleId.Should().Be("rule");
+        WorkflowFormRouting.Decide(step, Fields, new Dictionary<string, object?> { ["date"] = new DateTime(2026, 10, 10), ["time"] = new TimeSpan(9, 30, 0) }).RuleId.Should().Be("rule");
         WorkflowFormRouting.Decide(Step(Condition("amount", "between", 10, 20)), Fields, new Dictionary<string, object?> { ["amount"] = 20m }).RuleId.Should().Be("rule");
     }
 

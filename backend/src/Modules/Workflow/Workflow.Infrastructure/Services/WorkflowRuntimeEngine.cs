@@ -2,17 +2,17 @@ namespace Workflow.Infrastructure.Services;
 
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using NWFM.Shared.Integration.Workflow;
-using NWFM.Shared.Results;
-using NWFM.Shared.Organization;
 using NWFM.Shared.Integration.Organization;
+using NWFM.Shared.Integration.Workflow;
+using NWFM.Shared.Organization;
+using NWFM.Shared.Results;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Constants;
+using Workflow.Application.Integrations;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 using Workflow.Infrastructure.Persistence;
-using Workflow.Application.Integrations;
 
 /// <summary>
 /// Generic workflow engine. Handles Start, UserTask, ExclusiveGateway, ServiceTask,
@@ -83,33 +83,33 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
         IWorkflowIntegrationRuntime? integrations = null, WorkflowActivityEvents? activityEvents = null,
         IOrgDirectory? directory = null, IOrgScopeProvider? scopes = null)
     {
-        _db                     = db;
-        _bindingRepo            = bindingRepo;
-        _versionResolver        = versionResolver;
-        _definitionRepo         = definitionRepo;
-        _versionRepo            = versionRepo;
-        _instanceRepo           = instanceRepo;
-        _activityRepo           = activityRepo;
-        _workItemRepo           = workItemRepo;
-        _candidateRepo          = candidateRepo;
-        _variableRepo           = variableRepo;
-        _transitionEvaluator    = transitionEvaluator;
-        _assignmentResolver     = assignmentResolver;
-        _candidateFactory       = candidateFactory;
-        _slaRepo                = slaRepo;
-        _calendarService        = calendarService;
+        _db = db;
+        _bindingRepo = bindingRepo;
+        _versionResolver = versionResolver;
+        _definitionRepo = definitionRepo;
+        _versionRepo = versionRepo;
+        _instanceRepo = instanceRepo;
+        _activityRepo = activityRepo;
+        _workItemRepo = workItemRepo;
+        _candidateRepo = candidateRepo;
+        _variableRepo = variableRepo;
+        _transitionEvaluator = transitionEvaluator;
+        _assignmentResolver = assignmentResolver;
+        _candidateFactory = candidateFactory;
+        _slaRepo = slaRepo;
+        _calendarService = calendarService;
         _transitionInstanceRepo = transitionInstanceRepo;
-        _events                 = events;
-        _eventRepo              = eventRepo;
-        _actionRegistry         = actionRegistry;
-        _incidentService        = incidentService;
-        _timerService           = timerService;
-        _timerRepo              = timerRepo;
-        _notificationPublisher  = notificationPublisher;
-        _tokenRepo              = tokenRepo;
-        _outcomeDispatcher      = outcomeDispatcher;
-        _requestProjector       = requestProjector;
-        _integrations           = integrations;
+        _events = events;
+        _eventRepo = eventRepo;
+        _actionRegistry = actionRegistry;
+        _incidentService = incidentService;
+        _timerService = timerService;
+        _timerRepo = timerRepo;
+        _notificationPublisher = notificationPublisher;
+        _tokenRepo = tokenRepo;
+        _outcomeDispatcher = outcomeDispatcher;
+        _requestProjector = requestProjector;
+        _integrations = integrations;
         _activityEvents = activityEvents;
         _directory = directory;
         _scopes = scopes;
@@ -677,252 +677,252 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             switch (currentActivity.ActivityType)
             {
                 case ActivityType.Start:
-                {
-                    var nextKey = GetSingleOutgoing(version, currentNodeKey);
-                    if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-                    instance.AdvanceTo(nextKey, now);
-                    currentNodeKey = nextKey;
-                    break;
-                }
+                    {
+                        var nextKey = GetSingleOutgoing(version, currentNodeKey);
+                        if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        instance.AdvanceTo(nextKey, now);
+                        currentNodeKey = nextKey;
+                        break;
+                    }
 
                 case ActivityType.UserTask:
-                {
-                    var activityInst = retryExecution ?? await CreateActivityInstanceAsync(
-                        instance, currentActivity, now, cancellationToken);
-                    activityInst.AttachToken(currentToken?.Id);
-                    activityInst.SetDeadline(await ResolveUserTaskDueAtAsync(instance.OrganizationId, currentActivity.ConfigurationJson, now, cancellationToken));
-                    if (_activityEvents is not null)
                     {
-                        var entry = await _activityEvents.QueueAsync(instance, currentActivity, activityInst, "OnEnter", "entry", cancellationToken);
-                        if (entry.IsFailure) return Result.Failure(entry.Error);
-                        if (!entry.Value) { activityInst.SetPhase("WaitingForEnterEvents"); instance.AdvanceTo(currentNodeKey, now); return Result.Success(); }
+                        var activityInst = retryExecution ?? await CreateActivityInstanceAsync(
+                            instance, currentActivity, now, cancellationToken);
+                        activityInst.AttachToken(currentToken?.Id);
+                        activityInst.SetDeadline(await ResolveUserTaskDueAtAsync(instance.OrganizationId, currentActivity.ConfigurationJson, now, cancellationToken));
+                        if (_activityEvents is not null)
+                        {
+                            var entry = await _activityEvents.QueueAsync(instance, currentActivity, activityInst, "OnEnter", "entry", cancellationToken);
+                            if (entry.IsFailure) return Result.Failure(entry.Error);
+                            if (!entry.Value) { activityInst.SetPhase("WaitingForEnterEvents"); instance.AdvanceTo(currentNodeKey, now); return Result.Success(); }
+                        }
+
+                        var hooks = await ExecuteHooksAsync(instance, currentActivity, activityInst, ActionExecutionTrigger.OnEnter, null, now, cancellationToken);
+                        if (hooks.IsFailure) return hooks;
+
+                        return await CreateApprovalTaskAsync(instance, currentActivity, activityInst, now, cancellationToken);
                     }
-
-                    var hooks = await ExecuteHooksAsync(instance, currentActivity, activityInst, ActionExecutionTrigger.OnEnter, null, now, cancellationToken);
-                    if (hooks.IsFailure) return hooks;
-
-                    return await CreateApprovalTaskAsync(instance, currentActivity, activityInst, now, cancellationToken);
-                }
 
                 case ActivityType.ExclusiveGateway:
-                {
-                    var gatewayInst = await CreateActivityInstanceAsync(
-                        instance, currentActivity, now, cancellationToken);
+                    {
+                        var gatewayInst = await CreateActivityInstanceAsync(
+                            instance, currentActivity, now, cancellationToken);
 
-                    var outgoingTransitions = version.Transitions
-                        .Where(t => t.FromActivityDefinitionId == currentActivity.Id)
-                        .ToList();
+                        var outgoingTransitions = version.Transitions
+                            .Where(t => t.FromActivityDefinitionId == currentActivity.Id)
+                            .ToList();
 
-                    var variables = await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
-                    var transitionKey = _transitionEvaluator.Evaluate(outgoingTransitions, variables);
+                        var variables = await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken);
+                        var transitionKey = _transitionEvaluator.Evaluate(outgoingTransitions, variables);
 
-                    if (transitionKey is null)
-                        return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        if (transitionKey is null)
+                            return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
 
-                    var selectedTransition = outgoingTransitions.First(t => t.TransitionKey == transitionKey);
-                    var nextActivity = version.Activities.FirstOrDefault(
-                        a => a.Id == selectedTransition.ToActivityDefinitionId);
-                    if (nextActivity is null)
-                        return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        var selectedTransition = outgoingTransitions.First(t => t.TransitionKey == transitionKey);
+                        var nextActivity = version.Activities.FirstOrDefault(
+                            a => a.Id == selectedTransition.ToActivityDefinitionId);
+                        if (nextActivity is null)
+                            return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
 
-                    await RecordTransitionTakenAsync(
-                        instance, currentNodeKey, nextActivity.NodeKey, selectedTransition, now, cancellationToken);
+                        await RecordTransitionTakenAsync(
+                            instance, currentNodeKey, nextActivity.NodeKey, selectedTransition, now, cancellationToken);
 
-                    gatewayInst.Complete(now);
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.ActivityCompleted, now, currentNodeKey,
-                        cancellationToken: cancellationToken);
+                        gatewayInst.Complete(now);
+                        await _events.AppendAsync(
+                            instance.OrganizationId, instance.Id,
+                            WorkflowEventType.ActivityCompleted, now, currentNodeKey,
+                            cancellationToken: cancellationToken);
 
-                    instance.AdvanceTo(nextActivity.NodeKey, now);
-                    currentNodeKey = nextActivity.NodeKey;
-                    break;
-                }
+                        instance.AdvanceTo(nextActivity.NodeKey, now);
+                        currentNodeKey = nextActivity.NodeKey;
+                        break;
+                    }
 
                 case ActivityType.ScriptTask:
-                {
-                    var scriptResult = await ExecuteScriptTaskAsync(
-                        instance, version, currentActivity, now, cancellationToken);
-                    if (scriptResult.IsFailure)
-                        return scriptResult;
+                    {
+                        var scriptResult = await ExecuteScriptTaskAsync(
+                            instance, version, currentActivity, now, cancellationToken);
+                        if (scriptResult.IsFailure)
+                            return scriptResult;
 
-                    var nextKey = GetSingleOutgoing(version, currentNodeKey);
-                    if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-                    instance.AdvanceTo(nextKey, now);
-                    currentNodeKey = nextKey;
-                    break;
-                }
+                        var nextKey = GetSingleOutgoing(version, currentNodeKey);
+                        if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        instance.AdvanceTo(nextKey, now);
+                        currentNodeKey = nextKey;
+                        break;
+                    }
 
                 case ActivityType.WaitEvent:
-                {
-                    var waitInstance = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
-                    waitInstance.AttachToken(currentToken?.Id);
-                    EventActivityConfiguration eventConfig;
-                    try { eventConfig = IntegrationJson.Read<EventActivityConfiguration>(currentActivity.ConfigurationJson); }
-                    catch (JsonException) { eventConfig = new(); }
-                    if (eventConfig.ConnectionId != Guid.Empty)
                     {
-                        if (_integrations is null) return Result.Failure(new Error("Workflow.Integration.Unavailable", "Integration runtime is unavailable."));
-                        var variables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
-                        var registration = await _integrations.RegisterWaitAsync(instance.Id, waitInstance.Id,
-                            currentActivity.ConfigurationJson!, variables, cancellationToken);
-                        if (registration.IsFailure) return registration;
+                        var waitInstance = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+                        waitInstance.AttachToken(currentToken?.Id);
+                        EventActivityConfiguration eventConfig;
+                        try { eventConfig = IntegrationJson.Read<EventActivityConfiguration>(currentActivity.ConfigurationJson); }
+                        catch (JsonException) { eventConfig = new(); }
+                        if (eventConfig.ConnectionId != Guid.Empty)
+                        {
+                            if (_integrations is null) return Result.Failure(new Error("Workflow.Integration.Unavailable", "Integration runtime is unavailable."));
+                            var variables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
+                            var registration = await _integrations.RegisterWaitAsync(instance.Id, waitInstance.Id,
+                                currentActivity.ConfigurationJson!, variables, cancellationToken);
+                            if (registration.IsFailure) return registration;
+                        }
+
+                        await _events.AppendAsync(
+                            instance.OrganizationId, instance.Id,
+                            WorkflowEventType.ActivityStarted, now, currentNodeKey,
+                            payloadJson: currentActivity.ConfigurationJson,
+                            cancellationToken: cancellationToken);
+
+                        instance.AdvanceTo(currentNodeKey, now);
+                        return Result.Success(); // HALT — waiting for external signal
                     }
-
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.ActivityStarted, now, currentNodeKey,
-                        payloadJson: currentActivity.ConfigurationJson,
-                        cancellationToken: cancellationToken);
-
-                    instance.AdvanceTo(currentNodeKey, now);
-                    return Result.Success(); // HALT — waiting for external signal
-                }
 
                 case ActivityType.ServiceTask:
-                {
-                    if (currentActivity.ActionKey == "http.request")
-                        return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Http", now, cancellationToken);
-                    var serviceResult = await ExecuteServiceTaskAsync(
-                        instance, currentActivity, now, cancellationToken);
-                    if (serviceResult.IsFailure)
-                        return serviceResult;
+                    {
+                        if (currentActivity.ActionKey == "http.request")
+                            return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Http", now, cancellationToken);
+                        var serviceResult = await ExecuteServiceTaskAsync(
+                            instance, currentActivity, now, cancellationToken);
+                        if (serviceResult.IsFailure)
+                            return serviceResult;
 
-                    var nextKey = GetSingleOutgoing(version, currentNodeKey);
-                    if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-                    instance.AdvanceTo(nextKey, now);
-                    currentNodeKey = nextKey;
-                    break;
-                }
+                        var nextKey = GetSingleOutgoing(version, currentNodeKey);
+                        if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        instance.AdvanceTo(nextKey, now);
+                        currentNodeKey = nextKey;
+                        break;
+                    }
 
                 case ActivityType.Timer:
-                {
-                    var activityInst = await CreateActivityInstanceAsync(
-                        instance, currentActivity, now, cancellationToken);
-                    activityInst.AttachToken(currentToken?.Id);
+                    {
+                        var activityInst = await CreateActivityInstanceAsync(
+                            instance, currentActivity, now, cancellationToken);
+                        activityInst.AttachToken(currentToken?.Id);
 
-                    var timerConfig = ParseTimerConfig(currentActivity.ConfigurationJson);
-                    var dueAt = ResolveTimerDueAt(timerConfig, now);
+                        var timerConfig = ParseTimerConfig(currentActivity.ConfigurationJson);
+                        var dueAt = ResolveTimerDueAt(timerConfig, now);
 
-                    var scheduleResult = await _timerService.ScheduleAsync(
-                        instance.OrganizationId,
-                        instance.Id,
-                        activityInst.Id,
-                        timerConfig.TimerType,
-                        dueAt,
-                        now,
-                        timerConfig.SignalKey,
-                        cancellationToken);
+                        var scheduleResult = await _timerService.ScheduleAsync(
+                            instance.OrganizationId,
+                            instance.Id,
+                            activityInst.Id,
+                            timerConfig.TimerType,
+                            dueAt,
+                            now,
+                            timerConfig.SignalKey,
+                            cancellationToken);
 
-                    if (scheduleResult.IsFailure)
-                        return Result.Failure(scheduleResult.Error);
+                        if (scheduleResult.IsFailure)
+                            return Result.Failure(scheduleResult.Error);
 
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.TimerScheduled, now, currentNodeKey,
-                        payloadJson: $"{{\"timerId\":\"{scheduleResult.Value.Id}\",\"dueAt\":\"{dueAt:O}\"}}",
-                        cancellationToken: cancellationToken);
+                        await _events.AppendAsync(
+                            instance.OrganizationId, instance.Id,
+                            WorkflowEventType.TimerScheduled, now, currentNodeKey,
+                            payloadJson: $"{{\"timerId\":\"{scheduleResult.Value.Id}\",\"dueAt\":\"{dueAt:O}\"}}",
+                            cancellationToken: cancellationToken);
 
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.ActivityStarted, now, currentNodeKey,
-                        cancellationToken: cancellationToken);
+                        await _events.AppendAsync(
+                            instance.OrganizationId, instance.Id,
+                            WorkflowEventType.ActivityStarted, now, currentNodeKey,
+                            cancellationToken: cancellationToken);
 
-                    instance.AdvanceTo(currentNodeKey, now);
-                    return Result.Success(); // HALT — waiting for timer
-                }
+                        instance.AdvanceTo(currentNodeKey, now);
+                        return Result.Success(); // HALT — waiting for timer
+                    }
 
                 case ActivityType.NotificationTask:
-                {
-                    var emailConfig = IntegrationJson.Read<EmailActivityConfiguration>(currentActivity.ConfigurationJson);
-                    if (emailConfig.Channels.Contains("Email", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (emailConfig.Channels.Contains("InApp", StringComparison.OrdinalIgnoreCase))
+                        var emailConfig = IntegrationJson.Read<EmailActivityConfiguration>(currentActivity.ConfigurationJson);
+                        if (emailConfig.Channels.Contains("Email", StringComparison.OrdinalIgnoreCase))
                         {
-                            var inAppVariables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
-                            await _notificationPublisher.PublishAsync(new WorkflowNotificationRequest(instance.OrganizationId,
-                                emailConfig.TemplateKey, WorkflowNotificationChannel.InApp, inAppVariables,
-                                instance.CorrelationId ?? instance.Id.ToString(), emailConfig.RecipientUserIds), cancellationToken);
+                            if (emailConfig.Channels.Contains("InApp", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var inAppVariables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, cancellationToken));
+                                await _notificationPublisher.PublishAsync(new WorkflowNotificationRequest(instance.OrganizationId,
+                                    emailConfig.TemplateKey, WorkflowNotificationChannel.InApp, inAppVariables,
+                                    instance.CorrelationId ?? instance.Id.ToString(), emailConfig.RecipientUserIds), cancellationToken);
+                            }
+                            return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Email", now, cancellationToken);
                         }
-                        return await QueueIntegrationActivityAsync(instance, currentActivity, currentToken, "Email", now, cancellationToken);
-                    }
-                    var notifResult = await ExecuteNotificationTaskAsync(
-                        instance, currentActivity, now, cancellationToken);
-                    if (notifResult.IsFailure)
-                        return notifResult;
+                        var notifResult = await ExecuteNotificationTaskAsync(
+                            instance, currentActivity, now, cancellationToken);
+                        if (notifResult.IsFailure)
+                            return notifResult;
 
-                    var nextKey = GetSingleOutgoing(version, currentNodeKey);
-                    if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
-                    instance.AdvanceTo(nextKey, now);
-                    currentNodeKey = nextKey;
-                    break;
-                }
+                        var nextKey = GetSingleOutgoing(version, currentNodeKey);
+                        if (nextKey is null) return Result.Failure(WorkflowErrors.Instance.NoOutgoingTransition);
+                        instance.AdvanceTo(nextKey, now);
+                        currentNodeKey = nextKey;
+                        break;
+                    }
 
                 case ActivityType.ParallelGateway:
-                {
-                    var forkResult = await ExecuteParallelGatewayAsync(
-                        instance, version, currentActivity, now, cancellationToken, currentToken);
-                    return forkResult;
-                }
+                    {
+                        var forkResult = await ExecuteParallelGatewayAsync(
+                            instance, version, currentActivity, now, cancellationToken, currentToken);
+                        return forkResult;
+                    }
 
                 case ActivityType.InclusiveGateway:
-                {
-                    var inclusiveResult = await ExecuteInclusiveGatewayAsync(
-                        instance, version, currentActivity, now, cancellationToken, currentToken);
-                    return inclusiveResult;
-                }
+                    {
+                        var inclusiveResult = await ExecuteInclusiveGatewayAsync(
+                            instance, version, currentActivity, now, cancellationToken, currentToken);
+                        return inclusiveResult;
+                    }
 
                 case ActivityType.MainActivity:
                 case ActivityType.CallActivity:
-                {
-                    var callResult = await ExecuteCallActivityAsync(
-                        instance, version, currentActivity, now, cancellationToken, currentToken);
-                    return callResult;
-                }
+                    {
+                        var callResult = await ExecuteCallActivityAsync(
+                            instance, version, currentActivity, now, cancellationToken, currentToken);
+                        return callResult;
+                    }
 
                 case ActivityType.JoinGateway:
-                {
-                    var joinResult = await ExecuteJoinGatewayAsync(
-                        instance, version, currentActivity, currentToken, now, cancellationToken);
+                    {
+                        var joinResult = await ExecuteJoinGatewayAsync(
+                            instance, version, currentActivity, currentToken, now, cancellationToken);
 
-                    if (joinResult.Halt)
-                        return joinResult.Result;
+                        if (joinResult.Halt)
+                            return joinResult.Result;
 
-                    if (joinResult.Result.IsFailure)
-                        return joinResult.Result;
+                        if (joinResult.Result.IsFailure)
+                            return joinResult.Result;
 
-                    currentToken = currentToken?.ParentTokenId is Guid parentTokenId ? await _tokenRepo.GetByIdAsync(parentTokenId, cancellationToken) : null;
-                    currentNodeKey = joinResult.NextNodeKey!;
-                    instance.AdvanceTo(currentNodeKey, now);
-                    break;
-                }
+                        currentToken = currentToken?.ParentTokenId is Guid parentTokenId ? await _tokenRepo.GetByIdAsync(parentTokenId, cancellationToken) : null;
+                        currentNodeKey = joinResult.NextNodeKey!;
+                        instance.AdvanceTo(currentNodeKey, now);
+                        break;
+                    }
 
                 case ActivityType.End:
-                {
-                    var endActivity = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
-                    endActivity.AttachToken(currentToken?.Id);
-                    endActivity.Complete(now);
-                    if (currentToken is not null)
                     {
-                        currentToken.Complete(now);
-                        await _db.SaveChangesAsync(cancellationToken);
-                        if ((await _tokenRepo.GetByInstanceIdAsync(instance.Id, cancellationToken)).Any(t => t.Status == ExecutionTokenStatus.Active))
-                            return Result.Success();
+                        var endActivity = await CreateActivityInstanceAsync(instance, currentActivity, now, cancellationToken);
+                        endActivity.AttachToken(currentToken?.Id);
+                        endActivity.Complete(now);
+                        if (currentToken is not null)
+                        {
+                            currentToken.Complete(now);
+                            await _db.SaveChangesAsync(cancellationToken);
+                            if ((await _tokenRepo.GetByInstanceIdAsync(instance.Id, cancellationToken)).Any(t => t.Status == ExecutionTokenStatus.Active))
+                                return Result.Success();
+                        }
+                        instance.Complete(now);
+
+                        await _events.AppendAsync(
+                            instance.OrganizationId, instance.Id,
+                            WorkflowEventType.InstanceCompleted, now, currentNodeKey,
+                            cancellationToken: cancellationToken);
+
+                        if (instance.ParentInstanceId is null) await DispatchOutcomeAsync(instance, now, cancellationToken);
+
+                        // The durable child worker resumes asynchronous parents under
+                        // their own lock. Avoid acquiring parent locks from child transactions.
+
+                        return Result.Success();
                     }
-                    instance.Complete(now);
-
-                    await _events.AppendAsync(
-                        instance.OrganizationId, instance.Id,
-                        WorkflowEventType.InstanceCompleted, now, currentNodeKey,
-                        cancellationToken: cancellationToken);
-
-                    if (instance.ParentInstanceId is null) await DispatchOutcomeAsync(instance, now, cancellationToken);
-
-                    // The durable child worker resumes asynchronous parents under
-                    // their own lock. Avoid acquiring parent locks from child transactions.
-
-                    return Result.Success();
-                }
 
                 default:
                     return Result.Failure(WorkflowErrors.Instance.UnhandledActivityType);
@@ -1959,8 +1959,13 @@ internal sealed partial class WorkflowRuntimeEngine : IWorkflowRuntimeEngine
             var valueJson = ResolveScriptValue(rawValue, existingVars);
             using var valueDocument = JsonDocument.Parse(valueJson);
             var valueType = version.Variables.FirstOrDefault(v => v.VariableKey == name)?.DataType
-                ?? (valueDocument.RootElement.ValueKind switch { JsonValueKind.Number => VariableDataType.Decimal,
-                    JsonValueKind.True or JsonValueKind.False => VariableDataType.Boolean, JsonValueKind.String => VariableDataType.String, _ => VariableDataType.Json });
+                ?? (valueDocument.RootElement.ValueKind switch
+                {
+                    JsonValueKind.Number => VariableDataType.Decimal,
+                    JsonValueKind.True or JsonValueKind.False => VariableDataType.Boolean,
+                    JsonValueKind.String => VariableDataType.String,
+                    _ => VariableDataType.Json
+                });
             await UpsertVariableAsync(
                 instance, name, valueJson, valueType, now, cancellationToken);
 

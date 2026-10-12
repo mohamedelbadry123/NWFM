@@ -39,3 +39,18 @@ Apply the additive Workflow migration **20261009120000_ActivityFormProgress** be
 - Workflow completion permission also permits uploading form media; file ownership checks still apply.
 
 Form Engine remains the owner of schemas and submissions. Workflow reads Task Type associations through `IWorkflowTaskTypeCatalog` and form data through `IFormGateway`.
+
+## End-to-end regression tests
+
+Run `npm run test:e2e:replay` from the repository root in the Linux/WSL environment described in [quality-gates.md](quality-gates.md). The launcher owns a disposable SQL Server database and local transports; it must not target a business database. The new activity-form tests use exact browser interactions and require no model calls or additional recordings.
+
+`tests/workflow-activity-forms.e2e.ts` covers:
+
+- Required-field validation, forward skips, backward routes, repeated visits, and default Next routes.
+- Assignment and deadline retention between forms; entered answers survive workspace refresh.
+- Historical submission replay and rejection of unknown visits without duplicate advancement.
+- Nested numeric routing, parent/child gating, fresh child runs after returning to an activity, and persisted completion history after reload.
+- Read-only child previews and rejection of missing form destinations before publication.
+- Claiming and submitting forms from task detail, preserving the current visit after reload, and completing the task through its dedicated endpoint.
+
+The fresh-database run also verifies demo startup. Demo workflows now bind an optional approval-notes form to their own task type, satisfying the same publication rules as other workflows without requiring answers for the seeded approval walkthrough.

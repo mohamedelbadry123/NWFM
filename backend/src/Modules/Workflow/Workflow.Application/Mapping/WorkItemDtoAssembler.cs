@@ -1,17 +1,17 @@
 namespace Workflow.Application.Mapping;
 
+using System.Text.Json;
+using NWFM.Shared.Integration.Forms;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Commands.ClaimWorkItem;
 using Workflow.Application.DTOs;
+using Workflow.Application.Helpers;
+using Workflow.Application.Integrations;
 using Workflow.Application.Queries.GetWorkflowVersionById;
+using Workflow.Application.Workspace;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
-using Workflow.Application.Helpers;
-using Workflow.Application.Integrations;
-using System.Text.Json;
-using NWFM.Shared.Integration.Forms;
-using Workflow.Application.Workspace;
 
 public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
 {
@@ -91,11 +91,19 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
                         visit.SubmittedAt, visit.RuleId, visit.Destination, visit.Answers, schemas[key]));
                 }
             }
-            return dto with { AvailableOutcomes = outcomes, FormFields = selectedForm is null ? config.FormFields : [], FormValues = values,
-                FormVisitId = progress?.VisitId, ActiveFormStepId = progress?.ActiveStepId,
-                FormSteps = binding.FormSteps.Count > 0 ? binding.FormSteps : null, FormHistory = progress is null ? null : history,
+            return dto with
+            {
+                AvailableOutcomes = outcomes,
+                FormFields = selectedForm is null ? config.FormFields : [],
+                FormValues = values,
+                FormVisitId = progress?.VisitId,
+                ActiveFormStepId = progress?.ActiveStepId,
+                FormSteps = binding.FormSteps.Count > 0 ? binding.FormSteps : null,
+                FormHistory = progress is null ? null : history,
                 SelectedForm = selectedForm,
-                InstructionsEn = config.InstructionsEn, InstructionsAr = config.InstructionsAr };
+                InstructionsEn = config.InstructionsEn,
+                InstructionsAr = config.InstructionsAr
+            };
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         { return dto with { AvailableOutcomes = outcomes }; }

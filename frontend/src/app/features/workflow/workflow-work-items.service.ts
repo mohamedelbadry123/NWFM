@@ -11,14 +11,30 @@ import { apiWorkflowWorkItemsWorkItemIdClaimPost } from '@shared/models/fn/work-
 import { apiWorkflowWorkItemsWorkItemIdReleasePost } from '@shared/models/fn/work-items/api-workflow-work-items-work-item-id-release-post';
 import { apiWorkflowWorkItemsGroupGroupIdGet } from '@shared/models/fn/work-items/api-workflow-work-items-group-group-id-get';
 import type { WorkItemDto } from '@shared/models/models/Workflow/Application/DTOs/work-item-dto';
-import type { CompleteWorkItemPayload, WorkflowWorkItemExtras } from '@core/models/workflow-ops.models';
+import type {
+  CompleteWorkItemPayload,
+  WorkflowWorkItemExtras,
+} from '@core/models/workflow-ops.models';
 
-export type WorkflowWorkItemView = WorkItemDto & WorkflowWorkItemExtras & {
-  instructionsEn?: string; instructionsAr?: string;
-  formFields?: { key: string; labelEn: string; labelAr: string; type: string; required: boolean; options?: string[] }[];
-  selectedForm?: WorkflowSelectedForm; formValues?: Record<string, unknown>;
-  formVisitId?: string; activeFormStepId?: string; formSteps?: ActivityFormStep[]; formHistory?: ActivityFormVisit[];
-};
+export type WorkflowWorkItemView = WorkItemDto &
+  WorkflowWorkItemExtras & {
+    instructionsEn?: string;
+    instructionsAr?: string;
+    formFields?: {
+      key: string;
+      labelEn: string;
+      labelAr: string;
+      type: string;
+      required: boolean;
+      options?: string[];
+    }[];
+    selectedForm?: WorkflowSelectedForm;
+    formValues?: Record<string, unknown>;
+    formVisitId?: string;
+    activeFormStepId?: string;
+    formSteps?: ActivityFormStep[];
+    formHistory?: ActivityFormVisit[];
+  };
 
 @Injectable({ providedIn: 'root' })
 export class WorkflowWorkItemsService {
@@ -27,7 +43,7 @@ export class WorkflowWorkItemsService {
 
   getMyWorkItems(): Observable<WorkflowWorkItemView[]> {
     return apiWorkflowWorkItemsMyGet(this.http, this.config.rootUrl).pipe(
-      map(r => (r.body as WorkflowWorkItemView[]) ?? [])
+      map((r) => (r.body as WorkflowWorkItemView[]) ?? []),
     );
   }
 
@@ -45,20 +61,20 @@ export class WorkflowWorkItemsService {
 
   getById(workItemId: string): Observable<WorkflowWorkItemView> {
     return apiWorkflowWorkItemsWorkItemIdGet(this.http, this.config.rootUrl, { workItemId }).pipe(
-      map(r => r.body as WorkflowWorkItemView)
+      map((r) => r.body as WorkflowWorkItemView),
     );
   }
 
   getGroupWorkItems(groupId: string): Observable<WorkItemDto[]> {
     return apiWorkflowWorkItemsGroupGroupIdGet(this.http, this.config.rootUrl, { groupId }).pipe(
-      map(r => r.body as WorkItemDto[])
+      map((r) => r.body as WorkItemDto[]),
     );
   }
 
   claim(workItemId: string): Observable<WorkflowWorkItemView> {
-    return apiWorkflowWorkItemsWorkItemIdClaimPost(this.http, this.config.rootUrl, { workItemId }).pipe(
-      map(r => r.body as WorkflowWorkItemView)
-    );
+    return apiWorkflowWorkItemsWorkItemIdClaimPost(this.http, this.config.rootUrl, {
+      workItemId,
+    }).pipe(map((r) => r.body as WorkflowWorkItemView));
   }
 
   complete(workItemId: string, req: CompleteWorkItemPayload): Observable<WorkflowWorkItemView> {
@@ -69,9 +85,9 @@ export class WorkflowWorkItemsService {
   }
 
   release(workItemId: string): Observable<void> {
-    return apiWorkflowWorkItemsWorkItemIdReleasePost(this.http, this.config.rootUrl, { workItemId }).pipe(
-      map(() => undefined)
-    );
+    return apiWorkflowWorkItemsWorkItemIdReleasePost(this.http, this.config.rootUrl, {
+      workItemId,
+    }).pipe(map(() => undefined));
   }
 
   reassign(workItemId: string, newAssignmentGroupId: string): Observable<WorkflowWorkItemView> {

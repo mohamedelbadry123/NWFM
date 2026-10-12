@@ -103,9 +103,10 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
     }
     private async Task<IReadOnlyList<WorkspaceWorkflow>> CatalogForKindAsync(string kind, CancellationToken ct, Guid? selectedVersionId = null)
     {
-        var rows = await (from v in db.WorkflowVersions.AsNoTracking() join d in db.WorkflowDefinitions on v.WorkflowDefinitionId equals d.Id
-            where d.IsActive && v.Status == WorkflowVersionStatus.Published && v.WorkspaceJson != null
-            select new WorkspaceWorkflow(d.Id, d.Name, d.NameAr, v.Id, v.VersionNumber, v.WorkspaceJson, d.DefinitionKey)).ToListAsync(ct);
+        var rows = await (from v in db.WorkflowVersions.AsNoTracking()
+                          join d in db.WorkflowDefinitions on v.WorkflowDefinitionId equals d.Id
+                          where d.IsActive && v.Status == WorkflowVersionStatus.Published && v.WorkspaceJson != null
+                          select new WorkspaceWorkflow(d.Id, d.Name, d.NameAr, v.Id, v.VersionNumber, v.WorkspaceJson, d.DefinitionKey)).ToListAsync(ct);
         return rows.Where(x => WorkflowWorkspaceDefinition.KindOf(x.WorkspaceJson) == kind)
             .GroupBy(x => x.Id).SelectMany(g => g.Where(x => x.VersionId == selectedVersionId || x.VersionNumber == g.Max(v => v.VersionNumber)))
             .OrderBy(x => x.Name).ThenByDescending(x => x.VersionNumber).ToList();
@@ -159,9 +160,11 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
     public async Task<IReadOnlyList<WorkspaceInstanceSummary>> ListAsync(string? search, CancellationToken ct)
     {
         var visible = db.WorkflowInstances.AsNoTracking().Where(WorkflowScopeFilter.ForScope(await CallerScopeAsync(ct)));
-        var query = from i in visible join v in db.WorkflowVersions on i.PinnedWorkflowVersionId equals v.Id
-            join d in db.WorkflowDefinitions on v.WorkflowDefinitionId equals d.Id where i.ParentInstanceId == null
-            select new { i.Id, d.Name, i.Status, i.CorrelationId, i.StartedAt, i.IsDemo, i.ClusterCode, i.CbuCode, i.BranchCode, i.OperationAreaCode };
+        var query = from i in visible
+                    join v in db.WorkflowVersions on i.PinnedWorkflowVersionId equals v.Id
+                    join d in db.WorkflowDefinitions on v.WorkflowDefinitionId equals d.Id
+                    where i.ParentInstanceId == null
+                    select new { i.Id, d.Name, i.Status, i.CorrelationId, i.StartedAt, i.IsDemo, i.ClusterCode, i.CbuCode, i.BranchCode, i.OperationAreaCode };
         if (!string.IsNullOrWhiteSpace(search)) query = query.Where(i => i.Name.Contains(search) || i.CorrelationId != null && i.CorrelationId.Contains(search));
         return (await query.OrderByDescending(i => i.StartedAt).Take(200).ToListAsync(ct))
             .Select(i => new WorkspaceInstanceSummary(i.Id, i.Name, i.Status.ToString(), i.CorrelationId, i.StartedAt, i.IsDemo,

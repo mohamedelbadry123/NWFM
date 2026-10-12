@@ -1,4 +1,3 @@
-using NWFM.Shared.Integration.Forms;
 using Workflow.Application.DTOs;
 using Workflow.Application.Helpers;
 using Workflow.Application.Workspace;
@@ -25,7 +24,7 @@ internal sealed partial class WorkflowWorkspacePublisher
                 edges.Add((Node(activity.NodeKey), Form(activity.NodeKey, config.FormSteps[0].Id)));
                 foreach (var step in config.FormSteps)
                 {
-                    var key = Form(activity.NodeKey, step.Id);states.Add((key, activity.NodeKey, step.Name));
+                    var key = Form(activity.NodeKey, step.Id); states.Add((key, activity.NodeKey, step.Name));
                     foreach (var destination in step.Rules.Take(100).Select(r => r.Destination).Append(step.Otherwise))
                     {
                         try
