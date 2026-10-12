@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
@@ -103,7 +104,7 @@ describe('WorkflowDesignerComponent scale', () => {
     c.addTaskActivity({id:'task-id',code:'SURVEY',nameEn:'Survey',nameAr:'مسح'});
     let node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');
     expect(node.name).toBe('Survey');expect(JSON.parse(node.configurationJson).taskTypeId).toBe('task-id');
-    c.undo();expect(c.nodes().some((n:CanvasNode)=>n.type==='MainActivity')).toBeFalse();
+    c.undo();expect(c.nodes().some((n:CanvasNode)=>n.type==='MainActivity')).toBe(false);
     c.redo();node=c.nodes().find((n:CanvasNode)=>n.type==='MainActivity');c.selectedNodeId.set(node.id);
     c.duplicateSelected();
     const activities=c.nodes().filter((n:CanvasNode)=>n.type==='MainActivity');expect(activities.length).toBe(2);
@@ -148,14 +149,14 @@ describe('WorkflowDesignerComponent scale', () => {
     const params = new Subject<{ get(key: string): string }>();
     (TestBed.inject(ActivatedRoute) as unknown as {paramMap: unknown}).paramMap = params;
     const versions = TestBed.inject(WorkflowVersionsService);
-    const load = spyOn(versions, 'getById').and.callFake((_definition, version) => of({id:version,status:version === 'published' ? 'Published' : 'Draft',activities:[],transitions:[],variables:[]}));
+    const load = vi.spyOn(versions, 'getById').mockImplementation((_definition, version) => of({id:version,status:version === 'published' ? 'Published' : 'Draft',activities:[],transitions:[],variables:[]}));
     component.ngOnInit();
     params.next({get:key => key === 'definitionId' ? 'definition' : 'published'});
     const editor = component as unknown as {version:()=>{status:string};isReadonly:()=>boolean};
-    expect(editor.isReadonly()).toBeTrue();
+    expect(editor.isReadonly()).toBe(true);
     params.next({get:key => key === 'definitionId' ? 'definition' : 'cloned'});
     expect(editor.version().status).toBe('Draft');
-    expect(editor.isReadonly()).toBeFalse();
+    expect(editor.isReadonly()).toBe(false);
     expect(load).toHaveBeenCalledWith('definition','cloned');
     fixture.destroy();
   });
@@ -192,7 +193,7 @@ describe('WorkflowDesignerComponent scale', () => {
     const editor = configure('Timer', { timerType: 'DueDate', dueAt: '2026-09-19T12:30:45.000Z', extension: true });
     const saved = JSON.parse(editor.buildConfigurationJson('Timer', editor.propsForm.value));
     expect(saved.dueAt).toBe('2026-09-19T12:30:45.000Z');
-    expect(saved.extension).toBeTrue();
+    expect(saved.extension).toBe(true);
   });
 
   it('removes obsolete timer settings when changing timer type', () => {
@@ -213,11 +214,11 @@ describe('WorkflowDesignerComponent scale', () => {
     designer.selectedNodeId.set(node.id);
     designer.slaEditor.set({ locked: true, departmentCode: 'D1', fieldActivityCode: 'FA1' });
     for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBeTrue();
+    expect(designer.nodes().some(n => n.id === node.id)).toBe(true);
     expect(designer.selectedNodeId()).toBe(node.id);
     designer.slaEditor.set(null);
     designer.onKeyDown(new KeyboardEvent('keydown', { key: 'Delete' }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBeFalse();
+    expect(designer.nodes().some(n => n.id === node.id)).toBe(false);
   });
 
   it('shows Form on both business activity types and no tabs on other nodes', () => {
@@ -225,7 +226,7 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(ids('UserTask')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
     expect(ids('MainActivity')).toEqual(['general', 'assignment', 'form', 'actions', 'sla']);
     for (const type of ['Start', 'End', 'ExclusiveGateway', 'ParallelGateway', 'Timer', 'ServiceTask', 'NotificationTask', 'WaitEvent'] as NodeType[]) {
-      expect(ids(type)).withContext(type).toEqual([]);
+      expect(ids(type), type).toEqual([]);
     }
     expect(WorkflowDesignerComponent.tabsFor('UserTask').map(t => t.labelKey)).toContain('workflow.designer.tab_actions');
   });
@@ -249,7 +250,7 @@ describe('WorkflowDesignerComponent scale', () => {
     expect(designer.inspectorTab()).toBe('form');
     designer.inspectorTab.set('sla');
     designer.onNodeClick(new MouseEvent('click'), task.id);
-    expect(designer.inspectorTab()).withContext('a tab both have is kept').toBe('sla');
+    expect(designer.inspectorTab(), 'a tab both have is kept').toBe('sla');
   });
 
   it('keeps the rejection destination and legacy task questions through General edits', () => {
@@ -278,13 +279,13 @@ describe('WorkflowDesignerComponent scale', () => {
       configure(type, { departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', rejectTargetNodeKey: 'earlier_review' });
       fixture.detectChanges();
       const panel = (fixture.nativeElement as HTMLElement).querySelector('#wf-activity-panel');
-      expect(panel).withContext(type).not.toBeNull();
-      expect(panel!.querySelector('#wf-activity-task-type')).withContext(type).not.toBeNull();
-      expect(panel!.querySelector('#wf-activity-department')).withContext(type).toBeNull();
-      expect(panel!.querySelector('#wf-activity-field-type')).withContext(type).toBeNull();
-      expect(panel!.querySelector('#wf-activity-outcomes')).withContext(type).toBeNull();
-      expect(panel!.querySelector('#wf-activity-reject-target')).withContext(type).toBeNull();
-      expect(panel!.textContent).withContext(type).not.toMatch(/Accept and Reject|Return to/);
+      expect(panel, type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-task-type'), type).not.toBeNull();
+      expect(panel!.querySelector('#wf-activity-department'), type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-field-type'), type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-outcomes'), type).toBeNull();
+      expect(panel!.querySelector('#wf-activity-reject-target'), type).toBeNull();
+      expect(panel!.textContent, type).not.toMatch(/Accept and Reject|Return to/);
     }
   });
 
@@ -299,7 +300,7 @@ describe('WorkflowDesignerComponent scale', () => {
     designer.formPreview.set({ form: { id: 'f' }, departmentCode: '10', fieldActivityCode: 'LEAK_REPAIR', versionNo: 1 });
     for (const key of ['Delete', 'Backspace', 'Escape']) designer.onKeyDown(new KeyboardEvent('keydown', { key }));
     designer.onKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
-    expect(designer.nodes().some(n => n.id === node.id)).toBeTrue();
+    expect(designer.nodes().some(n => n.id === node.id)).toBe(true);
     expect(designer.selectedNodeId()).toBe(node.id);
   });
 
@@ -318,6 +319,6 @@ describe('WorkflowDesignerComponent scale', () => {
     const saved = JSON.parse(editor.buildConfigurationJson('ScriptTask', editor.propsForm.value));
     expect(saved.setVariables).toEqual({ amount: 20 });
     expect(saved.assignments).toBeUndefined();
-    expect(saved.extension).toBeTrue();
+    expect(saved.extension).toBe(true);
   });
 });

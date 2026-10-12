@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import { FormBuilderStore } from './form-builder.store';
 import { ELEMENT_TYPES } from '../../../../shared/form-schema/form-schema.types';
 
@@ -73,7 +74,9 @@ describe('form builder store', () => {
     const photo = store.addFromType(ELEMENT_TYPES.Photo);
     store.update(photo.key, { data_name: 'photos', max_files: 5 });
 
-    const elements = (JSON.parse(store.json()) as Record<string, unknown>)['elements'] as Array<Record<string, unknown>>;
+    const elements = (JSON.parse(store.json()) as Record<string, unknown>)['elements'] as Array<
+      Record<string, unknown>
+    >;
     const stored = Object.fromEntries(elements.map((el) => [el['data_name'], el]));
 
     expect((stored['material']['choices'] as unknown[]).length).toBe(2);
@@ -115,20 +118,28 @@ describe('form builder store', () => {
       show_in_task_grid: true,
       rules: [
         {
-          when: { match: 'all', conditions: [{ field: 'leak_size', operator: 'greater_than', value: '10' }] },
+          when: {
+            match: 'all',
+            conditions: [{ field: 'leak_size', operator: 'greater_than', value: '10' }],
+          },
           then: "'High'",
         },
       ],
       default: "'Low'",
     };
 
-    store.loadFromJson({ name_en: 'Leak', name_ar: 'تسرب', elements: [], computed_columns: [column] });
+    store.loadFromJson({
+      name_en: 'Leak',
+      name_ar: 'تسرب',
+      elements: [],
+      computed_columns: [column],
+    });
     const saved = JSON.parse(store.json()) as Record<string, unknown>;
 
     expect(saved['computed_columns']).toEqual([column]);
 
     store.setComputedColumns([]);
-    expect('computed_columns' in (JSON.parse(store.json()) as Record<string, unknown>)).toBeFalse();
+    expect('computed_columns' in (JSON.parse(store.json()) as Record<string, unknown>)).toBe(false);
   });
 
   it('clears everything when a new form is started', () => {
@@ -138,7 +149,9 @@ describe('form builder store', () => {
       name_en: 'x',
       name_ar: 'x',
       elements: [],
-      computed_columns: [{ key: 'a', label_en: 'A', label_ar: 'A', output_type: 'text', rules: [], default: "'a'" }],
+      computed_columns: [
+        { key: 'a', label_en: 'A', label_ar: 'A', output_type: 'text', rules: [], default: "'a'" },
+      ],
     });
     store.resetForm();
 

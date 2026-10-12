@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { toKey } from './computed-columns-dialog.component';
 
 describe('toKey', () => {

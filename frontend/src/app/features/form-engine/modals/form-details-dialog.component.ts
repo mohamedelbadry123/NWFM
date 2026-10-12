@@ -74,14 +74,19 @@ export class FormDetailsDialogComponent {
       fieldActivityCode: form?.fieldActivityCode ?? null,
     }, { emitEvent: false });
 
-    this.loadFieldActivities(form?.fieldActivityCode ?? null);
-
-    // The code identifies published versions, so it is set once and then read-only.
+    // The code identifies published versions, so it is set once and then read-only. Classification
+    // (category, department, activity) is not asked for on create, so its controls are disabled there.
+    const { code, category, departmentCode, fieldActivityCode } = this.model.controls;
     if (this.isEdit) {
-      this.model.controls.code.disable();
+      code.disable();
+      [category, departmentCode, fieldActivityCode].forEach((c) => c.enable());
     } else {
-      this.model.controls.code.enable();
+      code.enable();
+      [category, departmentCode, fieldActivityCode].forEach((c) => c.disable());
+      return;
     }
+
+    this.loadFieldActivities(form?.fieldActivityCode ?? null);
 
     if (this.departments().length === 0) {
       this.lookups
@@ -132,9 +137,6 @@ export class FormDetailsDialogComponent {
           code: value.code!,
           nameEn: value.nameEn!,
           nameAr: value.nameAr!,
-          category: value.category!,
-          departmentCode: value.departmentCode!,
-          fieldActivityCode: value.fieldActivityCode!,
         });
 
     this.saving.set(true);

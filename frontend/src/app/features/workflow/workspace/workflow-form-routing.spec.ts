@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { of, Subject } from 'rxjs';
 import { LocaleService } from '@core/i18n/locale.service';
@@ -9,21 +10,21 @@ import { ActivityFormStep, activityFormSteps, routingFields, routingOperators } 
 
 describe('Per-form routing designer',()=>{
   const steps:ActivityFormStep[]=[{id:'one',formId:'A',versionNo:1,name:'First',rules:[],otherwise:{kind:'Next'}},{id:'two',formId:'B',versionNo:2,name:'Second',rules:[],otherwise:{kind:'Next'}}];
-  let api:jasmine.SpyObj<WorkflowActivityFormsService>;
+  let api:Record<string, Mock>;
   beforeEach(()=>{
-    api=jasmine.createSpyObj('forms',['previewForTaskType','listForTaskType']);
-    api.previewForTaskType.and.returnValue(of({schemaJson:JSON.stringify({elements:[{type:'section',elements:[{type:'date',data_name:'day',label_en:'Day'}]},{type:'single_choice',data_name:'result',choices:[{value:'A',label_en:'Approve'}]}]})} as ActivityFormPreview));
-    api.listForTaskType.and.returnValue(of({items:[],totalCount:0,usableCount:0,pageNumber:1,pageSize:20}));
+    api={'previewForTaskType': vi.fn(),'listForTaskType': vi.fn()};
+    api.previewForTaskType.mockReturnValue(of({schemaJson:JSON.stringify({elements:[{type:'section',elements:[{type:'date',data_name:'day',label_en:'Day'}]},{type:'single_choice',data_name:'result',choices:[{value:'A',label_en:'Approve'}]}]})} as ActivityFormPreview));
+    api.listForTaskType.mockReturnValue(of({items:[],totalCount:0,usableCount:0,pageNumber:1,pageSize:20}));
     TestBed.configureTestingModule({imports:[WorkflowFormActionsComponent,WorkflowActivityFormsComponent],providers:[{provide:WorkflowActivityFormsService,useValue:api},{provide:LocaleService,useValue:{isRtl:()=>false,locale:()=> 'en'}}]});
   });
   const create=()=>{const c=TestBed.runInInjectionContext(()=>new WorkflowFormActionsComponent());c.configuration=JSON.stringify({taskTypeId:'T',formSteps:steps});c.ngOnChanges();return c;};
 
   it('loads only the selected pinned form and keeps rules scoped to that form',()=>{
-    const c=create();const saved=jasmine.createSpy('saved');c.configurationChange.subscribe(saved);
+    const c=create();const saved=vi.fn();c.configurationChange.subscribe(saved);
     expect(api.previewForTaskType).toHaveBeenCalledWith('T','A',1);expect(c.fields().map(f=>f.dataName)).toEqual(['day','result']);
     c.addRule();c.selectedStep()!.rules[0].when.conditions.push({field:'day',operator:'between',value:'2026-10-01',to:'2026-10-31'});c.save();
     c.selectStep('two');c.addRule();c.selectedStep()!.rules[0].destination={kind:'Form',target:'one'};c.save();
-    const config=JSON.parse(saved.calls.mostRecent().args[0]);expect(config.formSteps[0].rules[0].when.conditions[0].operator).toBe('between');expect(config.formSteps[1].rules[0].destination.target).toBe('one');
+    const config=JSON.parse(saved.mock.lastCall![0]);expect(config.formSteps[0].rules[0].when.conditions[0].operator).toBe('between');expect(config.formSteps[1].rules[0].destination.target).toBe('one');
     expect(config.formSteps[0].rules[0].id).not.toBe(config.formSteps[1].rules[0].id);
   });
   it('reorders and duplicates rules with stable condition groups and new rule IDs',()=>{
@@ -31,7 +32,7 @@ describe('Per-form routing designer',()=>{
     const copy=c.selectedStep()!.rules[1];expect(copy.id).not.toBe(first.id);expect(copy.when).toEqual(first.when);c.move(1,-1);expect(c.selectedStep()!.rules[0].id).toBe(copy.id);
   });
   it('ignores a late schema response for another form',()=>{
-    const slow=new Subject<ActivityFormPreview>();api.previewForTaskType.and.returnValues(slow,of({schemaJson:'{"elements":[]}'} as ActivityFormPreview));
+    const slow=new Subject<ActivityFormPreview>();api.previewForTaskType.mockReturnValueOnce(slow).mockReturnValueOnce(of({schemaJson:'{"elements":[]}'} as ActivityFormPreview));
     const c=create();c.selectStep('two');slow.next({schemaJson:'{"elements":[{"data_name":"old","type":"text"}]}'} as ActivityFormPreview);expect(c.fields()).toEqual([]);
   });
   it('renders the nested editor and both forms without changing the draft',()=>{
@@ -58,8 +59,8 @@ describe('Per-form routing designer',()=>{
     expect(editors[1].textContent).toContain('Earlier activity');
     expect(editors[1].textContent).toContain('Later activity');
     expect(editors[1].textContent).toContain('(Restart activity)');
-    const saved=jasmine.createSpy('saved');c.configurationChange.subscribe(saved);c.save();
-    const config=JSON.parse(saved.calls.mostRecent().args[0]);
+    const saved=vi.fn();c.configurationChange.subscribe(saved);c.save();
+    const config=JSON.parse(saved.mock.lastCall![0]);
     expect(config.formSteps[1].rules[0].destination).toEqual({kind:'Form',target:'one'});
     expect(config.formSteps[1].otherwise).toEqual({kind:'Activity',target:'earlier'});
     fixture.destroy();
@@ -69,7 +70,7 @@ describe('Per-form routing designer',()=>{
     c.move(1,-1);expect(c.steps[1].otherwise.target).toBe('two');c.remove('two');expect(c.steps[0].otherwise.target).toBe('two');
   });
   it('preserves rules for review after changing the published version',()=>{
-    const c=TestBed.runInInjectionContext(()=>new WorkflowActivityFormsComponent());c.configuration=JSON.stringify({taskTypeId:'T',formSteps:steps});c.ngOnChanges();c.version(c.steps[0],3);expect(c.steps[0].reviewRequired).toBeTrue();
+    const c=TestBed.runInInjectionContext(()=>new WorkflowActivityFormsComponent());c.configuration=JSON.stringify({taskTypeId:'T',formSteps:steps});c.ngOnChanges();c.version(c.steps[0],3);expect(c.steps[0].reviewRequired).toBe(true);
   });
   it('renders and edits scalar choices separately from multiple-choice comparisons',async()=>{
     const fixture=TestBed.createComponent(WorkflowRoutingGroupComponent);
@@ -83,18 +84,18 @@ describe('Per-form routing designer',()=>{
     expect(group.conditions[0].value).toBe('B');
     fixture.componentInstance.changeOperator(group.conditions[0],'in');fixture.detectChanges();await fixture.whenStable();
     select=fixture.nativeElement.querySelectorAll('select')[3];
-    expect(select.multiple).toBeTrue();select.options[0].selected=true;select.options[1].selected=true;
+    expect(select.multiple).toBe(true);select.options[0].selected=true;select.options[1].selected=true;
     select.dispatchEvent(new Event('change'));fixture.detectChanges();
     expect(group.conditions[0].value).toEqual(['A','B']);
     fixture.componentInstance.changeOperator(group.conditions[0],'equal');fixture.detectChanges();await fixture.whenStable();
-    select=fixture.nativeElement.querySelectorAll('select')[3];expect(select.multiple).toBeFalse();
+    select=fixture.nativeElement.querySelectorAll('select')[3];expect(select.multiple).toBe(false);
     select.selectedIndex=1;select.dispatchEvent(new Event('change'));fixture.detectChanges();
     expect(group.conditions[0].value).toBe('A');fixture.destroy();
   });
 });
 
 describe('Routing schema metadata',()=>{
-  it('adapts legacy single-form bindings as one step',()=>expect(activityFormSteps({formDefinitionId:'old',formVersionNo:2})[0]).toEqual(jasmine.objectContaining({id:'legacy-form',formId:'old',versionNo:2})));
+  it('adapts legacy single-form bindings as one step',()=>expect(activityFormSteps({formDefinitionId:'old',formVersionNo:2})[0]).toEqual(expect.objectContaining({id:'legacy-form',formId:'old',versionNo:2})));
   it('exposes published options and nested fields but excludes sections and computed fields',()=>{
     const fields=routingFields({elements:[{type:'section',data_name:'section',elements:[{type:'single_choice',data_name:'answer',choices:[{value:'X',label_en:'Choice'}]}]}],computed_columns:[{key:'computed'}]});
     expect(fields.length).toBe(1);expect(fields[0].choices[0].value).toBe('X');

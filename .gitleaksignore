@@ -1,0 +1,4 @@
+# Owner accepted this specific historical finding on 2026-10-12.
+# Revocation is unconfirmed. The value is removed from the current config.
+# This does not exempt new commits, paths, or other Google API keys.
+8df65b3c8fbbb660a24e1331af6c58eca1208d49:frontend/public/config/app-config.json:gcp-api-key:2

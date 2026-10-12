@@ -2,6 +2,7 @@ using FormEngine.Application.Common.Interfaces;
 using FormEngine.Application.Constants;
 using FormEngine.Application.Forms.Common;
 using FormEngine.Application.Forms.Models;
+using FormEngine.Domain.Constants;
 using FormEngine.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -28,10 +29,12 @@ public sealed class CreateFormCommandHandler(
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.DuplicateCode(code));
         }
 
-        var department = request.DepartmentCode!.Trim();
-        var activity = request.FieldActivityCode!.Trim();
+        var department = request.DepartmentCode?.Trim();
+        var activity = request.FieldActivityCode?.Trim();
 
-        if (!await directory.IsValidFieldActivityAsync(department, activity, ct))
+        // Classification is optional at creation; an activity is checked only when one is given.
+        if (!string.IsNullOrEmpty(department) && !string.IsNullOrEmpty(activity)
+            && !await directory.IsValidFieldActivityAsync(department, activity, ct))
         {
             return Result.Failure<FormDetailDto>(FormEngineErrors.Form.InvalidFieldActivity(department, activity));
         }
@@ -42,7 +45,7 @@ public sealed class CreateFormCommandHandler(
                 code,
                 request.NameEn,
                 request.NameAr,
-                request.Category,
+                string.IsNullOrWhiteSpace(request.Category) ? FormCategories.General : request.Category,
                 department,
                 activity,
                 user.Id,

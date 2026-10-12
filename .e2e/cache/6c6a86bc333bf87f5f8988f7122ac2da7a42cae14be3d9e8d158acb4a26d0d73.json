@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-12T04:17:57.754Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Accept\" in \"Closure\"",
+        "target": {
+          "role": "button",
+          "name": "Accept",
+          "within": "Closure"
+        }
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Refresh\"",
+        "target": {
+          "role": "button",
+          "name": "Refresh"
+        }
+      },
+      {
+        "name": "tap",
+        "summary": "tap button \"Refresh\"",
+        "target": {
+          "role": "button",
+          "name": "Refresh"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/workflow-lifecycle.e2e.ts::a%20workflow%20progresses%20through%20child%20approvals%20to%20persisted%20completion",
+      "targetId": "chromium",
+      "instructionDigest": "02a5403ee74493ee80ebf3db2b6152562516a10f3801117a61908861fc7d6312",
+      "paramsDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Accepted the parent Closure activity and refreshed while required integration events processed. The workflow header now shows Completed.",
+    "startPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endAnchors": [
+      {
+        "text": "Completed · Cluster: Central Cluster · CBU: Head Office"
+      },
+      {
+        "role": "heading",
+        "name": "Send completion record"
+      },
+      {
+        "text": "Http"
+      },
+      {
+        "text": "Completed · 1 attempts"
+      },
+      {
+        "text": "· Background delivery"
+      },
+      {
+        "text": "Event node: delivery · Source: Send completion record"
+      },
+      {
+        "text": "Response details"
+      },
+      {
+        "text": "Demo — sms"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "text": "Running · Cluster: Central Cluster · CBU: Head Office"
+      },
+      {
+        "text": "Assigned to another group."
+      },
+      {
+        "text": "Awaiting approval"
+      },
+      {
+        "role": "textbox",
+        "name": "Comment"
+      },
+      {
+        "role": "button",
+        "name": "Reject"
+      },
+      {
+        "role": "button",
+        "name": "Accept"
+      },
+      {
+        "role": "button",
+        "name": "Add comment"
+      },
+      {
+        "text": "No integration events yet."
+      }
+    ],
+    "endWaitMs": 12752,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "631c6881b8a0bf692d328f5599cda29787551d35eb61d876546567bb7b81b604",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "96bb74140c497b1e9b484f905e3e12bb533b95d50b9d7e17832f76889447fd0a",
+      "agentContextDigest": "b42883aaaffa5ebe4f759748acdd78d7e6a8e75654bb89d1b15a6126e6424e55"
+    }
+  }
+}

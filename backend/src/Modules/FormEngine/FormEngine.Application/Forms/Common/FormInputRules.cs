@@ -41,6 +41,11 @@ internal static class FormInputRules
             .MaximumLength(FormDefinition.DepartmentCodeMaxLength)
             .WithMessage($"Department code must not exceed {FormDefinition.DepartmentCodeMaxLength} characters.");
 
+    public static IRuleBuilderOptions<T, string?> ValidFieldActivityCode<T>(this IRuleBuilder<T, string?> rule) =>
+        rule
+            .MaximumLength(FormDefinition.FieldActivityCodeMaxLength)
+            .WithMessage($"Field activity code must not exceed {FormDefinition.FieldActivityCodeMaxLength} characters.");
+
     public static IRuleBuilderOptions<T, string?> RequiredFieldActivityCode<T>(this IRuleBuilder<T, string?> rule) =>
         rule
             .NotEmpty().WithMessage("Field activity is required.")

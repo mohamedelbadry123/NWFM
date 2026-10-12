@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { highlightXml } from './workflow-xml-highlight';
 
 describe('highlightXml', () => {
@@ -7,7 +8,7 @@ describe('highlightXml', () => {
 
   it('tokenizes tags, attributes, and values', () => {
     const [line] = highlightXml('<Activity nodeKey="start" type="Start" />');
-    const kinds = line.tokens.map(t => `${t.kind}:${t.text}`);
+    const kinds = line.tokens.map((t) => `${t.kind}:${t.text}`);
     expect(kinds).toContain('tag:Activity');
     expect(kinds).toContain('attr:nodeKey');
     expect(kinds).toContain('value:"start"');
@@ -23,7 +24,7 @@ describe('highlightXml', () => {
   it('numbers each pretty-printed line', () => {
     const xml = '<WorkflowDefinition>\n  <Activities />\n</WorkflowDefinition>';
     const lines = highlightXml(xml);
-    expect(lines.map(l => l.number)).toEqual([1, 2, 3]);
-    expect(lines[1].tokens.some(t => t.kind === 'tag' && t.text === 'Activities')).toBe(true);
+    expect(lines.map((l) => l.number)).toEqual([1, 2, 3]);
+    expect(lines[1].tokens.some((t) => t.kind === 'tag' && t.text === 'Activities')).toBe(true);
   });
 });

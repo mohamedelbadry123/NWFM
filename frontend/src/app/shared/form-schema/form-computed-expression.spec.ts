@@ -1,8 +1,9 @@
+import { describe, expect, it } from 'vitest';
 import { checkExpression } from './form-computed-expression';
 
 describe('checkExpression', () => {
   it('accepts arithmetic, text, fields and functions, and lists the fields read', () => {
-    const check = checkExpression("round(sum(width, height) / 2, 1) + abs(-depth)");
+    const check = checkExpression('round(sum(width, height) / 2, 1) + abs(-depth)');
 
     expect(check.error).toBeNull();
     expect(check.fields).toEqual(['width', 'height', 'depth']);

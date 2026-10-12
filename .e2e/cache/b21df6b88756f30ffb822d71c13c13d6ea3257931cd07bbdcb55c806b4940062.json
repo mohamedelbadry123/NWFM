@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "trace-1",
+  "createdAt": "2026-10-12T04:17:57.751Z",
+  "payload": {
+    "actions": [
+      {
+        "name": "tap",
+        "summary": "tap button \"Start instance\"",
+        "target": {
+          "role": "button",
+          "name": "Start instance"
+        }
+      }
+    ],
+    "executor": {
+      "name": "e2e-default-agent",
+      "version": "2"
+    },
+    "recordedFor": {
+      "testId": "tests/workflow-lifecycle.e2e.ts::a%20workflow%20progresses%20through%20child%20approvals%20to%20persisted%20completion",
+      "targetId": "chromium",
+      "instructionDigest": "1a1c01f07fd0956954db17220f7540f30795df3658df5cfb0a2506235c7fa49d",
+      "paramsDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "callIndex": 0,
+      "agent": "default"
+    },
+    "summary": "Clicked Start instance. The configured Demo — Water isolation — Visual workflow started successfully; its instance is Running at /admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24.",
+    "startPath": "/workflow/start",
+    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "endAnchors": [
+      {
+        "role": "link",
+        "name": "Back to instances"
+      },
+      {
+        "role": "heading",
+        "name": "Demo — Water isolation — Visual"
+      },
+      {
+        "text": "Running · Cluster: Central Cluster · CBU: Head Office"
+      },
+      {
+        "role": "button",
+        "name": "Refresh"
+      },
+      {
+        "text": "Demo instance"
+      },
+      {
+        "role": "option",
+        "name": "Signed-in user",
+        "states": [
+          "selected"
+        ]
+      },
+      {
+        "role": "option",
+        "name": "Demo reviewer"
+      },
+      {
+        "role": "option",
+        "name": "Demo closure officer"
+      }
+    ],
+    "goneAnchors": [
+      {
+        "role": "heading",
+        "name": "New instance"
+      },
+      {
+        "text": "Start a published workflow and follow its activities."
+      },
+      {
+        "role": "option",
+        "name": "Select a workflow"
+      },
+      {
+        "role": "option",
+        "name": "Demo — Water isolation — CALLBACK — Visual · Version 1"
+      },
+      {
+        "role": "option",
+        "name": "Demo — Water isolation — FAILURE — Visual · Version 1"
+      },
+      {
+        "role": "option",
+        "name": "Demo — Water isolation — OVERDUE — Visual · Version 1"
+      },
+      {
+        "role": "option",
+        "name": "Demo — Water isolation — Visual · Version 1",
+        "states": [
+          "selected"
+        ]
+      },
+      {
+        "text": "Instance location"
+      }
+    ],
+    "endWaitMs": 13008,
+    "keyedBy": {
+      "cacheSchema": "trace-1",
+      "policyVersion": "conservative/6",
+      "project": "631c6881b8a0bf692d328f5599cda29787551d35eb61d876546567bb7b81b604",
+      "platform": "web",
+      "engineName": "web",
+      "engineSpiVersion": 1,
+      "appIdentity": "96bb74140c497b1e9b484f905e3e12bb533b95d50b9d7e17832f76889447fd0a",
+      "agentContextDigest": "b42883aaaffa5ebe4f759748acdd78d7e6a8e75654bb89d1b15a6126e6424e55"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { LocaleService } from '@core/i18n/locale.service';
 import { WorkflowSelectedFormComponent } from './workflow-selected-form.component';
@@ -15,12 +16,12 @@ describe('Selected workflow form',()=>{
     const fixture=TestBed.createComponent(WorkflowSelectedFormComponent);
     const selected={formId:'form',versionNo:2,schemaJson:JSON.stringify({name_en:'Activity form',elements:[{type:'text',data_name:'notes',label_en:'Notes',required:true}]})};
     fixture.componentRef.setInput('workItemId','work');fixture.componentRef.setInput('selectedForm',selected);fixture.detectChanges();await fixture.whenStable();fixture.detectChanges();
-    expect(fixture.componentInstance.validate()).toBeFalse();
+    expect(fixture.componentInstance.validate()).toBe(false);
     const input=fixture.nativeElement.querySelector('input') as HTMLInputElement;
     expect(input).not.toBeNull();
-    const changed=jasmine.createSpy('changed');fixture.componentInstance.answersChange.subscribe(changed);
+    const changed=vi.fn();fixture.componentInstance.answersChange.subscribe(changed);
     input.value='Completed inspection';input.dispatchEvent(new Event('input',{bubbles:true}));fixture.detectChanges();await fixture.whenStable();
-    expect(fixture.componentInstance.validate()).toBeTrue();expect(fixture.componentInstance.payload()['notes']).toBe('Completed inspection');expect(changed).toHaveBeenCalled();
+    expect(fixture.componentInstance.validate()).toBe(true);expect(fixture.componentInstance.payload()['notes']).toBe('Completed inspection');expect(changed).toHaveBeenCalled();
     fixture.componentRef.setInput('selectedForm',{...selected});fixture.componentRef.setInput('answers',{notes:'Completed inspection'});fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('input')).toBe(input);expect(input.value).toBe('Completed inspection');
   });
@@ -30,6 +31,6 @@ describe('Selected workflow form',()=>{
     c.readonly=true;c.ngOnChanges();expect(c.initialAnswers).toEqual({a:'typed'});
   });
   it('does not allow completion when the pinned schema is missing or malformed',()=>{
-    const c=TestBed.runInInjectionContext(()=>new WorkflowSelectedFormComponent());c.selectedForm={formId:'f',versionNo:1,schemaJson:'broken'};c.ngOnChanges();expect(c.definition).toBeNull();expect(c.validate()).toBeFalse();
+    const c=TestBed.runInInjectionContext(()=>new WorkflowSelectedFormComponent());c.selectedForm={formId:'f',versionNo:1,schemaJson:'broken'};c.ngOnChanges();expect(c.definition).toBeNull();expect(c.validate()).toBe(false);
   });
 });

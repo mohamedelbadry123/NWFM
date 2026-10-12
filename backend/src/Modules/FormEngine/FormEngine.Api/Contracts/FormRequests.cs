@@ -2,12 +2,15 @@ using Microsoft.AspNetCore.Http;
 
 namespace FormEngine.Api.Contracts;
 
-/// <summary>Body of a form create. The code is set once and never changes afterwards.</summary>
+/// <summary>
+/// Body of a form create. The code is set once and never changes afterwards. Category, department
+/// and field activity are optional here; they are set later through an update.
+/// </summary>
 public sealed record CreateFormRequest(
     string Code,
     string NameEn,
     string NameAr,
-    string Category,
+    string? Category,
     string? DepartmentCode,
     string? FieldActivityCode);
 

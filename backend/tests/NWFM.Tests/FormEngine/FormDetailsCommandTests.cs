@@ -115,14 +115,30 @@ public sealed class FormDetailsCommandTests : IDisposable
         result.Error.Code.Should().Be(FormEngineErrors.Codes.FormInvalidFieldActivity);
     }
 
+    [Fact]
+    public async Task Create_WithoutClassification_DefaultsToGeneralAndNoActivity()
+    {
+        var command = new CreateFormCommand { Code = "FRM-010", NameEn = "Plain", NameAr = "بسيط" };
+
+        new CreateFormCommandValidator().Validate(command).IsValid.Should().BeTrue();
+
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Category.Should().Be(FormCategories.General);
+        result.Value.DepartmentCode.Should().BeNull();
+        result.Value.FieldActivityCode.Should().BeNull();
+        _directory.Verify(
+            d => d.IsValidFieldActivityAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     [Theory]
     [InlineData(null, "FA-1")]
     [InlineData("D-1", null)]
     [InlineData("", "")]
-    public void Validators_RequireTheDepartmentAndTheActivity(string? department, string? activity)
+    public void UpdateValidator_RequiresTheDepartmentAndTheActivity(string? department, string? activity)
     {
-        new CreateFormCommandValidator().Validate(CreateCommand(department, activity)).IsValid.Should().BeFalse();
-
         new UpdateFormCommandValidator()
             .Validate(new UpdateFormCommand
             {

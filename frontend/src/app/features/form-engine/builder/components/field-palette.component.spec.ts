@@ -1,9 +1,14 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { FieldPaletteComponent } from './field-palette.component';
 import { PALETTE_ITEMS } from '../data/palette';
-import { DROP_IDS, ELEMENT_TYPES, type ElementType } from '../../../../shared/form-schema/form-schema.types';
+import {
+  DROP_IDS,
+  ELEMENT_TYPES,
+  type ElementType,
+} from '../../../../shared/form-schema/form-schema.types';
 
 /**
  * The palette is how a field gets onto the canvas. It once compiled cleanly while rendering
@@ -25,7 +30,13 @@ describe('FieldPaletteComponent', () => {
       formBuilder: {
         fields: 'Fields',
         paletteHint: 'Drag a field onto the canvas',
-        groups: { basic: 'Basic', choice: 'Choice', media: 'Media', location: 'Location', design: 'Design' },
+        groups: {
+          basic: 'Basic',
+          choice: 'Choice',
+          media: 'Media',
+          location: 'Location',
+          design: 'Design',
+        },
         types: { text: 'Text', geolocation: 'Location', section: 'Section' },
       },
     });

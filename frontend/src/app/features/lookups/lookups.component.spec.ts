@@ -1,3 +1,4 @@
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
@@ -28,8 +29,13 @@ describe('LookupsComponent tabs', () => {
             hasAnyPermission: (...wanted: string[]) => wanted.some((p) => permissions.includes(p)),
           },
         },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(options.tab ? { tab: options.tab } : {}) } } },
-        { provide: Router, useValue: { navigate: jasmine.createSpy('navigate').and.resolveTo(true) } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { queryParamMap: convertToParamMap(options.tab ? { tab: options.tab } : {}) },
+          },
+        },
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         { provide: LookupsService, useValue: {} },
       ],
     });
@@ -37,10 +43,15 @@ describe('LookupsComponent tabs', () => {
     const fixture = TestBed.createComponent(LookupsComponent);
     fixture.componentInstance.ngOnInit();
     return fixture.componentInstance as unknown as {
-      visibleTabs: () => { key: string }[];
+      visibleTabs: () => {
+        key: string;
+      }[];
       activeKey: () => string;
       onTabChange: (value: string) => void;
-      currentTab: () => { type: string; parentType?: string };
+      currentTab: () => {
+        type: string;
+        parentType?: string;
+      };
     };
   }
 
@@ -68,7 +79,9 @@ describe('LookupsComponent tabs', () => {
   });
 
   it('opens the tab an old address asked for', () => {
-    expect(create({ roles: [ADMINISTRATOR_ROLE], tab: 'c2m-actions' }).activeKey()).toBe('c2m-actions');
+    expect(create({ roles: [ADMINISTRATOR_ROLE], tab: 'c2m-actions' }).activeKey()).toBe(
+      'c2m-actions',
+    );
   });
 
   it('keeps activity types available with no department parent', () => {
@@ -88,17 +101,21 @@ describe('LookupsComponent tabs', () => {
   });
 
   it('falls back to the first tab it may show when the asked-for one is not allowed', () => {
-    expect(create({ permissions: [PERMISSIONS.viewForms], tab: 'task-types' }).activeKey()).toBe('field-catalog');
+    expect(create({ permissions: [PERMISSIONS.viewForms], tab: 'task-types' }).activeKey()).toBe(
+      'field-catalog',
+    );
   });
 
   it('keeps the chosen tab in the address', () => {
     const page = create({ roles: [ADMINISTRATOR_ROLE] });
     page.onTabChange('field-catalog');
 
-    const router = TestBed.inject(Router) as unknown as { navigate: jasmine.Spy };
+    const router = TestBed.inject(Router) as unknown as {
+      navigate: Mock;
+    };
     expect(page.activeKey()).toBe('field-catalog');
-    expect(router.navigate.calls.mostRecent().args[1]).toEqual(
-      jasmine.objectContaining({ queryParams: { tab: 'field-catalog' }, replaceUrl: true }),
+    expect(vi.mocked(router.navigate).mock.lastCall?.[1]).toEqual(
+      expect.objectContaining({ queryParams: { tab: 'field-catalog' }, replaceUrl: true }),
     );
   });
 });

@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 import { LocaleService } from '@core/i18n/locale.service';
@@ -15,10 +16,10 @@ import { environment } from '../../../../environments/environment';
 describe('Workflow workspace contracts', () => {
   it('allows the task detail screen without exposing other legacy workflow pages', () => {
     const previous=environment.workflowWorkspace;environment.workflowWorkspace=true;
-    const blocked={blocked:true};const parseUrl=jasmine.createSpy().and.returnValue(blocked);
+    const blocked={blocked:true};const parseUrl=vi.fn().mockReturnValue(blocked);
     TestBed.configureTestingModule({providers:[{provide:Router,useValue:{parseUrl}}]});
     try {
-      expect(TestBed.runInInjectionContext(()=>workflowWorkspaceGuard({} as any,{url:'/org/workflow/tasks/qa-task'} as any))).toBeTrue();
+      expect(TestBed.runInInjectionContext(()=>workflowWorkspaceGuard({} as any,{url:'/org/workflow/tasks/qa-task'} as any))).toBe(true);
       expect(TestBed.runInInjectionContext(()=>workflowWorkspaceGuard({} as any,{url:'/org/workflow/participants'} as any))).toBe(blocked as any);
     } finally {environment.workflowWorkspace=previous;}
   });
@@ -43,7 +44,7 @@ describe('Workflow organization location', () => {
       const settings = normalizeWorkspaceSettings({ kind: 'Main', clusterCode: 'CC', regionCode: 'RCBU', cityCode: '1110', designerVersion: 2 });
 
       expect(settings).toEqual({ kind: 'Main', clusterCode: 'CC', cbuCode: 'RCBU', branchCode: '1110', designerVersion: 2 });
-      expect(hasLegacyLocationConflict(settings)).toBeFalse();
+      expect(hasLegacyLocationConflict(settings)).toBe(false);
       expect(workspaceLocation(settings)).toEqual({ clusterCode: 'CC', cbuCode: 'RCBU', branchCode: '1110', operationAreaCode: null });
     });
 
@@ -57,24 +58,24 @@ describe('Workflow organization location', () => {
 
       expect(settings.cbuCode).toBe('RCBU');
       expect(settings.regionCode).toBe('JCBU');
-      expect(hasLegacyLocationConflict(settings)).toBeTrue();
-      expect(hasRequiredLocation(settings)).toBeFalse();
+      expect(hasLegacyLocationConflict(settings)).toBe(true);
+      expect(hasRequiredLocation(settings)).toBe(false);
     });
 
     it('treats a legacy child with null geography as a child with no place', () => {
       const settings = normalizeWorkspaceSettings(JSON.parse('{"kind":"Child","clusterCode":null,"regionCode":null,"cityCode":null}'));
 
-      expect('regionCode' in settings || 'cityCode' in settings).toBeFalse();
-      expect(hasLegacyLocationConflict(settings)).toBeFalse();
+      expect('regionCode' in settings || 'cityCode' in settings).toBe(false);
+      expect(hasLegacyLocationConflict(settings)).toBe(false);
       expect(workspaceLocation(settings)).toEqual({ clusterCode: null, cbuCode: null, branchCode: null, operationAreaCode: null });
     });
   });
 
   it('requires at least a cluster and a CBU for a main workflow', () => {
-    expect(hasRequiredLocation({ kind: 'Main' })).toBeFalse();
-    expect(hasRequiredLocation({ kind: 'Main', clusterCode: 'CC' })).toBeFalse();
-    expect(hasRequiredLocation({ kind: 'Main', clusterCode: 'CC', cbuCode: 'RCBU' })).toBeTrue();
-    expect(hasRequiredLocation({ kind: 'Child' })).toBeTrue();
+    expect(hasRequiredLocation({ kind: 'Main' })).toBe(false);
+    expect(hasRequiredLocation({ kind: 'Main', clusterCode: 'CC' })).toBe(false);
+    expect(hasRequiredLocation({ kind: 'Main', clusterCode: 'CC', cbuCode: 'RCBU' })).toBe(true);
+    expect(hasRequiredLocation({ kind: 'Child' })).toBe(true);
   });
 
   describe('WorkflowLocationComponent', () => {
@@ -98,12 +99,12 @@ describe('Workflow organization location', () => {
     it('writes only the canonical keys for a chosen location, replacing legacy ones', () => {
       component.settings = { kind: 'Main', clusterCode: 'CC', cbuCode: 'RCBU', regionCode: 'JCBU', designerVersion: 2 };
       component.ngOnChanges();
-      expect(component.conflict()).toBeTrue();
+      expect(component.conflict()).toBe(true);
 
       component.chooseLocation({ clusterCode: 'CC', cbuCode: 'RCBU', branchCode: null, operationAreaCode: 'OA1' });
 
       expect(emitted.at(-1)).toEqual({ kind: 'Main', designerVersion: 2, clusterCode: 'CC', cbuCode: 'RCBU', operationAreaCode: 'OA1' });
-      expect(component.conflict()).toBeFalse();
+      expect(component.conflict()).toBe(false);
     });
 
     it('drops the dependent codes the shared selector cleared after a parent change', () => {
