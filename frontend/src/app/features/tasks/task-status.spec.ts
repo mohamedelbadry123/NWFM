@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   c2mStatusSeverity,
   canRetryC2m,
@@ -33,79 +34,98 @@ describe('task-status', () => {
 
     it('reviews only a filled task', () => {
       for (const status of TASK_STATUSES) {
-        expect(canRunTaskAction('complete', status)).withContext(status).toBe(status === TaskStatus.Submitted);
-        expect(canRunTaskAction('return', status)).withContext(status).toBe(status === TaskStatus.Submitted);
+        expect(canRunTaskAction('complete', status), status).toBe(status === TaskStatus.Submitted);
+        expect(canRunTaskAction('return', status), status).toBe(status === TaskStatus.Submitted);
       }
     });
 
     it('offers nothing on a closed task', () => {
       for (const action of ['assign', 'fill', 'complete', 'return', 'expire', 'edit'] as const) {
-        expect(canRunTaskAction(action, TaskStatus.Approved)).withContext(action).toBeFalse();
-        expect(canRunTaskAction(action, TaskStatus.Expired)).withContext(action).toBeFalse();
+        expect(canRunTaskAction(action, TaskStatus.Approved), action).toBe(false);
+        expect(canRunTaskAction(action, TaskStatus.Expired), action).toBe(false);
       }
     });
 
     it('offers nothing when the status is unknown', () => {
-      expect(canRunTaskAction('assign', null)).toBeFalse();
-      expect(canRunTaskAction('assign', undefined)).toBeFalse();
-      expect(canRunTaskAction('assign', 'UNDER_REVIEW')).toBeFalse();
+      expect(canRunTaskAction('assign', null)).toBe(false);
+      expect(canRunTaskAction('assign', undefined)).toBe(false);
+      expect(canRunTaskAction('assign', 'UNDER_REVIEW')).toBe(false);
     });
   });
 
   describe('canReassign', () => {
     it('allows moving an unfilled task', () => {
-      expect(canReassign(TaskStatus.Created, 0)).toBeTrue();
-      expect(canReassign(TaskStatus.Assigned, 0)).toBeTrue();
-      expect(canReassign(TaskStatus.InProgress, null)).toBeTrue();
+      expect(canReassign(TaskStatus.Created, 0)).toBe(true);
+      expect(canReassign(TaskStatus.Assigned, 0)).toBe(true);
+      expect(canReassign(TaskStatus.InProgress, null)).toBe(true);
     });
 
     it('locks a task to the crew once anything is filled', () => {
-      expect(canReassign(TaskStatus.Assigned, 1)).toBeFalse();
-      expect(canReassign(TaskStatus.Submitted, 0)).toBeFalse();
-      expect(canReassign(TaskStatus.Returned, 1)).toBeFalse();
+      expect(canReassign(TaskStatus.Assigned, 1)).toBe(false);
+      expect(canReassign(TaskStatus.Submitted, 0)).toBe(false);
+      expect(canReassign(TaskStatus.Returned, 1)).toBe(false);
     });
   });
 
   describe('canMigrateVersion', () => {
     const form = { versionNo: 2, currentVersionNo: 3 as number | null, submissionCount: 0 };
     const task = { status: TaskStatus.Assigned, forms: [form] };
-    const withForm = (changes: Partial<typeof form>) => ({ status: task.status, forms: [{ ...form, ...changes }] });
+    const withForm = (changes: Partial<typeof form>) => ({
+      status: task.status,
+      forms: [{ ...form, ...changes }],
+    });
 
     it('offers a newer version to an unfilled task', () => {
-      expect(canMigrateVersion(task)).toBeTrue();
+      expect(canMigrateVersion(task)).toBe(true);
     });
 
     it('offers nothing when the pinned version is current, or the form is gone', () => {
-      expect(canMigrateVersion(withForm({ currentVersionNo: 2 }))).toBeFalse();
-      expect(canMigrateVersion(withForm({ currentVersionNo: null }))).toBeFalse();
+      expect(canMigrateVersion(withForm({ currentVersionNo: 2 }))).toBe(false);
+      expect(canMigrateVersion(withForm({ currentVersionNo: null }))).toBe(false);
     });
 
     it('keeps a filled task on the version its answers were given against', () => {
-      expect(canMigrateVersion(withForm({ submissionCount: 1 }))).toBeFalse();
+      expect(canMigrateVersion(withForm({ submissionCount: 1 }))).toBe(false);
     });
 
     it('still moves an unfilled form of a task whose other form is filled', () => {
       const filled = { versionNo: 1, currentVersionNo: 1, submissionCount: 1 };
-      expect(canMigrateVersion({ status: TaskStatus.InProgress, forms: [filled, form] })).toBeTrue();
-      expect(canMigrateVersion({ status: TaskStatus.Approved, forms: [filled, form] })).toBeFalse();
+      expect(canMigrateVersion({ status: TaskStatus.InProgress, forms: [filled, form] })).toBe(
+        true,
+      );
+      expect(canMigrateVersion({ status: TaskStatus.Approved, forms: [filled, form] })).toBe(false);
     });
   });
 
   describe('formsProgress', () => {
     it('counts filled forms only when there is more than one', () => {
-      expect(formsProgress({ forms: [{}, {}, {}], filledFormCount: 1, requiredFormCount: 3 })).toBe('1/3');
+      expect(formsProgress({ forms: [{}, {}, {}], filledFormCount: 1, requiredFormCount: 3 })).toBe(
+        '1/3',
+      );
       expect(formsProgress({ forms: [{}], filledFormCount: 1, requiredFormCount: 1 })).toBeNull();
     });
   });
 
   describe('wasSubmittedAgain', () => {
     it('is true when the latest fill came after the return', () => {
-      expect(wasSubmittedAgain({ returnedDate: '2026-09-01T08:00:00Z', submittedDate: '2026-09-02T08:00:00Z' })).toBeTrue();
+      expect(
+        wasSubmittedAgain({
+          returnedDate: '2026-09-01T08:00:00Z',
+          submittedDate: '2026-09-02T08:00:00Z',
+        }),
+      ).toBe(true);
     });
 
     it('is false while the rework is outstanding, or when never returned', () => {
-      expect(wasSubmittedAgain({ returnedDate: '2026-09-02T08:00:00Z', submittedDate: '2026-09-01T08:00:00Z' })).toBeFalse();
-      expect(wasSubmittedAgain({ returnedDate: null, submittedDate: '2026-09-01T08:00:00Z' })).toBeFalse();
+      expect(
+        wasSubmittedAgain({
+          returnedDate: '2026-09-02T08:00:00Z',
+          submittedDate: '2026-09-01T08:00:00Z',
+        }),
+      ).toBe(false);
+      expect(wasSubmittedAgain({ returnedDate: null, submittedDate: '2026-09-01T08:00:00Z' })).toBe(
+        false,
+      );
     });
   });
 
@@ -114,27 +134,29 @@ describe('task-status', () => {
     const past = '2026-09-20T12:00:00Z';
 
     it('flags an open task past its fill deadline', () => {
-      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: past }, now)).toBeTrue();
-      expect(isOverdue({ status: TaskStatus.Returned, dueDate: past }, now)).toBeTrue();
+      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: past }, now)).toBe(true);
+      expect(isOverdue({ status: TaskStatus.Returned, dueDate: past }, now)).toBe(true);
     });
 
     it('does not flag a filled or closed task, a future deadline, or no deadline', () => {
-      expect(isOverdue({ status: TaskStatus.Submitted, dueDate: past }, now)).toBeFalse();
-      expect(isOverdue({ status: TaskStatus.Approved, dueDate: past }, now)).toBeFalse();
-      expect(isOverdue({ status: TaskStatus.Expired, dueDate: past }, now)).toBeFalse();
-      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: '2026-09-22T12:00:00Z' }, now)).toBeFalse();
-      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: null }, now)).toBeFalse();
+      expect(isOverdue({ status: TaskStatus.Submitted, dueDate: past }, now)).toBe(false);
+      expect(isOverdue({ status: TaskStatus.Approved, dueDate: past }, now)).toBe(false);
+      expect(isOverdue({ status: TaskStatus.Expired, dueDate: past }, now)).toBe(false);
+      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: '2026-09-22T12:00:00Z' }, now)).toBe(
+        false,
+      );
+      expect(isOverdue({ status: TaskStatus.Assigned, dueDate: null }, now)).toBe(false);
     });
   });
 
   describe('C2M closure', () => {
     it('offers a retry only on an approved task whose closure was refused or failed', () => {
-      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'REJECTED' })).toBeTrue();
-      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'FAILED' })).toBeTrue();
-      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'CLOSED' })).toBeFalse();
-      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'PENDING' })).toBeFalse();
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'REJECTED' })).toBe(true);
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'FAILED' })).toBe(true);
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'CLOSED' })).toBe(false);
+      expect(canRetryC2m({ status: TaskStatus.Approved, c2mStatus: 'PENDING' })).toBe(false);
       // Refused while a reviewer was approving: the task is still filled, and approving again retries.
-      expect(canRetryC2m({ status: TaskStatus.Submitted, c2mStatus: 'REJECTED' })).toBeFalse();
+      expect(canRetryC2m({ status: TaskStatus.Submitted, c2mStatus: 'REJECTED' })).toBe(false);
     });
 
     it('colours a closure that needs a person red', () => {

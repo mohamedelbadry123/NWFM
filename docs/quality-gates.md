@@ -105,15 +105,26 @@ historical commit/path/rule fingerprint. Revocation is unconfirmed; Git history
 still contains the value. This exception does not allow future secret additions.
 No history rewrite or protected-branch force push was performed.
 
-The frontend toolchain still includes the high-severity braces advisory
+The frontend now uses `@angular/build`, Vitest with the Playwright Chromium
+provider, and Tailwind 4 with its PostCSS plugin. This removes every dependency
+path to the unpatched `braces` advisory
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
-The published version 3.0.3 is affected and has no patched replacement at rollout.
-The Security check deliberately remains blocking until a compatible fix is available.
-Do not disable the audit or bypass the merge gate.
+Both npm audits report zero vulnerabilities. No advisory is suppressed, no
+package is renamed or locally patched, and the high/critical security gate is unchanged.
+
+All existing tests were migrated to Vitest without dropping assertions or test
+cases. `npm run test:frontend` supplies the same installed Chromium used by e2e;
+`CHROME_BIN` can select an alternative executable. The application remains on
+Angular 21. Tailwind's theme now lives in `frontend/src/styles/global.css`;
+`tailwind-compat.css` preserves the existing rounded, shadow, blur and outline
+utility contract so component templates do not need business-logic edits.
+Browser regression tests cover these utilities, brand colors, dark mode,
+Arabic logical positioning, CSS variables and important modifiers.
+Tailwind 4 requires Safari 16.4+, Chrome 111+ or Firefox 128+.
 
 ## Verification evidence
 
-The rollout was checked with 694 backend tests, 228 frontend tests, production
+The rollout was checked with 694 backend tests, 235 frontend tests, production
 builds, and six tooling tests. The tooling tests exercise actual Git hooks,
 including partial staging, deletion-only commits, invalid messages, lint failures,
 and failing unit commands.

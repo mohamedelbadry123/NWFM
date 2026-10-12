@@ -1,305 +1,621 @@
 /* ── Tailwind CSS ────────────────────────────────────────────────────────────── */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source('../');
+@import './tailwind-compat.css';
 
-/* ── Poppins — primary UI typeface (new brand identity), self-hosted ────────── */
-@font-face {
-  font-family: 'Poppins';
-  src: url('/assets/fonts/Poppins-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  src: url('/assets/fonts/Poppins-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  src: url('/assets/fonts/Poppins-SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  src: url('/assets/fonts/Poppins-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
+@plugin 'tailwindcss-primeui';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary-50: #eef2fe;
+  --color-primary-100: #dce3fd;
+  --color-primary-200: #b9c7fb;
+  --color-primary-300: #8fa6f5;
+  --color-primary-400: #5b78ec;
+  --color-primary-500: #2450de;
+  --color-primary-600: #1d42c4;
+  --color-primary-700: #1a37a0;
+  --color-primary-800: #182f80;
+  --color-primary-900: #171a56;
+  --color-primary: #2450de;
+
+  --color-brand-50: #eef2fe;
+  --color-brand-100: #dce3fd;
+  --color-brand-200: #b9c7fb;
+  --color-brand-300: #8fa6f5;
+  --color-brand-400: #5b78ec;
+  --color-brand-500: #2450de;
+  --color-brand-600: #1d42c4;
+  --color-brand-700: #1a37a0;
+  --color-brand-800: #182f80;
+  --color-brand-900: #171a56;
+  --color-brand: #2450de;
+
+  --color-navy-50: #edeef4;
+  --color-navy-100: #d3d5e4;
+  --color-navy-200: #a7abc9;
+  --color-navy-300: #7b81ae;
+  --color-navy-400: #4f5793;
+  --color-navy-500: #2a3072;
+  --color-navy-600: #212659;
+  --color-navy-700: #1c204e;
+  --color-navy-800: #171a56;
+  --color-navy-900: #10133d;
+  --color-navy: #171a56;
+
+  --color-teal-50: #e9fbf6;
+  --color-teal-100: #c9f5ea;
+  --color-teal-200: #97ead8;
+  --color-teal-300: #5fd9c2;
+  --color-teal-400: #2bc3ac;
+  --color-teal-500: #1da592;
+  --color-teal-600: #178575;
+  --color-teal-700: #15685d;
+  --color-teal-800: #12534b;
+  --color-teal-900: #0f433d;
+  --color-teal: #2bc3ac;
+
+  --color-accent-50: #eef5fb;
+  --color-accent-100: #d7e8f5;
+  --color-accent-200: #b4d3ec;
+  --color-accent-300: #8abbe1;
+  --color-accent-400: #5a9fd8;
+  --color-accent-500: #3d84c4;
+  --color-accent-600: #316ba0;
+  --color-accent-700: #2a5680;
+  --color-accent-800: #254768;
+  --color-accent-900: #213b56;
+  --color-accent: #5a9fd8;
+
+  --color-success-50: #e7f8f0;
+  --color-success-100: #c6efda;
+  --color-success-400: #32d583;
+  --color-success-500: #12b76a;
+  --color-success-600: #039855;
+  --color-success-700: #027a48;
+  --color-success: #12b76a;
+
+  --color-warning-50: #fef6e7;
+  --color-warning-100: #fde9c4;
+  --color-warning-400: #fdb022;
+  --color-warning-500: #f79009;
+  --color-warning-600: #dc6803;
+  --color-warning-700: #b54708;
+  --color-warning: #f79009;
+
+  --color-danger-50: #feeceb;
+  --color-danger-100: #fcd4d0;
+  --color-danger-400: #f97066;
+  --color-danger-500: #f04438;
+  --color-danger-600: #d92d20;
+  --color-danger-700: #b42318;
+  --color-danger: #f04438;
+
+  --color-info-50: #eef5fb;
+  --color-info-100: #d7e8f5;
+  --color-info-400: #5a9fd8;
+  --color-info-500: #3d84c4;
+  --color-info-600: #316ba0;
+  --color-info-700: #2a5680;
+  --color-info: #5a9fd8;
+
+  --color-ink-50: #f4f6fb;
+  --color-ink-100: #e7ebf3;
+  --color-ink-200: #d3d9e6;
+  --color-ink-300: #b0b8cb;
+  --color-ink-400: #7e879d;
+  --color-ink-500: #5a6377;
+  --color-ink-600: #3e465a;
+  --color-ink-700: #2e3550;
+  --color-ink-800: #20263f;
+  --color-ink-900: #171a56;
+  --color-ink: #171a56;
+
+  --color-surface-500: #3e4a87;
+  --color-surface-600: #2e3868;
+  --color-surface-700: #212a54;
+  --color-surface-800: #161d40;
+  --color-surface-850: #0f1430;
+  --color-surface-900: #0a0e22;
+  --color-surface-950: #070a18;
+  --color-surface: #0a0e22;
+
+  --font-sans: Poppins, 'DIN NEXT', 'LT ARABIC', system-ui, sans-serif;
+  --font-en: Poppins, 'DIN NEXT', system-ui, sans-serif;
+  --font-ar: 'LT ARABIC', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-display: Intrade, Poppins, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --tracking-tightish: -0.02em;
+  --tracking-tighter2: -0.035em;
+
+  --shadow-brand: 0 12px 28px -10px rgba(36, 80, 222, 0.45);
+  --shadow-brand-sm: 0 2px 8px -2px rgba(36, 80, 222, 0.3);
 }
 
-/* ── DIN NEXT — stubs (place woff2 files in public/assets/fonts/ when ready) ── */
-@font-face {
-  font-family: 'DIN NEXT';
-  src: url('/assets/fonts/DINNext-Light.woff2') format('woff2');
-  font-weight: 300;
-  font-display: swap;
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 }
 
-@font-face {
-  font-family: 'DIN NEXT';
-  src: url('/assets/fonts/DINNext-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
+@utility wf-card {
+  @apply rounded-2xl border border-ink-200 bg-white shadow-sm
+      dark:border-surface-600 dark:bg-surface-800 dark:shadow-black/20;
 }
 
-@font-face {
-  font-family: 'DIN NEXT';
-  src: url('/assets/fonts/DINNext-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
+@utility wf-input {
+  @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900
+      placeholder:text-ink-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary
+      dark:border-surface-600 dark:bg-surface-900 dark:text-white dark:placeholder:text-ink-400;
 }
 
-@font-face {
-  font-family: 'DIN NEXT';
-  src: url('/assets/fonts/DINNext-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
+@utility wf-btn-secondary {
+  @apply inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5
+      text-sm font-medium text-ink-800 transition-colors hover:border-primary/40 hover:bg-ink-50
+      dark:border-surface-600 dark:bg-surface-900/40 dark:text-white dark:hover:border-primary/40 dark:hover:bg-surface-800;
 }
 
-/* ── LT ARABIC — stubs (place woff2 files in public/assets/fonts/ when ready) ─ */
-@font-face {
-  font-family: 'LT ARABIC';
-  src: url('/assets/fonts/LTArabic-Light.woff2') format('woff2');
-  font-weight: 300;
-  font-display: swap;
+@utility wf-btn-primary {
+  @apply inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5
+      text-sm font-medium text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-400
+      disabled:cursor-not-allowed disabled:opacity-50;
 }
 
-@font-face {
-  font-family: 'LT ARABIC';
-  src: url('/assets/fonts/LTArabic-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
+@utility wf-modal {
+  @apply w-full rounded-xl border border-ink-200 bg-white shadow-2xl
+      dark:border-surface-600 dark:bg-surface-800;
 }
 
-@font-face {
-  font-family: 'LT ARABIC';
-  src: url('/assets/fonts/LTArabic-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
+@utility wf-title {
+  @apply text-ink-900 dark:text-white;
 }
 
-@font-face {
-  font-family: 'LT ARABIC';
-  src: url('/assets/fonts/LTArabic-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
+@utility wf-muted {
+  @apply text-ink-500 dark:text-ink-300;
 }
 
-/* ── CSS Custom Properties — Design Tokens (Privora new identity) ───────────── */
-:root {
-  --color-primary:       #2450DE;  /* Clarity Blue  — primary action        */
-  --color-primary-hover: #1D42C4;
-  --color-primary-tint:  #EEF2FE;
-  --color-navy:          #171A56;  /* Trust Navy    — text / dark surface   */
-  --color-teal:          #2BC3AC;  /* Assurance Teal — success / secondary  */
-  --color-accent:        #5A9FD8;  /* Intelligence Blue — accent / info     */
-  --color-dark:          #171A56;
-  --font-sans:           'Poppins', 'DIN NEXT', 'LT ARABIC', system-ui, sans-serif;
-}
+@layer utilities {
+  /* ── Poppins — primary UI typeface (new brand identity), self-hosted ────────── */
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/assets/fonts/Poppins-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/assets/fonts/Poppins-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/assets/fonts/Poppins-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Poppins';
+    src: url('/assets/fonts/Poppins-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
 
-/* ── HugeIcons (free stroke set) ───────────────────────────────────────────────
+  /* ── DIN NEXT — stubs (place woff2 files in public/assets/fonts/ when ready) ── */
+  @font-face {
+    font-family: 'DIN NEXT';
+    src: url('/assets/fonts/DINNext-Light.woff2') format('woff2');
+    font-weight: 300;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'DIN NEXT';
+    src: url('/assets/fonts/DINNext-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'DIN NEXT';
+    src: url('/assets/fonts/DINNext-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'DIN NEXT';
+    src: url('/assets/fonts/DINNext-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+
+  /* ── LT ARABIC — stubs (place woff2 files in public/assets/fonts/ when ready) ─ */
+  @font-face {
+    font-family: 'LT ARABIC';
+    src: url('/assets/fonts/LTArabic-Light.woff2') format('woff2');
+    font-weight: 300;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'LT ARABIC';
+    src: url('/assets/fonts/LTArabic-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'LT ARABIC';
+    src: url('/assets/fonts/LTArabic-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'LT ARABIC';
+    src: url('/assets/fonts/LTArabic-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+
+  /* ── CSS Custom Properties — Design Tokens (Privora new identity) ───────────── */
+  :root {
+    --color-primary: #2450de; /* Clarity Blue  — primary action        */
+    --color-primary-hover: #1d42c4;
+    --color-primary-tint: #eef2fe;
+    --color-navy: #171a56; /* Trust Navy    — text / dark surface   */
+    --color-teal: #2bc3ac; /* Assurance Teal — success / secondary  */
+    --color-accent: #5a9fd8; /* Intelligence Blue — accent / info     */
+    --color-dark: #171a56;
+    --font-sans: 'Poppins', 'DIN NEXT', 'LT ARABIC', system-ui, sans-serif;
+  }
+
+  /* ── HugeIcons (free stroke set) ───────────────────────────────────────────────
    The @hugeicons/angular renderer emits <svg fill="none"> without applying a stroke,
    so the stroke-style glyphs would be invisible. Paint them in the current text
    colour here; icons inherit size from the component's width/height. */
-hugeicons-icon svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+  hugeicons-icon svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 
-/* ── Design-system form controls (prv-*) — reusable across feature forms ────── */
-.prv-label { display: block; font-size: 13px; font-weight: 600; color: #2E3550; margin-bottom: 6px; }
-.prv-required { color: #F04438; }
-.prv-input, .prv-select, .prv-textarea {
-  width: 100%; height: 44px; padding: 0 14px; border-radius: 10px;
-  background: #FFFFFF; border: 1.5px solid #D3D9E6; color: #171A56; font-size: 14px;
-  outline: none; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
-}
-.prv-select { padding-inline-end: 34px; cursor: pointer; }
-.prv-textarea { height: auto; min-height: 96px; padding: 11px 14px; resize: vertical; }
-.prv-input::placeholder, .prv-textarea::placeholder { color: #7E879D; }
-.prv-input:hover, .prv-select:hover, .prv-textarea:hover { border-color: #B0B8CB; }
-.prv-input:focus, .prv-select:focus, .prv-textarea:focus { border-color: #2450DE; box-shadow: 0 0 0 4px rgba(36,80,222,.12); }
-.prv-input--error, .prv-select--error, .prv-textarea--error { border-color: #F04438; }
-.prv-input--error:focus, .prv-textarea--error:focus { box-shadow: 0 0 0 4px rgba(240,68,56,.12); }
-.prv-input:disabled, .prv-select:disabled, .prv-textarea:disabled { background: #F4F6FB; color: #7E879D; cursor: not-allowed; }
-.prv-field-error { display: block; font-size: 12px; color: #DC2626; margin-top: 5px; }
-.prv-hint { display: block; font-size: 12px; color: #7E879D; margin-top: 5px; }
-.prv-hint--ok { color: #039855; }
-html.dark .prv-label { color: rgba(234,236,245,.82); }
-html.dark .prv-input, html.dark .prv-select, html.dark .prv-textarea { background: #0F1430; border-color: #2E3868; color: #EAECF5; }
-html.dark .prv-input:hover, html.dark .prv-select:hover, html.dark .prv-textarea:hover { border-color: #3E4A87; }
-html.dark .prv-input:focus, html.dark .prv-select:focus, html.dark .prv-textarea:focus { border-color: #2450DE; box-shadow: 0 0 0 4px rgba(36,80,222,.28); }
-html.dark .prv-input:disabled, html.dark .prv-select:disabled, html.dark .prv-textarea:disabled { background: #161D40; color: rgba(234,236,245,.4); }
+  /* ── Design-system form controls (prv-*) — reusable across feature forms ────── */
+  .prv-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2e3550;
+    margin-bottom: 6px;
+  }
+  .prv-required {
+    color: #f04438;
+  }
+  .prv-input,
+  .prv-select,
+  .prv-textarea {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1.5px solid #d3d9e6;
+    color: #171a56;
+    font-size: 14px;
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease;
+  }
+  .prv-select {
+    padding-inline-end: 34px;
+    cursor: pointer;
+  }
+  .prv-textarea {
+    height: auto;
+    min-height: 96px;
+    padding: 11px 14px;
+    resize: vertical;
+  }
+  .prv-input::placeholder,
+  .prv-textarea::placeholder {
+    color: #7e879d;
+  }
+  .prv-input:hover,
+  .prv-select:hover,
+  .prv-textarea:hover {
+    border-color: #b0b8cb;
+  }
+  .prv-input:focus,
+  .prv-select:focus,
+  .prv-textarea:focus {
+    border-color: #2450de;
+    box-shadow: 0 0 0 4px rgba(36, 80, 222, 0.12);
+  }
+  .prv-input--error,
+  .prv-select--error,
+  .prv-textarea--error {
+    border-color: #f04438;
+  }
+  .prv-input--error:focus,
+  .prv-textarea--error:focus {
+    box-shadow: 0 0 0 4px rgba(240, 68, 56, 0.12);
+  }
+  .prv-input:disabled,
+  .prv-select:disabled,
+  .prv-textarea:disabled {
+    background: #f4f6fb;
+    color: #7e879d;
+    cursor: not-allowed;
+  }
+  .prv-field-error {
+    display: block;
+    font-size: 12px;
+    color: #dc2626;
+    margin-top: 5px;
+  }
+  .prv-hint {
+    display: block;
+    font-size: 12px;
+    color: #7e879d;
+    margin-top: 5px;
+  }
+  .prv-hint--ok {
+    color: #039855;
+  }
+  html.dark .prv-label {
+    color: rgba(234, 236, 245, 0.82);
+  }
+  html.dark .prv-input,
+  html.dark .prv-select,
+  html.dark .prv-textarea {
+    background: #0f1430;
+    border-color: #2e3868;
+    color: #eaecf5;
+  }
+  html.dark .prv-input:hover,
+  html.dark .prv-select:hover,
+  html.dark .prv-textarea:hover {
+    border-color: #3e4a87;
+  }
+  html.dark .prv-input:focus,
+  html.dark .prv-select:focus,
+  html.dark .prv-textarea:focus {
+    border-color: #2450de;
+    box-shadow: 0 0 0 4px rgba(36, 80, 222, 0.28);
+  }
+  html.dark .prv-input:disabled,
+  html.dark .prv-select:disabled,
+  html.dark .prv-textarea:disabled {
+    background: #161d40;
+    color: rgba(234, 236, 245, 0.4);
+  }
 
-/* ── Base ────────────────────────────────────────────────────────────────────── */
-html {
-  -webkit-font-smoothing: antialiased;
-}
+  /* ── Base ────────────────────────────────────────────────────────────────────── */
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
 
-html,
-body {
-  font-family: var(--font-sans);
-  background-color: #FFFFFF;
-  color: #171A56;
-  margin: 0;
-  padding: 0;
-}
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #ffffff;
+    color: #171a56;
+    margin: 0;
+    padding: 0;
+  }
 
-html.dark body {
-  background: #0A0E22;
-  color: #EAECF5;
-}
+  html.dark body {
+    background: #0a0e22;
+    color: #eaecf5;
+  }
 
-/* ── RTL/LTR transition ──────────────────────────────────────────────────────── */
-html {
-  scroll-behavior: smooth;
-  transition: direction 0s;
-}
+  /* ── RTL/LTR transition ──────────────────────────────────────────────────────── */
+  html {
+    scroll-behavior: smooth;
+    transition: direction 0s;
+  }
 
-/* ── Keyboard focus ring ──────────────────────────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
+  /* ── Keyboard focus ring ──────────────────────────────────────────────────────── */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
 
-/* ── Per-page font rules (matching dashboard.html design) ─────────────────── */
-html[lang="en"] body { font-family: 'Poppins', 'DIN NEXT', system-ui, sans-serif; letter-spacing: -0.005em; }
-html[lang="ar"] body,
-html[dir="rtl"] { font-family: 'LT ARABIC', 'IBM Plex Sans Arabic', system-ui, sans-serif; letter-spacing: 0; }
+  /* ── Per-page font rules (matching dashboard.html design) ─────────────────── */
+  html[lang='en'] body {
+    font-family: 'Poppins', 'DIN NEXT', system-ui, sans-serif;
+    letter-spacing: -0.005em;
+  }
+  html[lang='ar'] body,
+  html[dir='rtl'] {
+    font-family: 'LT ARABIC', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+    letter-spacing: 0;
+  }
 
-/* ── Arabic typography: "Hint-medium" spec ─────────────────────────────────── */
-.hint-medium { font-size: 12px; font-weight: 500; line-height: 1; text-align: start; }
-html[dir="rtl"] .text-xs,
-html[dir="rtl"] .text-\[10px\],
-html[dir="rtl"] .hint-medium {
-  font-size: 12px; font-weight: 500; line-height: 1; text-align: start; letter-spacing: 0;
-}
-html[dir="rtl"] .text-center .text-xs,
-html[dir="rtl"] .text-center .text-\[10px\] { text-align: center; }
-html[dir="rtl"] .text-end .text-xs,
-html[dir="rtl"] .text-end.text-xs { text-align: end; }
-html[dir="rtl"] h1 { line-height: 1.15 !important; }
-html[dir="rtl"] h2 { line-height: 1.2 !important; }
+  /* ── Arabic typography: "Hint-medium" spec ─────────────────────────────────── */
+  .hint-medium {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    text-align: start;
+  }
+  html[dir='rtl'] .text-xs,
+  html[dir='rtl'] .text-\[10px\],
+  html[dir='rtl'] .hint-medium {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    text-align: start;
+    letter-spacing: 0;
+  }
+  html[dir='rtl'] .text-center .text-xs,
+  html[dir='rtl'] .text-center .text-\[10px\] {
+    text-align: center;
+  }
+  html[dir='rtl'] .text-end .text-xs,
+  html[dir='rtl'] .text-end.text-xs {
+    text-align: end;
+  }
+  html[dir='rtl'] h1 {
+    line-height: 1.15 !important;
+  }
+  html[dir='rtl'] h2 {
+    line-height: 1.2 !important;
+  }
 
-@keyframes pulseDot { 0%,100% { opacity:1; transform: scale(1); } 50% { opacity:.5; transform: scale(.85); } }
-.pulse-dot { animation: pulseDot 1.8s ease-in-out infinite; }
+  @keyframes pulseDot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(0.85);
+    }
+  }
+  .pulse-dot {
+    animation: pulseDot 1.8s ease-in-out infinite;
+  }
 
-.btn-primary { background:#2450DE; color:white; transition: background .15s ease, transform .15s ease, box-shadow .15s ease; }
-.btn-primary:hover { background:#1D42C4; box-shadow: 0 12px 28px -10px rgba(36,80,222,.55); }
+  .btn-primary {
+    background: #2450de;
+    color: white;
+    transition:
+      background 0.15s ease,
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .btn-primary:hover {
+    background: #1d42c4;
+    box-shadow: 0 12px 28px -10px rgba(36, 80, 222, 0.55);
+  }
 
-/* Language pill */
-.lang-pill { position: relative; display:inline-flex; align-items:center; background:#EEF2FE; border:1px solid #DCE3FD; border-radius:999px; padding:3px; }
-.lang-pill button { position:relative; z-index:1; font-size:12px; font-weight:600; padding: 5px 12px; border-radius: 999px; color:#1A37A0; transition: color .2s ease; min-width: 44px; }
-.lang-pill button.active { color:#FFFFFF; }
-.lang-pill .thumb { position:absolute; top:3px; bottom:3px; width: calc(50% - 3px); background:#5040D6; border-radius:999px; transition: transform .25s ease; inset-inline-start: 3px; }
+  /* Language pill */
+  .lang-pill {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: #eef2fe;
+    border: 1px solid #dce3fd;
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .lang-pill button {
+    position: relative;
+    z-index: 1;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    color: #1a37a0;
+    transition: color 0.2s ease;
+    min-width: 44px;
+  }
+  .lang-pill button.active {
+    color: #ffffff;
+  }
+  .lang-pill .thumb {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    width: calc(50% - 3px);
+    background: #5040d6;
+    border-radius: 999px;
+    transition: transform 0.25s ease;
+    inset-inline-start: 3px;
+  }
 
-/* ── Page card ───────────────────────────────────────────────────────────────
+  /* ── Page card ───────────────────────────────────────────────────────────────
  * The frame a list or detail page sits in. Several pages already carried
  * `class="card"` while nothing defined it, so each looked like whatever its own
  * utility classes happened to give it. One definition is what makes them agree.
  */
-.card {
-  background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  border-radius: 0.75rem;
-  box-shadow: var(--app-shadow-sm);
-}
+  .card {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--app-shadow-sm);
+  }
 
-/* ── Data grid skin ──────────────────────────────────────────────────────────
+  /* ── Data grid skin ──────────────────────────────────────────────────────────
  * Opted into with `styleClass="app-table …"` on a p-table. Unlayered, so it wins
  * over PrimeNG's own cascade layer without `!important`.
  */
-.p-datatable.app-table .p-datatable-table-container {
-  /* What `[scrollable]` turns into the viewport: the sideways overflow belongs
+  .p-datatable.app-table .p-datatable-table-container {
+    /* What `[scrollable]` turns into the viewport: the sideways overflow belongs
      here, not on the page. No border — the surrounding .card already frames it. */
-  border-radius: 0.625rem;
-  overflow-x: auto;
-}
+    border-radius: 0.625rem;
+    overflow-x: auto;
+  }
 
-.p-datatable.app-table .p-datatable-thead > tr > th {
-  background: var(--app-surface-alt);
-  border-bottom: 1px solid var(--app-border);
-  /* Columns are sized from their content by the table's min-width; a wrapping
+  .p-datatable.app-table .p-datatable-thead > tr > th {
+    background: var(--app-surface-alt);
+    border-bottom: 1px solid var(--app-border);
+    /* Columns are sized from their content by the table's min-width; a wrapping
      header defeats that and gives three-line headings. */
-  white-space: nowrap;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--p-text-muted-color);
-  padding: 0.625rem 0.75rem;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
+    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--p-text-muted-color);
+    padding: 0.625rem 0.75rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
 
-.p-datatable.app-table .p-datatable-tbody > tr > td {
-  /* Same reason as the headers: a value that wraps makes every row a different
+  .p-datatable.app-table .p-datatable-tbody > tr > td {
+    /* Same reason as the headers: a value that wraps makes every row a different
      height and the grid loses its scanline. */
-  white-space: nowrap;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--app-border), transparent 45%);
-  vertical-align: middle;
-}
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--app-border), transparent 45%);
+    vertical-align: middle;
+  }
 
-/* Opt-in for the few columns that need to breathe. Put it on the th and the td. */
-.p-datatable.app-table .app-col-wrap {
-  white-space: normal;
-}
+  /* Opt-in for the few columns that need to breathe. Put it on the th and the td. */
+  .p-datatable.app-table .app-col-wrap {
+    white-space: normal;
+  }
 
-.p-datatable.app-table .p-datatable-tbody > tr:last-child > td {
-  border-bottom: 0;
-}
+  .p-datatable.app-table .p-datatable-tbody > tr:last-child > td {
+    border-bottom: 0;
+  }
 
-.p-datatable.app-table .p-datatable-paginator-bottom {
-  border: 0;
-  padding-top: 0.75rem;
-}
+  .p-datatable.app-table .p-datatable-paginator-bottom {
+    border: 0;
+    padding-top: 0.75rem;
+  }
 
-/* The caption holds the filter bar; it reads as part of the page, not as another
+  /* The caption holds the filter bar; it reads as part of the page, not as another
    boxed panel stacked on the table. */
-.p-datatable.app-table .p-datatable-header {
-  background: transparent;
-  border: 0;
-  padding: 0 0 0.75rem 0;
-}
+  .p-datatable.app-table .p-datatable-header {
+    background: transparent;
+    border: 0;
+    padding: 0 0 0.75rem 0;
+  }
 
-/* ── Workflow surfaces (light + dark) ─────────────────────────────────────── */
-@layer components {
-  .wf-card {
-    @apply rounded-2xl border border-ink-200 bg-white shadow-sm
-      dark:border-surface-600 dark:bg-surface-800 dark:shadow-black/20;
-  }
-  .wf-input {
-    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900
-      placeholder:text-ink-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary
-      dark:border-surface-600 dark:bg-surface-900 dark:text-white dark:placeholder:text-ink-400;
-  }
-  .wf-btn-secondary {
-    @apply inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5
-      text-sm font-medium text-ink-800 transition-colors hover:border-primary/40 hover:bg-ink-50
-      dark:border-surface-600 dark:bg-surface-900/40 dark:text-white dark:hover:border-primary/40 dark:hover:bg-surface-800;
-  }
-  .wf-btn-primary {
-    @apply inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5
-      text-sm font-medium text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-400
-      disabled:cursor-not-allowed disabled:opacity-50;
-  }
-  .wf-modal {
-    @apply w-full rounded-xl border border-ink-200 bg-white shadow-2xl
-      dark:border-surface-600 dark:bg-surface-800;
-  }
-  .wf-title {
-    @apply text-ink-900 dark:text-white;
-  }
-  .wf-muted {
-    @apply text-ink-500 dark:text-ink-300;
-  }
+  /* ── Workflow surfaces (light + dark) ─────────────────────────────────────── */
 }
 
 /* ---- Badge / tag system ------------------------------------------------
@@ -321,12 +637,30 @@ html[dir="rtl"] h2 { line-height: 1.2 !important; }
   color: var(--acc-neutral-fg);
 }
 
-.app-badge--brand { background: var(--acc-brand-bg); color: var(--acc-brand-fg); }
-.app-badge--rule { background: var(--acc-rule-bg); color: var(--acc-rule-fg); }
-.app-badge--success { background: var(--acc-success-bg); color: var(--acc-success-fg); }
-.app-badge--warn { background: var(--acc-warn-bg); color: var(--acc-warn-fg); }
-.app-badge--danger { background: var(--acc-danger-bg); color: var(--acc-danger-fg); }
-.app-badge--neutral { background: var(--acc-neutral-bg); color: var(--acc-neutral-fg); }
+.app-badge--brand {
+  background: var(--acc-brand-bg);
+  color: var(--acc-brand-fg);
+}
+.app-badge--rule {
+  background: var(--acc-rule-bg);
+  color: var(--acc-rule-fg);
+}
+.app-badge--success {
+  background: var(--acc-success-bg);
+  color: var(--acc-success-fg);
+}
+.app-badge--warn {
+  background: var(--acc-warn-bg);
+  color: var(--acc-warn-fg);
+}
+.app-badge--danger {
+  background: var(--acc-danger-bg);
+  color: var(--acc-danger-fg);
+}
+.app-badge--neutral {
+  background: var(--acc-neutral-bg);
+  color: var(--acc-neutral-fg);
+}
 
 .app-badge--code {
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;

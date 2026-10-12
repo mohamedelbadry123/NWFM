@@ -83,6 +83,12 @@ jobs:
       - run: npx --no-install e2e-web install chromium --with-deps
       - run: npm run test:frontend
       - run: npm run build:frontend
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-failures
+          path: frontend/src/**/__screenshots__/
+          retention-days: 7
 
   backend:
     name: Backend

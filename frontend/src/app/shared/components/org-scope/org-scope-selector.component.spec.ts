@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateService } from '@ngx-translate/core';
 import { Observable, Subject, of } from 'rxjs';
@@ -19,15 +20,28 @@ describe('OrgScopeSelectorComponent', () => {
   let pending: Map<string, Subject<LookupItem[]>>;
   let requests: string[];
 
-  const item = (code: string, parentCode?: string): LookupItem => ({ id: code, code, nameEn: code, nameAr: code, isActive: true, parentCode });
+  const item = (code: string, parentCode?: string): LookupItem => ({
+    id: code,
+    code,
+    nameEn: code,
+    nameAr: code,
+    isActive: true,
+    parentCode,
+  });
   const key = (type: LookupType, parentCode?: string) => `${type}:${parentCode ?? ''}`;
-  const reply = (type: LookupType, parentCode: string, items: LookupItem[]) => pending.get(key(type, parentCode))!.next(items);
+  const reply = (type: LookupType, parentCode: string, items: LookupItem[]) =>
+    pending.get(key(type, parentCode))!.next(items);
 
   beforeEach(() => {
     pending = new Map();
     requests = [];
     const lookups = {
-      listAll: (type: LookupType, options?: { parentCode?: string }): Observable<LookupItem[]> => {
+      listAll: (
+        type: LookupType,
+        options?: {
+          parentCode?: string;
+        },
+      ): Observable<LookupItem[]> => {
         if (!options?.parentCode) return of(type === 'Cluster' ? [item('C1'), item('C2')] : []);
         requests.push(key(type, options.parentCode));
         const subject = new Subject<LookupItem[]>();
@@ -48,7 +62,7 @@ describe('OrgScopeSelectorComponent', () => {
     fixture = TestBed.createComponent(OrgScopeSelectorComponent);
     picker = fixture.componentInstance;
     emitted = [];
-    picker.locationChange.subscribe(location => emitted.push(location));
+    picker.locationChange.subscribe((location) => emitted.push(location));
     fixture.detectChanges();
   });
 
@@ -64,9 +78,9 @@ describe('OrgScopeSelectorComponent', () => {
     pick();
 
     expect(requests).toEqual(['Cbu:C1', 'Branch:CB1', 'OperationArea:CB1']);
-    expect(picker['cbus']().map(o => o.value)).toEqual(['CB1', 'CB2']);
-    expect(picker['branches']().map(o => o.value)).toEqual(['BR1']);
-    expect(picker['operationAreas']().map(o => o.value)).toEqual(['OA1']);
+    expect(picker['cbus']().map((o) => o.value)).toEqual(['CB1', 'CB2']);
+    expect(picker['branches']().map((o) => o.value)).toEqual(['BR1']);
+    expect(picker['operationAreas']().map((o) => o.value)).toEqual(['OA1']);
   });
 
   it('keeps branch and operation area side by side — they are siblings, not a chain', () => {
@@ -74,7 +88,12 @@ describe('OrgScopeSelectorComponent', () => {
     picker['onBranchChange']('BR1');
     picker['onOperationAreaChange']('OA1');
 
-    expect(emitted.at(-1)).toEqual({ clusterCode: 'C1', cbuCode: 'CB1', branchCode: 'BR1', operationAreaCode: 'OA1' });
+    expect(emitted.at(-1)).toEqual({
+      clusterCode: 'C1',
+      cbuCode: 'CB1',
+      branchCode: 'BR1',
+      operationAreaCode: 'OA1',
+    });
   });
 
   it('clears the CBU, branch and operation area when the cluster changes', () => {
@@ -84,7 +103,12 @@ describe('OrgScopeSelectorComponent', () => {
 
     picker['onClusterChange']('C2');
 
-    expect(emitted.at(-1)).toEqual({ clusterCode: 'C2', cbuCode: null, branchCode: null, operationAreaCode: null });
+    expect(emitted.at(-1)).toEqual({
+      clusterCode: 'C2',
+      cbuCode: null,
+      branchCode: null,
+      operationAreaCode: null,
+    });
     expect(picker['branches']()).toEqual([]);
     expect(picker['operationAreas']()).toEqual([]);
   });
@@ -96,7 +120,12 @@ describe('OrgScopeSelectorComponent', () => {
 
     picker['onCbuChange']('CB2');
 
-    expect(emitted.at(-1)).toEqual({ clusterCode: 'C1', cbuCode: 'CB2', branchCode: null, operationAreaCode: null });
+    expect(emitted.at(-1)).toEqual({
+      clusterCode: 'C1',
+      cbuCode: 'CB2',
+      branchCode: null,
+      operationAreaCode: null,
+    });
     expect(requests).toContain('Branch:CB2');
     expect(requests).toContain('OperationArea:CB2');
   });
@@ -107,7 +136,7 @@ describe('OrgScopeSelectorComponent', () => {
     reply('Cbu', 'C2', [item('CB3', 'C2')]);
     reply('Cbu', 'C1', [item('CB1', 'C1')]);
 
-    expect(picker['cbus']().map(o => o.value)).toEqual(['CB3']);
+    expect(picker['cbus']().map((o) => o.value)).toEqual(['CB3']);
 
     picker['onCbuChange']('CB3');
     picker['onCbuChange'](null);
@@ -117,7 +146,12 @@ describe('OrgScopeSelectorComponent', () => {
   });
 
   it('rebuilds the cascade from a saved location', async () => {
-    fixture.componentRef.setInput('initialLocation', { clusterCode: 'C1', cbuCode: 'CB1', branchCode: 'BR1', operationAreaCode: null });
+    fixture.componentRef.setInput('initialLocation', {
+      clusterCode: 'C1',
+      cbuCode: 'CB1',
+      branchCode: 'BR1',
+      operationAreaCode: null,
+    });
     fixture.detectChanges();
     await fixture.whenStable();
 

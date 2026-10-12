@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { OrgFilterDialogComponent } from './org-filter-dialog.component';
@@ -13,8 +14,18 @@ describe('OrgFilterDialogComponent', () => {
   let dialog: OrgFilterDialogComponent;
   let emitted: OrgLocation[];
 
-  const applied: OrgLocation = { clusterCode: 'CENTRAL', cbuCode: 'RCBU', branchCode: null, operationAreaCode: null };
-  const narrower: OrgLocation = { clusterCode: 'CENTRAL', cbuCode: 'RCBU', branchCode: 'R-16', operationAreaCode: null };
+  const applied: OrgLocation = {
+    clusterCode: 'CENTRAL',
+    cbuCode: 'RCBU',
+    branchCode: null,
+    operationAreaCode: null,
+  };
+  const narrower: OrgLocation = {
+    clusterCode: 'CENTRAL',
+    cbuCode: 'RCBU',
+    branchCode: 'R-16',
+    operationAreaCode: null,
+  };
 
   beforeEach(() => {
     TestBed.overrideComponent(OrgFilterDialogComponent, { set: { template: '', imports: [] } });
@@ -37,7 +48,7 @@ describe('OrgFilterDialogComponent', () => {
 
     expect(dialog['draft']()).toEqual(applied);
     expect(dialog['seed']()).toEqual(applied);
-    expect(dialog['canApply']()).toBeTrue();
+    expect(dialog['canApply']()).toBe(true);
   });
 
   it('gives the picker a fresh seed on every open, so it rebuilds its cascade', () => {
@@ -59,7 +70,7 @@ describe('OrgFilterDialogComponent', () => {
     dialog['apply']();
 
     expect(emitted).toEqual([narrower]);
-    expect(dialog.visible()).toBeFalse();
+    expect(dialog.visible()).toBe(false);
   });
 
   it('drops the draft on Cancel, and reopens on what is applied', () => {
@@ -68,7 +79,7 @@ describe('OrgFilterDialogComponent', () => {
     dialog['cancel']();
 
     expect(emitted).toEqual([]);
-    expect(dialog.visible()).toBeFalse();
+    expect(dialog.visible()).toBe(false);
 
     open();
     expect(dialog['draft']()).toEqual(applied);
@@ -80,8 +91,8 @@ describe('OrgFilterDialogComponent', () => {
 
     expect(dialog['draft']()).toEqual(EMPTY_ORG_LOCATION);
     expect(dialog['seed']()).toEqual(EMPTY_ORG_LOCATION);
-    expect(dialog['canApply']()).toBeFalse();
-    expect(dialog.visible()).toBeTrue();
+    expect(dialog['canApply']()).toBe(false);
+    expect(dialog.visible()).toBe(true);
     expect(emitted).toEqual([]);
   });
 

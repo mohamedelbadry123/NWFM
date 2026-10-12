@@ -7,6 +7,6 @@ const chrome = process.env.CHROME_BIN || chromium.executablePath();
 if (!existsSync(chrome))
   throw new Error('Install Chromium first: npx @e2e-dev/web install chromium --with-deps');
 run('dotnet', ['test', 'backend/NWFM.sln', '--configuration', 'Release', '--logger', 'trx']);
-run('npm', ['--prefix', 'frontend', 'test', '--', '--watch=false', '--browsers=ChromeHeadless'], {
+run('npm', ['--prefix', 'frontend', 'test', '--', '--watch=false', '--headless'], {
   env: { ...process.env, CHROME_BIN: chrome },
 });

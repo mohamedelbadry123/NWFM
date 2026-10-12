@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import {
   canvasWorldSize,
   layoutWorkflowGraph,
@@ -56,16 +57,20 @@ describe('workflow canvas layout', () => {
   });
 
   it('detects a dumped pile of nodes', () => {
-    expect(nodesAreCollapsed([
-      { x: 100, y: 100 },
-      { x: 102, y: 98 },
-      { x: 100, y: 101 },
-    ])).toBe(true);
-    expect(nodesAreCollapsed([
-      { x: 100, y: 100 },
-      { x: 100, y: 360 },
-      { x: 100, y: 620 },
-    ])).toBe(false);
+    expect(
+      nodesAreCollapsed([
+        { x: 100, y: 100 },
+        { x: 102, y: 98 },
+        { x: 100, y: 101 },
+      ]),
+    ).toBe(true);
+    expect(
+      nodesAreCollapsed([
+        { x: 100, y: 100 },
+        { x: 100, y: 360 },
+        { x: 100, y: 620 },
+      ]),
+    ).toBe(false);
   });
 
   it('remaps canvas ids to new activity ids by nodeKey', () => {

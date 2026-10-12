@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { buildRulePredicate } from './form-schema-rules';
 import { RULE_MATCH, RULE_OPERATORS, type RuleGroup, type RuleOperator } from './form-schema.types';
 
@@ -16,9 +17,11 @@ describe('form schema rules', () => {
     expect(buildRulePredicate(group(RULE_MATCH.All, []))).toBeNull();
 
     // A blank row in the builder names no field, so it is not a condition.
-    expect(buildRulePredicate(group(RULE_MATCH.All, [
-      { field: '', operator: RULE_OPERATORS.Equal, value: 'x' },
-    ]))).toBeNull();
+    expect(
+      buildRulePredicate(
+        group(RULE_MATCH.All, [{ field: '', operator: RULE_OPERATORS.Equal, value: 'x' }]),
+      ),
+    ).toBeNull();
   });
 
   it('applies the text operators', () => {
@@ -33,16 +36,18 @@ describe('form schema rules', () => {
     ];
 
     for (const [operator, value, expected] of cases) {
-      const predicate = buildRulePredicate(group(RULE_MATCH.All, [{ field: 'material', operator, value }]));
+      const predicate = buildRulePredicate(
+        group(RULE_MATCH.All, [{ field: 'material', operator, value }]),
+      );
 
-      expect(predicate!({ material: 'steel' })).withContext(operator + ' ' + value).toBe(expected);
+      expect(predicate!({ material: 'steel' }), operator + ' ' + value).toBe(expected);
     }
   });
 
   it('compares numbers, and treats an unanswered field as no match', () => {
-    const greater = buildRulePredicate(group(RULE_MATCH.All, [
-      { field: 'depth', operator: RULE_OPERATORS.GreaterThan, value: '3' },
-    ]))!;
+    const greater = buildRulePredicate(
+      group(RULE_MATCH.All, [{ field: 'depth', operator: RULE_OPERATORS.GreaterThan, value: '3' }]),
+    )!;
 
     expect(greater({ depth: 5 })).toBe(true);
     expect(greater({ depth: 1 })).toBe(false);
@@ -50,9 +55,9 @@ describe('form schema rules', () => {
   });
 
   it('asks whether a multi-choice answer holds the value', () => {
-    const predicate = buildRulePredicate(group(RULE_MATCH.All, [
-      { field: 'impacts', operator: RULE_OPERATORS.Equal, value: 'soil' },
-    ]))!;
+    const predicate = buildRulePredicate(
+      group(RULE_MATCH.All, [{ field: 'impacts', operator: RULE_OPERATORS.Equal, value: 'soil' }]),
+    )!;
 
     expect(predicate({ impacts: ['water', 'soil'] })).toBe(true);
     expect(predicate({ impacts: ['water'] })).toBe(false);
@@ -73,9 +78,9 @@ describe('form schema rules', () => {
   });
 
   it('is satisfied by an operator it does not know, rather than hiding the field', () => {
-    const predicate = buildRulePredicate(group(RULE_MATCH.All, [
-      { field: 'a', operator: 'sounds_like' as never, value: '1' },
-    ]))!;
+    const predicate = buildRulePredicate(
+      group(RULE_MATCH.All, [{ field: 'a', operator: 'sounds_like' as never, value: '1' }]),
+    )!;
 
     expect(predicate({ a: 'zzz' })).toBe(true);
   });
