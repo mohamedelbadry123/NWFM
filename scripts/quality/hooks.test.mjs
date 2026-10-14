@@ -29,6 +29,8 @@ test('real hooks preserve partial staging, reject lint and test failures, and en
     ok(git('init', '-b', 'feature/hooks'));
     ok(git('config', 'user.name', 'Hook verifier'));
     ok(git('config', 'user.email', 'hooks@example.test'));
+    // A global autocrlf would rewrite the fixture's line endings and break lint-staged's patch restore.
+    ok(git('config', 'core.autocrlf', 'false'));
     mkdirSync(path.join(fixture, 'scripts/quality'), { recursive: true });
     for (const file of ['check-files.mjs', 'process.mjs', 'branch-guard.mjs'])
       copyFileSync(
@@ -43,7 +45,12 @@ test('real hooks preserve partial staging, reject lint and test failures, and en
       'eslint.config.mjs',
     ])
       copyFileSync(path.join(root, file), path.join(fixture, file));
-    symlinkSync(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'), 'dir');
+    // A junction needs no symlink privilege on Windows; cleanup removes the link, not its target.
+    symlinkSync(
+      path.join(root, 'node_modules'),
+      path.join(fixture, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     writeFileSync(path.join(fixture, '.gitignore'), 'node_modules/\n');
     writeFileSync(
       path.join(fixture, 'package.json'),
