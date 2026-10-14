@@ -1,7 +1,6 @@
 using Auth.Application.Auth.Models;
 using Auth.Application.Common.Interfaces;
 using Auth.Application.Constants;
-using NWFM.Shared.Constants;
 using Auth.Domain.Constants;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +33,7 @@ internal sealed class GetCurrentUserProfileQueryHandler(
                 Level = s.Level,
                 Code = s.Code,
                 DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
-                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+                TaskTypeIds = s.TaskTypes.Select(t => t.TaskTypeId).ToList()
             })
             .AsNoTracking()
             .ToListAsync(cancellationToken);

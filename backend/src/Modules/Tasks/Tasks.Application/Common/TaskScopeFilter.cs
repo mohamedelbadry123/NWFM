@@ -34,6 +34,7 @@ internal static class TaskScopeFilter
             var branchCodes = territory.BranchCodes.ToList();
             var areaCodes = territory.OperationAreaCodes.ToList();
             var departmentCode = territory.DepartmentCode;
+            var taskTypeIds = territory.TaskTypeIds.ToList();
 
             // Work with no department is admitted by every group: the field is optional, and hiding
             // unclassified work would lose it rather than protect it.
@@ -41,13 +42,18 @@ internal static class TaskScopeFilter
                 ? _ => true
                 : t => t.DepartmentCode == null || t.DepartmentCode == departmentCode;
 
+            // Every task has a type, so a group naming types admits only those.
+            Expression<Func<FieldTask, bool>> matchesTaskType = taskTypeIds.Count == 0
+                ? _ => true
+                : t => taskTypeIds.Contains(t.TaskTypeId);
+
             Expression<Func<FieldTask, bool>> matchesLocation = territory.CoversAllTerritory
                 ? _ => true
                 : t => (t.CbuCode != null && cbuCodes.Contains(t.CbuCode))
                     || (t.BranchCode != null && branchCodes.Contains(t.BranchCode))
                     || (t.OperationAreaCode != null && areaCodes.Contains(t.OperationAreaCode));
 
-            predicate = predicate.Or(matchesDepartment.And(matchesLocation));
+            predicate = predicate.Or(matchesDepartment.And(matchesTaskType).And(matchesLocation));
         }
 
         return predicate;
@@ -63,7 +69,7 @@ internal static class TaskScopeFilter
     /// <summary>The same rule for a task already loaded.</summary>
     public static bool Allows(FieldTask task, OrgScopeSet scope, Guid? callerTeamId)
     {
-        if (!scope.Covers(task.CbuCode, task.BranchCode, task.OperationAreaCode, task.DepartmentCode))
+        if (!scope.Covers(task.CbuCode, task.BranchCode, task.OperationAreaCode, task.DepartmentCode, task.TaskTypeId))
         {
             return false;
         }

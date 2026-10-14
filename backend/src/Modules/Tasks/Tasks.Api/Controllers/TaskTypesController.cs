@@ -24,7 +24,7 @@ public sealed class TaskTypesController(ISender sender) : ControllerBase
         (await sender.Send(query, ct)).ToActionResult();
 
     [HttpGet("active")]
-    [Authorize(Policy = NwfmPolicies.TaskTypeReaders)]
+    [Authorize(Policy = NwfmPolicies.ActiveTaskTypeReaders)]
     [ProducesResponseType(typeof(Result<IReadOnlyList<TaskTypeDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetActive(CancellationToken ct) =>
         (await sender.Send(new GetActiveTaskTypesQuery(), ct)).ToActionResult();

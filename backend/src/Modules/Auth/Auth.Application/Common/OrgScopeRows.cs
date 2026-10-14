@@ -20,7 +20,7 @@ internal static class OrgScopeRows
                 Level = s.Level,
                 Code = s.Code,
                 DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
-                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+                TaskTypeIds = s.TaskTypes.Select(t => t.TaskTypeId).ToList()
             })
             .ToListAsync(ct);
 
@@ -44,7 +44,7 @@ internal static class OrgScopeRows
                     Level = s.Level,
                     Code = s.Code,
                     DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
-                    ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+                    TaskTypeIds = s.TaskTypes.Select(t => t.TaskTypeId).ToList()
                 }
             })
             .ToListAsync(ct);
@@ -75,7 +75,7 @@ internal static class OrgScopeRows
             try
             {
                 replacements.Add(OrgScope.Create(
-                    ownerType, ownerId, scope.Level, scope.Code, scope.DepartmentCodes, scope.ActivityTypeCodes));
+                    ownerType, ownerId, scope.Level, scope.Code, scope.DepartmentCodes, scope.TaskTypeIds));
             }
             catch (DomainException ex)
             {
@@ -83,10 +83,10 @@ internal static class OrgScopeRows
             }
         }
 
-        // Loaded with their department and activity type rows, so those go with them.
+        // Loaded with their department and task type rows, so those go with them.
         var existing = await db.OrgScopes
             .Include(s => s.Departments)
-            .Include(s => s.ActivityTypes)
+            .Include(s => s.TaskTypes)
             .Where(s => s.OwnerType == ownerType && s.OwnerId == ownerId)
             .ToListAsync(ct);
 

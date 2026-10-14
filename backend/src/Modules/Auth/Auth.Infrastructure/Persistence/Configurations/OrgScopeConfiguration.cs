@@ -21,8 +21,8 @@ public sealed class OrgScopeConfiguration : IEntityTypeConfiguration<OrgScope>
         builder.HasMany(e => e.Departments).WithOne().HasForeignKey(d => d.OrgScopeId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(e => e.Departments).UsePropertyAccessMode(PropertyAccessMode.Field);
 
-        builder.HasMany(e => e.ActivityTypes).WithOne().HasForeignKey(a => a.OrgScopeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(e => e.ActivityTypes).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.HasMany(e => e.TaskTypes).WithOne().HasForeignKey(t => t.OrgScopeId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(e => e.TaskTypes).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
 
@@ -36,12 +36,11 @@ public sealed class OrgScopeDepartmentConfiguration : IEntityTypeConfiguration<O
     }
 }
 
-public sealed class OrgScopeActivityTypeConfiguration : IEntityTypeConfiguration<OrgScopeActivityType>
+public sealed class OrgScopeTaskTypeConfiguration : IEntityTypeConfiguration<OrgScopeTaskType>
 {
-    public void Configure(EntityTypeBuilder<OrgScopeActivityType> builder)
+    public void Configure(EntityTypeBuilder<OrgScopeTaskType> builder)
     {
-        builder.ToTable("OrgScopesActivityType");
-        builder.HasKey(e => new { e.OrgScopeId, e.ActivityTypeCode });
-        builder.Property(e => e.ActivityTypeCode).HasMaxLength(50).IsRequired();
+        builder.ToTable("OrgScopesTaskTypes");
+        builder.HasKey(e => new { e.OrgScopeId, e.TaskTypeId });
     }
 }

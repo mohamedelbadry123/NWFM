@@ -3,15 +3,15 @@ namespace NWFM.Shared.Organization;
 /// <summary>
 /// One row of an owner's coverage — a place, kinds of work, or both. A null <see cref="Level"/> /
 /// <see cref="Code"/> means every territory; no <see cref="DepartmentCodes"/> means every department;
-/// no <see cref="ActivityTypeCodes"/> means every activity type.
+/// no <see cref="TaskTypeIds"/> means every task type.
 /// </summary>
 public sealed record OrgScopeRow(
     string? Level,
     string? Code,
     IReadOnlyList<string> DepartmentCodes,
-    IReadOnlyList<string> ActivityTypeCodes)
+    IReadOnlyList<Guid> TaskTypeIds)
 {
-    /// <summary>A row for one department, or for all of them when null, and every activity type.</summary>
+    /// <summary>A row for one department, or for all of them when null, and every task type.</summary>
     public OrgScopeRow(string? level, string? code, string? departmentCode)
         : this(level, code, string.IsNullOrWhiteSpace(departmentCode) ? [] : [departmentCode], [])
     {
@@ -21,8 +21,8 @@ public sealed record OrgScopeRow(
 /// <summary>
 /// One department's coverage flattened into plain code lists, for a caller that must filter in the
 /// database. <see cref="OrgScopeSet.Covers"/> answers the same question for a row already loaded;
-/// this hands the codes to a query so the rows never have to be. <see cref="ActivityTypeCodes"/> is
-/// empty when the group takes every activity type.
+/// this hands the codes to a query so the rows never have to be. <see cref="TaskTypeIds"/> is
+/// empty when the group takes every task type.
 /// </summary>
 public sealed record OrgScopeTerritory(
     string? DepartmentCode,
@@ -30,14 +30,14 @@ public sealed record OrgScopeTerritory(
     IReadOnlyList<string> CbuCodes,
     IReadOnlyList<string> BranchCodes,
     IReadOnlyList<string> OperationAreaCodes,
-    IReadOnlyList<string> ActivityTypeCodes)
+    IReadOnlyList<Guid> TaskTypeIds)
 {
     public IReadOnlyList<string> ClusterCodes { get; init; } = [];
 }
 
 /// <summary>
 /// The expanded coverage an owner — a user or a team — holds: its scope rows grouped by department
-/// (and the activity types the row names), each group carrying every CBU, branch and operation area
+/// (and the task types the row names), each group carrying every CBU, branch and operation area
 /// code its rows reach. A row naming several departments counts as one row per department.
 ///
 /// Grouped rather than flattened because the axes are not independent: an owner working water in
@@ -73,7 +73,7 @@ public sealed class OrgScopeSet
 
         foreach (var row in list)
         {
-            var activityTypes = Clean(row.ActivityTypeCodes);
+            var taskTypes = (row.TaskTypeIds ?? []).Where(id => id != Guid.Empty).Distinct().ToList();
             var departments = Clean(row.DepartmentCodes);
 
             // A row with no department is one group taking every department.
@@ -81,13 +81,13 @@ public sealed class OrgScopeSet
 
             foreach (var department in targets)
             {
-                // "" stands in for "no department", and the activity types join the key, so rows that
+                // "" stands in for "no department", and the task types join the key, so rows that
                 // cover the same kinds of work share one group and their territories union.
-                var key = (department ?? string.Empty) + "|" + string.Join(",", activityTypes.Order(StringComparer.OrdinalIgnoreCase));
+                var key = (department ?? string.Empty) + "|" + string.Join(",", taskTypes.Order());
 
                 if (!groups.TryGetValue(key, out var group))
                 {
-                    group = new Group(department, activityTypes);
+                    group = new Group(department, taskTypes);
                     groups[key] = group;
                 }
 
@@ -109,24 +109,24 @@ public sealed class OrgScopeSet
     /// True when this coverage reaches the given work. Every axis must be satisfied by the <b>same</b>
     /// group — the reason for grouping. On the location axis, reaching the work through any one of
     /// CBU, branch or operation area is enough, since work need not carry every level. Work with no
-    /// activity type (a task, say) is taken by any group, as work with no department is.
+    /// task type is taken by any group, as work with no department is.
     /// </summary>
     public bool Covers(
         string? cbuCode,
         string? branchCode,
         string? operationAreaCode,
         string? departmentCode,
-        string? activityTypeCode = null) =>
+        Guid? taskTypeId = null) =>
         IsUnrestricted
         || _groups.Any(group =>
             group.AcceptsDepartment(departmentCode)
-            && group.AcceptsActivityType(activityTypeCode)
+            && group.AcceptsTaskType(taskTypeId)
             && group.AcceptsLocation(cbuCode, branchCode, operationAreaCode));
 
     /// <summary>Broad cluster work requires an explicit cluster grant, not just one of its CBUs.</summary>
-    public bool CoversCluster(string? clusterCode, string? departmentCode = null, string? activityTypeCode = null) => IsUnrestricted
+    public bool CoversCluster(string? clusterCode, string? departmentCode = null, Guid? taskTypeId = null) => IsUnrestricted
         || _groups.Any(g => g.AcceptsDepartment(departmentCode)
-            && g.AcceptsActivityType(activityTypeCode)
+            && g.AcceptsTaskType(taskTypeId)
             && (g.CoversAllTerritory || clusterCode is not null && g.ClusterCodes.Contains(clusterCode)));
 
     /// <summary>True when this coverage and <paramref name="other"/> share any work at all.</summary>
@@ -135,7 +135,7 @@ public sealed class OrgScopeSet
         || other.IsUnrestricted
         || _groups.Any(group => other._groups.Any(otherGroup =>
             group.AcceptsDepartment(otherGroup.DepartmentCode)
-            && group.OverlapsActivityTypes(otherGroup)
+            && group.OverlapsTaskTypes(otherGroup)
             && group.OverlapsLocation(otherGroup)));
 
     /// <summary>
@@ -150,7 +150,7 @@ public sealed class OrgScopeSet
             [.. group.CbuCodes],
             [.. group.BranchCodes],
             [.. group.OperationAreaCodes],
-            [.. group.ActivityTypeCodes]) { ClusterCodes = [.. group.ClusterCodes] })];
+            [.. group.TaskTypeIds]) { ClusterCodes = [.. group.ClusterCodes] })];
 
     private static List<string> Clean(IReadOnlyList<string>? codes) =>
         (codes ?? []).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())
@@ -200,12 +200,12 @@ public sealed class OrgScopeSet
         }
     }
 
-    private sealed class Group(string? departmentCode, IEnumerable<string> activityTypeCodes)
+    private sealed class Group(string? departmentCode, IEnumerable<Guid> taskTypeIds)
     {
         public string? DepartmentCode { get; } = departmentCode;
 
-        /// <summary>The activity types the group takes; empty for every one.</summary>
-        public HashSet<string> ActivityTypeCodes { get; } = new(activityTypeCodes, StringComparer.OrdinalIgnoreCase);
+        /// <summary>The task types the group takes; empty for every one.</summary>
+        public HashSet<Guid> TaskTypeIds { get; } = [.. taskTypeIds];
 
         /// <summary>Set by a department-only row: that department, in every territory.</summary>
         public bool CoversAllTerritory { get; set; }
@@ -225,15 +225,16 @@ public sealed class OrgScopeSet
             || string.Equals(DepartmentCode, departmentCode.Trim(), StringComparison.OrdinalIgnoreCase);
 
         /// <summary>The same rule as the department: no list takes any type, work with no type is taken.</summary>
-        public bool AcceptsActivityType(string? activityTypeCode) =>
-            ActivityTypeCodes.Count == 0
-            || string.IsNullOrWhiteSpace(activityTypeCode)
-            || ActivityTypeCodes.Contains(activityTypeCode.Trim());
+        public bool AcceptsTaskType(Guid? taskTypeId) =>
+            TaskTypeIds.Count == 0
+            || taskTypeId is null
+            || taskTypeId == Guid.Empty
+            || TaskTypeIds.Contains(taskTypeId.Value);
 
-        public bool OverlapsActivityTypes(Group other) =>
-            ActivityTypeCodes.Count == 0
-            || other.ActivityTypeCodes.Count == 0
-            || ActivityTypeCodes.Overlaps(other.ActivityTypeCodes);
+        public bool OverlapsTaskTypes(Group other) =>
+            TaskTypeIds.Count == 0
+            || other.TaskTypeIds.Count == 0
+            || TaskTypeIds.Overlaps(other.TaskTypeIds);
 
         public bool AcceptsLocation(string? cbuCode, string? branchCode, string? operationAreaCode) =>
             CoversAllTerritory

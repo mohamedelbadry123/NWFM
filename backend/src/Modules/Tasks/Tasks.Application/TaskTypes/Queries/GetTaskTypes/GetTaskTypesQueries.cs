@@ -31,8 +31,8 @@ public sealed class GetTaskTypesQueryValidator : AbstractValidator<GetTaskTypesQ
     }
 }
 
-/// <summary>Active types, for the pickers that raise and filter tasks.</summary>
-[Authorize(Policy = NwfmPolicies.TaskTypeReaders)]
+/// <summary>Active types, for the pickers that raise and filter tasks and narrow team and user coverage.</summary>
+[Authorize(Policy = NwfmPolicies.ActiveTaskTypeReaders)]
 public sealed record GetActiveTaskTypesQuery : IRequest<Result<IReadOnlyList<TaskTypeDto>>>;
 
 [Authorize(Policy = NwfmPolicies.TaskTypeReaders)]

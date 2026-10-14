@@ -22,9 +22,15 @@ import { TooltipModule } from 'primeng/tooltip';
 import { TranslateContextDirective } from '../../../core/i18n/translate-context.directive';
 import { HasPermissionDirective, PERMISSIONS } from '../../../core/auth/permissions';
 import { apiErrorMessage } from '../../../core/api/api-error-message';
+import { LocaleService } from '../../../core/i18n/locale.service';
 import { OrgNamesService } from '../../../core/lookups/org-names.service';
+import { TaskTypesService } from '../../../core/tasks/task-types.service';
 import { Team, TeamsService } from '../../../core/teams/teams.service';
-import { LEVEL_LABEL_KEYS, OrgScopeAssignment, OrgScopeLevel } from '../../../shared/components/org-scope/org-scope.model';
+import {
+  LEVEL_LABEL_KEYS,
+  OrgScopeAssignment,
+  OrgScopeLevel,
+} from '../../../shared/components/org-scope/org-scope.model';
 import { TeamDialogComponent } from './team-dialog.component';
 
 interface FilterOption {
@@ -88,7 +94,14 @@ interface FilterOption {
             <div class="flex flex-wrap items-center gap-2.5 p-1">
               <p-iconfield iconPosition="left" class="w-full sm:w-72">
                 <p-inputicon styleClass="pi pi-search" />
-                <input pInputText type="text" [(ngModel)]="search" (keyup.enter)="reload()" [placeholder]="t('teams.searchPlaceholder')" class="w-full" />
+                <input
+                  pInputText
+                  type="text"
+                  [(ngModel)]="search"
+                  (keyup.enter)="reload()"
+                  [placeholder]="t('teams.searchPlaceholder')"
+                  class="w-full"
+                />
               </p-iconfield>
               <p-select
                 [(ngModel)]="activeFilter"
@@ -101,7 +114,13 @@ interface FilterOption {
                 appendTo="body"
                 styleClass="w-full sm:w-40"
               />
-              <p-button [label]="t('common.apply')" icon="pi pi-filter" severity="secondary" [outlined]="true" (onClick)="reload()" />
+              <p-button
+                [label]="t('common.apply')"
+                icon="pi pi-filter"
+                severity="secondary"
+                [outlined]="true"
+                (onClick)="reload()"
+              />
             </div>
           </ng-template>
 
@@ -132,12 +151,25 @@ interface FilterOption {
                 </div>
               </td>
               <td>
-                <p-tag [value]="t(team.isActive ? 'common.active' : 'common.inactive')" [severity]="team.isActive ? 'success' : 'secondary'" />
+                <p-tag
+                  [value]="t(team.isActive ? 'common.active' : 'common.inactive')"
+                  [severity]="team.isActive ? 'success' : 'secondary'"
+                />
               </td>
-              <td>{{ team.lastActiveAt ? (team.lastActiveAt | date: 'yyyy-MM-dd HH:mm') : '—' }}</td>
+              <td>
+                {{ team.lastActiveAt ? (team.lastActiveAt | date: 'yyyy-MM-dd HH:mm') : '—' }}
+              </td>
               <td class="text-end">
                 <ng-container *hasPermission="PERMISSIONS.manageTeams">
-                  <p-button icon="pi pi-pencil" [rounded]="true" [text]="true" severity="secondary" [pTooltip]="t('common.edit')" (onClick)="openEdit(team)" />
+                  <p-button
+                    icon="pi pi-pencil"
+                    [rounded]="true"
+                    [text]="true"
+                    severity="secondary"
+                    [pTooltip]="t('common.edit')"
+                    [ariaLabel]="t('common.edit')"
+                    (onClick)="openEdit(team)"
+                  />
                   <p-button
                     icon="pi pi-key"
                     [rounded]="true"
@@ -162,7 +194,9 @@ interface FilterOption {
           </ng-template>
 
           <ng-template pTemplate="emptymessage">
-            <tr><td colspan="7" class="p-6 text-center text-surface-500">{{ t('teams.empty') }}</td></tr>
+            <tr>
+              <td colspan="7" class="p-6 text-center text-surface-500">{{ t('teams.empty') }}</td>
+            </tr>
           </ng-template>
         </p-table>
       </div>
@@ -177,14 +211,34 @@ interface FilterOption {
         [draggable]="false"
         [style]="{ width: '26rem' }"
       >
-        <p class="mb-3 text-sm text-surface-500">{{ t('teams.resetHint', { code: selected()?.userCode }) }}</p>
-        <p-password [(ngModel)]="newPassword" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" autocomplete="new-password" />
+        <p class="mb-3 text-sm text-surface-500">
+          {{ t('teams.resetHint', { code: selected()?.userCode }) }}
+        </p>
+        <p-password
+          [(ngModel)]="newPassword"
+          [feedback]="false"
+          [toggleMask]="true"
+          styleClass="w-full"
+          inputStyleClass="w-full"
+          autocomplete="new-password"
+        />
         @if (newPassword && newPassword.length < 8) {
           <small class="text-red-500">{{ t('teams.passwordTooShort') }}</small>
         }
         <ng-template pTemplate="footer">
-          <p-button [label]="t('common.cancel')" severity="secondary" [text]="true" (onClick)="resetVisible.set(false)" />
-          <p-button [label]="t('users.resetPassword')" icon="pi pi-key" [loading]="resetting()" [disabled]="!newPassword || newPassword.length < 8" (onClick)="resetPassword()" />
+          <p-button
+            [label]="t('common.cancel')"
+            severity="secondary"
+            [text]="true"
+            (onClick)="resetVisible.set(false)"
+          />
+          <p-button
+            [label]="t('users.resetPassword')"
+            icon="pi pi-key"
+            [loading]="resetting()"
+            [disabled]="!newPassword || newPassword.length < 8"
+            (onClick)="resetPassword()"
+          />
         </ng-template>
       </p-dialog>
     </ng-container>
@@ -197,6 +251,13 @@ export class TeamListComponent implements OnInit {
   private readonly translate = inject(TranslateService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly orgNames = inject(OrgNamesService);
+  private readonly taskTypesApi = inject(TaskTypesService);
+  private readonly locale = inject(LocaleService);
+
+  /** Active task types by id, for naming the ones a team's coverage is narrowed to. */
+  private readonly taskTypeNames = signal<ReadonlyMap<string, { nameEn: string; nameAr: string }>>(
+    new Map(),
+  );
 
   protected readonly PERMISSIONS = PERMISSIONS;
   protected readonly teams = signal<Team[]>([]);
@@ -221,6 +282,14 @@ export class TeamListComponent implements OnInit {
 
   ngOnInit(): void {
     this.orgNames.ensureLoaded();
+    this.taskTypesApi
+      .active()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) =>
+          this.taskTypeNames.set(new Map((result.value ?? []).map((type) => [type.id, type]))),
+        error: () => undefined,
+      });
   }
 
   protected load(event?: TableLazyLoadEvent): void {
@@ -232,7 +301,10 @@ export class TeamListComponent implements OnInit {
     this.loading.set(true);
     this.api
       .list(this.page, this.pageSize, this.search.trim() || null, this.activeFilter)
-      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loading.set(false)))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.loading.set(false)),
+      )
       .subscribe({
         next: (res) => {
           this.teams.set(res.value?.items ?? []);
@@ -264,11 +336,21 @@ export class TeamListComponent implements OnInit {
       parts.push(this.orgNames.label('Department', department));
     }
 
-    if (scope.activityTypeCodes?.length) {
-      parts.push(scope.activityTypeCodes.join(', '));
+    if (scope.taskTypeIds?.length) {
+      parts.push(scope.taskTypeIds.map((id) => this.taskTypeName(id)).join(', '));
     }
 
     return parts.join(' · ');
+  }
+
+  /** The type's name in the reader's language; the id when it is not an active type. */
+  private taskTypeName(id: string): string {
+    const type = this.taskTypeNames().get(id);
+    if (!type) {
+      return id;
+    }
+
+    return this.locale.locale() === 'ar' ? type.nameAr || type.nameEn : type.nameEn || type.nameAr;
   }
 
   protected openNew(): void {
@@ -299,7 +381,10 @@ export class TeamListComponent implements OnInit {
       .pipe(finalize(() => this.resetting.set(false)))
       .subscribe({
         next: () => {
-          this.messages.add({ severity: 'success', summary: this.translate.instant('users.passwordReset') });
+          this.messages.add({
+            severity: 'success',
+            summary: this.translate.instant('users.passwordReset'),
+          });
           this.resetVisible.set(false);
         },
         error: (error: unknown) => this.fail(error),
@@ -311,7 +396,10 @@ export class TeamListComponent implements OnInit {
 
     this.confirm.confirm({
       header: this.translate.instant('common.confirm'),
-      message: this.translate.instant(activate ? 'teams.confirmActivate' : 'teams.confirmDeactivate', { name: team.name }),
+      message: this.translate.instant(
+        activate ? 'teams.confirmActivate' : 'teams.confirmDeactivate',
+        { name: team.name },
+      ),
       accept: () => {
         this.busyId.set(team.id);
         this.api

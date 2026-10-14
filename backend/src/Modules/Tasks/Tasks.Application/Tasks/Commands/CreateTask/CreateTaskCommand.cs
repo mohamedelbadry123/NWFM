@@ -129,8 +129,8 @@ public sealed class CreateTaskCommandHandler(
 
         var departmentCode = string.IsNullOrWhiteSpace(request.DepartmentCode) ? null : request.DepartmentCode;
 
-        // Raising work somewhere is claiming it for that territory; nobody may do that outside their own.
-        if (!await access.CoversAsync(request.CbuCode, request.BranchCode, request.OperationAreaCode, departmentCode, ct))
+        // Raising work somewhere is claiming it for that territory and task type; nobody may do that outside their own.
+        if (!await access.CoversAsync(request.CbuCode, request.BranchCode, request.OperationAreaCode, departmentCode, type.Id, ct))
         {
             return Result.Failure<Guid>(TaskErrors.Task.OutsideScope);
         }

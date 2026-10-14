@@ -27,13 +27,13 @@ public sealed record OrgLocation(
         new(Clean(ClusterCode), Clean(CbuCode), Clean(BranchCode), Clean(OperationAreaCode));
 
     /// <summary>
-    /// Whether <paramref name="scope"/> reaches this place. Work carries no department or activity type
+    /// Whether <paramref name="scope"/> reaches this place. Work carries no department or task type
     /// here unless given, so any group in the scope may take it — the reference rule for unclassified work.
     /// </summary>
-    public bool IsCoveredBy(OrgScopeSet scope, string? departmentCode = null, string? activityTypeCode = null) =>
+    public bool IsCoveredBy(OrgScopeSet scope, string? departmentCode = null, Guid? taskTypeId = null) =>
         Clean(CbuCode) is null && Clean(BranchCode) is null && Clean(OperationAreaCode) is null
-            ? scope.CoversCluster(Clean(ClusterCode), departmentCode, activityTypeCode)
-            : scope.Covers(Clean(CbuCode), Clean(BranchCode), Clean(OperationAreaCode), departmentCode, activityTypeCode);
+            ? scope.CoversCluster(Clean(ClusterCode), departmentCode, taskTypeId)
+            : scope.Covers(Clean(CbuCode), Clean(BranchCode), Clean(OperationAreaCode), departmentCode, taskTypeId);
 
     /// <summary>
     /// The hierarchy rule, given the units the directory holds as active. <paramref name="active"/> and

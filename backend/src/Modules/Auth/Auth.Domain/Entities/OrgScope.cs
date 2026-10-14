@@ -6,12 +6,12 @@ namespace Auth.Domain.Entities;
 
 /// <summary>
 /// One row of an owner's coverage: a territory (or everywhere), narrowed to some departments and
-/// activity types. No departments means every department; no activity types means every type.
+/// task types. No departments means every department; no task types means every type.
 /// </summary>
 public sealed class OrgScope : Entity
 {
     private readonly List<OrgScopeDepartment> _departments = [];
-    private readonly List<OrgScopeActivityType> _activityTypes = [];
+    private readonly List<OrgScopeTaskType> _taskTypes = [];
 
     private OrgScope() { }
 
@@ -36,8 +36,8 @@ public sealed class OrgScope : Entity
     /// <summary>The departments this row covers (<c>OrgScopesDepartment</c>); empty for all of them.</summary>
     public IReadOnlyCollection<OrgScopeDepartment> Departments => _departments.AsReadOnly();
 
-    /// <summary>The activity types this row covers (<c>OrgScopesActivityType</c>); empty for all of them.</summary>
-    public IReadOnlyCollection<OrgScopeActivityType> ActivityTypes => _activityTypes.AsReadOnly();
+    /// <summary>The task types this row covers (<c>OrgScopesTaskTypes</c>); empty for all of them.</summary>
+    public IReadOnlyCollection<OrgScopeTaskType> TaskTypes => _taskTypes.AsReadOnly();
 
     public static OrgScope Create(
         string ownerType,
@@ -45,7 +45,7 @@ public sealed class OrgScope : Entity
         string? level,
         string? code,
         IEnumerable<string>? departmentCodes = null,
-        IEnumerable<string>? activityTypeCodes = null)
+        IEnumerable<Guid>? taskTypeIds = null)
     {
         if (!OrgScopeOwnerTypes.IsDefined(ownerType))
             throw new DomainException($"Unknown scope owner type '{ownerType}'.");
@@ -63,14 +63,14 @@ public sealed class OrgScope : Entity
             throw new DomainException($"Unknown scope level '{normalizedLevel}'.");
 
         var departments = Distinct(departmentCodes);
-        var activityTypes = Distinct(activityTypeCodes);
+        var taskTypes = (taskTypeIds ?? []).Where(id => id != Guid.Empty).Distinct().ToList();
 
-        if (normalizedLevel is null && departments.Count == 0 && activityTypes.Count == 0)
-            throw new DomainException("A scope must name a territory, a department, an activity type, or a mix of them.");
+        if (normalizedLevel is null && departments.Count == 0 && taskTypes.Count == 0)
+            throw new DomainException("A scope must name a territory, a department, a task type, or a mix of them.");
 
         var scope = new OrgScope(ownerType, ownerId.Trim(), normalizedLevel, normalizedCode);
         scope._departments.AddRange(departments.Select(d => new OrgScopeDepartment(scope.Id, d)));
-        scope._activityTypes.AddRange(activityTypes.Select(a => new OrgScopeActivityType(scope.Id, a)));
+        scope._taskTypes.AddRange(taskTypes.Select(t => new OrgScopeTaskType(scope.Id, t)));
         return scope;
     }
 
@@ -96,19 +96,19 @@ public sealed class OrgScopeDepartment
     public string DepartmentCode { get; private set; } = default!;
 }
 
-/// <summary>One activity type an org scope covers. Table: <c>OrgScopesActivityType</c>.</summary>
-public sealed class OrgScopeActivityType
+/// <summary>One task type an org scope covers. Table: <c>OrgScopesTaskTypes</c>.</summary>
+public sealed class OrgScopeTaskType
 {
-    private OrgScopeActivityType() { }
+    private OrgScopeTaskType() { }
 
-    internal OrgScopeActivityType(Guid orgScopeId, string activityTypeCode)
+    internal OrgScopeTaskType(Guid orgScopeId, Guid taskTypeId)
     {
         OrgScopeId = orgScopeId;
-        ActivityTypeCode = activityTypeCode;
+        TaskTypeId = taskTypeId;
     }
 
     public Guid OrgScopeId { get; private set; }
 
-    /// <summary><c>Auth.LKP_FIELD_ACTIVITY_TYPE.Code</c>.</summary>
-    public string ActivityTypeCode { get; private set; } = default!;
+    /// <summary><c>Task.TaskTypes.Id</c> — owned by the Tasks module, so not a foreign key here.</summary>
+    public Guid TaskTypeId { get; private set; }
 }

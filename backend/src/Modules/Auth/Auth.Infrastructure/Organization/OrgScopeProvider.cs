@@ -100,7 +100,7 @@ internal sealed class OrgScopeProvider(
                 s.Level,
                 s.Code,
                 DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
-                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+                TaskTypeIds = s.TaskTypes.Select(t => t.TaskTypeId).ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -122,7 +122,7 @@ internal sealed class OrgScopeProvider(
 
             coverage.Add(new OrgTeamCoverage(
                 team,
-                OrgScopeSet.FromRows(teamRows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.ActivityTypeCodes)), hierarchy)));
+                OrgScopeSet.FromRows(teamRows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.TaskTypeIds)), hierarchy)));
         }
 
         return coverage;
@@ -231,7 +231,7 @@ internal sealed class OrgScopeProvider(
                 s.Level,
                 s.Code,
                 DepartmentCodes = s.Departments.Select(d => d.DepartmentCode).ToList(),
-                ActivityTypeCodes = s.ActivityTypes.Select(a => a.ActivityTypeCode).ToList()
+                TaskTypeIds = s.TaskTypes.Select(t => t.TaskTypeId).ToList()
             })
             .ToListAsync(cancellationToken);
 
@@ -242,7 +242,7 @@ internal sealed class OrgScopeProvider(
 
         var hierarchy = await GetHierarchyValueAsync(cancellationToken);
         return OrgScopeSet.FromRows(
-            rows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.ActivityTypeCodes)), hierarchy);
+            rows.Select(r => new OrgScopeRow(r.Level, r.Code, r.DepartmentCodes, r.TaskTypeIds)), hierarchy);
     }
 
     private async ValueTask<OrgHierarchy> LoadHierarchyAsync(CancellationToken cancellationToken)

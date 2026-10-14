@@ -1,8 +1,10 @@
 <div class="flex flex-col gap-3">
-  <div class="grid grid-cols-1 gap-3"
-       [class.sm:grid-cols-2]="true"
-       [class.md:grid-cols-2]="layout() === 'grid'"
-       [class.md:grid-cols-4]="layout() === 'row'">
+  <div
+    class="grid grid-cols-1 gap-3"
+    [class.sm:grid-cols-2]="true"
+    [class.md:grid-cols-2]="layout() === 'grid'"
+    [class.md:grid-cols-4]="layout() === 'row'"
+  >
     <div class="flex flex-col gap-1">
       <label class="text-sm font-medium">{{ 'org.cluster' | translate }}</label>
       <p-select
@@ -105,19 +107,19 @@
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-sm font-medium">{{ 'org.activityTypes' | translate }}</label>
+        <label class="text-sm font-medium">{{ 'org.taskTypes' | translate }}</label>
         <p-multiselect
-          [options]="activityTypes()"
-          [ngModel]="activityTypeCodes()"
-          (ngModelChange)="activityTypeCodes.set($event ?? [])"
+          [options]="taskTypes()"
+          [ngModel]="taskTypeIds()"
+          (ngModelChange)="taskTypeIds.set($event ?? [])"
           optionLabel="label"
           optionValue="value"
           display="chip"
-          [placeholder]="'org.allActivityTypes' | translate"
+          [placeholder]="'org.allTaskTypes' | translate"
           [showClear]="true"
           [filter]="true"
           filterBy="label"
-          [loading]="loadingActivityTypes()"
+          [loading]="loadingTaskTypes()"
           [disabled]="disabled()"
           appendTo="body"
           styleClass="w-full"

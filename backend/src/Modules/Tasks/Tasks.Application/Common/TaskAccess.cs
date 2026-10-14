@@ -63,12 +63,13 @@ public sealed class TaskAccess(ITasksDbContext db, IOrgScopeProvider scopes, ICu
             : null;
     }
 
-    /// <summary>Whether the caller's territory reaches a place — asked before a task is raised or moved there.</summary>
+    /// <summary>Whether the caller's coverage reaches a place and task type — asked before a task is raised or moved there.</summary>
     public async Task<bool> CoversAsync(
         string? cbuCode,
         string? branchCode,
         string? operationAreaCode,
         string? departmentCode,
+        Guid? taskTypeId,
         CancellationToken ct) =>
-        (await CallerScopeAsync(ct)).Covers(cbuCode, branchCode, operationAreaCode, departmentCode);
+        (await CallerScopeAsync(ct)).Covers(cbuCode, branchCode, operationAreaCode, departmentCode, taskTypeId);
 }

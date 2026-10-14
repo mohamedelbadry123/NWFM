@@ -11,7 +11,7 @@ namespace Tasks.Application.Tasks.Common;
 internal static class TeamEligibility
 {
     /// <summary>
-    /// Active teams whose territory covers the task and overlaps the caller's own — a team outside
+    /// Active teams whose coverage reaches the task (place, department and task type) and overlaps the caller's own — a team outside
     /// the caller's territory is not theirs to direct, even if it covers the task.
     /// </summary>
     public static async Task<IReadOnlyList<OrgTeamInfo>> CoveringAsync(
@@ -23,7 +23,7 @@ internal static class TeamEligibility
         var teams = await directory.GetActiveTeamsAsync(ct);
 
         return teams
-            .Where(t => t.Scope.Covers(task.CbuCode, task.BranchCode, task.OperationAreaCode, task.DepartmentCode))
+            .Where(t => t.Scope.Covers(task.CbuCode, task.BranchCode, task.OperationAreaCode, task.DepartmentCode, task.TaskTypeId))
             .Where(t => callerScope.Overlaps(t.Scope))
             .Select(t => t.Team)
             .ToList();

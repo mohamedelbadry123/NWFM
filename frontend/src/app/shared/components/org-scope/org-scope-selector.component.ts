@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -11,6 +20,7 @@ import { SelectModule } from 'primeng/select';
 
 import { LookupsService } from '../../../core/lookups/lookups.service';
 import { LocaleService } from '../../../core/i18n/locale.service';
+import { TaskTypesService } from '../../../core/tasks/task-types.service';
 import {
   EMPTY_ORG_LOCATION,
   LEVEL_LABEL_KEYS,
@@ -35,7 +45,15 @@ interface SelectOption {
 @Component({
   selector: 'app-org-scope-selector',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ButtonModule, Chip, MultiSelectModule, SelectModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    ButtonModule,
+    Chip,
+    MultiSelectModule,
+    SelectModule,
+  ],
   templateUrl: './org-scope-selector.component.html',
 })
 export class OrgScopeSelectorComponent {
@@ -50,6 +68,7 @@ export class OrgScopeSelectorComponent {
   readonly scopesChange = output<OrgScopeAssignment[]>();
 
   private readonly lookups = inject(LookupsService);
+  private readonly taskTypesApi = inject(TaskTypesService);
   private readonly translate = inject(TranslateService);
   private readonly locale = inject(LocaleService);
 
@@ -58,27 +77,27 @@ export class OrgScopeSelectorComponent {
   protected readonly branchCode = signal<string | null>(null);
   protected readonly operationAreaCode = signal<string | null>(null);
   protected readonly departmentCodes = signal<string[]>([]);
-  protected readonly activityTypeCodes = signal<string[]>([]);
+  protected readonly taskTypeIds = signal<string[]>([]);
 
   protected readonly clusters = signal<SelectOption[]>([]);
   protected readonly cbus = signal<SelectOption[]>([]);
   protected readonly branches = signal<SelectOption[]>([]);
   protected readonly operationAreas = signal<SelectOption[]>([]);
   protected readonly departments = signal<SelectOption[]>([]);
-  protected readonly activityTypes = signal<SelectOption[]>([]);
+  protected readonly taskTypes = signal<SelectOption[]>([]);
 
   protected readonly loadingClusters = signal(false);
   protected readonly loadingCbus = signal(false);
   protected readonly loadingBranches = signal(false);
   protected readonly loadingOperationAreas = signal(false);
   protected readonly loadingDepartments = signal(false);
-  protected readonly loadingActivityTypes = signal(false);
+  protected readonly loadingTaskTypes = signal(false);
 
   protected readonly scopes = signal<OrgScopeAssignment[]>([]);
 
   private readonly scopeLabels = signal<Map<string, string>>(new Map());
   private readonly departmentLabels = signal<Map<string, string>>(new Map());
-  private readonly activityTypeLabels = signal<Map<string, string>>(new Map());
+  private readonly taskTypeLabels = signal<Map<string, string>>(new Map());
 
   protected readonly selectedLevel = computed<OrgScopeLevel | null>(() => {
     if (this.operationAreaCode()) return ORG_SCOPE_LEVELS.operationArea;
@@ -96,24 +115,36 @@ export class OrgScopeSelectorComponent {
     const level = this.selectedLevel();
     const code = this.selectedCode();
     const departments = this.departmentCodes();
-    const activityTypes = this.activityTypeCodes();
+    const taskTypes = this.taskTypeIds();
 
     if (this.disabled()) {
       return false;
     }
 
-    if ((!level || !code) && departments.length === 0 && activityTypes.length === 0) {
+    if ((!level || !code) && departments.length === 0 && taskTypes.length === 0) {
       return false;
     }
 
-    const candidate: OrgScopeAssignment = { level, code, departmentCodes: departments, activityTypeCodes: activityTypes };
-    return !this.scopes().some(scope => this.isSameScope(scope, candidate));
+    const candidate: OrgScopeAssignment = {
+      level,
+      code,
+      departmentCodes: departments,
+      taskTypeIds: taskTypes,
+    };
+    return !this.scopes().some((scope) => this.isSameScope(scope, candidate));
   });
 
   constructor() {
     this.loadClusters();
     this.loadDepartments();
-    this.loadActivityTypes();
+
+    let taskTypesRequested = false;
+    effect(() => {
+      if (this.mode() === 'multi' && !taskTypesRequested) {
+        taskTypesRequested = true;
+        untracked(() => this.loadTaskTypes());
+      }
+    });
 
     effect(() => {
       const location = this.initialLocation();
@@ -126,11 +157,11 @@ export class OrgScopeSelectorComponent {
       const initial = this.initialScopes();
       untracked(() => {
         this.scopes.set(
-          initial.map(scope => ({
+          initial.map((scope) => ({
             level: scope.level,
             code: scope.code,
             departmentCodes: [...(scope.departmentCodes ?? [])],
-            activityTypeCodes: [...(scope.activityTypeCodes ?? [])],
+            taskTypeIds: [...(scope.taskTypeIds ?? [])],
           })),
         );
         if (initial.length > 0) {
@@ -178,11 +209,13 @@ export class OrgScopeSelectorComponent {
     const level = this.selectedLevel();
     const code = this.selectedCode();
     const departments = [...this.departmentCodes()];
-    const activityTypes = [...this.activityTypeCodes()];
+    const taskTypes = [...this.taskTypeIds()];
     const hasTerritory = !!level && !!code;
 
     const covered = hasTerritory
-      ? this.scopes().filter(scope => !this.isCoveredBy(scope, level!, code!, departments, activityTypes))
+      ? this.scopes().filter(
+          (scope) => !this.isCoveredBy(scope, level!, code!, departments, taskTypes),
+        )
       : this.scopes();
 
     this.scopes.set([
@@ -191,7 +224,7 @@ export class OrgScopeSelectorComponent {
         level: hasTerritory ? level! : undefined,
         code: hasTerritory ? code! : undefined,
         departmentCodes: departments,
-        activityTypeCodes: activityTypes,
+        taskTypeIds: taskTypes,
       },
     ]);
 
@@ -204,7 +237,7 @@ export class OrgScopeSelectorComponent {
   }
 
   protected removeScope(scope: OrgScopeAssignment): void {
-    this.scopes.set(this.scopes().filter(item => !this.isSameScope(item, scope)));
+    this.scopes.set(this.scopes().filter((item) => !this.isSameScope(item, scope)));
     this.scopesChange.emit(this.scopes());
   }
 
@@ -225,21 +258,21 @@ export class OrgScopeSelectorComponent {
     parts.push(
       departments.length === 0
         ? this.translate.instant('org.allDepartments')
-        : departments.map(code => this.departmentLabels().get(code) ?? `#${code}`).join(', '),
+        : departments.map((code) => this.departmentLabels().get(code) ?? `#${code}`).join(', '),
     );
 
-    const activityTypes = scope.activityTypeCodes ?? [];
+    const taskTypes = scope.taskTypeIds ?? [];
     parts.push(
-      activityTypes.length === 0
-        ? this.translate.instant('org.allActivityTypes')
-        : activityTypes.map(code => this.activityTypeLabels().get(code) ?? code).join(', '),
+      taskTypes.length === 0
+        ? this.translate.instant('org.allTaskTypes')
+        : taskTypes.map((id) => this.taskTypeLabels().get(id) ?? id).join(', '),
     );
 
     return parts.join(' · ');
   }
 
   protected scopeKey(scope: OrgScopeAssignment): string {
-    return `${scope.level ?? ''}|${scope.code ?? ''}|${this.listKey(scope.departmentCodes)}|${this.listKey(scope.activityTypeCodes)}`;
+    return `${scope.level ?? ''}|${scope.code ?? ''}|${this.listKey(scope.departmentCodes)}|${this.listKey(scope.taskTypeIds)}`;
   }
 
   reset(): void {
@@ -248,15 +281,20 @@ export class OrgScopeSelectorComponent {
   }
 
   private isSameScope(left: OrgScopeAssignment, right: OrgScopeAssignment): boolean {
-    return (left.level ?? null) === (right.level ?? null)
-      && (left.code ?? null) === (right.code ?? null)
-      && this.listKey(left.departmentCodes) === this.listKey(right.departmentCodes)
-      && this.listKey(left.activityTypeCodes) === this.listKey(right.activityTypeCodes);
+    return (
+      (left.level ?? null) === (right.level ?? null) &&
+      (left.code ?? null) === (right.code ?? null) &&
+      this.listKey(left.departmentCodes) === this.listKey(right.departmentCodes) &&
+      this.listKey(left.taskTypeIds) === this.listKey(right.taskTypeIds)
+    );
   }
 
   /** A list's identity regardless of order: rows naming the same codes are the same row. */
   private listKey(codes: readonly string[] | null | undefined): string {
-    return [...(codes ?? [])].map(code => code.toUpperCase()).sort().join(',');
+    return [...(codes ?? [])]
+      .map((code) => code.toUpperCase())
+      .sort()
+      .join(',');
   }
 
   private resetSelection(): void {
@@ -265,7 +303,7 @@ export class OrgScopeSelectorComponent {
     this.branchCode.set(null);
     this.operationAreaCode.set(null);
     this.departmentCodes.set([]);
-    this.activityTypeCodes.set([]);
+    this.taskTypeIds.set([]);
     this.cbus.set([]);
     this.branches.set([]);
     this.operationAreas.set([]);
@@ -285,7 +323,7 @@ export class OrgScopeSelectorComponent {
 
     if (!clusterCode && location.cbuCode) {
       const allCbus = await firstValueFrom(this.lookups.listAll('Cbu')).catch(() => []);
-      clusterCode = allCbus.find(cbu => cbu.code === location.cbuCode)?.parentCode ?? null;
+      clusterCode = allCbus.find((cbu) => cbu.code === location.cbuCode)?.parentCode ?? null;
     }
 
     this.clusterCode.set(clusterCode);
@@ -305,10 +343,11 @@ export class OrgScopeSelectorComponent {
 
   private loadClusters(): void {
     this.loadingClusters.set(true);
-    this.lookups.listAll('Cluster', { isActive: true })
+    this.lookups
+      .listAll('Cluster', { isActive: true })
       .pipe(finalize(() => this.loadingClusters.set(false)))
       .subscribe({
-        next: items => this.clusters.set(this.toOptions(items)),
+        next: (items) => this.clusters.set(this.toOptions(items)),
         error: () => this.clusters.set([]),
       });
   }
@@ -320,12 +359,17 @@ export class OrgScopeSelectorComponent {
     }
 
     this.loadingCbus.set(true);
-    this.lookups.listAll('Cbu', { parentCode: clusterCode, isActive: true })
+    this.lookups
+      .listAll('Cbu', { parentCode: clusterCode, isActive: true })
       .pipe(finalize(() => this.loadingCbus.set(false)))
       .subscribe({
         // A reply for a cluster no longer selected must not repopulate the list.
-        next: items => { if (this.clusterCode() === clusterCode) this.cbus.set(this.toOptions(items)); },
-        error: () => { if (this.clusterCode() === clusterCode) this.cbus.set([]); },
+        next: (items) => {
+          if (this.clusterCode() === clusterCode) this.cbus.set(this.toOptions(items));
+        },
+        error: () => {
+          if (this.clusterCode() === clusterCode) this.cbus.set([]);
+        },
       });
   }
 
@@ -336,11 +380,16 @@ export class OrgScopeSelectorComponent {
     }
 
     this.loadingBranches.set(true);
-    this.lookups.listAll('Branch', { parentCode: cbuCode, isActive: true })
+    this.lookups
+      .listAll('Branch', { parentCode: cbuCode, isActive: true })
       .pipe(finalize(() => this.loadingBranches.set(false)))
       .subscribe({
-        next: items => { if (this.cbuCode() === cbuCode) this.branches.set(this.toOptions(items)); },
-        error: () => { if (this.cbuCode() === cbuCode) this.branches.set([]); },
+        next: (items) => {
+          if (this.cbuCode() === cbuCode) this.branches.set(this.toOptions(items));
+        },
+        error: () => {
+          if (this.cbuCode() === cbuCode) this.branches.set([]);
+        },
       });
   }
 
@@ -351,20 +400,26 @@ export class OrgScopeSelectorComponent {
     }
 
     this.loadingOperationAreas.set(true);
-    this.lookups.listAll('OperationArea', { parentCode: cbuCode, isActive: true })
+    this.lookups
+      .listAll('OperationArea', { parentCode: cbuCode, isActive: true })
       .pipe(finalize(() => this.loadingOperationAreas.set(false)))
       .subscribe({
-        next: items => { if (this.cbuCode() === cbuCode) this.operationAreas.set(this.toOptions(items)); },
-        error: () => { if (this.cbuCode() === cbuCode) this.operationAreas.set([]); },
+        next: (items) => {
+          if (this.cbuCode() === cbuCode) this.operationAreas.set(this.toOptions(items));
+        },
+        error: () => {
+          if (this.cbuCode() === cbuCode) this.operationAreas.set([]);
+        },
       });
   }
 
   private loadDepartments(): void {
     this.loadingDepartments.set(true);
-    this.lookups.listAll('Department', { isActive: true })
+    this.lookups
+      .listAll('Department', { isActive: true })
       .pipe(finalize(() => this.loadingDepartments.set(false)))
       .subscribe({
-        next: items => {
+        next: (items) => {
           this.departments.set(this.toNameOptions(items));
           const labels = new Map(untracked(this.departmentLabels));
           for (const item of items) {
@@ -376,40 +431,65 @@ export class OrgScopeSelectorComponent {
       });
   }
 
-  private loadActivityTypes(): void {
-    this.loadingActivityTypes.set(true);
-    this.lookups.listAll('FieldActivityType', { isActive: true })
-      .pipe(finalize(() => this.loadingActivityTypes.set(false)))
+  /** Only coverage rows name task types, so a single-place picker never asks for them. */
+  private loadTaskTypes(): void {
+    this.loadingTaskTypes.set(true);
+    this.taskTypesApi
+      .active()
+      .pipe(finalize(() => this.loadingTaskTypes.set(false)))
       .subscribe({
-        next: items => {
-          this.activityTypes.set(this.toNameOptions(items));
-          const labels = new Map(untracked(this.activityTypeLabels));
+        next: (result) => {
+          const items = result.value ?? [];
+          this.taskTypes.set(
+            items.map((item) => ({
+              label: this.localizedName(item.nameEn, item.nameAr) || item.code,
+              value: item.id,
+            })),
+          );
+          const labels = new Map(untracked(this.taskTypeLabels));
           for (const item of items) {
-            labels.set(item.code, this.localizedName(item.nameEn, item.nameAr) || item.code);
+            labels.set(item.id, this.localizedName(item.nameEn, item.nameAr) || item.code);
           }
-          this.activityTypeLabels.set(labels);
+          this.taskTypeLabels.set(labels);
         },
-        error: () => this.activityTypes.set([]),
+        error: () => this.taskTypes.set([]),
       });
   }
 
   private loadScopeLabels(): void {
-    const merge = (level: OrgScopeLevel, items: { code: string; nameEn: string; nameAr: string }[]) => {
+    const merge = (
+      level: OrgScopeLevel,
+      items: { code: string; nameEn: string; nameAr: string }[],
+    ) => {
       const labels = new Map(untracked(this.scopeLabels));
       for (const item of items) {
-        labels.set(this.labelKey(level, item.code), this.localizedName(item.nameEn, item.nameAr) || item.code);
+        labels.set(
+          this.labelKey(level, item.code),
+          this.localizedName(item.nameEn, item.nameAr) || item.code,
+        );
       }
       this.scopeLabels.set(labels);
     };
 
-    this.lookups.listAll('Cluster').subscribe({ next: items => merge(ORG_SCOPE_LEVELS.cluster, items), error: () => undefined });
-    this.lookups.listAll('Cbu').subscribe({ next: items => merge(ORG_SCOPE_LEVELS.cbu, items), error: () => undefined });
-    this.lookups.listAll('Branch').subscribe({ next: items => merge(ORG_SCOPE_LEVELS.branch, items), error: () => undefined });
-    this.lookups.listAll('OperationArea').subscribe({ next: items => merge(ORG_SCOPE_LEVELS.operationArea, items), error: () => undefined });
+    this.lookups.listAll('Cluster').subscribe({
+      next: (items) => merge(ORG_SCOPE_LEVELS.cluster, items),
+      error: () => undefined,
+    });
+    this.lookups
+      .listAll('Cbu')
+      .subscribe({ next: (items) => merge(ORG_SCOPE_LEVELS.cbu, items), error: () => undefined });
+    this.lookups.listAll('Branch').subscribe({
+      next: (items) => merge(ORG_SCOPE_LEVELS.branch, items),
+      error: () => undefined,
+    });
+    this.lookups.listAll('OperationArea').subscribe({
+      next: (items) => merge(ORG_SCOPE_LEVELS.operationArea, items),
+      error: () => undefined,
+    });
   }
 
   private rememberLabel(level: OrgScopeLevel, code: string): void {
-    const label = this.optionsFor(level).find(option => option.value === code)?.label;
+    const label = this.optionsFor(level).find((option) => option.value === code)?.label;
     if (!label) return;
     const labels = new Map(untracked(this.scopeLabels));
     labels.set(this.labelKey(level, code), label);
@@ -418,10 +498,14 @@ export class OrgScopeSelectorComponent {
 
   private optionsFor(level: OrgScopeLevel): SelectOption[] {
     switch (level) {
-      case ORG_SCOPE_LEVELS.cluster: return this.clusters();
-      case ORG_SCOPE_LEVELS.cbu: return this.cbus();
-      case ORG_SCOPE_LEVELS.branch: return this.branches();
-      default: return this.operationAreas();
+      case ORG_SCOPE_LEVELS.cluster:
+        return this.clusters();
+      case ORG_SCOPE_LEVELS.cbu:
+        return this.cbus();
+      case ORG_SCOPE_LEVELS.branch:
+        return this.branches();
+      default:
+        return this.operationAreas();
     }
   }
 
@@ -430,10 +514,12 @@ export class OrgScopeSelectorComponent {
     level: OrgScopeLevel,
     code: string,
     departmentCodes: readonly string[],
-    activityTypeCodes: readonly string[],
+    taskTypeIds: readonly string[],
   ): boolean {
-    if (this.listKey(scope.departmentCodes) !== this.listKey(departmentCodes)
-      || this.listKey(scope.activityTypeCodes) !== this.listKey(activityTypeCodes)) {
+    if (
+      this.listKey(scope.departmentCodes) !== this.listKey(departmentCodes) ||
+      this.listKey(scope.taskTypeIds) !== this.listKey(taskTypeIds)
+    ) {
       return false;
     }
     if (!scope.level || !scope.code) {
@@ -458,14 +544,14 @@ export class OrgScopeSelectorComponent {
   }
 
   private toOptions(items: { code: string; nameEn: string; nameAr: string }[]): SelectOption[] {
-    return items.map(item => ({
+    return items.map((item) => ({
       label: this.optionLabel(item.code, item.nameEn, item.nameAr),
       value: item.code,
     }));
   }
 
   private toNameOptions(items: { code: string; nameEn: string; nameAr: string }[]): SelectOption[] {
-    return items.map(item => ({
+    return items.map((item) => ({
       label: this.localizedName(item.nameEn, item.nameAr) || item.code,
       value: item.code,
     }));
@@ -477,9 +563,7 @@ export class OrgScopeSelectorComponent {
   }
 
   private localizedName(nameEn?: string, nameAr?: string): string {
-    return this.locale.locale() === 'ar'
-      ? (nameAr || nameEn || '')
-      : (nameEn || nameAr || '');
+    return this.locale.locale() === 'ar' ? nameAr || nameEn || '' : nameEn || nameAr || '';
   }
 
   protected readonly emptyLocation = EMPTY_ORG_LOCATION;

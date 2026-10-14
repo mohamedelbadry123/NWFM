@@ -51,16 +51,21 @@ export const EMPTY_ORG_LOCATION: OrgLocation = {
 };
 
 export function isEmptyLocation(location: OrgLocation | null | undefined): boolean {
-  return !location?.clusterCode && !location?.cbuCode && !location?.branchCode && !location?.operationAreaCode;
+  return (
+    !location?.clusterCode &&
+    !location?.cbuCode &&
+    !location?.branchCode &&
+    !location?.operationAreaCode
+  );
 }
 
 /**
- * One coverage row: a territory (or everywhere), narrowed to some departments and activity types.
+ * One coverage row: a territory (or everywhere), narrowed to some departments and task types.
  * An empty list covers all of them.
  */
 export interface OrgScopeAssignment {
   level?: string | null;
   code?: string | null;
   departmentCodes?: string[] | null;
-  activityTypeCodes?: string[] | null;
+  taskTypeIds?: string[] | null;
 }

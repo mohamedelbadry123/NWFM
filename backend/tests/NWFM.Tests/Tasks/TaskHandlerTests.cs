@@ -67,6 +67,10 @@ public sealed class TaskHandlerTests : IDisposable
     private static OrgScopeSet Branch(string code, string? department = null) =>
         OrgScopeSet.FromRows([new OrgScopeRow(OrgLevels.Branch, code, department)], Hierarchy);
 
+    /// <summary>Those task types, wherever they are and in every department.</summary>
+    private static OrgScopeSet TaskTypes(params Guid[] taskTypeIds) =>
+        OrgScopeSet.FromRows([new OrgScopeRow(null, null, [], taskTypeIds)], Hierarchy);
+
     private void PublishedForm(int versionNo, bool acceptsSubmissions = true) =>
         _forms.Setup(f => f.FindPublishedAsync(TaskTestData.FormId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PublishedFormInfo(
@@ -98,6 +102,27 @@ public sealed class TaskHandlerTests : IDisposable
         var result = await ListHandler().Handle(new GetTasksQuery(), CancellationToken.None);
 
         result.Value.Items.Select(t => t.BranchCode).Should().BeEquivalentTo(["R-16"]);
+    }
+
+    [Fact]
+    public async Task List_ShowsOnlyTasksOfTheCallersTaskTypes()
+    {
+        var (leaks, mine) = await SeedAsync("R-16");
+        await SeedAsync("R-21");
+        CallerScope(TaskTypes(leaks.Id));
+
+        var result = await ListHandler().Handle(new GetTasksQuery(), CancellationToken.None);
+
+        result.Value.Items.Should().ContainSingle().Which.Id.Should().Be(mine.Id);
+    }
+
+    [Fact]
+    public async Task GetById_ATaskOfAnotherTaskTypeIsNotFound()
+    {
+        var (_, task) = await SeedAsync("R-16");
+        CallerScope(TaskTypes(Guid.NewGuid()));
+
+        (await Access.FindAsync(task.Id, CancellationToken.None)).Should().BeNull();
     }
 
     [Fact]
@@ -199,6 +224,45 @@ public sealed class TaskHandlerTests : IDisposable
 
         result.Error.Code.Should().Be(TaskErrors.Codes.TaskOutsideScope);
         (await _db.Tasks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Create_ATaskTypeOutsideTheCallersCoverageIsRefused()
+    {
+        var type = TaskTestData.Type();
+        _db.TaskTypes.Add(type);
+        await _db.SaveChangesAsync();
+        CallerScope(TaskTypes(Guid.NewGuid()));
+
+        var handler = new CreateTaskCommandHandler(_db, Access, _forms.Object, _user.Object, _clock);
+        var result = await handler.Handle(
+            new CreateTaskCommand { TaskTypeId = type.Id, Latitude = 24.66, Longitude = 46.71, CbuCode = "RCBU", BranchCode = "R-16" },
+            CancellationToken.None);
+
+        result.Error.Code.Should().Be(TaskErrors.Codes.TaskOutsideScope);
+        (await _db.Tasks.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Assign_OnlyToATeamWhoseTaskTypesIncludeTheTasks()
+    {
+        var (type, task) = await SeedAsync("R-16");
+        var leaks = new OrgTeamInfo(Guid.NewGuid(), "Leak crew", null, true);
+        var other = new OrgTeamInfo(Guid.NewGuid(), "Other crew", null, true);
+
+        _directory.Setup(d => d.GetActiveTeamsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new OrgTeamCoverage(leaks, TaskTypes(type.Id)),
+            new OrgTeamCoverage(other, TaskTypes(Guid.NewGuid())),
+        ]);
+
+        var handler = new AssignTaskCommandHandler(_db, Access, _directory.Object, _user.Object, _clock);
+
+        var refused = await handler.Handle(new AssignTaskCommand { TaskId = task.Id, TeamId = other.Id }, CancellationToken.None);
+        refused.Error.Code.Should().Be(TaskErrors.Codes.TeamNotEligible);
+
+        var assigned = await handler.Handle(new AssignTaskCommand { TaskId = task.Id, TeamId = leaks.Id }, CancellationToken.None);
+        assigned.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

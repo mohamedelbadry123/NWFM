@@ -2,15 +2,15 @@ namespace NWFM.Tests.Modules.Workflow;
 
 using System.Text.Json.Nodes;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Moq;
-using NWFM.Shared.Integration.Organization;
-using NWFM.Shared.Organization;
 using global::Workflow.Application.Workspace;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Infrastructure.Persistence.Repositories;
 using global::Workflow.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using NWFM.Shared.Integration.Organization;
+using NWFM.Shared.Organization;
 
 /// <summary>
 /// The workspace end to end on the shared org hierarchy: a workflow published with the pre-hierarchy
@@ -137,7 +137,33 @@ public sealed partial class WorkflowRuntimeEnginePathTests
 
         var otherDepartment = await Workspace(CoverageOf(new OrgScopeRow(OrgLevels.Cbu, "R1", "10")))
             .ActAsync(task.Id, new(Guid.NewGuid(), "APPROVE"), Guid.NewGuid(), false, default);
-        otherDepartment.Error.Message.Should().Contain("department or activity type is outside your organization coverage");
+        otherDepartment.Error.Message.Should().Contain("department or task type is outside your organization coverage");
+    }
+
+    [Fact]
+    public async Task Act_RefusesTasksOfAnActivityWhoseTaskTypeIsOutsideCoverage()
+    {
+        var now = DateTime.UtcNow;
+        var seeded = SeedWorkspace(now);
+        var taskTypeId = Guid.NewGuid();
+        var main = await _db.ActivityDefinitions.SingleAsync(a => a.WorkflowVersionId == seeded.Version && a.ActivityType == ActivityType.MainActivity);
+        var config = JsonNode.Parse(main.ConfigurationJson!)!;
+        config["taskTypeId"] = taskTypeId.ToString();
+        _db.Entry(main).Property(a => a.ConfigurationJson).CurrentValue = config.ToJsonString();
+        await _db.SaveChangesAsync();
+        var engine = BuildEngine(_db);
+        var root = (await engine.StartAsync(_orgId, seeded.Binding.Id, "case", "act-type", now, pinnedWorkflowVersionId: seeded.Version)).Value;
+        await engine.ResumeFromTimerAsync((await _db.WorkflowTimers.SingleAsync()).Id, now.AddMinutes(1));
+        await engine.ResumeFromCallActivityAsync(root.Id, "activity", now.AddMinutes(1));
+        var task = await _db.WorkItems.SingleAsync();
+
+        var refused = await Workspace(CoverageOf(new OrgScopeRow(OrgLevels.Cbu, "R1", [], [Guid.NewGuid()])))
+            .ActAsync(task.Id, new(Guid.NewGuid(), "APPROVE"), Guid.NewGuid(), false, default);
+        refused.Error.Message.Should().Contain("department or task type is outside your organization coverage");
+
+        var commented = await Workspace(CoverageOf(new OrgScopeRow(OrgLevels.Cbu, "R1", [], [taskTypeId])))
+            .ActAsync(task.Id, new(Guid.NewGuid(), "comment", "Checked on site."), Guid.NewGuid(), false, default);
+        commented.IsSuccess.Should().BeTrue(commented.IsFailure ? commented.Error.Message : "");
     }
 
     [Fact]

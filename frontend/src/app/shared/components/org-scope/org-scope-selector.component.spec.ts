@@ -5,8 +5,9 @@ import { Observable, Subject, of } from 'rxjs';
 
 import { LocaleService } from '../../../core/i18n/locale.service';
 import { LookupItem, LookupType, LookupsService } from '../../../core/lookups/lookups.service';
+import { TaskTypesService } from '../../../core/tasks/task-types.service';
 import { OrgScopeSelectorComponent } from './org-scope-selector.component';
-import { OrgLocation } from './org-scope.model';
+import { OrgLocation, OrgScopeAssignment } from './org-scope.model';
 
 /**
  * The cascade every module places work with: Cluster → CBU → (Branch | Operation Area). A parent
@@ -19,6 +20,20 @@ describe('OrgScopeSelectorComponent', () => {
   let emitted: OrgLocation[];
   let pending: Map<string, Subject<LookupItem[]>>;
   let requests: string[];
+  let taskTypeRequests: number;
+
+  const leakRepair = {
+    id: 'a1f0c6e2-0000-4000-8000-000000000001',
+    code: 'LEAK',
+    nameEn: 'Leak repair',
+    nameAr: 'إصلاح تسرب',
+  };
+  const isolation = {
+    id: 'a1f0c6e2-0000-4000-8000-000000000002',
+    code: 'ISO',
+    nameEn: 'Isolation',
+    nameAr: 'عزل',
+  };
 
   const item = (code: string, parentCode?: string): LookupItem => ({
     id: code,
@@ -35,6 +50,13 @@ describe('OrgScopeSelectorComponent', () => {
   beforeEach(() => {
     pending = new Map();
     requests = [];
+    taskTypeRequests = 0;
+    const taskTypes = {
+      active: () => {
+        taskTypeRequests++;
+        return of({ isSuccess: true, value: [leakRepair, isolation] });
+      },
+    };
     const lookups = {
       listAll: (
         type: LookupType,
@@ -53,6 +75,7 @@ describe('OrgScopeSelectorComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: LookupsService, useValue: lookups },
+        { provide: TaskTypesService, useValue: taskTypes },
         { provide: LocaleService, useValue: { locale: () => 'en' } },
         { provide: TranslateService, useValue: { instant: (k: string) => k } },
       ],
@@ -159,5 +182,57 @@ describe('OrgScopeSelectorComponent', () => {
     expect(picker['cbuCode']()).toBe('CB1');
     expect(picker['branchCode']()).toBe('BR1');
     expect(requests).toEqual(['Cbu:C1', 'Branch:CB1', 'OperationArea:CB1']);
+  });
+
+  describe('coverage rows', () => {
+    let rows: OrgScopeAssignment[][];
+
+    beforeEach(() => {
+      rows = [];
+      picker.scopesChange.subscribe((scopes) => rows.push(scopes));
+      fixture.componentRef.setInput('mode', 'multi');
+      fixture.detectChanges();
+    });
+
+    it('offers the active task types by id, and only once it is a coverage picker', () => {
+      expect(taskTypeRequests).toBe(1);
+      expect(picker['taskTypes']()).toEqual([
+        { label: 'Leak repair', value: leakRepair.id },
+        { label: 'Isolation', value: isolation.id },
+      ]);
+    });
+
+    it('adds a row narrowed to task types alone, and names them', () => {
+      picker['taskTypeIds'].set([leakRepair.id, isolation.id]);
+      picker['addScope']();
+
+      const [row] = rows.at(-1)!;
+      expect(row.level).toBeUndefined();
+      expect(row.taskTypeIds).toEqual([leakRepair.id, isolation.id]);
+      expect(picker['scopeLabel'](row)).toBe(
+        'org.everywhere · org.allDepartments · Leak repair, Isolation',
+      );
+      expect(picker['taskTypeIds']()).toEqual([]);
+    });
+
+    it('treats the same task types in another order as the same row', () => {
+      picker['taskTypeIds'].set([leakRepair.id, isolation.id]);
+      picker['addScope']();
+      picker['taskTypeIds'].set([isolation.id, leakRepair.id]);
+
+      expect(picker['canAdd']()).toBe(false);
+    });
+
+    it('removes a task type row', () => {
+      picker['taskTypeIds'].set([leakRepair.id]);
+      picker['addScope']();
+      picker['removeScope'](rows.at(-1)![0]);
+
+      expect(rows.at(-1)).toEqual([]);
+    });
+  });
+
+  it('never asks for task types as a single-place picker', () => {
+    expect(taskTypeRequests).toBe(0);
   });
 });

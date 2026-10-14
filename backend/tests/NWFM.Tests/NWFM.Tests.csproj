@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NWFM.Shared\NWFM.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Auth\Auth.Domain\Auth.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Workflow.Domain\Workflow.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Workflow.Application\Workflow.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Workflow.Infrastructure\Workflow.Infrastructure.csproj" />

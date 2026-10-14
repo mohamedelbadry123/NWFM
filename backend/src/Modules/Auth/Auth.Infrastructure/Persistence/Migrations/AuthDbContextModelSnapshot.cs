@@ -376,20 +376,6 @@ namespace Auth.Infrastructure.Persistence.Migrations
                     b.ToTable("OrgScopes", "Auth");
                 });
 
-            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeActivityType", b =>
-                {
-                    b.Property<Guid>("OrgScopeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ActivityTypeCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("OrgScopeId", "ActivityTypeCode");
-
-                    b.ToTable("OrgScopesActivityType", "Auth");
-                });
-
             modelBuilder.Entity("Auth.Domain.Entities.OrgScopeDepartment", b =>
                 {
                     b.Property<Guid>("OrgScopeId")
@@ -402,6 +388,19 @@ namespace Auth.Infrastructure.Persistence.Migrations
                     b.HasKey("OrgScopeId", "DepartmentCode");
 
                     b.ToTable("OrgScopesDepartment", "Auth");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeTaskType", b =>
+                {
+                    b.Property<Guid>("OrgScopeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TaskTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("OrgScopeId", "TaskTypeId");
+
+                    b.ToTable("OrgScopesTaskTypes", "Auth");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.Permission", b =>
@@ -830,19 +829,19 @@ namespace Auth.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeActivityType", b =>
+            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeDepartment", b =>
                 {
                     b.HasOne("Auth.Domain.Entities.OrgScope", null)
-                        .WithMany("ActivityTypes")
+                        .WithMany("Departments")
                         .HasForeignKey("OrgScopeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeDepartment", b =>
+            modelBuilder.Entity("Auth.Domain.Entities.OrgScopeTaskType", b =>
                 {
                     b.HasOne("Auth.Domain.Entities.OrgScope", null)
-                        .WithMany("Departments")
+                        .WithMany("TaskTypes")
                         .HasForeignKey("OrgScopeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -917,9 +916,9 @@ namespace Auth.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Auth.Domain.Entities.OrgScope", b =>
                 {
-                    b.Navigation("ActivityTypes");
-
                     b.Navigation("Departments");
+
+                    b.Navigation("TaskTypes");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.Permission", b =>

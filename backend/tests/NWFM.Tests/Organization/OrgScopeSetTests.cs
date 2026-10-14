@@ -18,6 +18,9 @@ public sealed class OrgScopeSetTests
         [("BR1", "CB1"), ("BR2", "CB1"), ("BR3", "CB2"), ("BR4", "CB3")],
         [("OA1", "CB1")]);
 
+    private static readonly Guid LeakRepair = Guid.Parse("6f1c2a52-0d7e-4b8a-9a51-1f0b6d3e7c01");
+    private static readonly Guid Isolation = Guid.Parse("6f1c2a52-0d7e-4b8a-9a51-1f0b6d3e7c02");
+
     private static OrgScopeSet Scope(params OrgScopeRow[] rows) => OrgScopeSet.FromRows(rows, Hierarchy);
 
     [Fact]
@@ -127,30 +130,41 @@ public sealed class OrgScopeSetTests
     }
 
     [Fact]
-    public void Covers_ActivityTypesNarrowARow_AndWorkWithNoTypeIsStillTaken()
+    public void Covers_TaskTypesNarrowARow_AndWorkWithNoTypeIsStillTaken()
     {
-        var scope = Scope(new OrgScopeRow(OrgLevels.Cbu, "CB1", ["10"], ["LEAK_REPAIR"]));
+        var scope = Scope(new OrgScopeRow(OrgLevels.Cbu, "CB1", ["10"], [LeakRepair]));
 
-        scope.Covers("CB1", null, null, "10", "LEAK_REPAIR").Should().BeTrue();
-        scope.Covers("CB1", null, null, "10", "ISOLATION").Should().BeFalse();
+        scope.Covers("CB1", null, null, "10", LeakRepair).Should().BeTrue();
+        scope.Covers("CB1", null, null, "10", Isolation).Should().BeFalse();
         scope.Covers("CB1", null, null, "10").Should().BeTrue();
-        scope.ToTerritories().Single().ActivityTypeCodes.Should().BeEquivalentTo(["LEAK_REPAIR"]);
+        scope.ToTerritories().Single().TaskTypeIds.Should().BeEquivalentTo([LeakRepair]);
     }
 
     [Fact]
-    public void Covers_AnActivityTypeOnlyRowReachesThatTypeEverywhere_InEveryDepartment()
+    public void Covers_ATaskTypeOnlyRowReachesThatTypeEverywhere_InEveryDepartment()
     {
-        var scope = Scope(new OrgScopeRow(null, null, [], ["ISOLATION"]));
+        var scope = Scope(new OrgScopeRow(null, null, [], [Isolation]));
 
-        scope.Covers("CB3", "BR4", null, "11", "ISOLATION").Should().BeTrue();
-        scope.Covers("CB3", "BR4", null, "11", "LEAK_REPAIR").Should().BeFalse();
+        scope.Covers("CB3", "BR4", null, "11", Isolation).Should().BeTrue();
+        scope.Covers("CB3", "BR4", null, "11", LeakRepair).Should().BeFalse();
     }
 
     [Fact]
-    public void Overlaps_OnlyWhenTheActivityTypesMeet()
+    public void Covers_RowsNamingTheSameTaskTypesShareOneGroup_AndTheirTerritoriesUnion()
     {
-        var leaks = Scope(new OrgScopeRow(OrgLevels.Cluster, "C1", [], ["LEAK_REPAIR"]));
-        var isolation = Scope(new OrgScopeRow(OrgLevels.Branch, "BR1", [], ["ISOLATION"]));
+        var scope = Scope(
+            new OrgScopeRow(OrgLevels.Branch, "BR1", [], [LeakRepair, Isolation]),
+            new OrgScopeRow(OrgLevels.Branch, "BR4", [], [Isolation, LeakRepair]));
+
+        scope.ToTerritories().Should().ContainSingle();
+        scope.Covers(null, "BR4", null, null, LeakRepair).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Overlaps_OnlyWhenTheTaskTypesMeet()
+    {
+        var leaks = Scope(new OrgScopeRow(OrgLevels.Cluster, "C1", [], [LeakRepair]));
+        var isolation = Scope(new OrgScopeRow(OrgLevels.Branch, "BR1", [], [Isolation]));
         var anyType = Scope(new OrgScopeRow(OrgLevels.Branch, "BR1", null));
 
         leaks.Overlaps(isolation).Should().BeFalse();

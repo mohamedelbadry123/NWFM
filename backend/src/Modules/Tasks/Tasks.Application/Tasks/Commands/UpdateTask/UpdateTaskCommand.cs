@@ -76,7 +76,7 @@ public sealed class UpdateTaskCommandHandler(
         var location = TaskLocationValidator.ToLocation(request, request.DepartmentCode);
         var moved = HasMoved(task, location);
 
-        if (moved && !await access.CoversAsync(location.CbuCode, location.BranchCode, location.OperationAreaCode, location.DepartmentCode, ct))
+        if (moved && !await access.CoversAsync(location.CbuCode, location.BranchCode, location.OperationAreaCode, location.DepartmentCode, task.TaskTypeId, ct))
         {
             return Result.Failure(TaskErrors.Task.OutsideScope);
         }

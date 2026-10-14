@@ -18,5 +18,5 @@ public sealed class AuthScopeDto
     public string? Level { get; init; }
     public string? Code { get; init; }
     public IReadOnlyList<string> DepartmentCodes { get; init; } = [];
-    public IReadOnlyList<string> ActivityTypeCodes { get; init; } = [];
+    public IReadOnlyList<Guid> TaskTypeIds { get; init; } = [];
 }
