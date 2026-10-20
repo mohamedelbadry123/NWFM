@@ -6,18 +6,40 @@ The application uses Auth login and permissions with one server-configured defau
 
 ## Start locally
 
-Prerequisites: .NET 10 SDK, Node.js 22.12+ (22.x), npm, and SQL Server.
+Security rollout: initialization now runs separately from the request host.
+Use an explicitly initialized, tenant-bound database and a restricted request
+login. Existing administrator-based startup needs the
+[tenant security rollout](docs/security/tenant-security.md#provisioning-and-rollout)
+before serving requests. The isolated E2E launcher provisions both identities
+automatically for disposable tests.
 
-On Windows, double-click **start-dev.bat** in the project directory. It opens separate backend and frontend server windows and installs frontend dependencies if missing. It checks both ports before starting: existing healthy NWFM services are reused, while another application or an unhealthy service causes a clear error. It never silently switches ports. Open http://localhost:4200 once both servers are ready; press Ctrl+C in each server window to stop them.
+Prerequisites: .NET 10 SDK, Node.js 22.22.3+ (22.x), npm, SQL Server and the Microsoft `sqlcmd` tools. The [container setup](#containers) provisions these database identities for a local Docker deployment.
+
+First initialize the database and provision its request identity below. Then run **start-dev.bat** from a terminal carrying the configured tenant, signing key and restricted connection string, or save those settings with .NET user secrets before double-clicking it. It opens separate backend and frontend server windows and installs frontend dependencies if missing. It checks both ports before starting: existing healthy NWFM services are reused, while another application or an unhealthy service causes a clear error. It never silently switches ports.
 
 Reserve ports **4200** (frontend) and **5081** (API) for NWFM development on this machine. Other local applications and IIS sites must use separate ports. Stop the development servers before running the Docker configuration, which uses the same ports. The API launch profile, Angular proxy and Docker configuration all agree on port 5081; do not change just one to work around a conflict.
 
-For manual startup, use the following commands.
-
-From the project directory:
+For a new local SQL Server database, run this once from PowerShell in the project directory using a Windows identity authorized to initialize it. Choose one immutable tenant GUID and independent random values for the signing key and request password. The request password must contain 32–128 ASCII letters, digits, `_`, `!` or `-` and satisfy SQL Server's password policy. Place real secrets only in your local environment or secret store.
 
 ```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:NWFM_TENANT_ID = "<tenant-guid>"
+$env:Application__TenantId = $env:NWFM_TENANT_ID
+$env:JwtSettings__SigningKey = "<random signing key of at least 32 bytes>"
+$env:NWFM_RUNTIME_PASSWORD = "<independent strong request password>"
+$env:ConnectionStrings__DefaultConnection = "Server=localhost;Database=NWFM;Integrated Security=True;TrustServerCertificate=True"
 dotnet restore backend/NWFM.sln
+dotnet run --project backend/src/NWFM.Api --no-launch-profile -- --DatabaseStartup:InitializeOnly=true --DatabaseStartup:ApplyMigrations=true --DatabaseStartup:SeedData=true --DatabaseStartup:ApplySqlObjects=true
+.\scripts\provision-local-runtime.ps1
+$env:ConnectionStrings__DefaultConnection = "Server=localhost;Database=NWFM;User Id=nwfm_request;Password=$env:NWFM_RUNTIME_PASSWORD;TrustServerCertificate=True;Max Pool Size=20"
+Remove-Item Env:NWFM_RUNTIME_PASSWORD
+```
+
+The initialization command migrates, seeds local demo accounts/reference data and exits. The provisioning script only targets `localhost` / `NWFM`, validates the existing tenant binding and grants the request identity its required schema access. It never replaces data or an existing login's password. Use separately reviewed operator provisioning for another SQL Server or a business deployment; leave example-data seeding disabled there.
+
+Keep the tenant ID, signing key, storage root and restricted connection configured for subsequent starts. The ordinary request host starts with every `DatabaseStartup` flag false:
+
+```powershell
 dotnet run --project backend/src/NWFM.Api
 ```
 
@@ -31,9 +53,7 @@ npm start
 
 Open http://localhost:4200. The API listens on http://localhost:5081 and its API explorer is at http://localhost:5081/swagger.
 
-The default connection uses Windows authentication to SQL Server on `localhost`, database `NWFM`. The startup identity needs permission to create that database. Override `ConnectionStrings__DefaultConnection` for another SQL Server; use a new NWFM database, never the reference database. No reference credentials or data are copied.
-
-Startup applies workflow migrations and initializes the default tenant. Auth migrations/seeding use the `DatabaseStartup` settings. Workflow examples are created only when `WorkflowDemo:Enabled=true`; the [demo setup](WORKFLOW_WORKSPACE.md#local-demo-setup) also enables local transports. Leave demo and Auth data seeding disabled for business deployments.
+The checked-in Windows-authentication connection is an initialization template. A request host using an administrative identity is refused. All module migrations and SQL objects now run only in the separate initialization command; ordinary startup never updates the schema. Workflow examples additionally require `WorkflowDemo:Enabled=true` during initialization and local demo transports. Use a fresh NWFM database, never a reference project's database.
 
 ## First workflow
 
@@ -112,7 +132,7 @@ the fill's `wfm_action_taken` answer; fields with a C2M parameter name travel wi
 is off until `C2m:Enabled` is set, and every attempt is logged on the task's **C2M** tab. See
 [docs/form-engine.md](docs/form-engine.md#13-closing-c2m-field-activities).
 
-With `DatabaseStartup:SeedData` on, startup seeds two task types (bound to the two seeded forms), four
+With `DatabaseStartup:SeedData` on, explicit initialization seeds two task types (bound to the two seeded forms), four
 sample tasks around Riyadh, and the reference app's C2M action mappings. To generate a Tasks migration,
 from `backend`:
 
@@ -120,9 +140,9 @@ from `backend`:
 dotnet ef migrations add <Name> --project src/Modules/Tasks/Tasks.Infrastructure --startup-project src/NWFM.Api --output-dir Persistence/Migrations
 ```
 
-The two modules used to live in the `FE` and `TK` schemas. On startup each module first moves its
+The two modules used to live in the `FE` and `TK` schemas. During initialization each module first moves its
 migration history table into the new schema, then a migration moves its tables, including every
-per-form `SUB_` table. Apply these by starting the API rather than with `dotnet ef database update`,
+per-form `SUB_` table. Apply these with the initialize-only command rather than `dotnet ef database update`,
 which does not run that first step.
 
 ## Verify
@@ -159,9 +179,18 @@ Workflow improvements are tracked in [the implementation plan](WORKFLOW_ENGINE_E
 
 ## Containers
 
-Copy `.env.example` to `.env`, set a local SQL Server password, and run `docker compose up --build`. The frontend is available at http://localhost:4200. The database volume is separate from any reference project volume. This is a local development configuration, not a production deployment.
+Copy `.env.example` to `.env` and fill the tenant ID, separate random SQL administrator/request passwords, and a random JWT signing key. Use a unique Compose project name for each tenant. The sample secret values are deliberately empty so an unconfigured launch fails.
 
-The workspace was verified with SQL Server, 319 backend tests, 60 frontend tests, production builds, authenticated API checks, real process restarts and browser checks. See the workspace guide for evidence and remaining build warnings. The containers have not been run for this workspace change.
+```text
+docker compose --profile initialize run --build --rm provision-runtime
+docker compose up --build -d backend frontend
+```
+
+The first command starts SQL Server, runs the API once with administrative initialization credentials, then provisions `nwfm_request` with narrow schema grants. The second starts the API with that restricted login and all initialization flags disabled. The API container runs as a non-root user. No SQL port is published; API/frontend ports bind only to loopback.
+
+Open http://localhost:4200. The database, tenant-bound media and data-protection key volumes persist across restarts. Reusing those volumes with another tenant ID fails. After a schema update, stop the request host, repeat initialization/provisioning, then restart it. Initialization does not reactivate an offboarded tenant. Changing an existing request password requires an explicit SQL credential rotation; provisioning never silently resets it.
+
+This configuration seeds development accounts and stores local secrets in the ignored `.env` and isolated local volumes. Use the [security rollout requirements](docs/security/tenant-security.md) for production secret injection, encrypted key storage, infrastructure isolation, backups, quotas and retention. The disposable SQL E2E suite separately verifies the request grants, binding guards and recovery lifecycle.
 
 ## Contribution quality gates
 

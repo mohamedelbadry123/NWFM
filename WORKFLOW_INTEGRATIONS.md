@@ -23,7 +23,7 @@ Use `{{variableName}}` in text. JSON whole-value substitutions preserve type: `{
 Response mappings are destination variable -> source path:
 
 ```json
-{"externalId":"body.id","httpStatus":"status","provider":"headers.x-provider"}
+{ "externalId": "body.id", "httpStatus": "status", "provider": "headers.x-provider" }
 ```
 
 Headers use lowercase names. Dot paths, numeric array segments and `$` root are supported. Missing mapping fields fail explicitly. Preview mappings using a sample response before **Send test request**, which performs a real request and can change external data.
@@ -41,11 +41,28 @@ Create a webhook connection with a random API key or HMAC secret of at least 32 
 The v1 endpoint is `/api/workflow/integrations/webhooks/{connectionId}`. The connection identifies the source within the configured tenant. Send:
 
 ```json
-{"eventId":"provider-message-123","eventKey":"order.ready","correlationId":"order-42","payload":{"approved":true}}
+{
+  "eventId": "provider-message-123",
+  "eventKey": "order.ready",
+  "correlationId": "order-42",
+  "payload": { "approved": true }
+}
 ```
 
 - API key: `X-Workflow-Key` header.
-- HMAC: `X-Workflow-Timestamp` is Unix seconds; `X-Workflow-Signature` is hex HMAC-SHA256 of the UTF-8 bytes of `timestamp + "." + exactRequestBody`, using the secret. The window is five minutes. Re-sign old retries with the same event ID.
+- HMAC: `X-Workflow-Timestamp` is Unix seconds; `X-Workflow-Signature` is lowercase hex HMAC-SHA256 of the canonical UTF-8 request below, using the secret. The window is five minutes. Re-sign old retries with the same event ID.
+
+```text
+NWFM-WEBHOOK-V2
+{server tenant ID as lowercase hyphenated GUID}
+{connection ID as lowercase hyphenated GUID}
+POST
+/api/workflow/integrations/webhooks/{connection ID as lowercase hyphenated GUID}
+{X-Workflow-Timestamp}
+{lowercase hexadecimal SHA-256 of the exact UTF-8 request body}
+```
+
+Join these seven lines with LF (`\n`) and no trailing newline. This version binds the tenant, receiver, HTTP method, route, expiration and body. Senders using the former `timestamp.body` signature must update with this release; that signature is rejected. Use independent credentials per connection and environment.
 
 Mapping `approved` -> `approved` reads the payload. Correlation uses the envelope field, not arbitrary payload filters. Required mapping paths validate field presence; general JSON Schema validation is not provided. Reuse eventId for redelivery; new business events need new IDs.
 
@@ -70,6 +87,8 @@ Call Activity selects latest or fixed published child version, parent-input/chil
 ## Monitor and recover
 
 The instance workspace displays events, integration operations and retry controls. The retained administration API lists operations, receipts and waits. Job states are Pending, Running, Delivered, Completed, Failed and Cancelled. Delivered means only workflow advancement remains. Leases last three minutes; workers poll every two seconds with four parallel deliveries per host. Timers use the existing configured interval.
+
+`WorkflowSettings:MaxPendingPerQueue` bounds each persisted inbox, outbox, integration-job, event-receipt, event-wait and timer queue (default 10,000; permitted range 1–100,000). Active retries consume capacity; completing or cancelling work releases it. SQL transaction locks serialize concurrent admissions, and an over-capacity HTTP request receives 429. This is a deployment tenant budget; set limits from measured capacity and contractual quotas. Disabling the tenant stops new background processing; already transmitted external operations cannot be recalled.
 
 Replay a failed operation after fixing its provider/connection, retaining its operation ID. Legacy integration-activity replay reopens only its failed activity and rejects completed/cancelled/suspended workflows. Required activity events retry while their execution remains active; background activity events can retry after workflow completion without reopening it. Suspended/cancelled ancestors block delivery and progression. Callback replay only consumes an unconsumed event against one active matching wait.
 

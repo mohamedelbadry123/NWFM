@@ -4,13 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Workflow.Application.Abstractions;
+using Workflow.Application.Integrations;
 using Workflow.Application.Settings;
 using Workflow.Domain.Repositories;
 using Workflow.Infrastructure.Background;
 using Workflow.Infrastructure.Persistence;
 using Workflow.Infrastructure.Persistence.Repositories;
 using Workflow.Infrastructure.Services;
-using Workflow.Application.Integrations;
 
 public static class DependencyInjection
 {
@@ -19,8 +19,11 @@ public static class DependencyInjection
         string connectionString,
         IConfiguration configuration)
     {
-        services.Configure<WorkflowSettings>(
-            configuration.GetSection(WorkflowSettings.SectionName));
+        services.AddOptions<WorkflowSettings>()
+            .Bind(configuration.GetSection(WorkflowSettings.SectionName))
+            .Validate(o => o.MaxPendingPerQueue is >= 1 and <= 100000,
+                "Workflow queue capacity must be between 1 and 100000.")
+            .ValidateOnStart();
 
         services.AddDbContext<WorkflowDbContext>(options =>
             options.UseSqlServer(

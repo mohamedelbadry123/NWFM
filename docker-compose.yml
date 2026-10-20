@@ -1,33 +1,90 @@
-name: nwfm
+name: ${NWFM_COMPOSE_PROJECT:-nwfm-local}
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  Application__TenantId: ${NWFM_TENANT_ID:?Set the immutable NWFM_TENANT_ID in .env}
+  JwtSettings__SigningKey: ${NWFM_JWT_SIGNING_KEY:?Set a random NWFM_JWT_SIGNING_KEY in .env}
+  FileStorage__Root: /var/nwfm/media
+  CorsOrigins__0: http://localhost:4200
+
 services:
   database:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      ACCEPT_EULA: "Y"
+      ACCEPT_EULA: 'Y'
       MSSQL_SA_PASSWORD: ${NWFM_SQL_PASSWORD:?Set NWFM_SQL_PASSWORD in .env}
     volumes:
       - nwfm-sql:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      test:
+        - CMD-SHELL
+        - SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null
       interval: 10s
       retries: 20
       start_period: 30s
+
+  # This profile exits after initialization and exposes no request port.
+  bootstrap:
+    profiles: [initialize]
+    build: ./backend
+    environment:
+      <<: *api-environment
+      ConnectionStrings__DefaultConnection: Server=database;Database=NWFM;User Id=sa;Password=${NWFM_SQL_PASSWORD};TrustServerCertificate=True;Max Pool Size=20
+      DatabaseStartup__InitializeOnly: 'true'
+      DatabaseStartup__ApplyMigrations: 'true'
+      DatabaseStartup__SeedData: 'true'
+      DatabaseStartup__ApplySqlObjects: 'true'
+    volumes:
+      - nwfm-media:/var/nwfm/media
+      - nwfm-keys:/home/app/.aspnet/DataProtection-Keys
+    depends_on:
+      database:
+        condition: service_healthy
+
+  provision-runtime:
+    profiles: [initialize]
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    entrypoint: ['/bin/bash', '/provision/provision-local-runtime.sh']
+    environment:
+      NWFM_LOCAL_COMPOSE: '1'
+      NWFM_TENANT_ID: ${NWFM_TENANT_ID}
+      NWFM_RUNTIME_PASSWORD: ${NWFM_RUNTIME_PASSWORD:?Set a separate NWFM_RUNTIME_PASSWORD in .env}
+      SQLCMDPASSWORD: ${NWFM_SQL_PASSWORD}
+    volumes:
+      - ./scripts/provision-local-runtime.sh:/provision/provision-local-runtime.sh:ro
+      - ./scripts/provision-local-runtime.sql:/provision/provision-local-runtime.sql:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
   backend:
     build: ./backend
     environment:
+      <<: *api-environment
       Urls: http://+:8080
       AllowedHosts: localhost;127.0.0.1;backend
-      ConnectionStrings__DefaultConnection: Server=database;Database=NWFM;User Id=sa;Password=${NWFM_SQL_PASSWORD};TrustServerCertificate=True
+      ConnectionStrings__DefaultConnection: Server=database;Database=NWFM;User Id=nwfm_request;Password=${NWFM_RUNTIME_PASSWORD};TrustServerCertificate=True;Max Pool Size=20
+      DatabaseStartup__InitializeOnly: 'false'
+      DatabaseStartup__ApplyMigrations: 'false'
+      DatabaseStartup__SeedData: 'false'
+      DatabaseStartup__ApplySqlObjects: 'false'
+    volumes:
+      - nwfm-media:/var/nwfm/media
+      - nwfm-keys:/home/app/.aspnet/DataProtection-Keys
     depends_on:
       database:
         condition: service_healthy
     ports:
-      - "127.0.0.1:5081:8080"
+      - '127.0.0.1:5081:8080'
+
   frontend:
     build: ./frontend
     ports:
-      - "127.0.0.1:4200:80"
+      - '127.0.0.1:4200:80'
     depends_on:
       - backend
+
 volumes:
   nwfm-sql:
+  nwfm-media:
+  nwfm-keys:

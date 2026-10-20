@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NWFM.Shared.Abstractions;
+using NWFM.Shared.Options;
 using Tasks.Application.C2m;
 using Tasks.Domain.Constants;
 using Tasks.Infrastructure.Persistence;
@@ -51,7 +53,7 @@ internal sealed class C2mClosureHostedService(
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    private async Task SendQueuedAsync(TimeSpan interval, CancellationToken ct)
+    internal async Task SendQueuedAsync(TimeSpan interval, CancellationToken ct)
     {
         var now = clock.GetUtcNow().UtcDateTime;
         var due = now - interval;
@@ -59,6 +61,7 @@ internal sealed class C2mClosureHostedService(
         List<Guid> queued;
         using (var scope = scopes.CreateScope())
         {
+            if (!await IsTenantActiveAsync(scope.ServiceProvider, ct)) return;
             var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
             queued = await db.Tasks
                 .AsNoTracking()
@@ -77,9 +80,10 @@ internal sealed class C2mClosureHostedService(
         }
     }
 
-    private async Task SendOneAsync(Guid taskId, DateTime due, CancellationToken ct)
+    internal async Task SendOneAsync(Guid taskId, DateTime due, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
+        if (!await IsTenantActiveAsync(scope.ServiceProvider, ct)) return;
         var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
         var closure = scope.ServiceProvider.GetRequiredService<TaskC2mClosure>();
 
@@ -121,5 +125,13 @@ internal sealed class C2mClosureHostedService(
             outcome.Kind,
             task.C2mStatus,
             outcome.Message);
+    }
+
+    private static async Task<bool> IsTenantActiveAsync(IServiceProvider services, CancellationToken ct)
+    {
+        var tenant = services.GetService<IOptions<TenantIsolationOptions>>()?.Value;
+        var availability = services.GetService<ITenantAvailability>();
+        return tenant is { IsActive: true } && tenant.TenantId != Guid.Empty && availability is not null
+            && await availability.IsActiveAsync(ct);
     }
 }

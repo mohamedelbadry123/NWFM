@@ -1,14 +1,24 @@
 namespace Workflow.Infrastructure.Persistence;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Persistence;
+using Workflow.Application.Settings;
 using Workflow.Domain.Entities;
 
-public sealed class WorkflowDbContext : BaseDbContext
+public sealed partial class WorkflowDbContext : BaseDbContext
 {
-    public WorkflowDbContext(DbContextOptions<WorkflowDbContext> options, ICurrentTenant currentTenant)
-        : base(options, currentTenant) { }
+    private readonly int _maximumPendingPerQueue;
+
+    public WorkflowDbContext(DbContextOptions<WorkflowDbContext> options, ICurrentTenant currentTenant,
+        IOptions<WorkflowSettings>? settings = null)
+        : base(options, currentTenant)
+    {
+        _maximumPendingPerQueue = settings?.Value.MaxPendingPerQueue ?? 10000;
+        if (_maximumPendingPerQueue is < 1 or > 100000)
+            throw new InvalidOperationException("Workflow queue capacity must be between 1 and 100000.");
+    }
 
     public DbSet<WorkflowParticipant> Participants => Set<WorkflowParticipant>();
     public DbSet<WorkflowWorkspaceAction> WorkspaceActions => Set<WorkflowWorkspaceAction>();

@@ -27,7 +27,7 @@ public sealed class AppContextController(
     {
         var tenant = new TenantDto(options.Value.TenantId, options.Value.TenantName);
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
+        if (User.Identity?.IsAuthenticated != true || string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
             return new AppContextDto(tenant, [], null);
 
         var participants = await db.Participants

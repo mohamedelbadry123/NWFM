@@ -1,4 +1,6 @@
+using Auth.Infrastructure;
 using FluentValidation;
+using FormEngine.Infrastructure;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -7,16 +9,20 @@ using NWFM.Api.Services;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Behaviors;
 using NWFM.Shared.Integration.Workflow;
-using Auth.Infrastructure;
-using FormEngine.Infrastructure;
+using NWFM.Shared.Options;
 using Tasks.Infrastructure;
 using Workflow.Infrastructure;
-using Workflow.Infrastructure.Persistence;
 using AppContext = NWFM.Api.Services.ApplicationContext;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+var databaseStartup = builder.Configuration.GetSection(DatabaseStartupOptions.SectionName)
+    .Get<DatabaseStartupOptions>() ?? new();
+TenantDatabaseBoundary.ValidateStartup(databaseStartup);
+await TenantDatabaseBoundary.VerifyAsync(connectionString,
+    builder.Configuration.GetValue<Guid>("Application:TenantId"), databaseStartup.InitializeOnly);
 
 builder.Services.AddOptions<ApplicationOptions>().BindConfiguration("Application")
     .Validate(o => o.TenantId != Guid.Empty, "Tenant ID is required.").ValidateOnStart();
@@ -51,6 +57,14 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBeh
 
 builder.Services.AddScoped<IWorkflowOutcomeHandler, StandaloneOutcomeHandler>();
 builder.Services.AddScoped<TenantScopeFilter>();
+builder.Services.AddOptions<TenantResourceOptions>().BindConfiguration("TenantResourceLimits")
+    .Validate(o => o.RequestsPerMinute is > 0 and <= 100000
+        && o.PrincipalRequestsPerMinute is > 0 and <= 10000
+        && o.LoginRequestsPerMinute is > 0 and <= 100
+        && o.ConcurrentRequests is > 0 and <= 128, "Tenant resource limits must be bounded and positive.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<TenantResourceLimits>();
+builder.Services.AddSingleton<TenantSecuritySignals>();
 
 var corsOrigins = builder.Configuration.GetSection("CorsOrigins").Get<string[]>() ?? [];
 // Content-Disposition is exposed so a cross-origin client can read a report's file name.
@@ -94,11 +108,19 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
+// Bind and verify storage before either bootstrap work or the request host can use it.
+_ = app.Services.GetRequiredService<NWFM.Shared.Storage.IFileStorage>();
 
 app.UseExceptionHandler(handler => handler.Run(async http =>
 {
     var error = http.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-    if (error is ValidationException validation)
+    if (error is NWFM.Shared.Exceptions.WorkflowQueueCapacityException)
+    {
+        http.Response.StatusCode = 429;
+        http.Response.Headers.RetryAfter = "60";
+        await http.Response.WriteAsJsonAsync(new { code = "Tenant.QueueCapacity", message = "Queued work capacity is exhausted. Try again later." });
+    }
+    else if (error is ValidationException validation)
     {
         http.Response.StatusCode = 400;
         await http.Response.WriteAsJsonAsync(new { code = "Validation.Failed", message = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)) });
@@ -118,27 +140,33 @@ app.UseExceptionHandler(handler => handler.Run(async http =>
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors();
+app.UseMiddleware<TenantRequestBudgetMiddleware>();
 app.UseAuthentication();
-app.UseAuthorization();
+app.UseMiddleware<TenantPrincipalBudgetMiddleware>();
 app.UseMiddleware<RequestContextMiddleware>();
+app.UseAuthorization();
 app.MapControllers();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", application = "NWFM" }));
 
-// Auth database: migrate, SQL objects, seed — controlled by DatabaseStartup flags.
-await app.InitialiseAuthDatabaseAsync();
-
-// FormEngine database: migrate, ensure each published form's submission table, seed the example forms.
-await app.InitialiseFormEngineDatabaseAsync();
-
-// Tasks database: migrate, seed task types bound to the forms seeded above.
-await app.InitialiseTasksDatabaseAsync();
-
-// Workflow database: always migrates (existing behavior).
-await using (var scope = app.Services.CreateAsyncScope())
+if (databaseStartup.InitializeOnly)
 {
-    await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
-    await WorkflowWorkspaceDemo.InitializeAsync(scope.ServiceProvider, app.Configuration);
+    // Auth database: migrate, SQL objects, seed — controlled by DatabaseStartup flags.
+    await app.InitialiseAuthDatabaseAsync();
+
+    // FormEngine database: migrate, ensure each published form's submission table, seed the example forms.
+    await app.InitialiseFormEngineDatabaseAsync();
+
+    // Tasks database: migrate, seed task types bound to the forms seeded above.
+    await app.InitialiseTasksDatabaseAsync();
+
+    // Workflow database: migration and seed operations respect the same initialization flags.
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
+        await WorkflowWorkspaceDemo.InitializeAsync(scope.ServiceProvider, app.Configuration);
+    }
+    return;
 }
 
 app.Run();

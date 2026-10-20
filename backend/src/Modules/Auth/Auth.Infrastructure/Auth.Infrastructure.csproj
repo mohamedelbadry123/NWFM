@@ -29,6 +29,7 @@
     <PackageReference Include="System.DirectoryServices.Protocols" />
     <PackageReference Include="Sustainsys.Saml2.AspNetCore2" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
   </ItemGroup>
 

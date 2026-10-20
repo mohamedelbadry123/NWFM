@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NWFM.Shared.Integration.Workflow;
-using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 
 /// <summary>
@@ -25,7 +24,7 @@ internal sealed class WorkflowOutboxHostedService : BackgroundService
         ILogger<WorkflowOutboxHostedService> logger)
     {
         _scopeFactory = scopeFactory;
-        _logger       = logger;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,12 +60,16 @@ internal sealed class WorkflowOutboxHostedService : BackgroundService
     private async Task ProcessPendingAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        if (!await WorkflowTenantAdmission.IsActiveAsync(scope.ServiceProvider, cancellationToken)) return;
         var outbox = scope.ServiceProvider.GetRequiredService<IWorkflowIntegrationOutboxRepository>();
         var handlers = scope.ServiceProvider.GetServices<IWorkflowOutcomeHandler>().ToList();
 
         var pending = await outbox.GetPendingAsync(BatchSize, cancellationToken);
         foreach (var message in pending)
         {
+            // Leave undelivered work pending if the deployment is suspended after
+            // fetching this batch; it must not become a failed business operation.
+            await WorkflowTenantAdmission.RequireMessageScopeAsync(scope.ServiceProvider, message.OrganizationId, cancellationToken);
             try
             {
                 var now = DateTime.UtcNow;
