@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace Auth.Domain.Options;
 
 public sealed class ExternalConsumersOptions
@@ -9,27 +12,35 @@ public sealed class ExternalConsumersOptions
     public List<ExternalConsumerApp> Internal { get; set; } = [];
     public List<ExternalConsumerApp> Mob { get; set; } = [];
 
-    public ExternalConsumerApp? FindByApiKey(string apiKey)
+    public ExternalConsumerApp? FindAuthorizedConsumer(
+        string apiKey, Guid tenantId, string environment, string requiredScope)
     {
+        if (tenantId == Guid.Empty || string.IsNullOrWhiteSpace(environment) ||
+            string.IsNullOrWhiteSpace(requiredScope) || string.IsNullOrWhiteSpace(apiKey) ||
+            apiKey.Length < 32 || apiKey.Length > 512)
+            return null;
+
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(apiKey));
         return All().FirstOrDefault(c =>
-            string.Equals(c.ApiKey, apiKey, StringComparison.Ordinal));
+            c.IsEnabled && !string.IsNullOrWhiteSpace(c.AppID) &&
+            c.TenantId == tenantId &&
+            string.Equals(c.Environment, environment, StringComparison.Ordinal) &&
+            c.Scopes.Contains(requiredScope, StringComparer.Ordinal) &&
+            MatchesHash(digest, c.ApiKeySha256));
     }
 
-    public ExternalConsumerApp? FindByApiKey(string apiKey, string systemName)
+    private static bool MatchesHash(byte[] digest, string configuredHash)
     {
-        return GetConsumers(systemName)
-            .FirstOrDefault(c => string.Equals(c.ApiKey, apiKey, StringComparison.Ordinal));
-    }
-
-    private List<ExternalConsumerApp> GetConsumers(string systemName) =>
-        systemName.ToUpperInvariant() switch
+        if (configuredHash.Length != 64) return false;
+        try
         {
-            "WFM" => WFM,
-            "C2M" => C2M,
-            "INTERNAL" => Internal,
-            "MOB" => Mob,
-            _ => []
-        };
+            return CryptographicOperations.FixedTimeEquals(digest, Convert.FromHexString(configuredHash));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 
     private IEnumerable<ExternalConsumerApp> All() =>
         WFM.Concat(C2M).Concat(Internal).Concat(Mob);
@@ -39,6 +50,11 @@ public sealed class ExternalConsumerApp
 {
     public string AppID { get; set; } = string.Empty;
     public string AppName { get; set; } = string.Empty;
-    public string ApiKey { get; set; } = string.Empty;
+    /// <summary>SHA-256 of a cryptographically random, high-entropy API credential.</summary>
+    public string ApiKeySha256 { get; set; } = string.Empty;
     public string SystemName { get; set; } = string.Empty;
+    public Guid TenantId { get; set; }
+    public string Environment { get; set; } = string.Empty;
+    public List<string> Scopes { get; set; } = [];
+    public bool IsEnabled { get; set; }
 }

@@ -1,5 +1,4 @@
 using Auth.Application.Common.Interfaces;
-using Auth.Application.Users;
 using Auth.Application.Users.Models;
 using MediatR;
 using NWFM.Shared.Results;
@@ -13,6 +12,10 @@ public sealed class UpdateUserCommandHandler(
 {
     public async Task<Result<UserDetailDto>> Handle(UpdateUserCommand request, CancellationToken ct)
     {
+        var validation = UserOrgScopeWriter.Validate(request.UserId, request.Scopes);
+        if (validation.IsFailure)
+            return Result<UserDetailDto>.Failure(validation.Error);
+
         var updateResult = await userAccountService.UpdateUserAsync(request.UserId, new EditedUserAccount
         {
             Email = request.Email,

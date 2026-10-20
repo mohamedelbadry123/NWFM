@@ -1,5 +1,4 @@
 using Auth.Application.Common.Interfaces;
-using Auth.Application.Users;
 using Auth.Application.Users.Models;
 using MediatR;
 using NWFM.Shared.Results;
@@ -13,6 +12,12 @@ public sealed class CreateUserCommandHandler(
 {
     public async Task<Result<UserDetailDto>> Handle(CreateUserCommand request, CancellationToken ct)
     {
+        // The account ID is assigned by Identity later; scope validation performs
+        // no persistence and only needs a nonempty owner for its domain checks.
+        var validation = UserOrgScopeWriter.Validate("pending-user", request.Scopes);
+        if (validation.IsFailure)
+            return Result<UserDetailDto>.Failure(validation.Error);
+
         var createResult = await userAccountService.CreateUserAsync(new NewUserAccount
         {
             UserName = request.UserName,

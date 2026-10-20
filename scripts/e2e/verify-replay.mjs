@@ -1,7 +1,26 @@
-export function verifyReplay(report, startedAt) {
+import { createHash } from 'node:crypto';
+
+export function verifyReplay(report, { nonce, receipt } = {}) {
   const run = report.run;
-  const requiredFiles = ['tests/example.e2e.ts', 'tests/workflow-lifecycle.e2e.ts'];
-  if (!run || Date.parse(run.startedAt) < startedAt || !Number.isFinite(Date.parse(run.startedAt)))
+  const requiredFiles = [
+    'tests/example.e2e.ts',
+    'tests/workflow-lifecycle.e2e.ts',
+    'tests/workflow-activity-forms.e2e.ts',
+    'tests/tenant-security.e2e.ts',
+  ];
+  if (
+    report.schemaVersion !== 'report-1' ||
+    !run ||
+    typeof run.id !== 'string' ||
+    !run.id ||
+    !Number.isFinite(Date.parse(run.startedAt)) ||
+    !Number.isFinite(Date.parse(run.finishedAt)) ||
+    typeof nonce !== 'string' ||
+    !nonce ||
+    receipt?.nonce !== nonce ||
+    receipt.runId !== run.id ||
+    receipt.digest !== createHash('sha256').update(JSON.stringify(report)).digest('hex')
+  )
     throw new Error('Replay did not produce a fresh report.');
   if (run.status !== 'passed' || run.exitCode !== 0 || run.errors?.length)
     throw new Error('Replay run failed.');

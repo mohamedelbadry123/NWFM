@@ -68,20 +68,9 @@ internal static class OrgScopeRows
         IReadOnlyList<OrgScopeAssignmentDto>? scopes,
         CancellationToken ct)
     {
-        var replacements = new List<OrgScope>();
-
-        foreach (var scope in scopes ?? [])
-        {
-            try
-            {
-                replacements.Add(OrgScope.Create(
-                    ownerType, ownerId, scope.Level, scope.Code, scope.DepartmentCodes, scope.ActivityTypeCodes));
-            }
-            catch (DomainException ex)
-            {
-                return Result<bool>.Failure(new Error("Auth.InvalidScope", ex.Message));
-            }
-        }
+        var prepared = Prepare(ownerType, ownerId, scopes);
+        if (prepared.IsFailure)
+            return Result<bool>.Failure(prepared.Error);
 
         // Loaded with their department and activity type rows, so those go with them.
         var existing = await db.OrgScopes
@@ -91,9 +80,40 @@ internal static class OrgScopeRows
             .ToListAsync(ct);
 
         db.OrgScopes.RemoveRange(existing);
-        db.OrgScopes.AddRange(replacements);
+        db.OrgScopes.AddRange(prepared.Value);
 
         await db.SaveChangesAsync(ct);
         return Result<bool>.Success(true);
+    }
+
+    /// <summary>Validate the complete request before account or role changes are persisted.</summary>
+    public static Result<bool> Validate(
+        string ownerType, string ownerId, IReadOnlyList<OrgScopeAssignmentDto>? scopes)
+    {
+        var prepared = Prepare(ownerType, ownerId, scopes);
+        return prepared.IsSuccess ? Result<bool>.Success(true) : Result<bool>.Failure(prepared.Error);
+    }
+
+    private static Result<IReadOnlyList<OrgScope>> Prepare(
+        string ownerType, string ownerId, IReadOnlyList<OrgScopeAssignmentDto>? scopes)
+    {
+        var replacements = new List<OrgScope>();
+
+        foreach (var scope in scopes ?? [])
+        {
+            if (scope is null)
+                return Result<IReadOnlyList<OrgScope>>.Failure(
+                    new Error("Auth.InvalidScope", "A scope entry must not be null."));
+            try
+            {
+                replacements.Add(OrgScope.Create(
+                    ownerType, ownerId, scope.Level, scope.Code, scope.DepartmentCodes, scope.ActivityTypeCodes));
+            }
+            catch (DomainException ex)
+            {
+                return Result<IReadOnlyList<OrgScope>>.Failure(new Error("Auth.InvalidScope", ex.Message));
+            }
+        }
+        return Result<IReadOnlyList<OrgScope>>.Success(replacements);
     }
 }

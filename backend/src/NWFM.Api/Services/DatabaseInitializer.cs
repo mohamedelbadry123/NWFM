@@ -18,7 +18,8 @@ public static class DatabaseInitializer
     {
         var db = services.GetRequiredService<WorkflowDbContext>();
         var options = services.GetRequiredService<IOptions<ApplicationOptions>>().Value;
-        await db.Database.MigrateAsync();
+        if (services.GetRequiredService<IOptions<NWFM.Shared.Options.DatabaseStartupOptions>>().Value.ApplyMigrations)
+            await db.Database.MigrateAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
         var now = DateTime.UtcNow;
         if (!await db.Set<Tenant>().AnyAsync(t => t.Id == options.TenantId))

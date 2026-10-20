@@ -25,11 +25,9 @@ public sealed class PermissionResolver(
         ApplicationUser? user = await userManager.FindByIdAsync(userId);
         if (user is null) return [];
 
-        return await cache.GetOrCreateAsync(
-            CacheKeys.Auth.Permissions.ForUser(userId),
-            token => LoadForUserAsync(user, token),
-            EntryOptions,
-            cancellationToken);
+        // Authorization grants must reflect revocation immediately on every
+        // application instance. A local or distributed cache is not authoritative.
+        return await LoadForUserAsync(user, cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> GetPermissionCodesForRoleAsync(

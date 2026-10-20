@@ -2,18 +2,18 @@ namespace NWFM.Tests.Modules.Workflow;
 
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Security.Cryptography;
 using FluentAssertions;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using global::Workflow.Application.Integrations;
 using global::Workflow.Application.Settings;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 public sealed partial class WorkflowRuntimeEnginePathTests
 {
@@ -24,7 +24,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     [InlineData("line\nnext")]
     public async Task TypedAssignments_PreserveLiteralStrings(string value)
     {
-        var config = Config(new { assignmentFormat = "typed", setVariables = new Dictionary<string,string> { ["BusinessEntityId"] = value } });
+        var config = Config(new { assignmentFormat = "typed", setVariables = new Dictionary<string, string> { ["BusinessEntityId"] = value } });
         var (binding, version) = SeedSingleActivity(ActivityType.ScriptTask, config, DateTime.UtcNow);
         var started = await BuildEngine(_db).StartAsync(_orgId, binding.Id, "original", "typed", DateTime.UtcNow, pinnedWorkflowVersionId: version);
         started.IsSuccess.Should().BeTrue();
@@ -80,11 +80,32 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     {
         var api = Integrations(); var id = await Connection(api, auth: "Hmac"); var body = Envelope("signed");
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        string Sign(string stamp) => Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(new string('b', 40)), Encoding.UTF8.GetBytes(stamp + "." + body)));
+        string Sign(string stamp) => WorkflowIntegrations.SignWebhook(_orgId, id, stamp, body, new string('b', 40));
         (await api.ReceiveEventAsync(id, body + " ", timestamp, Sign(timestamp), null, default)).IsFailure.Should().BeTrue();
         var old = DateTimeOffset.UtcNow.AddMinutes(-6).ToUnixTimeSeconds().ToString();
         (await api.ReceiveEventAsync(id, body, old, Sign(old), null, default)).IsFailure.Should().BeTrue();
         (await api.ReceiveEventAsync(id, body, timestamp, Sign(timestamp), null, default)).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Hmac_RejectsAnotherTenantOrConnectionEvenWhenTheSecretIsReused()
+    {
+        var api = Integrations();
+        var first = await Connection(api, auth: "Hmac");
+        var second = await Connection(api, auth: "Hmac");
+        var body = Envelope("scope-bound");
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var secret = new string('b', 40);
+        var otherConnection = WorkflowIntegrations.SignWebhook(_orgId, first, timestamp, body, secret);
+        var otherTenant = WorkflowIntegrations.SignWebhook(Guid.NewGuid(), second, timestamp, body, secret);
+        var legacy = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(timestamp + "." + body)));
+
+        (await api.ReceiveEventAsync(second, body, timestamp, otherConnection, null, default)).Error.Code.Should().EndWith("Unauthorized");
+        (await api.ReceiveEventAsync(second, body, timestamp, otherTenant, null, default)).Error.Code.Should().EndWith("Unauthorized");
+        (await api.ReceiveEventAsync(second, body, timestamp, legacy, null, default)).Error.Code.Should().EndWith("Unauthorized");
+        (await api.ReceiveEventAsync(second, body, timestamp,
+            WorkflowIntegrations.SignWebhook(_orgId, second, timestamp, body, secret), null, default)).IsSuccess.Should().BeTrue();
+        (await _db.EventReceipts.CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -188,9 +209,12 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     public async Task Http_UsesRealRequest_MapsHeaders_RedactsCredentials_AndRefusesRedirect()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        var received = Task.Run(async () => { using var client = await listener.AcceptTcpClientAsync(); using var stream = client.GetStream(); using var reader = new StreamReader(stream, leaveOpen: true);
+        var received = Task.Run(async () =>
+        {
+            using var client = await listener.AcceptTcpClientAsync(); using var stream = client.GetStream(); using var reader = new StreamReader(stream, leaveOpen: true);
             var lines = new List<string>(); string? line; while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync())) lines.Add(line);
-            var response = Encoding.UTF8.GetBytes("HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/secret\r\nX-Result: ok\r\nContent-Length: 12\r\nConnection: close\r\n\r\nsecret-token"); await stream.WriteAsync(response); return lines; });
+            var response = Encoding.UTF8.GetBytes("HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/secret\r\nX-Result: ok\r\nContent-Length: 12\r\nConnection: close\r\n\r\nsecret-token"); await stream.WriteAsync(response); return lines;
+        });
         var connection = WorkflowIntegrationConnection.Create(_orgId); connection.Update("local", "Http", $"http://127.0.0.1:{port}", "Bearer", "", true, 0, false);
         var result = await new WorkflowIntegrationTransport().SendHttpAsync(connection, new() { ["token"] = "secret-token" },
             new() { Path = "/orders", Query = new() { ["id"] = "{{id}}" } }, new() { ["id"] = JsonSerializer.SerializeToElement("A B") }, "operation-1", default);
@@ -199,10 +223,14 @@ public sealed partial class WorkflowRuntimeEnginePathTests
     }
 
     [Theory]
-    [InlineData("127.0.0.1", false, false)] [InlineData("10.0.0.1", false, false)]
-    [InlineData("169.254.169.254", true, false)] [InlineData("::ffff:127.0.0.1", false, false)]
-    [InlineData("::1", false, false)] [InlineData("fc00::1", false, false)]
-    [InlineData("8.8.8.8", false, true)] [InlineData("10.0.0.1", true, true)]
+    [InlineData("127.0.0.1", false, false)]
+    [InlineData("10.0.0.1", false, false)]
+    [InlineData("169.254.169.254", true, false)]
+    [InlineData("::ffff:127.0.0.1", false, false)]
+    [InlineData("::1", false, false)]
+    [InlineData("fc00::1", false, false)]
+    [InlineData("8.8.8.8", false, true)]
+    [InlineData("10.0.0.1", true, true)]
     public void Http_NetworkPolicyRejectsPrivateAndMetadata(string address, bool allowPrivate, bool allowed)
         => WorkflowIntegrationTransport.IsAllowedAddress(IPAddress.Parse(address), allowPrivate).Should().Be(allowed);
 

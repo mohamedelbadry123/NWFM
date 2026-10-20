@@ -8,7 +8,7 @@ public sealed class LoggingSmsSender(ILogger<LoggingSmsSender> logger) : ISmsSen
 {
     public Task<Result<bool>> SendAsync(string phoneNumber, string message, CancellationToken ct = default)
     {
-        logger.LogInformation("SMS to {PhoneNumber}: {Message}", phoneNumber, message);
+        logger.LogInformation("SMS delivery requested using the local logging transport; message content and recipient are suppressed.");
         return Task.FromResult(Result<bool>.Success(true));
     }
 }

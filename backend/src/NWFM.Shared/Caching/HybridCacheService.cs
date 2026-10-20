@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Options;
 
@@ -10,8 +11,15 @@ namespace NWFM.Shared.Caching;
 /// <c>IDistributedCache</c> is registered as L2 — so moving from in-memory to distributed
 /// is a registration change in <see cref="CachingServiceRegistration"/>, not a code change here.
 /// </summary>
-public sealed class HybridCacheService(HybridCache cache, IOptions<CacheSettings> settings) : ICacheService
+public sealed class HybridCacheService(
+    HybridCache cache,
+    IOptions<CacheSettings> settings,
+    IOptions<TenantIsolationOptions> tenantOptions,
+    IHostEnvironment environment) : ICacheService
 {
+    private readonly string _tenantPrefix = tenantOptions.Value.TenantId != Guid.Empty
+        ? $"environment:{environment.EnvironmentName}:tenant:{tenantOptions.Value.TenantId:D}:"
+        : throw new InvalidOperationException("A server-configured tenant is required for caching.");
     private readonly CacheEntryOptions _defaults = CacheEntryOptions.FromMinutes(
         settings.Value.DefaultExpirationMinutes,
         settings.Value.DefaultLocalExpirationMinutes);
@@ -22,7 +30,7 @@ public sealed class HybridCacheService(HybridCache cache, IOptions<CacheSettings
         CacheEntryOptions? options = null,
         CancellationToken cancellationToken = default) =>
         cache.GetOrCreateAsync(
-            key,
+            ScopedKey(key),
             factory,
             static (state, token) => state(token),
             ToHybridOptions(options),
@@ -34,13 +42,21 @@ public sealed class HybridCacheService(HybridCache cache, IOptions<CacheSettings
         T value,
         CacheEntryOptions? options = null,
         CancellationToken cancellationToken = default) =>
-        cache.SetAsync(key, value, ToHybridOptions(options), tags: null, cancellationToken);
+        cache.SetAsync(ScopedKey(key), value, ToHybridOptions(options), tags: null, cancellationToken);
 
     public ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default) =>
-        cache.RemoveAsync(key, cancellationToken);
+        cache.RemoveAsync(ScopedKey(key), cancellationToken);
 
     public ValueTask RemoveAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default) =>
-        cache.RemoveAsync(keys, cancellationToken);
+        cache.RemoveAsync(keys.Select(ScopedKey), cancellationToken);
+
+    // All current entries contain deployment-owned data (including lookups and
+    // field definitions). There are deliberately no globally shared entries.
+    private string ScopedKey(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return _tenantPrefix + key;
+    }
 
     private HybridCacheEntryOptions ToHybridOptions(CacheEntryOptions? options)
     {

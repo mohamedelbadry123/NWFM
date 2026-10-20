@@ -57,12 +57,20 @@ public sealed class UploadFormFileCommandHandler(
         var fileId = Guid.NewGuid();
         var storedName = fileId.ToString("N") + extension;
 
-        var stored = await fileStorage.SaveAsync(
-            request.Content,
-            storedName,
-            request.ContentType,
-            settings.PendingFolder,
-            ct);
+        StoredFile stored;
+        try
+        {
+            stored = await fileStorage.SaveAsync(
+                request.Content,
+                storedName,
+                request.ContentType,
+                settings.PendingFolder,
+                ct);
+        }
+        catch (FileStorageLimitException)
+        {
+            return Result.Failure<UploadedFileDto>(FormEngineErrors.File.TooLarge(settings.MaxFileSizeMb));
+        }
 
         if (stored.SizeBytes == 0)
         {

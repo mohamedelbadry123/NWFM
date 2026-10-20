@@ -13,3 +13,4 @@ frontend/src/app/shared/services/
 .work/
 .e2e/
 **/package-lock.json
+docs/security/vendor/
