@@ -15,7 +15,9 @@ public sealed partial class WorkflowDbContext : BaseDbContext
         IOptions<WorkflowSettings>? settings = null)
         : base(options, currentTenant)
     {
-        _maximumPendingPerQueue = settings?.Value.MaxPendingPerQueue ?? 10000;
+        var configured = settings?.Value;
+        _maximumPendingPerQueue = configured?.MaxPendingPerQueueByTenant.GetValueOrDefault(currentTenant.OrganizationId.ToString("D"))
+            is { } perTenant and > 0 ? perTenant : configured?.MaxPendingPerQueue ?? 10000;
         if (_maximumPendingPerQueue is < 1 or > 100000)
             throw new InvalidOperationException("Workflow queue capacity must be between 1 and 100000.");
     }

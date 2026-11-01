@@ -1,0 +1,68 @@
+<ng-container *appI18n="let t">
+  <header class="nav" [class.solid]="scrolled() || menuOpen()">
+    <div class="nav-inner">
+      <a routerLink="/" class="brand">
+        <img [src]="logoMark" alt="" />
+        <span>{{ t('common.appName') }}</span>
+      </a>
+
+      <nav class="links" [attr.aria-label]="t('landing.nav.label')">
+        @for (link of links; track link.id) {
+          <button type="button" class="link" (click)="go(link.id)">{{ t(link.labelKey) }}</button>
+        }
+      </nav>
+
+      <span class="spacer"></span>
+
+      <button
+        type="button"
+        class="icon-btn"
+        (click)="language.toggle()"
+        [attr.aria-label]="t('common.language')"
+      >
+        <i class="pi pi-globe"></i>
+        <span class="lang-code">{{ language.current() === 'ar' ? 'EN' : 'ع' }}</span>
+      </button>
+      <button
+        type="button"
+        class="icon-btn"
+        (click)="theme.toggle()"
+        [attr.aria-label]="t('common.toggleTheme')"
+      >
+        <i
+          class="pi"
+          [class.pi-moon]="theme.mode() === 'light'"
+          [class.pi-sun]="theme.mode() === 'dark'"
+        ></i>
+      </button>
+      <button type="button" class="link sign-in" (click)="go(sections.workspaces)">
+        {{ t('landing.nav.signIn') }}
+      </button>
+      <p-button class="cta" [label]="t('landing.nav.cta')" size="small" routerLink="/signup" />
+      <button
+        type="button"
+        class="icon-btn menu-btn"
+        (click)="toggleMenu()"
+        [attr.aria-expanded]="menuOpen()"
+        [attr.aria-label]="t(menuOpen() ? 'landing.nav.closeMenu' : 'landing.nav.openMenu')"
+      >
+        <i class="pi" [class.pi-bars]="!menuOpen()" [class.pi-times]="menuOpen()"></i>
+      </button>
+    </div>
+
+    @if (menuOpen()) {
+      <nav class="mobile-menu" [attr.aria-label]="t('landing.nav.label')">
+        @for (link of links; track link.id) {
+          <button type="button" class="mobile-link" (click)="go(link.id)">
+            {{ t(link.labelKey) }}
+          </button>
+        }
+        <button type="button" class="mobile-link" (click)="go(sections.workspaces)">
+          {{ t('landing.nav.signIn') }}
+        </button>
+        <a routerLink="/console/login" class="mobile-link">{{ t('landing.footer.staffSignIn') }}</a>
+        <p-button [label]="t('landing.nav.cta')" routerLink="/signup" styleClass="w-full" />
+      </nav>
+    }
+  </header>
+</ng-container>

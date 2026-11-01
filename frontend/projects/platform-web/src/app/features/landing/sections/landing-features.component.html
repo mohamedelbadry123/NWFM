@@ -1,0 +1,74 @@
+<ng-container *appI18n="let t">
+  <div class="container">
+    <header class="section-head center">
+      <span class="eyebrow">{{ t('landing.features.eyebrow') }}</span>
+      <h2>{{ t('landing.features.title') }}</h2>
+      <p>{{ t('landing.features.subtitle') }}</p>
+    </header>
+
+    <div class="bento">
+      <article class="tile wide">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-sitemap"></i></span>
+          <h3>{{ t('landing.features.designer.title') }}</h3>
+          <p>{{ t('landing.features.designer.text') }}</p>
+        </div>
+        <app-designer-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-objects-column"></i></span>
+          <h3>{{ t('landing.features.forms.title') }}</h3>
+          <p>{{ t('landing.features.forms.text') }}</p>
+        </div>
+        <app-form-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-users"></i></span>
+          <h3>{{ t('landing.features.teams.title') }}</h3>
+          <p>{{ t('landing.features.teams.text') }}</p>
+        </div>
+        <app-tasks-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile wide">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-chart-line"></i></span>
+          <h3>{{ t('landing.features.monitoring.title') }}</h3>
+          <p>{{ t('landing.features.monitoring.text') }}</p>
+        </div>
+        <app-monitor-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-shield"></i></span>
+          <h3>{{ t('landing.features.permissions.title') }}</h3>
+          <p>{{ t('landing.features.permissions.text') }}</p>
+        </div>
+        <app-permissions-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-clock"></i></span>
+          <h3>{{ t('landing.features.sla.title') }}</h3>
+          <p>{{ t('landing.features.sla.text') }}</p>
+        </div>
+        <app-sla-preview class="mini" aria-hidden="true" />
+      </article>
+
+      <article class="tile">
+        <div class="tile-copy">
+          <span class="tile-icon"><i class="pi pi-link"></i></span>
+          <h3>{{ t('landing.features.integrations.title') }}</h3>
+          <p>{{ t('landing.features.integrations.text') }}</p>
+        </div>
+        <app-integrations-preview class="mini" aria-hidden="true" />
+      </article>
+    </div>
+  </div>
+</ng-container>

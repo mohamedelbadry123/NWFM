@@ -1,0 +1,161 @@
+@use '../landing-kit' as kit;
+
+:host {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: block;
+  @include kit.tokens;
+}
+
+:host-context([data-theme='dark']) {
+  @include kit.dark-tokens;
+}
+
+.nav {
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+
+  &.solid {
+    background: color-mix(in srgb, var(--lp-page) 82%, transparent);
+    border-bottom-color: var(--app-border);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  }
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.47rem;
+  height: 5.33rem;
+  @include kit.container;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--lp-ink);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 1.53rem;
+
+  img {
+    width: 2.93rem;
+    height: 2.93rem;
+    object-fit: contain;
+    border-radius: 0.67rem;
+  }
+}
+
+.links {
+  display: flex;
+  gap: 0.2rem;
+  margin-inline-start: 2rem;
+
+  @media (max-width: 960px) {
+    display: none;
+  }
+}
+
+.link {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 0.67rem;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font: inherit;
+  font-size: 1.23rem;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--lp-ink);
+    background: var(--app-hover);
+  }
+
+  &.sign-in {
+    color: var(--lp-ink);
+
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.47rem;
+  padding: 0.73rem 0.87rem;
+  border: none;
+  border-radius: 0.8rem;
+  background: transparent;
+  color: var(--p-text-color);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--app-hover);
+  }
+
+  .lang-code {
+    font-size: 1.07rem;
+    font-weight: 600;
+  }
+}
+
+.cta {
+  margin-inline-start: 0.47rem;
+
+  @media (max-width: 480px) {
+    display: none;
+  }
+}
+
+.menu-btn {
+  display: none;
+
+  @media (max-width: 960px) {
+    display: inline-flex;
+  }
+}
+
+.mobile-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.67rem;
+  padding-bottom: 1.67rem;
+  border-top: 1px solid var(--app-border);
+  @include kit.container;
+
+  @media (min-width: 961px) {
+    display: none;
+  }
+
+  p-button {
+    margin-top: 1rem;
+  }
+}
+
+.mobile-link {
+  padding: 1.07rem 0.33rem;
+  border: none;
+  border-bottom: 1px solid var(--app-border);
+  background: transparent;
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 1.33rem;
+  font-weight: 500;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}

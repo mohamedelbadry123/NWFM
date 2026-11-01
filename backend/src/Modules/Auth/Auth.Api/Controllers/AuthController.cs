@@ -1,3 +1,4 @@
+using Auth.Application.Auth.Commands.ActivateAccount;
 using Auth.Application.Auth.Commands.ExchangeSsoCode;
 using Auth.Application.Auth.Commands.LoginTeam;
 using Auth.Application.Auth.Commands.LoginUser;
@@ -37,6 +38,16 @@ public sealed class AuthController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(command, ct);
         return result.IsSuccess ? Ok(result) : Unauthorized(result);
+    }
+
+    /// <summary>Sets the first password from an activation link; the workspace comes from the host.</summary>
+    [HttpPost("activate")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(Result<string>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Activate([FromBody] ActivateAccountCommand command, CancellationToken ct)
+    {
+        var result = await sender.Send(command, ct);
+        return result.IsSuccess ? Ok(result) : BadRequest(result);
     }
 
     [HttpPost("logout")]

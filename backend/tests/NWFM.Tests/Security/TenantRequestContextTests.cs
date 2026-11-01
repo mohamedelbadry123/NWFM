@@ -6,10 +6,12 @@ using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NWFM.Api.Services;
 using NWFM.Shared.Abstractions;
+using NWFM.Shared.MultiTenancy;
+using NWFM.Tests.Tenancy;
 using Workflow.Infrastructure.Persistence;
 using AppContext = NWFM.Api.Services.ApplicationContext;
 
@@ -20,20 +22,30 @@ public sealed class TenantRequestContextTests
     [Theory]
     [InlineData("x-organization-id")]
     [InlineData("x-tenant-id")]
-    public async Task ForeignHeaderSelectorCannotReplaceServerTenant(string header)
+    public async Task ForeignHeaderSelectorCannotReplaceResolvedTenant(string header)
     {
         var tenant = Guid.NewGuid();
         var http = Http();
         http.Request.Headers[header] = Guid.NewGuid().ToString();
-        var context = Context(tenant);
-        using var db = Db(tenant);
         var called = false;
         var middleware = new RequestContextMiddleware(_ => { called = true; return Task.CompletedTask; },
             NullLogger<RequestContextMiddleware>.Instance);
-        await middleware.InvokeAsync(http, context, db);
+        await middleware.InvokeAsync(http, Tenants(tenant), new AppContext(), Services(tenant));
         Assert.False(called);
         Assert.Equal(400, http.Response.StatusCode);
-        Assert.Equal(tenant, context.OrganizationId);
+    }
+
+    [Fact]
+    public async Task HeaderSelectorThatRepeatsTheResolvedTenantIsAllowed()
+    {
+        var tenant = Guid.NewGuid();
+        var http = Http();
+        http.Request.Headers["x-tenant-id"] = tenant.ToString();
+        var called = false;
+        var middleware = new RequestContextMiddleware(_ => { called = true; return Task.CompletedTask; },
+            NullLogger<RequestContextMiddleware>.Instance);
+        await middleware.InvokeAsync(http, Tenants(tenant), new AppContext(), Services(tenant));
+        Assert.True(called);
     }
 
     [Theory]
@@ -45,10 +57,9 @@ public sealed class TenantRequestContextTests
         var tenant = Guid.NewGuid();
         var http = Http();
         http.Request.QueryString = new QueryString("?" + query);
-        using var db = Db(tenant);
         var middleware = new RequestContextMiddleware(_ => throw new InvalidOperationException("must not run"),
             NullLogger<RequestContextMiddleware>.Instance);
-        await middleware.InvokeAsync(http, Context(tenant), db);
+        await middleware.InvokeAsync(http, Tenants(tenant), new AppContext(), Services(tenant));
         Assert.Equal(400, http.Response.StatusCode);
     }
 
@@ -60,13 +71,27 @@ public sealed class TenantRequestContextTests
         http.User = new ClaimsPrincipal(new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
         ], "Bearer"));
-        var context = Context(tenant);
-        using var db = Db(tenant);
+        var context = new AppContext();
         var middleware = new RequestContextMiddleware(_ => throw new InvalidOperationException("must not run"),
             NullLogger<RequestContextMiddleware>.Instance);
-        await middleware.InvokeAsync(http, context, db);
+        await middleware.InvokeAsync(http, Tenants(tenant), context, Services(tenant));
         Assert.Equal(401, http.Response.StatusCode);
         Assert.Equal(Guid.Empty, context.ActorId);
+    }
+
+    [Fact]
+    public async Task TokenOfAnotherTenantIsRefusedOnThisTenantsRequest()
+    {
+        var tenant = Guid.NewGuid();
+        var http = Http();
+        http.User = new ClaimsPrincipal(new ClaimsIdentity([
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim(AppClaimTypes.TenantId, Guid.NewGuid().ToString())
+        ], "Bearer"));
+        var middleware = new RequestContextMiddleware(_ => throw new InvalidOperationException("must not run"),
+            NullLogger<RequestContextMiddleware>.Instance);
+        await middleware.InvokeAsync(http, Tenants(tenant), new AppContext(), Services(tenant));
+        Assert.Equal(401, http.Response.StatusCode);
     }
 
     [Fact]
@@ -79,15 +104,15 @@ public sealed class TenantRequestContextTests
             new Claim(ClaimTypes.NameIdentifier, user.ToString()),
             new Claim(AppClaimTypes.TenantId, tenant.ToString())
         ], "Bearer"));
-        var context = Context(tenant);
-        using var db = Db(tenant);
+        var context = new AppContext();
         var middleware = new RequestContextMiddleware(_ =>
         {
             Assert.Equal(user, context.ActorId);
             throw new InvalidOperationException("downstream failure");
         }, NullLogger<RequestContextMiddleware>.Instance);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => middleware.InvokeAsync(http, context, db));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            middleware.InvokeAsync(http, Tenants(tenant), context, Services(tenant)));
         Assert.Equal(Guid.Empty, context.ActorId);
         Assert.Equal(Guid.Empty, context.ParticipantId);
     }
@@ -127,9 +152,13 @@ public sealed class TenantRequestContextTests
         return http;
     }
 
-    private static AppContext Context(Guid tenant) => new(Options.Create(new ApplicationOptions { TenantId = tenant }));
-    private static WorkflowDbContext Db(Guid tenant) => new(
-        new DbContextOptionsBuilder<WorkflowDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options,
-        new Tenant(tenant));
+    private static ITenantContext Tenants(Guid tenant) => TestTenants.Fixed(TestTenants.Active(tenant));
+
+    private static IServiceProvider Services(Guid tenant) => new ServiceCollection()
+        .AddSingleton(new WorkflowDbContext(
+            new DbContextOptionsBuilder<WorkflowDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options,
+            new Tenant(tenant)))
+        .BuildServiceProvider();
+
     private sealed record Tenant(Guid OrganizationId) : ICurrentTenant;
 }

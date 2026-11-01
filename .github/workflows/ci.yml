@@ -141,7 +141,7 @@ jobs:
         run: npm run security:tenancy -- --check-upstream
       - name: Tenant security behavioral regressions
         if: ${{ !cancelled() }}
-        run: dotnet test backend/NWFM.sln --configuration Release --no-restore --filter "FullyQualifiedName~Security|FullyQualifiedName~WorkflowIntegrationTests|FullyQualifiedName~SubmissionMediaIsolationTests" --logger "trx;LogFileName=tenant-security.trx"
+        run: dotnet test backend/NWFM.sln --configuration Release --no-restore --filter "FullyQualifiedName~Security|FullyQualifiedName~NWFM.Tests.Tenancy|FullyQualifiedName~NWFM.Tests.Platform|FullyQualifiedName~WorkflowIntegrationTests|FullyQualifiedName~SubmissionMediaIsolationTests" --logger "trx;LogFileName=tenant-security.trx"
       - name: Secret scan
         if: ${{ !cancelled() }}
         run: bash scripts/quality/scan-secrets.sh

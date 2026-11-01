@@ -5,6 +5,8 @@ const { chromium } = createRequire(import.meta.resolve('@e2e-dev/web'))('playwri
 const chrome = process.env.CHROME_BIN || chromium.executablePath();
 if (!existsSync(chrome))
   throw new Error('Run npx @e2e-dev/web install chromium --with-deps first.');
-run('npm', ['--prefix', 'frontend', 'test', '--', '--watch=false', '--headless'], {
-  env: { ...process.env, CHROME_BIN: chrome },
-});
+// The tenant app and the platform app (landing, signup, staff console) are separate projects.
+for (const script of ['test', 'test:platform'])
+  run('npm', ['--prefix', 'frontend', 'run', script, '--', '--watch=false', '--headless'], {
+    env: { ...process.env, CHROME_BIN: chrome },
+  });

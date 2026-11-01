@@ -1,3 +1,5 @@
 {
-  "googleMapsApiKey": ""
+  "googleMapsApiKey": "",
+  "allowTenantQuery": false,
+  "platformUrl": "http://localhost:4300"
 }

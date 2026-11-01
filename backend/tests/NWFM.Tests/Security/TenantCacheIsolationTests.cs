@@ -5,7 +5,9 @@ using Microsoft.Extensions.Options;
 using Moq;
 using NWFM.Shared.Caching;
 using NWFM.Shared.Constants;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Options;
+using NWFM.Tests.Tenancy;
 
 namespace NWFM.Tests.Security;
 
@@ -46,13 +48,16 @@ public sealed class TenantCacheIsolationTests
     }
 
     [Fact]
-    public void CacheWithoutServerTenantFailsClosed()
+    public async Task CacheWithoutResolvedTenantFailsClosed()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddHybridCache();
         using var provider = services.BuildServiceProvider();
-        Assert.Throws<InvalidOperationException>(() => Create(provider.GetRequiredService<HybridCache>(), Guid.Empty));
+        var unbound = Create(provider.GetRequiredService<HybridCache>(), Guid.Empty);
+        await Assert.ThrowsAsync<TenantAccessException>(async () =>
+            await unbound.SetAsync(CacheKeys.Lookups.OrgHierarchy, "value"));
+        await Assert.ThrowsAsync<TenantAccessException>(async () => await Read(unbound, CacheKeys.Lookups.OrgHierarchy));
     }
 
     [Fact]
@@ -73,7 +78,7 @@ public sealed class TenantCacheIsolationTests
 
     private static HybridCacheService Create(HybridCache cache, Guid tenantId, string environment = "Testing") =>
         new(cache, Options.Create(new CacheSettings()),
-            Options.Create(new TenantIsolationOptions { TenantId = tenantId }),
+            TestTenants.Fixed(tenantId == Guid.Empty ? null : TestTenants.Active(tenantId)),
             Mock.Of<IHostEnvironment>(x => x.EnvironmentName == environment));
 
     private static ValueTask<string> Read(ICacheService cache, string key) =>

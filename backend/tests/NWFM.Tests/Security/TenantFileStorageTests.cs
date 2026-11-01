@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Moq;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Options;
 using NWFM.Shared.Storage;
+using NWFM.Tests.Tenancy;
 
 namespace NWFM.Tests.Security;
 
@@ -11,12 +13,23 @@ public sealed class TenantFileStorageTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "nwfm-storage-test-" + Guid.NewGuid().ToString("N"));
     private readonly Guid _tenant = Guid.NewGuid();
 
-    private LocalFileStorage Storage(Guid? tenant = null, string? root = null)
+    /// <summary>A tenant whose catalog entry pins its media root to <paramref name="root"/> (default <c>media</c>).</summary>
+    private LocalFileStorage Storage(Guid? tenant = null, string? root = null) =>
+        Storage(tenant == Guid.Empty ? null : new TenantInfo
+        {
+            Id = tenant ?? _tenant,
+            Key = "alpha",
+            Name = "Alpha",
+            Status = TenantStatus.Active,
+            StoragePath = root ?? "media"
+        });
+
+    private LocalFileStorage Storage(TenantInfo? tenant, string storageRoot = "tenants")
     {
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(e => e.ContentRootPath).Returns(_directory);
-        return new LocalFileStorage(Options.Create(new FileStorageOptions { Root = root ?? "media", MaxFileSizeMb = 1 }),
-            environment.Object, Options.Create(new TenantIsolationOptions { TenantId = tenant ?? _tenant }));
+        return new LocalFileStorage(Options.Create(new FileStorageOptions { Root = storageRoot, MaxFileSizeMb = 1 }),
+            environment.Object, TestTenants.Fixed(tenant));
     }
 
     [Fact]
@@ -27,16 +40,27 @@ public sealed class TenantFileStorageTests : IDisposable
         var restarted = Storage();
         await using var content = await restarted.OpenReadAsync("pending/file.bin", default);
         Assert.Equal(3, content.Length);
-        Assert.Throws<InvalidOperationException>(() => Storage(Guid.NewGuid()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Storage(Guid.NewGuid()).OpenReadAsync("pending/file.bin", default));
     }
 
     [Fact]
-    public void InvalidOrMissingTenantCannotBindStorage()
+    public async Task InvalidOrMissingTenantCannotBindStorage()
     {
-        Assert.Throws<InvalidOperationException>(() => Storage(Guid.Empty));
-        _ = Storage();
+        await Assert.ThrowsAsync<TenantAccessException>(() => Storage(Guid.Empty).OpenReadAsync("pending/file.bin", default));
+        await Storage().SaveAsync(new MemoryStream([1]), "file.bin", "application/octet-stream", "pending", default);
         File.WriteAllText(Path.Combine(_directory, "media", ".nwfm-tenant"), "invalid");
-        Assert.Throws<InvalidOperationException>(() => Storage());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Storage().OpenReadAsync("pending/file.bin", default));
+    }
+
+    [Fact]
+    public async Task TenantsWithoutAnExplicitRootGetTheirOwnFolderUnderTheStorageRoot()
+    {
+        var alpha = Storage(TestTenants.Active(key: "alpha"));
+        var beta = Storage(TestTenants.Active(key: "beta"));
+        await alpha.SaveAsync(new MemoryStream([1]), "same.bin", "application/octet-stream", "pending", default);
+        await beta.SaveAsync(new MemoryStream([2]), "same.bin", "application/octet-stream", "pending", default);
+        Assert.Equal(new byte[] { 1 }, await File.ReadAllBytesAsync(Path.Combine(_directory, "tenants", "alpha", "pending", "same.bin")));
+        Assert.Equal(new byte[] { 2 }, await File.ReadAllBytesAsync(Path.Combine(_directory, "tenants", "beta", "pending", "same.bin")));
     }
 
     [Theory]
@@ -109,7 +133,7 @@ public sealed class TenantFileStorageTests : IDisposable
         Directory.CreateSymbolicLink(link, outside);
         try
         {
-            Assert.Throws<InvalidOperationException>(() => Storage(root: Path.Combine(link, "media")));
+            Assert.Throws<InvalidOperationException>(() => Storage(root: Path.Combine(link, "media")).OpenReadAsync("pending/file.bin", default).GetAwaiter().GetResult());
             Assert.False(Directory.Exists(Path.Combine(outside, "media")));
         }
         finally { Directory.Delete(link); }

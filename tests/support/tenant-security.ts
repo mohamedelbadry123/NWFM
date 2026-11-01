@@ -8,7 +8,8 @@ export const tenantA = {
 };
 export const tenantB = {
   id: '20000000-0000-0000-0000-000000000002',
-  origin: 'http://localhost:4201',
+  // The same app and API; the host alone selects the workspace.
+  origin: 'http://beta.localhost:4200',
 };
 
 interface RequestOptions {

@@ -28,7 +28,11 @@ test(
     await login(tenantA.origin);
     const api = tenantApi(browser);
     await api('v1/form-engine/forms', 401, { anonymous: true });
-    await api('v1/form-engine/forms', 401, { origin: tenantB.origin });
+    // A token replayed on another workspace's host is refused before any handler runs.
+    const replayed = await api<{ error: { code: string } }>('v1/form-engine/forms', 400, {
+      origin: tenantB.origin,
+    });
+    expect(replayed.error.code).toBe('Tenant.Mismatch');
     const a = await createTenantResources(browser);
     await assertOwnResources(browser, a);
 
@@ -49,7 +53,7 @@ test(
     await assertOwnResources(browser, a);
 
     await login(tenantB.origin);
-    await api('v1/form-engine/forms', 401, { origin: tenantA.origin });
+    await api('v1/form-engine/forms', 400, { origin: tenantA.origin });
     const b = await createTenantResources(browser);
     await assertOwnResources(browser, b);
     await assertForeignResourcesDenied(browser, a);

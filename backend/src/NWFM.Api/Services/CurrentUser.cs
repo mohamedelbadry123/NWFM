@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Auth.Domain.Constants;
 using NWFM.Shared.Abstractions;
+using NWFM.Shared.MultiTenancy;
 
 namespace NWFM.Api.Services;
 
@@ -29,6 +30,16 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
             return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
         }
     }
+
+    public bool IsSupportSession => SupportSessionId is not null;
+
+    public Guid? ActorId => Guid.TryParse(User?.FindFirstValue(TenantClaimTypes.Actor), out var id) ? id : null;
+
+    public string? SupportActorName => User?.FindFirstValue(TenantClaimTypes.ActorName);
+
+    public string? SupportScope => User?.FindFirstValue(TenantClaimTypes.SupportScope);
+
+    public Guid? SupportSessionId => Guid.TryParse(User?.FindFirstValue(TenantClaimTypes.SupportSessionId), out var id) ? id : null;
 
     public bool IsInRole(string role) => User?.IsInRole(role) ?? false;
 

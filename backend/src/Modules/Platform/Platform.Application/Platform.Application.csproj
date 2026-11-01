@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The control plane's slices: tenants, plans, signup, provisioning, support sessions, staff users.
+    Referenced only by NWFM.Platform.Api (through Platform.Infrastructure). NWFM.Api must
+    never reference this project — that is what keeps platform endpoints and provisioning out of the
+    tenant API.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tenancy\Tenancy.Application\Tenancy.Application.csproj" />
+  </ItemGroup>
+</Project>

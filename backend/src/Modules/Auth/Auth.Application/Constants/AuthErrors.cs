@@ -25,4 +25,7 @@ public static class AuthErrors
     public static Error LookupUnknownType(string type) => new("Auth.LookupUnknownType", $"Unknown lookup type: {type}.");
     public static readonly Error TeamNotFound = new("Auth.TeamNotFound", "Team not found.");
     public static readonly Error TeamDuplicateName = new("Auth.TeamDuplicateName", "A team with this name already exists.");
+    public static readonly Error SigningNotConfigured = new("Auth.JwtNotConfigured", "JWT signing is not configured.");
+    public static readonly Error SupportSessionWrongTenant = new("Auth.SupportSessionWrongTenant", "The support session belongs to another workspace.", 403);
+    public static readonly Error ActivationInvalid = new("Auth.ActivationInvalid", "The activation link is invalid or has expired.");
 }

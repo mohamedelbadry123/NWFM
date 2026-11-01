@@ -1,14 +1,13 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using NWFM.Api.Hosting;
-using NWFM.Api.Services;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Exceptions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
+using NWFM.Tests.Tenancy;
 
 namespace NWFM.Tests.Security;
 
@@ -22,13 +21,12 @@ public sealed class TenantDenialTelemetryTests
         using var fixture = new Fixture();
         var response = new DeferredResponseFeature();
         var http = Request(response);
-        var middleware = new TenantRequestBudgetMiddleware(_ => status == 403
-            ? throw new UnauthorizedAccessException("private failure")
-            : throw new WorkflowQueueCapacityException("private queue"));
 
-        // The production exception handler wraps the budget middleware. It clears
-        // the response and chooses the status after the budget InvokeAsync unwinds.
-        var exception = await Record.ExceptionAsync(() => fixture.Invoke(middleware, http));
+        // The production exception handler wraps the budget middlewares. It clears the response
+        // and chooses the status after the budget InvokeAsync unwinds.
+        var exception = await Record.ExceptionAsync(() => fixture.Invoke(_ => status == 403
+            ? throw new UnauthorizedAccessException("private failure")
+            : throw new WorkflowQueueCapacityException("private queue"), http));
         Assert.NotNull(exception);
         http.Response.Clear();
         http.Response.StatusCode = exception is UnauthorizedAccessException ? 403 : 429;
@@ -51,14 +49,13 @@ public sealed class TenantDenialTelemetryTests
         using var fixture = new Fixture();
         var response = new DeferredResponseFeature();
         var http = Request(response);
-        var middleware = new TenantRequestBudgetMiddleware(context =>
+
+        await fixture.Invoke(context =>
         {
             context.Response.StatusCode = status;
-            if (selectorDenied) context.Items["TenantSecurity.SelectorDenied"] = true;
+            if (selectorDenied) context.Items[TenantRequestItems.SelectorDenied] = true;
             return Task.CompletedTask;
-        });
-
-        await fixture.Invoke(middleware, http);
+        }, http);
         await response.StartAsync();
 
         fixture.AssertSingleDenial(status);
@@ -67,7 +64,7 @@ public sealed class TenantDenialTelemetryTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task EarlyGlobalBudgetRejectionRecordsOneEvent(bool concurrencyExhausted)
+    public async Task EarlyTenantBudgetRejectionRecordsOneEvent(bool concurrencyExhausted)
     {
         using var fixture = new Fixture(new TenantResourceOptions
         {
@@ -75,17 +72,16 @@ public sealed class TenantDenialTelemetryTests
             ConcurrentRequests = concurrencyExhausted ? 1 : 10
         });
         using var consumed = concurrencyExhausted
-            ? fixture.Limits.AcquireConcurrency() : fixture.Limits.AcquireRequest();
+            ? fixture.Limits.AcquireConcurrency(fixture.Tenant) : fixture.Limits.AcquireRequest(fixture.Tenant);
         var response = new DeferredResponseFeature();
         var http = Request(response);
         var called = false;
-        var middleware = new TenantRequestBudgetMiddleware(_ =>
+
+        await fixture.Invoke(_ =>
         {
             called = true;
             return Task.CompletedTask;
-        });
-
-        await fixture.Invoke(middleware, http);
+        }, http);
         await response.StartAsync();
 
         Assert.False(called);
@@ -102,21 +98,39 @@ public sealed class TenantDenialTelemetryTests
             context.Response.StatusCode = 204;
             return Task.CompletedTask;
         });
-        var middleware = new TenantRequestBudgetMiddleware(context => principal.InvokeAsync(context, fixture.Limits));
+        RequestDelegate inner = context => principal.InvokeAsync(context, fixture.Limits, fixture.Context);
         var firstResponse = new DeferredResponseFeature();
         var first = Request(firstResponse);
-        await fixture.Invoke(middleware, first);
+        await fixture.Invoke(inner, first);
         await firstResponse.StartAsync();
         Assert.Equal(204, first.Response.StatusCode);
         Assert.Empty(fixture.Logger.Events);
 
         var secondResponse = new DeferredResponseFeature();
         var second = Request(secondResponse);
-        await fixture.Invoke(middleware, second);
+        await fixture.Invoke(inner, second);
         await secondResponse.StartAsync();
 
         Assert.Equal(429, second.Response.StatusCode);
         fixture.AssertSingleDenial(429);
+    }
+
+    [Fact]
+    public async Task DeactivatedTenantIsRefusedBeforeTheEndpoint()
+    {
+        using var fixture = new Fixture(active: false);
+        var response = new DeferredResponseFeature();
+        var http = Request(response);
+        var called = false;
+
+        await fixture.Invoke(_ =>
+        {
+            called = true;
+            return Task.CompletedTask;
+        }, http);
+
+        Assert.False(called);
+        Assert.Equal(503, http.Response.StatusCode);
     }
 
     private static DefaultHttpContext Request(DeferredResponseFeature response)
@@ -129,35 +143,40 @@ public sealed class TenantDenialTelemetryTests
 
     private sealed class Fixture : IDisposable
     {
-        private readonly IOptions<ApplicationOptions> _application = Options.Create(
-            new ApplicationOptions { TenantId = Guid.NewGuid() });
-        private readonly IOptionsMonitor<TenantIsolationOptions> _tenant;
         private readonly ITenantAvailability _availability;
         private readonly TenantSecuritySignals _signals;
+        public TenantInfo Tenant { get; } = TestTenants.Active();
+        public ITenantContext Context { get; }
         public CaptureLogger Logger { get; } = new();
         public TenantResourceLimits Limits { get; }
 
-        public Fixture(TenantResourceOptions? limits = null)
+        public Fixture(TenantResourceOptions? limits = null, bool active = true)
         {
-            var tenant = new Mock<IOptionsMonitor<TenantIsolationOptions>>();
-            tenant.SetupGet(x => x.CurrentValue).Returns(new TenantIsolationOptions { IsActive = true });
-            _tenant = tenant.Object;
+            Context = TestTenants.Fixed(Tenant);
             var availability = new Mock<ITenantAvailability>();
-            availability.Setup(x => x.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            availability.Setup(x => x.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(active);
             _availability = availability.Object;
-            Limits = new TenantResourceLimits(Options.Create(limits ?? new TenantResourceOptions()), _application);
-            _signals = new TenantSecuritySignals(_application, TimeProvider.System, Logger);
+            Limits = new TenantResourceLimits(Options.Create(limits ?? new TenantResourceOptions()));
+            _signals = new TenantSecuritySignals(TimeProvider.System, Logger);
         }
 
-        public Task Invoke(TenantRequestBudgetMiddleware middleware, HttpContext http) =>
-            middleware.InvokeAsync(http, Limits, _application, _tenant, _availability, _signals,
-                NullLogger<TenantRequestBudgetMiddleware>.Instance);
+        /// <summary>The production order: process budget, tenant resolution, tenant budget, then <paramref name="inner"/>.</summary>
+        public Task Invoke(RequestDelegate inner, HttpContext http)
+        {
+            var tenantBudget = new TenantRequestBudgetMiddleware(inner);
+            var global = new GlobalRequestBudgetMiddleware(context =>
+            {
+                context.Items[TenantRequestItems.TenantId] = Tenant.Id;
+                return tenantBudget.InvokeAsync(context, Limits, Context, _availability);
+            });
+            return global.InvokeAsync(http, Limits, _signals);
+        }
 
         public void AssertSingleDenial(int status)
         {
             var entry = Assert.Single(Logger.Events);
             Assert.Equal(4201, entry.Id);
-            Assert.Contains(_application.Value.TenantId.ToString(), entry.Message);
+            Assert.Contains(Tenant.Id.ToString(), entry.Message);
             Assert.Contains($"StatusCode={status}", entry.Message);
         }
 

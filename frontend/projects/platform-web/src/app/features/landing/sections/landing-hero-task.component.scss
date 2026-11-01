@@ -1,0 +1,160 @@
+@use '../landing-kit' as kit;
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.53rem;
+  padding: 1.2rem;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 1.33rem;
+  @include kit.tokens;
+}
+
+:host-context([data-theme='dark']) {
+  @include kit.dark-tokens;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.73rem;
+  min-width: 0;
+}
+
+.head-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.53rem;
+  height: 2.53rem;
+  border-radius: 0.73rem;
+  background: var(--lp-gradient);
+  color: #ffffff;
+
+  i {
+    font-size: 1.07rem;
+  }
+}
+
+.head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong,
+  small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  strong {
+    font-size: 1.09rem;
+    color: var(--lp-ink);
+  }
+
+  small {
+    font-size: 0.85rem;
+    color: var(--p-text-muted-color);
+  }
+}
+
+// Time used against the task's SLA.
+.sla {
+  display: flex;
+  align-items: center;
+  gap: 0.67rem;
+  margin-top: 0.27rem;
+
+  small {
+    flex-shrink: 0;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--acc-warn-fg);
+  }
+}
+
+.sla-track {
+  display: flex;
+  flex: 1;
+  height: 0.4rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--app-hover);
+
+  span {
+    width: 70%;
+    border-radius: inherit;
+    background: var(--lp-gradient);
+  }
+}
+
+.label {
+  margin-top: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--lp-ink);
+}
+
+.input {
+  padding: 0.53rem 0.73rem;
+  background: var(--app-ground);
+  border: 1px solid var(--app-border);
+  border-radius: 0.67rem;
+  font-size: 0.96rem;
+
+  &.comment {
+    min-height: 3.2rem;
+    color: var(--p-text-muted-color);
+  }
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.47rem;
+  align-self: flex-start;
+  padding: 0.4rem 0.73rem;
+  border: 1px dashed var(--app-border);
+  border-radius: 0.67rem;
+  font-size: 0.88rem;
+
+  i {
+    font-size: 0.93rem;
+    color: var(--acc-danger-fg);
+  }
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.53rem;
+  margin-top: 0.67rem;
+}
+
+.act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.47rem;
+  padding: 0.6rem;
+  border-radius: 0.8rem;
+  font-size: 0.96rem;
+  font-weight: 600;
+
+  i {
+    font-size: 0.87rem;
+  }
+}
+
+.accept {
+  background: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.reject {
+  border: 1px solid var(--acc-danger-fg);
+  color: var(--acc-danger-fg);
+}

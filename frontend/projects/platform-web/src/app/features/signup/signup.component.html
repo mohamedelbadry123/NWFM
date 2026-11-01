@@ -1,0 +1,160 @@
+<ng-container *appI18n="let t">
+  <div class="public-page">
+    <div class="public-topbar">
+      <button type="button" class="lang-toggle" (click)="language.toggle()">
+        <i class="pi pi-globe"></i>
+        <span>{{ language.current() === 'ar' ? t('common.english') : t('common.arabic') }}</span>
+      </button>
+    </div>
+
+    <div class="public-card">
+      <div class="public-heading">
+        <img [src]="logo" [alt]="t('common.appName')" />
+        <h1>{{ t('signup.title') }}</h1>
+        <p>{{ t('signup.subtitle') }}</p>
+      </div>
+
+      @if (loading()) {
+        <p>{{ t('common.loading') }}</p>
+      } @else {
+        <p-steps [model]="stepItems()" [activeIndex]="step()" [readonly]="true" />
+
+        <form [formGroup]="form" (ngSubmit)="submit()" class="mt-4">
+          @if (step() === 0) {
+            <div class="field">
+              <label for="organizationName">{{ t('signup.organizationName') }}</label>
+              <input pInputText id="organizationName" formControlName="organizationName" />
+            </div>
+            <div class="field">
+              <label for="tenantKey">{{ t('signup.tenantKey') }}</label>
+              <p-inputgroup dir="ltr">
+                @if (urlPrefix()) {
+                  <p-inputgroup-addon>{{ urlPrefix() }}</p-inputgroup-addon>
+                }
+                <input
+                  pInputText
+                  id="tenantKey"
+                  formControlName="tenantKey"
+                  [placeholder]="t('signup.tenantKeyPlaceholder')"
+                  autocomplete="off"
+                  spellcheck="false"
+                  (input)="onKeyTyped()"
+                  (blur)="normalizeKey()"
+                />
+                @if (urlSuffix()) {
+                  <p-inputgroup-addon>{{ urlSuffix() }}</p-inputgroup-addon>
+                }
+                <p-button
+                  type="button"
+                  icon="pi pi-sync"
+                  [outlined]="true"
+                  [disabled]="!form.controls.organizationName.value"
+                  [ariaLabel]="t('signup.generateKey')"
+                  [title]="t('signup.generateKey')"
+                  (onClick)="generateKey()"
+                />
+              </p-inputgroup>
+              <small>{{ t('signup.workspaceWillBe', { url: workspaceUrl() }) }}</small>
+              @if (
+                form.controls.tenantKey.touched &&
+                form.controls.tenantKey.hasError('tenantKeyFormat')
+              ) {
+                <small class="error">{{ t('signup.keyFormat') }}</small>
+              } @else if (checkingKey()) {
+                <small>{{ t('common.loading') }}</small>
+              } @else if (keyAvailable() === true) {
+                <small>{{ t('signup.keyAvailable') }}</small>
+              } @else if (keyAvailable() === false) {
+                <small class="error">{{ t(keyReasonKey()) }}</small>
+              }
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>{{ t('signup.plan') }}</label>
+                <p-select
+                  formControlName="planCode"
+                  [options]="plans()"
+                  optionLabel="code"
+                  optionValue="code"
+                  appendTo="body"
+                  styleClass="w-full"
+                />
+              </div>
+              <div class="field">
+                <label>{{ t('signup.language') }}</label>
+                <p-select
+                  formControlName="language"
+                  [options]="[
+                    { label: t('common.english'), value: 'en' },
+                    { label: t('common.arabic'), value: 'ar' },
+                  ]"
+                  optionLabel="label"
+                  optionValue="value"
+                  appendTo="body"
+                  styleClass="w-full"
+                />
+              </div>
+            </div>
+          }
+
+          @if (step() === 1) {
+            <div class="field">
+              <label for="adminFullName">{{ t('signup.adminFullName') }}</label>
+              <input pInputText id="adminFullName" formControlName="adminFullName" />
+            </div>
+            <div class="field">
+              <label for="adminEmail">{{ t('signup.adminEmail') }}</label>
+              <input pInputText id="adminEmail" type="email" formControlName="adminEmail" />
+            </div>
+            <div class="field">
+              <label for="adminPhone">{{ t('signup.adminPhone') }}</label>
+              <input pInputText id="adminPhone" formControlName="adminPhone" />
+            </div>
+          }
+
+          @if (step() === 2) {
+            <div class="field">
+              <label>{{ t('signup.databaseMode') }}</label>
+              <div class="flex flex-col gap-3">
+                <label class="flex items-center gap-2">
+                  <p-radioButton formControlName="databaseMode" [value]="1" inputId="managed" />
+                  <span>{{ t('signup.managedDb') }}</span>
+                </label>
+                <label class="flex items-center gap-2">
+                  <p-radioButton formControlName="databaseMode" [value]="2" inputId="byo" />
+                  <span>{{ t('signup.byoDb') }}</span>
+                </label>
+              </div>
+            </div>
+          }
+
+          <div class="actions">
+            @if (step() > 0) {
+              <p-button
+                type="button"
+                [label]="t('signup.back')"
+                [outlined]="true"
+                (onClick)="back()"
+                [disabled]="submitting()"
+              />
+            }
+            @if (step() < 2) {
+              <p-button type="button" [label]="t('signup.next')" (onClick)="next()" />
+            } @else {
+              <p-button
+                type="submit"
+                [label]="t('signup.submit')"
+                [loading]="submitting()"
+                [disabled]="submitting()"
+              />
+            }
+          </div>
+        </form>
+
+        <p class="mt-4 text-center">
+          <a routerLink="/">{{ t('signup.haveAccount') }}</a>
+        </p>
+      }
+    </div>
+  </div>
+</ng-container>

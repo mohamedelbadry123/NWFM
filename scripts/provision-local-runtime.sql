@@ -1,4 +1,4 @@
--- Variables are validated by provision-local-runtime.sh before sqlcmd substitution.
+-- Variables are validated by provision-local-runtime.ps1 before sqlcmd substitution.
 -- This script never changes tenant ownership, resets data, or rotates an existing login.
 SET NOCOUNT ON;
 SET XACT_ABORT ON;

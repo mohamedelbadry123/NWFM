@@ -1,10 +1,9 @@
-using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Persistence;
 using Tasks.Application.C2m;
 using Tasks.Application.Common;
@@ -18,11 +17,11 @@ namespace Tasks.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static void AddTasksInfrastructure(this IHostApplicationBuilder builder, string connectionString)
+    public static void AddTasksInfrastructure(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddDbContext<TasksDbContext>(options => options
+        builder.Services.AddDbContext<TasksDbContext>((sp, options) => options
             .UseSqlServer(
-                connectionString,
+                sp.GetRequiredService<ITenantConnectionStringResolver>().ResolveForCurrentTenant(),
                 sql => sql.MigrationsHistoryTable(TasksSchema.MigrationsHistoryTable, TasksSchema.Name))
             // A task's timeline is its audit trail, so nothing may rewrite a line of it.
             .AddInterceptors(new ImmutableEntityInterceptor()));
@@ -40,25 +39,12 @@ public static class DependencyInjection
         builder.Services.AddScoped<IC2mActionMappingResolver, C2mActionMappingResolver>();
         builder.Services.AddScoped<IC2mDispatcher, C2mDispatcher>();
         builder.Services.AddScoped<TaskC2mClosure>();
-        builder.Services.AddHostedService<C2mClosureHostedService>();
-
-        builder.Services.Configure<DatabaseStartupOptions>(
-            builder.Configuration.GetSection(DatabaseStartupOptions.SectionName));
 
         builder.Services.TryAddSingleton(TimeProvider.System);
-
-        builder.Services.AddScoped<TasksDatabaseInitializer>();
+        builder.Services.AddSingleton<ITenantDatabaseModule, TasksTenantDatabase>();
     }
 
-    /// <summary>
-    /// Runs the Tasks database initialiser (migrate, seed) using the three-flag
-    /// <see cref="DatabaseStartupOptions"/> pattern. Call after the FormEngine initialiser: the seed
-    /// binds its task types to the forms that one publishes.
-    /// </summary>
-    public static async Task InitialiseTasksDatabaseAsync(this WebApplication app)
-    {
-        using var scope = app.Services.CreateScope();
-        var initialiser = scope.ServiceProvider.GetRequiredService<TasksDatabaseInitializer>();
-        await initialiser.InitialiseAsync();
-    }
+    /// <summary>The C2M closure worker. Registered by the tenant API only; the control plane runs no tenant workers.</summary>
+    public static void AddTasksWorkers(this IHostApplicationBuilder builder) =>
+        builder.Services.AddHostedService<C2mClosureHostedService>();
 }

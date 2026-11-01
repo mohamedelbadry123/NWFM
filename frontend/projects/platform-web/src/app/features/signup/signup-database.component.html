@@ -1,0 +1,117 @@
+<ng-container *appI18n="let t">
+  <div class="public-page">
+    <div class="public-topbar">
+      <button type="button" class="lang-toggle" (click)="language.toggle()">
+        <i class="pi pi-globe"></i>
+        <span>{{ language.current() === 'ar' ? t('common.english') : t('common.arabic') }}</span>
+      </button>
+    </div>
+    <div class="public-card">
+      <div class="public-heading">
+        <img [src]="logo" [alt]="t('common.appName')" />
+        <h1>{{ t('signup.database.title') }}</h1>
+        <p>{{ t('signup.database.subtitle') }}</p>
+      </div>
+
+      @if (options()?.egressIps?.length) {
+        <p>{{ t('signup.database.egress') }}</p>
+        <ul>
+          @for (ip of options()!.egressIps; track ip) {
+            <li>
+              <code>{{ ip }}</code>
+            </li>
+          }
+        </ul>
+      }
+
+      <form [formGroup]="form">
+        <div class="field-row">
+          <div class="field">
+            <label>{{ t('signup.database.server') }}</label>
+            <input pInputText formControlName="server" />
+          </div>
+          <div class="field">
+            <label>{{ t('signup.database.port') }}</label>
+            <p-inputNumber formControlName="port" [useGrouping]="false" styleClass="w-full" />
+          </div>
+        </div>
+        <div class="field">
+          <label>{{ t('signup.database.name') }}</label>
+          <input pInputText formControlName="database" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>{{ t('signup.database.user') }}</label>
+            <input pInputText formControlName="userName" />
+          </div>
+          <div class="field">
+            <label>{{ t('signup.database.password') }}</label>
+            <p-password
+              formControlName="password"
+              [feedback]="false"
+              [toggleMask]="true"
+              styleClass="w-full"
+              inputStyleClass="w-full"
+            />
+          </div>
+        </div>
+        <p class="field-hint">{{ t('signup.database.runtimeHint') }}</p>
+        <div class="field-row">
+          <div class="field">
+            <label>{{ t('signup.database.runtimeUser') }}</label>
+            <input pInputText formControlName="runtimeUserName" />
+          </div>
+          <div class="field">
+            <label>{{ t('signup.database.runtimePassword') }}</label>
+            <p-password
+              formControlName="runtimePassword"
+              [feedback]="false"
+              [toggleMask]="true"
+              styleClass="w-full"
+              inputStyleClass="w-full"
+            />
+          </div>
+        </div>
+        <div class="field">
+          <label class="flex items-center gap-2">
+            <p-checkbox formControlName="trustServerCertificate" [binary]="true" />
+            <span>{{ t('signup.database.trustCert') }}</span>
+          </label>
+        </div>
+        <div class="actions">
+          <p-button
+            type="button"
+            [label]="t('signup.database.script')"
+            [outlined]="true"
+            (onClick)="loadScript()"
+          />
+          <p-button
+            type="button"
+            [label]="t('signup.database.test')"
+            [loading]="testing()"
+            [disabled]="testing() || saving()"
+            (onClick)="test()"
+          />
+          <p-button
+            type="button"
+            [label]="t('signup.database.save')"
+            [loading]="saving()"
+            [disabled]="saving() || testing()"
+            (onClick)="save()"
+          />
+        </div>
+      </form>
+
+      @if (script()) {
+        <pre class="mt-4 overflow-auto text-sm">{{ script() }}</pre>
+      }
+      @if (inspection(); as result) {
+        <ul class="mt-4">
+          @for (check of result.checks; track check.code) {
+            <li [class.error]="!check.passed">{{ check.message }}</li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+</ng-container>

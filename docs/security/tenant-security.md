@@ -7,55 +7,114 @@ Sheet Series Team and provided under CC-BY-SA-4.0.
 
 ## Supported boundary
 
-NWFM serves **one configured tenant per deployment, database, worker fleet and
-storage root**. Auth, FormEngine and Tasks have deployment-owned tables without
-row tenant columns. Workflow adds row ownership filters and write checks as
-defense in depth. Sharing one database between tenant deployments is unsupported.
-The startup guard rejects reassignment of a bound database or a database containing
-another tenant's workflow records. It also rejects an administrative request login.
+NWFM is a **database-per-tenant** service. Each workspace (tenant) has its own SQL
+Server database, its own restricted runtime login, and its own media storage root.
+A single tenant API (`NWFM.Api`) serves every workspace and binds each request to
+exactly one of them before any handler runs. A separate control plane
+(`NWFM.Platform.Api`) owns the tenant catalog (`NWFM_Catalog`): signup, approval,
+provisioning, migrations and staff operations.
+
+Auth, FormEngine and Tasks have tenant-owned tables without row tenant columns;
+their isolation is the database itself. Workflow keeps row ownership filters and
+write checks as defense in depth. Two workspaces never share a database. The
+control plane refuses to bind a database that is already bound to another
+workspace, or that contains another tenant's workflow records. The tenant API
+refuses to serve a workspace whose runtime credential can administer its database
+or reach another one.
 
 PostgreSQL RLS, PostgreSQL tenant session variables, SQLAlchemy, S3 buckets and
 presigned URLs in the article are illustrative technologies, not NWFM features.
 Their underlying authorization and isolation requirements are mapped to the actual
-implementation. A future shared-database hosting model requires a separate design,
-schema migration and negative-path tests for every table; the present work does
-not advertise that model as safe.
+implementation. Sharing one database between workspaces (row-level multi-tenancy)
+would need a separate design, schema migration, and negative-path tests for every
+table. This work does not offer that model.
+
+### Request binding
+
+`TenantResolutionMiddleware` (Tenancy.Api) runs after authentication and before
+authorization. It considers evidence in this order:
+
+1. **The signed `tid` claim.** `TenantSessionBinder` binds it while the bearer
+   token is validated. It also re-checks the session against that workspace's own
+   database: security stamp, account state, and `DeploymentBoundary.IsActive`.
+2. **The request host.** This is a registered `TenantHost` row or
+   `{key}.{Tenancy:RootDomain}`. Reserved labels such as `www`, `api` and
+   `platform` never resolve.
+3. **The `X-Tenant` header.** It is honoured only when `Tenancy:AllowTenantHeader`
+   is on (development) **and** the call carries no bearer token.
+4. **The refresh-token prefix.** This applies only to the anonymous refresh call.
+
+A host or header that names a different workspace from the token gets
+`400 Tenant.Mismatch`. An unknown workspace key in the header or refresh token
+gets `404 Tenant.NotFound`. A host that names no workspace, such as an
+unregistered subdomain, gets `400 Tenant.Required`. A tenant-scoped path that
+cannot be bound is refused; it is never served from a default. After resolution, the request passes these gates:
+
+- the catalog status and subscription
+- `503 Tenant.SchemaUpgradePending` while the database is behind the deployed schema
+- `503 Tenant.Unverified` while the runtime credential fails `TenantDatabaseVerifier`
+
+Every refusal emits event `4203/TenantResolutionRefused`.
+
+`RequestContextMiddleware` still rejects `x-tenant-id` / `x-organization-id`
+headers and `organizationId` / `tenantId` selectors that differ from the bound
+workspace. It also re-asserts `tid` against the bound workspace (event 4101).
 
 ## Implemented controls
 
-| Area                               | Implementation                                                                                                                                                                                                                                                     | Evidence                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Identity and current authorization | Tenant/session/security-stamp claims; current account, team, membership and permissions; atomic refresh consumption; immediate logout/account revocation; selector rejection and request-context cleanup; invalid scope edits rejected before account/role changes | Session, request-context, endpoint inventory and scope mutation tests; two-tenant E2E                          |
-| Database                           | Immutable deployment marker; separate initialization process; limited request role; database pool bound; row ownership immutable on tracked/detached writes; classified EF model inventory                                                                         | `TenantWriteBoundaryTests`, `TenantModelInventoryTests`, actual SQL startup/role/cross-database probes         |
-| Cache and sessions                 | Environment/tenant namespace for every cache operation; current grants validated independently of cache; isolated SSO cookie protection and tenant-scoped workflow credential protection; no-store API responses                                                   | `TenantCacheIsolationTests`, session and E2E revocation tests                                                  |
-| Service credentials                | Explicit tenant/environment/scope and hashed random API keys; canonical versioned webhook signing; production rejection of missing or checked-in JWT keys                                                                                                          | Service credential and JWT configuration tests, webhook tests and E2E                                          |
-| Resource use                       | Tenant, principal/IP and auth rate limits; request concurrency, bounded SQL pool; transactional pending queue limits; dedicated per-tenant worker processing                                                                                                       | `TenantResourceLimitTests`, `WorkflowQueueCapacityTests`, E2E concurrent overload and unaffected second tenant |
-| Async work                         | Active-tenant admission; scoped queue records and idempotency; authenticated ingress; bounded processing and retries                                                                                                                                               | `WorkflowWorkerTenantTests`, existing integration suites, E2E                                                  |
-| Files                              | Durable root ownership marker; strict relative paths; symlink/reparse rejection; bounded streaming; no silent overwrites; exact database/API authorization                                                                                                         | `TenantFileStorageTests`, `SubmissionMediaIsolationTests`, cross-deployment media E2E                          |
-| Lifecycle                          | Separate provisioning, active-state admission, operator tooling and retention/restore verification                                                                                                                                                                 | See operator tooling and deployment evidence below                                                             |
-| Audit                              | Verified tenant and trace context; rejected-access records; sensitive OTP/message content removed; tenant-owned workflow audit reads                                                                                                                               | Request-context/service-credential tests and E2E; external collector evidence remains required                 |
+| Area                               | Implementation                                                                                                                                                                                                                                                                                                                                                     | Evidence                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant resolution                  | Signed `tid` claim first; host or development-only anonymous header otherwise; mismatches refused; no default workspace; refusals audited (4203)                                                                                                                                                                                                                   | `TenantResolutionTests`, `TenancyKernelTests`, two-workspace E2E (cross-host token replay)                                                                                        |
+| Identity and current authorization | Tenant/session/security-stamp claims; current account, team, membership and permissions; atomic refresh consumption; immediate logout/account revocation; selector rejection and request-context cleanup; support sessions re-validated against the catalog and read-only unless granted otherwise                                                                 | Session, request-context, endpoint inventory and scope mutation tests; E2E                                                                                                        |
+| Database                           | Database per workspace, bound by `TenantBoundaryModule` to the catalog id; owner credential only in the control plane; restricted runtime login granted by `TenantRuntimeGrantsModule`; `TenantDatabaseVerifier` checks the actual SQL permissions before a workspace is served; row ownership immutable on tracked/detached writes; classified EF model inventory | `TenantWriteBoundaryTests`, `TenantModelInventoryTests`, `PlatformBoundaryTests`, E2E launcher probes (administrative, mis-wired, impersonating and foreign-database credentials) |
+| Catalog                            | The tenant API reads the catalog through a reader login with column-level grants. It never selects owner connection strings and never generates Data Protection keys. Connection strings are encrypted per purpose (runtime, owner).                                                                                                                               | `CatalogTests`, `scripts/provision-catalog-reader.sql`                                                                                                                            |
+| Cache and sessions                 | The cache key prefix is derived per call from the bound workspace, and a call without one throws. Current grants are validated independently of cache. The SSO cookie protector includes the tenant id in its purpose, workflow credentials are protected per tenant, and API responses are no-store.                                                              | `TenantCacheIsolationTests`, session and E2E revocation tests                                                                                                                     |
+| Service credentials                | Explicit tenant/environment/scope and hashed random API keys, accepted only on their own workspace; canonical versioned webhook signing; production rejection of missing or checked-in JWT keys; separate platform and tenant signing keys                                                                                                                         | Service credential and JWT configuration tests, webhook tests and E2E                                                                                                             |
+| Resource use                       | Pre-authentication global concurrency and per-address budgets. Per-workspace request and concurrency partitions (plan overrides apply), principal partitions keyed by workspace, and auth rate limits. Bounded SQL pools, transactional pending-queue limits per workspace, and bounded worker parallelism.                                                        | `TenantResourceLimitTests`, `WorkflowQueueCapacityTests`, E2E concurrent overload of one workspace                                                                                |
+| Async work                         | Each worker pass fans out over serving workspaces only (`ITenantFanOut`) under that workspace's scope, with per-workspace failure isolation. Queue records are scoped and idempotent, ingress is authenticated, and processing and retries are bounded.                                                                                                            | `WorkflowWorkerTenantTests`, `TenancyKernelTests`, existing integration suites, E2E                                                                                               |
+| Files                              | Per-workspace storage root with a durable ownership marker; strict relative paths; symlink/reparse rejection; bounded streaming; no silent overwrites; exact database/API authorization                                                                                                                                                                            | `TenantFileStorageTests`, `SubmissionMediaIsolationTests`, E2E                                                                                                                    |
+| Lifecycle                          | Signup with e-mail verification and staff approval; checkpointed provisioning; verification before activation; one-time activation links; operator offboarding and recovery tooling                                                                                                                                                                                | `CatalogTests`, `PlatformBoundaryTests`, lifecycle drill in the E2E launcher                                                                                                      |
+| Audit                              | Verified tenant and trace context; rejected-access records; per-workspace denial windows; platform audit trail for staff and support actions; sensitive OTP/message content removed                                                                                                                                                                                | Request-context/service-credential tests and E2E; external collector evidence remains required                                                                                    |
 
 ## Every PR
 
-The existing **Security** check now validates every article prose block, list
-point, strategy row and complete code example against the pinned catalog, checks
-the current upstream article for drift, and executes the tenant security
-regressions. Source or evidence omissions fail. Upstream changes require a fresh
-review and updated mapping; unavailable upstream verification fails closed.
+The existing **Security** check validates every article prose block, list point,
+strategy row and complete code example against the pinned catalog. It also checks
+the current upstream article for drift and runs the tenant security regressions
+(including `NWFM.Tests.Tenancy` and `NWFM.Tests.Platform`). A missing source or
+missing evidence fails the check. An upstream change needs a fresh review and an
+updated mapping. If upstream verification is unavailable, the check fails.
 
-The complete Backend and Frontend suites and builds still run. The existing E2E
-check includes deterministic security tests against two independently provisioned
-SQL Server databases and API deployments, using the actual restricted request
-roles and local integration transports. Test users, keys and database passwords
-are disposable. No model calls or OAuth credentials are needed for security tests.
-All existing workflow E2E recordings remain subject to strict replay.
+The complete Backend and Frontend suites and builds still run for both web apps.
+The E2E launcher builds this disposable environment:
+
+- one SQL Server container
+- the control plane, with two configuration workspaces (`alpha` at `localhost` and
+  `beta` at `beta.localhost`), each in its own database
+- one tenant API, running under each workspace's restricted login and the catalog
+  reader login
+
+Before the security tests run, the launcher proves fail-closed behaviour with
+short-lived probe hosts:
+
+- An administrative credential is refused (`Tenant.Unverified`).
+- A credential wired to another workspace's database is refused.
+- A login that can impersonate is refused, and so is a login without metadata
+  visibility.
+- A third workspace pointed at a bound database is refused adoption and put into
+  maintenance.
+
+Test users, keys and database passwords are disposable. Security tests need no
+model calls or OAuth credentials. All existing workflow E2E recordings remain
+subject to strict replay.
 
 CI publishes a coverage inventory and test results. Inventory completeness is
 **traceability**, not a semantic proof that arbitrary future code is secure.
 Behavioral tests, discovered model/controller/background-worker inventories and
-owner review supply additional checks. PR review must examine changed authorization, persistence, cache, storage,
-worker and operational paths against the catalog; newly introduced paths need
-positive same-tenant and negative cross-tenant tests.
+owner review supply additional checks. PR review must examine changed
+authorization, persistence, cache, storage, worker and operational paths against
+the catalog. Newly introduced paths need positive same-tenant and negative
+cross-tenant tests.
 
 No GitHub protection or review policy is weakened. The owner retains the final
 merge; independent approval count remains zero. No additional approval layer is
@@ -63,55 +122,82 @@ introduced.
 
 ## Provisioning and rollout
 
-1. Allocate a dedicated database, request login, storage volume and worker/service
-   identity for the tenant. Select an opaque random `Application:TenantId`.
-   Apply network rules so tenant services cannot connect to other tenant stores.
-2. Run initialization with the administrative connection, explicit
-   `DatabaseStartup:InitializeOnly=true`, and the needed
-   `ApplyMigrations`, `ApplySqlObjects`, and `SeedData` flags. Initialization binds
-   the database and exits without listening for requests. Production must keep
-   development/demo seeding disabled.
-3. Grant the request identity only necessary CRUD/EXECUTE on Auth, FormEngine,
-   Task and Workflow schemas, plus SELECT on `Tenancy.DeploymentBoundary` and
-   VIEW DEFINITION (not data modification) on `Tenancy.LifecycleAudit`.
-   Form publishing currently requires CREATE TABLE at database scope and ALTER
-   on FormEngine for dynamic submission tables. This is a deliberate elevated
-   application capability inside the isolated database, not a shared-table RLS
-   boundary. Bootstrap assigns FormEngine to a dedicated non-login schema owner
-   to prevent a form trigger's ownership chain from modifying protected schemas;
-   runtime verifies this separation. Grant VIEW DEFINITION on that owner so the
-   request identity can inspect its metadata. Restrict publishing to its existing permission. Do not grant
-   CONTROL, db_owner, db_securityadmin, db_ddladmin or ownership-marker writes.
-   Preserve `VIEW ANY DATABASE` metadata visibility (normally inherited from
-   `public`) so startup can verify the complete database access inventory; it does
-   not grant access to database contents. Specific login/user impersonation grants
-   are rejected as well as administrative roles.
-4. Run the request host with the restricted connection and every startup mutation
-   flag false. The guard checks actual SQL permissions, not just connection text.
-   Runtime credentials must not be able to read other tenant databases or
-   change their own binding. Preserve encrypted transport and trusted server
-   certificates outside disposable local tests.
-5. Give each storage root an OS identity/ACL accessible only by its tenant
-   service. The `.nwfm-tenant` marker prevents accidental root reuse, but is not
-   an OS authorization boundary. For an existing unmarked volume, independently
-   verify its ownership before first startup binds it. Never delete a marker to
-   repurpose a volume with existing data.
-6. Use separate production signing keys, service keys and Data Protection key
-   custody per tenant/environment. Redis namespaces prevent key collisions;
-   separate Redis credentials/instances are still needed when infrastructure-level
-   isolation is required. Raw access to a shared Redis service is not restricted
-   by an application key prefix.
-7. Roll out with forced sign-in: old access/refresh tokens and temporary SSO cookies
-   intentionally fail after tenant/session binding changes. Existing encrypted
-   Workflow connection credentials retain their original protection purpose;
-   preserve their Data Protection key ring during rollout. Update
-   webhook senders to the versioned canonical signature. Dormant API-key endpoints
-   require explicit scope and hashed-key configuration before they can be enabled.
+1. **Deploy the control plane first.** It needs the owner credentials:
+   - a catalog database login
+   - a server login per managed `DatabaseServer`
 
-The old development startup pattern that serves requests using a migration
-administrator is intentionally rejected. The disposable E2E launcher is a complete
-worked example of two-stage startup and minimal SQL grants. Adapt that pattern to
-your deployment's secret manager; never deploy its development seed accounts.
+   It also needs its own `PlatformJwt` signing key and the bootstrap platform
+   administrator password, the latter only until the first sign-in. On start it
+   migrates the catalog, seeds the plans, registers configuration workspaces,
+   ensures a current key in the shared Data Protection key ring, and migrates
+   those workspaces.
+
+2. **Provision the catalog reader** with `scripts/provision-catalog-reader.sql`.
+   The tenant API connects to the catalog only with this login.
+3. **Workspaces from signup.** A confirmed and approved signup is provisioned in
+   checkpointed steps:
+
+   1. Reserve the key.
+   2. Create or accept the database.
+   3. Validate it.
+   4. Migrate:
+      1. Boundary binding.
+      2. Module migrations.
+      3. Runtime grants.
+   5. Seed (roles, permissions, example forms and task types).
+   6. Create the administrator.
+   7. Verify the runtime credential.
+   8. Activate.
+   9. Send the one-time activation link.
+
+   The two database options work differently:
+   - **Platform-managed databases** get an owner principal and a separate runtime
+     principal.
+   - **Bring-your-own databases** need both principals from the customer's setup
+     script. They are inspected over an SSRF-screened connection, with encryption
+     enforced.
+
+4. **Configuration workspaces**, such as an adopted single-tenant deployment, keep
+   their existing database and id. The operator creates the runtime login (see
+   `scripts/provision-local-runtime.*`). The control plane grants it the runtime
+   permissions at the next migration. The tenant API refuses the workspace until
+   the login exists and passes verification.
+5. **Runtime permissions.** `TenantRuntimeGrantsModule` grants:
+   - CRUD/EXECUTE on Auth, FormEngine, Task and Workflow
+   - SELECT on `Tenancy.DeploymentBoundary`
+   - VIEW DEFINITION on `Tenancy.LifecycleAudit` and on the form storage owner
+   - CREATE TABLE plus ALTER on FormEngine, for dynamic submission tables
+
+   The CREATE TABLE grant is a deliberate elevated capability inside the isolated
+   database. The bootstrap assigns FormEngine to a dedicated non-login schema owner,
+   so a form trigger's ownership chain cannot modify protected schemas, and the
+   verifier checks that separation. Never grant CONTROL, db_owner,
+   db_securityadmin, db_ddladmin, impersonation or boundary writes. Keep
+   `VIEW ANY DATABASE` metadata visibility (normally inherited from `public`) so
+   the verifier can check the complete database access inventory.
+
+6. **Storage.** Each workspace's media root is
+   `{FileStorage:Root}/{key}` unless the catalog names one. The `.nwfm-tenant`
+   marker prevents accidental reuse but is not an OS authorization boundary. Never
+   delete a marker to repurpose a volume.
+7. **Keys and caches.** Use separate production signing keys for the platform and
+   the tenant API. The Data Protection key ring lives in the catalog. The control
+   plane creates and rotates the keys; the tenant API only reads them. Redis
+   namespaces prevent key collisions but do not restrict raw access to a shared
+   Redis service.
+8. **Deploy order.** Run the console's _migrate all_ before rolling out a tenant API
+   that expects a newer schema. Workspaces still behind return `503` until they are
+   migrated. Keep migrations additive.
+9. **Forced sign-in.** The `tenant_id` claim became `tid`, and refresh tokens carry
+   a workspace prefix, so existing sessions and temporary SSO cookies need a new
+   sign-in. Encrypted Workflow connection credentials keep their original
+   protection purpose. Import the legacy key ring into the catalog, or re-enter
+   those credentials, before switching hosts. Webhook and API-key callers must call
+   their workspace's host.
+
+The disposable E2E launcher (`scripts/e2e/start-app.mjs`) is a complete worked
+example of this sequence and of the minimal SQL grants. Adapt it to your
+deployment's secret manager, and never deploy its development seed accounts.
 
 ## Proposed policy defaults
 
@@ -143,9 +229,9 @@ apply current user/role/retention rules before any authorized promotion.
 The product has no shared snapshot download endpoint or tenant-facing bulk
 restore capability. A shared backup cannot be made safe by relabeling its tenant;
 it needs a separate selective recovery implementation and two-tenant drill before
-use. Current deployment isolation uses separate backups.
+use. Each workspace database is backed up separately.
 
-The implemented [operator commands](../tenant-lifecycle-operations.md) perform
+The implemented [operator commands](../platform/tenant-lifecycle-operations.md) perform
 transactional suspension, token/SSO revocation, account lockout and an audited
 retention schedule; they verify actual recovery database rows and storage ownership
 under a separate SQL operator role. They do not automatically delete production
@@ -159,15 +245,25 @@ repository. These are explicit obligations, not passing automated checks:
 - Verify network/OS/SQL/key-manager grants using each deployed request identity,
   including denial against another tenant's stores and backup repositories.
 - Configure CPU, memory, disk, storage capacity and database I/O quotas for each
-  deployment and global host/cluster safety limits. Application limits are per
-  process; distributed replicas need an aggregate gateway/quota budget.
+  workspace database and global host/cluster safety limits. Application limits are
+  per process; distributed replicas need an aggregate gateway/quota budget. Cap the
+  connection pool per workspace: every served workspace adds its own SQL pool.
 - Connect structured security events to a protected collector. Alert on repeated
   tenant mismatch/authorization denials, failed binding/role checks and abnormal
   queue or resource exhaustion; test notification delivery with synthetic events.
-  The API emits JSON event `4201/TenantAccessDenied` for each denied response.
-  Event `4202/TenantIsolationAlert` triggers at 20 denials within 60 seconds,
-  at most once per minute per deployment. Both include the server tenant ID. Configure the
-  collector to notify on event 4202 and failed startup boundary validation.
+  The tenant API emits these JSON events:
+
+  | Event | Name                       | When                                                                                                       |
+  | ----- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+  | 4201  | `TenantAccessDenied`       | Each denied response                                                                                       |
+  | 4203  | `TenantResolutionRefused`  | Each request that could not be bound to a workspace                                                        |
+  | 4202  | `TenantIsolationAlert`     | 20 denials within 60 seconds, at most once per minute per workspace. Unresolved requests share one window. |
+  | 4204  | `TenantDatabaseUnverified` | A workspace is refused because its runtime credential failed verification                                  |
+
+  All of them carry the workspace id. Configure the collector to notify on 4202,
+  on 4204, and on any control-plane migration failure (`TenantMigrationFailed` in
+  the platform audit).
+
 - Keep operator/lifecycle audit records append-only with separate retention access.
   Neither ordinary tenant users nor request database identities should edit them.
 - Execute the configured retention jobs across active stores, cache, object
@@ -179,7 +275,28 @@ repository. These are explicit obligations, not passing automated checks:
 
 ## Validation results
 
-Validated locally on 2026-10-20:
+Validated locally on 2026-10-27 for the database-per-tenant model:
+
+- Complete backend suite: **951 passed**, zero failures or skips. Release solution
+  build passed.
+- E2E `tests/tenant-security.e2e.ts`: **5 passed** against one shared tenant API
+  serving two workspaces (`alpha` at `localhost`, `beta` at `beta.localhost`) under
+  their restricted logins and the catalog reader login. Before the tests, the
+  launcher passed every probe, SQL privilege check and lifecycle drill:
+  - an administrative credential is refused
+  - a mis-wired credential is refused
+  - an impersonating credential is refused
+  - a credential without metadata visibility is refused
+  - foreign-database adoption is refused
+  - cross-database reads are denied
+  - boundary writes and the trigger escalation are denied
+  - offboarding and recovery tooling work
+- The other E2E files were not re-run against this model.
+- All 141 article units remain mapped (`tenant-coverage.mjs`).
+- Managed and bring-your-own signup provisioning were exercised end to end against a
+  disposable SQL Server. A full Compose image build was not exercised.
+
+Validated locally on 2026-10-20 (single-tenant deployments, superseded):
 
 - Complete backend suite: **875 passed**, zero failures or skips.
 - Complete frontend suite: **252 passed** across 37 files; production build passed.

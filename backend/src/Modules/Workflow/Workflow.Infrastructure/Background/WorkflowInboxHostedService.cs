@@ -37,7 +37,7 @@ internal sealed class WorkflowInboxHostedService : BackgroundService
         {
             try
             {
-                await ProcessPendingBatchAsync(stoppingToken);
+                await WorkflowTenantAdmission.ForEachTenantAsync(_scopeFactory, ProcessPendingBatchAsync, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

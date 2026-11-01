@@ -1,0 +1,108 @@
+@use '../landing-kit' as kit;
+
+:host {
+  padding-inline: 1.33rem;
+  @include kit.tokens;
+  @include kit.section-block;
+}
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  width: min(98.67rem, 100%);
+  margin-inline: auto;
+  padding: clamp(2.33rem, 5vw, 5.33rem);
+  border: 1px solid rgba(126, 202, 220, 0.14);
+  border-radius: 2.33rem;
+  background: linear-gradient(160deg, #0b2a36 0%, #0d3a4a 55%, #0f4a5e 100%);
+  color: #e9f5f8;
+}
+
+.glow {
+  position: absolute;
+  top: -40%;
+  inset-inline-end: -15%;
+  width: 56rem;
+  height: 56rem;
+  background: radial-gradient(circle, rgba(69, 173, 199, 0.35), transparent 60%);
+  pointer-events: none;
+}
+
+.section-head {
+  @include kit.section-head;
+}
+
+.eyebrow {
+  @include kit.eyebrow;
+}
+
+// On the dark panel the shared heading colours invert.
+.panel {
+  .section-head {
+    position: relative;
+    margin-bottom: 3.33rem;
+
+    h2 {
+      color: #ffffff;
+    }
+
+    p {
+      color: rgba(233, 245, 248, 0.72);
+    }
+  }
+
+  .eyebrow {
+    color: #7ecadc;
+  }
+}
+
+.grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.33rem;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.item {
+  padding: 1.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.33rem;
+  backdrop-filter: blur(6px);
+
+  h3 {
+    margin: 1.2rem 0 0.53rem;
+    font-size: 1.33rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  p {
+    margin: 0;
+    font-size: 1.2rem;
+    line-height: 1.55;
+    color: rgba(233, 245, 248, 0.7);
+  }
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 3.33rem;
+  height: 3.33rem;
+  border-radius: 1rem;
+  background: rgba(126, 202, 220, 0.15);
+  color: #a5e3ef;
+
+  i {
+    font-size: 1.4rem;
+  }
+}

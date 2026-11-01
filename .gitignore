@@ -95,3 +95,6 @@ node_modules/
 # Browser unit-test failure evidence
 frontend/src/**/__screenshots__/
 frontend/.vitest-attachments/
+
+# Development e-mails written by the mock sender (signup and activation links)
+data/

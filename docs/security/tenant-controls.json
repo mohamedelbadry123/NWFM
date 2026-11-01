@@ -8,12 +8,19 @@
   },
   "groups": {
     "overview": {
-      "implementation": ["docs/security/tenant-security.md", "backend/src/NWFM.Api/Program.cs"],
+      "implementation": [
+        "docs/security/tenant-security.md",
+        "backend/src/NWFM.Api/Program.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Api/Middleware/TenantResolutionMiddleware.cs",
+        "backend/src/NWFM.Platform.Api/Program.cs"
+      ],
       "tests": [
         "tests/tenant-security.e2e.ts",
-        "backend/tests/NWFM.Tests/Security/TenantModelInventoryTests.cs"
+        "backend/tests/NWFM.Tests/Security/TenantModelInventoryTests.cs",
+        "backend/tests/NWFM.Tests/Tenancy/TenantResolutionTests.cs",
+        "backend/tests/NWFM.Tests/Platform/PlatformBoundaryTests.cs"
       ],
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     "identity": {
       "implementation": [
@@ -21,29 +28,36 @@
         "backend/src/Modules/Auth/Auth.Application/Common/OrgScopeRows.cs",
         "backend/src/Modules/Auth/Auth.Application/Users/Commands/UpdateUser/UpdateUserCommandHandler.cs",
         "backend/src/NWFM.Api/Services/RequestContextMiddleware.cs",
-        "backend/src/NWFM.Api/Services/TenantScopeFilter.cs"
+        "backend/src/NWFM.Api/Services/TenantScopeFilter.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Api/Middleware/TenantSessionBinder.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Api/Middleware/TenantResolutionMiddleware.cs"
       ],
       "tests": [
         "backend/tests/NWFM.Tests/Security/TenantSessionTests.cs",
         "backend/tests/NWFM.Tests/Security/UserScopeMutationSafetyTests.cs",
         "backend/tests/NWFM.Tests/Security/TenantRequestContextTests.cs",
         "backend/tests/NWFM.Tests/Security/TenantEndpointBoundaryTests.cs",
-        "tests/tenant-security.e2e.ts"
+        "tests/tenant-security.e2e.ts",
+        "backend/tests/NWFM.Tests/Tenancy/TenantResolutionTests.cs"
       ],
-      "reason": "Signed sessions bind the configured tenant, persisted session and current security stamp. Current user/team/permission state is checked server-side; request selectors cannot replace that scope."
+      "reason": "Signed sessions carry exactly one catalog tenant (tid), bound during authentication; the host or development header can never name another tenant than the token. The persisted session and current security stamp are re-checked in that tenant's own database, current user/team/permission state is evaluated server-side, and request selectors cannot replace that scope."
     },
     "database": {
       "implementation": [
-        "backend/src/NWFM.Api/Hosting/TenantDatabaseBoundary.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantBoundaryModule.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantDatabaseVerifier.cs",
         "backend/src/NWFM.Shared/Persistence/BaseDbContext.cs",
-        "backend/src/Modules/Workflow/Workflow.Infrastructure/Persistence/WorkflowDbContext.cs"
+        "backend/src/Modules/Workflow/Workflow.Infrastructure/Persistence/WorkflowDbContext.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/MultiTenancy/TenantConnectionStringResolver.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantRuntimeGrantsModule.cs"
       ],
       "tests": [
         "backend/tests/NWFM.Tests/Security/TenantWriteBoundaryTests.cs",
         "backend/tests/NWFM.Tests/Security/TenantModelInventoryTests.cs",
         "backend/tests/NWFM.Tests/Security/AuthTenantInventoryTests.cs",
         "scripts/e2e/start-app.mjs",
-        "tests/tenant-security.e2e.ts"
+        "tests/tenant-security.e2e.ts",
+        "backend/tests/NWFM.Tests/Tenancy/CatalogTests.cs"
       ],
       "reason": "SQL Server databases are durably assigned to one tenant before migrations. Normal connections cannot administer the database or rewrite ownership. EF workflow filters and immutable tenant writes add defense in depth; discovery covers every mapped entity."
     },
@@ -62,7 +76,8 @@
     "resources": {
       "implementation": [
         "backend/src/NWFM.Api/Hosting/TenantResourceLimits.cs",
-        "backend/src/NWFM.Api/Hosting/TenantDatabaseBoundary.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantBoundaryModule.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantDatabaseVerifier.cs",
         "backend/src/Modules/Workflow/Workflow.Infrastructure/Persistence/WorkflowDbContext.QueueCapacity.cs"
       ],
       "tests": [
@@ -118,7 +133,8 @@
       "implementation": [
         "docs/security/tenant-security.md",
         "backend/src/NWFM.Shared/Abstractions/ITenantAvailability.cs",
-        "backend/src/NWFM.Api/Hosting/TenantDatabaseBoundary.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantBoundaryModule.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantDatabaseVerifier.cs",
         "backend/src/Modules/Auth/Auth.Infrastructure/Operations/TenantLifecycleOperations.cs",
         "backend/tools/NWFM.TenantAdmin/Program.cs"
       ],
@@ -151,7 +167,8 @@
     },
     "boundaries": {
       "implementation": [
-        "backend/src/NWFM.Api/Hosting/TenantDatabaseBoundary.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantBoundaryModule.cs",
+        "backend/src/Modules/Tenancy/Tenancy.Infrastructure/Boundary/TenantDatabaseVerifier.cs",
         "backend/src/NWFM.Shared/Persistence/BaseDbContext.cs",
         "backend/src/Modules/Workflow/Workflow.Infrastructure/Persistence/WorkflowDbContext.cs",
         "backend/src/NWFM.Shared/Caching/HybridCacheService.cs",
@@ -184,7 +201,7 @@
       "requirement": "Multi-tenant applications serve multiple customers (tenants) from a shared infrastructure, codebase, and often shared databases. This architecture is the foundation of modern SaaS platforms, offering cost efficiency and simplified operations.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-002",
@@ -196,7 +213,7 @@
       "requirement": "However, multi-tenancy introduces critical security challenges: a single vulnerability can expose all tenants' data, misconfigurations can leak data across tenant boundaries, and resource contention can impact availability.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-003",
@@ -208,7 +225,7 @@
       "requirement": "This cheat sheet provides best practices to secure multi-tenant applications, ensure tenant isolation, and prevent cross-tenant attacks.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-004",
@@ -220,7 +237,7 @@
       "requirement": "Use the [Authorization Cheat Sheet](Authorization_Cheat_Sheet.md) for baseline access controls.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-005",
@@ -232,7 +249,7 @@
       "requirement": "- **Cross-Tenant Data Leakage**: Bugs or misconfigurations exposing one tenant's data to another.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-006",
@@ -244,7 +261,7 @@
       "requirement": "- **Tenant Impersonation**: Attackers gaining access to another tenant's context or resources.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-007",
@@ -268,7 +285,7 @@
       "requirement": "- **Insecure Direct Object References (IDOR)**: Accessing resources by manipulating tenant/resource IDs.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-009",
@@ -293,7 +310,7 @@
       "requirement": "- **Privilege Escalation Across Tenants**: Exploiting admin functions to access other tenants.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-011",
@@ -305,7 +322,7 @@
       "requirement": "- **Tenant Context Injection**: Manipulating tenant identifiers in requests, tokens, or headers.",
       "group": "overview",
       "status": "repository",
-      "reason": "NWFM enforces one tenant per deployment and database; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
+      "reason": "NWFM gives every tenant its own database, reached only with that tenant's restricted runtime credential, and binds every request, worker pass and provisioning step to exactly one catalog tenant; the controls below cover identity, data, queues, cache, files and operations. Shared-database hosting is unsupported and rejected."
     },
     {
       "id": "MT-012",

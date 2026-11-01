@@ -10,6 +10,12 @@ public sealed class WorkflowSettings
     public int MaxPendingPerQueue { get; set; } = 10000;
 
     /// <summary>
+    /// Per-tenant overrides of <see cref="MaxPendingPerQueue"/>, keyed by tenant id. One tenant API serves
+    /// every workspace, so a workspace that needs a tighter or looser bound gets it here.
+    /// </summary>
+    public Dictionary<string, int> MaxPendingPerQueueByTenant { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// When true, seeds the designer example workflow on startup.
     /// Defaults to false. Must be explicitly enabled per environment.
     /// Never set to true in Production.

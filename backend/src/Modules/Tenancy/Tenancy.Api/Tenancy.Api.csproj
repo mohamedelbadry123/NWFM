@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The tenant API's tenancy surface: request-to-tenant resolution middleware, the workspace info
+    endpoint, support-access consent and the support handoff. Never referenced by the control plane.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tenancy.Application\Tenancy.Application.csproj" />
+  </ItemGroup>
+</Project>

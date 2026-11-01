@@ -9,10 +9,21 @@ export interface AppConfig {
    * rather than showing a broken map.
    */
   googleMapsApiKey: string;
+
+  /**
+   * Development only: let `?tenant=acme` name the workspace when the page is not on the workspace's
+   * own host. The API honours the resulting `X-Tenant` header only in Development.
+   */
+  allowTenantQuery: boolean;
+
+  /** The platform web app (landing page and signup), linked from the workspace-unavailable page. */
+  platformUrl: string;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   googleMapsApiKey: '',
+  allowTenantQuery: false,
+  platformUrl: '',
 };
 
 /** The value committed to source control, so a real key is never mistaken for one. */

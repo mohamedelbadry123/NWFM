@@ -1,0 +1,104 @@
+<ng-container *appI18n="let t">
+  <div class="container">
+    <header class="section-head center">
+      <span class="eyebrow">{{ t('landing.pricing.eyebrow') }}</span>
+      <h2>{{ t('landing.pricing.title') }}</h2>
+      <p>{{ t('landing.pricing.subtitle') }}</p>
+    </header>
+
+    @if (loading()) {
+      <div class="plans">
+        @for (i of skeletons; track i) {
+          <div class="plan"><p-skeleton width="100%" height="17rem" /></div>
+        }
+      </div>
+    } @else if (failed()) {
+      <div class="state">
+        <i class="pi pi-exclamation-triangle"></i>
+        <p>{{ t('landing.pricing.loadFailed') }}</p>
+        <p-button
+          [label]="t('landing.pricing.retry')"
+          icon="pi pi-refresh"
+          [outlined]="true"
+          (onClick)="load()"
+        />
+      </div>
+    } @else if (cards().length > 0) {
+      <div class="plans" [class.single]="cards().length === 1" [class.pair]="cards().length === 2">
+        @for (card of cards(); track card.plan.code) {
+          <article class="plan" [class.featured]="card.featured">
+            <div class="plan-top">
+              <h3>{{ card.name }}</h3>
+              @if (card.featured) {
+                <span class="plan-flag"
+                  ><i class="pi pi-star-fill"></i>{{ t('landing.pricing.featured') }}</span
+                >
+              }
+            </div>
+            @if (card.description) {
+              <p class="plan-desc">{{ card.description }}</p>
+            }
+
+            <div class="plan-figure">
+              @if ((card.plan.maxUsers ?? null) !== null) {
+                <strong>{{ card.plan.maxUsers }}</strong>
+                <span>{{ t('landing.pricing.usersUnit') }}</span>
+              } @else {
+                <strong>{{ t('landing.pricing.unlimited') }}</strong>
+                <span>{{ t('landing.pricing.usersUnit') }}</span>
+              }
+            </div>
+
+            @if (card.plan.trialDays > 0) {
+              <span class="plan-trial"
+                ><i class="pi pi-gift"></i
+                >{{ t('landing.pricing.trial', { days: card.plan.trialDays }) }}</span
+              >
+            }
+
+            <ul class="plan-limits">
+              <li>
+                <i class="pi pi-sitemap"></i>
+                {{
+                  (card.plan.maxTeams ?? null) !== null
+                    ? t('landing.pricing.teams', { count: card.plan.maxTeams })
+                    : t('landing.pricing.unlimitedTeams')
+                }}
+              </li>
+              <li>
+                <i class="pi pi-database"></i>
+                {{
+                  (card.plan.maxStorageGb ?? null) !== null
+                    ? t('landing.pricing.storage', { count: card.plan.maxStorageGb })
+                    : t('landing.pricing.unlimitedStorage')
+                }}
+              </li>
+            </ul>
+
+            <p-button
+              [label]="
+                card.plan.trialDays > 0
+                  ? t('landing.pricing.startTrial')
+                  : t('landing.pricing.choose')
+              "
+              [outlined]="!card.featured"
+              size="large"
+              routerLink="/signup"
+              [queryParams]="card.query"
+              styleClass="w-full"
+            />
+          </article>
+        }
+      </div>
+    }
+
+    <div class="included">
+      <span class="included-title">{{ t('landing.pricing.includedTitle') }}</span>
+      <ul>
+        @for (key of included; track key) {
+          <li><i class="pi pi-check"></i>{{ t(key) }}</li>
+        }
+      </ul>
+    </div>
+  </div>
+</ng-container>

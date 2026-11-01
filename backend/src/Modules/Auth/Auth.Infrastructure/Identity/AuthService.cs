@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Results;
 
 namespace Auth.Infrastructure.Identity;
@@ -23,7 +23,7 @@ public sealed class AuthService(
     ICurrentTenant tenant,
     IOptions<JwtSettings> jwtOptions,
     IOptions<SsoSettings> ssoOptions,
-    IOptionsMonitor<TenantIsolationOptions> isolationOptions,
+    ITenantContext tenantContext,
     TimeProvider timeProvider) : IAuthService
 {
     private static readonly Error InvalidCredentials = new("Auth.InvalidCredentials", "Invalid username or password.");
@@ -104,7 +104,7 @@ public sealed class AuthService(
 
     public async Task<Result<AuthTokenDto>> RefreshAsync(string refreshToken, CancellationToken ct)
     {
-        if (!isolationOptions.CurrentValue.IsActive)
+        if (tenantContext.Current is not { IsServing: true })
             return Result<AuthTokenDto>.Failure(TenantInactive);
         JwtSettings settings = jwtOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.SigningKey))
@@ -223,7 +223,7 @@ public sealed class AuthService(
 
     private async Task<Result<AuthTokenDto>> IssueTokensAsync(ApplicationUser user, CancellationToken ct)
     {
-        if (!isolationOptions.CurrentValue.IsActive)
+        if (tenantContext.Current is not { IsServing: true })
             return Result<AuthTokenDto>.Failure(TenantInactive);
         JwtSettings settings = jwtOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.SigningKey))

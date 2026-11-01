@@ -21,6 +21,8 @@ public sealed class TenantEndpointBoundaryTests
         ["AuthController.TeamLogin"] = "Password authentication precedes the tenant-isolated OTP challenge.",
         ["AuthController.VerifyTeamOtp"] = "Tenant-isolated OTP and current team/account authorization precede token issuance.",
         ["AuthController.ResendTeamOtp"] = "Existing tenant-isolated challenge and bounded retry rules are required.",
+        ["AuthController.Activate"] = "Single-use password set-up token, issued by the control plane and bound to this tenant's account and security stamp.",
+        ["SupportSessionController.Exchange"] = "Single-use, short-lived handoff code bound to a consented, unrevoked support grant for this tenant.",
         ["AuthSsoController.Login"] = "Starts the configured SAML identity-provider handshake.",
         ["AuthSsoController.Callback"] = "Validates the protected temporary SAML cookie and current account membership.",
         ["AuthSsoController.Logout"] = "Clears temporary cookies; account session revocation requires a verified user.",
@@ -43,7 +45,8 @@ public sealed class TenantEndpointBoundaryTests
             "WorkflowIntegrationsController", "WorkflowModuleCatalogController", "WorkflowNotificationsController",
             "WorkflowParticipantsController", "WorkflowRequestsController", "WorkflowRuntimeController",
             "WorkflowVersionsController", "WorkflowWorkloadController", "WorkflowWorkspaceController",
-            "WorkItemsController", "WorkspaceActivityFormsController", "WorkspaceSlaController"
+            "WorkItemsController", "WorkspaceActivityFormsController", "WorkspaceSlaController",
+            "SupportAccessController", "SupportSessionController"
         ];
         Assert.Equal(classifiedControllers.Order(), controllers.Select(x => x.Name).Order());
 
@@ -83,7 +86,8 @@ public sealed class TenantEndpointBoundaryTests
             typeof(Auth.Api.Controllers.AuthController).Assembly,
             typeof(FormEngine.Api.Controllers.FormsController).Assembly,
             typeof(Tasks.Api.Controllers.TasksController).Assembly,
-            typeof(global::Workflow.Api.Controllers.WorkItemsController).Assembly
+            typeof(global::Workflow.Api.Controllers.WorkItemsController).Assembly,
+            typeof(global::Tenancy.Api.Controllers.SupportAccessController).Assembly
         ];
         return modules.SelectMany(x => x.GetTypes())
             .Where(x => !x.IsAbstract && typeof(ControllerBase).IsAssignableFrom(x)).ToArray();

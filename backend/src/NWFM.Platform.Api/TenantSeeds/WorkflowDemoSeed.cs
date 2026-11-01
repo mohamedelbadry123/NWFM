@@ -1,0 +1,99 @@
+namespace NWFM.Platform.Api.TenantSeeds;
+
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using NWFM.Shared.MultiTenancy;
+using Workflow.Application.Commands.CreateWorkflowDraft;
+using Workflow.Application.Commands.PublishWorkflowVersion;
+using Workflow.Application.Commands.SaveWorkflowDraftXml;
+using Workflow.Application.Commands.ValidateWorkflowVersion;
+using Workflow.Domain.Entities;
+using Workflow.Domain.Enums;
+using Workflow.Infrastructure.Persistence;
+
+/// <summary>
+/// Development demonstration data for the bootstrap workspace (<c>WorkflowDemo:Enabled</c>): demo
+/// participants, a review group and a published simple-approval workflow. Spans modules, so it is a
+/// seed of the host rather than of any one module.
+/// </summary>
+public sealed class WorkflowDemoSeed(IConfiguration configuration) : ITenantDatabaseModule
+{
+    public string Name => "WorkflowDemo";
+
+    public int Order => 100;
+
+    public string? LatestMigrationId => null;
+
+    public Task MigrateAsync(IServiceProvider services, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<string>> GetPendingMigrationsAsync(IServiceProvider services, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
+
+    public async Task SeedAsync(IServiceProvider services, TenantSeedProfile profile, CancellationToken cancellationToken)
+    {
+        if (profile != TenantSeedProfile.Bootstrap || !configuration.GetValue<bool>("WorkflowDemo:Enabled")) return;
+        var tenant = services.GetRequiredService<ITenantContext>().Current ?? throw TenantAccessException.Required();
+        await DatabaseInitializer.SeedDemoAsync(services, tenant.Id);
+        await WorkflowWorkspaceDemo.InitializeAsync(services, configuration);
+    }
+}
+
+public static class DatabaseInitializer
+{
+    public static async Task SeedDemoAsync(IServiceProvider services, Guid tenantId)
+    {
+        var db = services.GetRequiredService<WorkflowDbContext>();
+        await using var tx = await db.Database.BeginTransactionAsync();
+        var now = DateTime.UtcNow;
+        var demoForm = await WorkflowDemoForms.EnsureAsync(services);
+        var actors = new[] { Guid.Parse("20000000-0000-0000-0000-000000000001"), Guid.Parse("20000000-0000-0000-0000-000000000002") };
+        for (var i = 0; i < actors.Length; i++)
+            if (!await db.Participants.AnyAsync(p => p.UserId == actors[i]))
+                db.Participants.Add(WorkflowParticipant.Create(tenantId, actors[i], $"Reviewer {i + 1}", $"reviewer{i + 1}@example.test", now, $"مراجع {i + 1}"));
+        await db.SaveChangesAsync();
+        var group = await db.AssignmentGroups.SingleOrDefaultAsync(g => g.Code == "REVIEWERS");
+        if (group is null)
+        {
+            group = WorkflowAssignmentGroup.Create(tenantId, "REVIEWERS", "Reviewers", AssignmentStrategy.RoundRobin, now, "المراجعون");
+            db.AssignmentGroups.Add(group);
+            await db.SaveChangesAsync();
+        }
+        foreach (var p in await db.Participants.Where(p => actors.Contains(p.UserId)).ToListAsync())
+            if (!await db.GroupMembers.AnyAsync(m => m.AssignmentGroupId == group.Id && m.ParticipantId == p.Id))
+                db.GroupMembers.Add(WorkflowGroupMember.Create(group.Id, p.Id, true, p.UserId == actors[0], now));
+        await db.SaveChangesAsync();
+        if (!await db.WorkflowDefinitions.AnyAsync(d => d.DefinitionKey == "SIMPLE_APPROVAL"))
+        {
+            var definition = WorkflowDefinition.Create(tenantId, "SIMPLE_APPROVAL", "Simple approval", now, "موافقة بسيطة");
+            db.WorkflowDefinitions.Add(definition);
+            await db.SaveChangesAsync();
+            var sender = services.GetRequiredService<ISender>();
+            var draft = await sender.Send(new CreateWorkflowDraftCommand(definition.Id, actors[0]));
+            if (draft.IsFailure) throw new InvalidOperationException(draft.Error.Message);
+            var xml = $$"""
+            <Workflow xmlns="https://privora.io/workflow/v1">
+              <Activities>
+                <Activity nodeKey="start" type="Start" name="Start" positionX="80" positionY="160" />
+                <Activity nodeKey="review" type="UserTask" name="Review request" positionX="260" positionY="140" assignmentGroupId="{{group.Id}}" configurationJson="{&quot;taskTypeId&quot;:&quot;{{demoForm.TaskTypeId}}&quot;,&quot;formDefinitionId&quot;:&quot;{{demoForm.FormId}}&quot;,&quot;formVersionNo&quot;:{{demoForm.VersionNo}}}" />
+                <Activity nodeKey="end" type="End" name="Completed" positionX="620" positionY="160" />
+              </Activities>
+              <Transitions>
+                <Transition key="t1" from="start" to="review" />
+                <Transition key="t2" from="review" to="end" />
+              </Transitions>
+            </Workflow>
+            """;
+            var saved = await sender.Send(new SaveWorkflowDraftXmlCommand(draft.Value.Id, xml));
+            if (saved.IsFailure) throw new InvalidOperationException(saved.Error.Message);
+            var validation = await sender.Send(new ValidateWorkflowVersionCommand(draft.Value.Id));
+            if (validation.IsFailure) throw new InvalidOperationException(validation.Error.Message);
+            var published = await sender.Send(new PublishWorkflowVersionCommand(draft.Value.Id, actors[0]));
+            if (published.IsFailure) throw new InvalidOperationException(published.Error.Message);
+            var binding = WorkflowBinding.Create(definition.Id, tenantId, "Standalone", "WorkflowRequest", "RequestSubmitted", now, mode: WorkflowBindingMode.Active, screenKey: "workflow.start");
+            binding.Activate(now);
+            db.WorkflowBindings.Add(binding);
+            await db.SaveChangesAsync();
+        }
+        await tx.CommitAsync();
+    }
+}

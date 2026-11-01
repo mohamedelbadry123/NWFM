@@ -2,7 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
+using NWFM.Tests.Tenancy;
 using Workflow.Application.Abstractions;
 using Workflow.Domain.Entities;
 using Workflow.Domain.Enums;
@@ -52,7 +53,7 @@ public sealed class WorkflowWorkerTenantTests
         var engine = new Mock<IWorkflowRuntimeEngine>(MockBehavior.Strict);
         var instances = new Mock<IWorkflowInstanceRepository>(MockBehavior.Strict);
         await using var services = new ServiceCollection()
-            .Configure<TenantIsolationOptions>(o => o.TenantId = tenant)
+            .AddSingleton(TestTenants.Fixed(TestTenants.Active(tenant)))
             .AddSingleton(availability.Object)
             .AddSingleton(inbox.Object)
             .AddSingleton(engine.Object)
@@ -76,7 +77,7 @@ public sealed class WorkflowWorkerTenantTests
     {
         var inbox = new Mock<IWorkflowIntegrationInboxRepository>(MockBehavior.Strict);
         await using var services = new ServiceCollection()
-            .Configure<TenantIsolationOptions>(o => { o.TenantId = Guid.NewGuid(); o.IsActive = false; })
+            .AddSingleton(TestTenants.Fixed(TestTenants.WithStatus(TenantStatus.Suspended, Guid.NewGuid())))
             .AddSingleton(inbox.Object)
             .BuildServiceProvider();
         var worker = new WorkflowInboxHostedService(services.GetRequiredService<IServiceScopeFactory>(),
@@ -94,13 +95,13 @@ public sealed class WorkflowWorkerTenantTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => WorkflowTenantAdmission.RequireMessageScopeAsync(missing, tenant, default));
         var availability = new Mock<ITenantAvailability>();
         availability.Setup(a => a.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        using var active = new ServiceCollection().Configure<TenantIsolationOptions>(o => o.TenantId = tenant)
+        using var active = new ServiceCollection().AddSingleton(TestTenants.Fixed(TestTenants.Active(tenant)))
             .AddSingleton(availability.Object).BuildServiceProvider();
         Assert.True(await WorkflowTenantAdmission.IsActiveAsync(active, default));
         await WorkflowTenantAdmission.RequireMessageScopeAsync(active, tenant, default);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => WorkflowTenantAdmission.RequireMessageScopeAsync(active, Guid.NewGuid(), default));
         using var inactive = new ServiceCollection()
-            .Configure<TenantIsolationOptions>(o => { o.TenantId = tenant; o.IsActive = false; }).BuildServiceProvider();
+            .AddSingleton(TestTenants.Fixed(TestTenants.WithStatus(TenantStatus.Suspended, tenant))).BuildServiceProvider();
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => WorkflowTenantAdmission.RequireMessageScopeAsync(inactive, tenant, default));
         availability.Setup(a => a.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
         Assert.False(await WorkflowTenantAdmission.IsActiveAsync(active, default));

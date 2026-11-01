@@ -11,8 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
 using NWFM.Shared.Results;
+using NWFM.Tests.Tenancy;
 
 public sealed class WorkflowInboxRecoveryTests
 {
@@ -70,7 +70,7 @@ public sealed class WorkflowInboxRecoveryTests
         var engine = new Mock<IWorkflowRuntimeEngine>();
 
         await using var services = new ServiceCollection()
-            .Configure<TenantIsolationOptions>(o => o.TenantId = organizationId)
+            .AddSingleton(TestTenants.Fixed(TestTenants.Active(organizationId)))
             .AddSingleton(Mock.Of<ITenantAvailability>(a => a.IsActiveAsync(It.IsAny<CancellationToken>()) == Task.FromResult(true)))
             .AddSingleton(inbox.Object)
             .AddSingleton(instances.Object)

@@ -3,7 +3,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
+using NWFM.Tests.Tenancy;
 using Tasks.Application.C2m;
 using Tasks.Infrastructure.C2m;
 
@@ -19,7 +20,7 @@ public sealed class TaskWorkerTenantTests
         var availability = new Mock<ITenantAvailability>();
         availability.Setup(a => a.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(durableActive);
         await using var services = new ServiceCollection()
-            .Configure<TenantIsolationOptions>(o => { o.TenantId = Guid.NewGuid(); o.IsActive = configuredActive; })
+            .AddSingleton(TestTenants.Fixed(configuredActive ? TestTenants.Active(Guid.NewGuid()) : TestTenants.WithStatus(TenantStatus.Suspended, Guid.NewGuid())))
             .AddSingleton(availability.Object)
             // No database or transport registered: reaching either is a test failure.
             .BuildServiceProvider();

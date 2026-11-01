@@ -1,0 +1,99 @@
+@use '../landing-kit' as kit;
+
+:host {
+  display: block;
+  padding-block: 1.33rem 6.67rem;
+  @include kit.tokens;
+}
+
+:host-context([data-theme='dark']) {
+  @include kit.dark-tokens;
+}
+
+.container {
+  @include kit.container;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(3.33rem, 6vw, 6rem) clamp(1.67rem, 4vw, 4rem);
+  border-radius: 2.33rem;
+  background:
+    radial-gradient(53.33rem 26.67rem at 50% 0%, rgba(165, 227, 239, 0.35), transparent 70%),
+    var(--lp-gradient);
+  box-shadow: 0 30px 60px -30px var(--lp-glow);
+  color: #ffffff;
+  text-align: center;
+
+  h2 {
+    position: relative;
+    max-width: 53.33rem;
+    margin: 0 auto 1.2rem;
+    font-size: clamp(2.4rem, 4vw, 3.67rem);
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #ffffff;
+    text-wrap: balance;
+  }
+
+  p {
+    position: relative;
+    max-width: 48rem;
+    margin: 0 auto 2.67rem;
+    font-size: 1.43rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.86);
+  }
+}
+
+:host-context([dir='rtl']) .card h2 {
+  letter-spacing: 0;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 60% 80% at 50% 0%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 0%, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
+.actions {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+// The buttons sit on the brand gradient, so they invert. Unlayered, so these win over PrimeNG's layer.
+:host ::ng-deep .p-button.cta-light {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--water-deep);
+
+  &:not(:disabled):hover {
+    background: var(--foam);
+    border-color: var(--foam);
+    color: var(--water-deep);
+  }
+}
+
+:host ::ng-deep .p-button.cta-on-dark {
+  color: #ffffff;
+
+  &:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+}
+
+:host-context([dir='rtl']) ::ng-deep .p-button-icon.pi-arrow-right {
+  transform: scaleX(-1);
+}

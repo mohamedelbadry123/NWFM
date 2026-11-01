@@ -1,0 +1,148 @@
+// Shared look for the landing page and its section components, so every section opens with the
+// same eyebrow / heading / lead rhythm and the page reads as one piece.
+//
+// Sizes are in rem against the app's 12px root (shared styles.scss), so 1.33rem ≈ 16px.
+//
+// Most of these mixins nest rules (media queries, :hover, children). Include them as the LAST
+// thing in a block: Sass is changing how declarations that follow nested rules are ordered
+// (https://sass-lang.com/d/mixed-decls), and a trailing include sidesteps it.
+
+$section-width: 98.67rem;
+
+@mixin container {
+  width: min(#{$section-width}, 100%);
+  margin-inline: auto;
+  padding-inline: 1.33rem;
+
+  @media (min-width: 768px) {
+    padding-inline: 2rem;
+  }
+}
+
+@mixin section-block {
+  display: block;
+  padding-block: 6rem;
+  scroll-margin-top: 6rem;
+
+  @media (max-width: 768px) {
+    padding-block: 4.33rem;
+  }
+}
+
+@mixin eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.53rem;
+  margin-bottom: 1.13rem;
+  color: var(--p-primary-color);
+  font-size: 1.07rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  :host-context([dir='rtl']) & {
+    letter-spacing: 0;
+  }
+}
+
+@mixin section-head {
+  max-width: 58.67rem;
+  margin-bottom: 3.67rem;
+
+  &.center {
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  h2 {
+    margin: 0 0 1.13rem;
+    font-size: clamp(2.33rem, 3.6vw, 3.47rem);
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--lp-ink);
+    text-wrap: balance;
+  }
+
+  p {
+    margin: 0;
+    font-size: 1.43rem;
+    line-height: 1.65;
+    color: var(--p-text-muted-color);
+  }
+
+  // Arabic script joins its letters; tracking breaks the joins.
+  :host-context([dir='rtl']) & h2 {
+    letter-spacing: 0;
+  }
+}
+
+// Ink and accent tokens the sections share. Each component applies them on its own host
+// (`:host { @include tokens }` and `:host-context([data-theme='dark']) { @include dark-tokens }`)
+// so a section rendered on its own still has them.
+@mixin tokens {
+  --lp-page: #fbfdfe;
+  --lp-band: #f2f7f9;
+  --lp-ink: #0b2a36;
+  --lp-gradient: linear-gradient(115deg, var(--water-deep) 0%, var(--aqua) 55%, var(--teal) 100%);
+  --lp-text-gradient: linear-gradient(100deg, var(--water) 0%, var(--aqua) 45%, var(--teal) 100%);
+  --lp-glow: rgba(36, 143, 172, 0.22);
+  --lp-tile: var(--app-surface);
+  --lp-inset: var(--app-surface-alt);
+}
+
+@mixin dark-tokens {
+  --lp-page: #0a1116;
+  --lp-band: #0e181e;
+  --lp-ink: #eef6f8;
+  --lp-text-gradient: linear-gradient(100deg, #7ecadc 0%, #a5e3ef 50%, #45adc7 100%);
+  --lp-glow: rgba(69, 173, 199, 0.2);
+  --lp-inset: #121c22;
+}
+
+// Directional icons (arrows, chevrons) point the other way in Arabic.
+@mixin rtl-flip {
+  :host-context([dir='rtl']) .rtl-flip {
+    transform: scaleX(-1);
+  }
+}
+
+// Loading-failed / empty placeholder shared by the data-driven sections.
+@mixin state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3.33rem 1.33rem;
+  text-align: center;
+  background: var(--app-surface);
+  border: 1px dashed var(--app-border);
+  border-radius: 1.33rem;
+  color: var(--p-text-muted-color);
+
+  i {
+    font-size: 2.33rem;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+@mixin tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--lp-tile);
+  border: 1px solid var(--app-border);
+  border-radius: 1.47rem;
+  box-shadow: var(--app-shadow-sm);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--p-primary-color) 45%, var(--app-border));
+    box-shadow: var(--app-shadow-md);
+  }
+}

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
 using Tasks.Application.C2m;
 using Tasks.Domain.Constants;
 using Tasks.Infrastructure.Persistence;
@@ -38,7 +38,10 @@ internal sealed class C2mClosureHostedService(
         {
             try
             {
-                await SendQueuedAsync(interval, stoppingToken);
+                ITenantFanOut fanOut;
+                using (var scope = scopes.CreateScope())
+                    fanOut = scope.ServiceProvider.GetRequiredService<ITenantFanOut>();
+                await fanOut.ForEachServingTenantAsync((_, ct) => SendQueuedAsync(interval, ct), stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -127,11 +130,12 @@ internal sealed class C2mClosureHostedService(
             outcome.Message);
     }
 
+    /// <summary>Each pass runs inside one tenant's ambient scope; a tenant that stopped serving is skipped.</summary>
     private static async Task<bool> IsTenantActiveAsync(IServiceProvider services, CancellationToken ct)
     {
-        var tenant = services.GetService<IOptions<TenantIsolationOptions>>()?.Value;
+        var tenant = services.GetService<ITenantContext>()?.Current;
         var availability = services.GetService<ITenantAvailability>();
-        return tenant is { IsActive: true } && tenant.TenantId != Guid.Empty && availability is not null
+        return tenant is { IsServing: true } && availability is not null
             && await availability.IsActiveAsync(ct);
     }
 }

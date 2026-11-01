@@ -8,10 +8,10 @@ using Auth.Infrastructure.Identity;
 using Auth.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Moq;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
+using NWFM.Tests.Tenancy;
 
 namespace NWFM.Tests.Security;
 
@@ -89,7 +89,7 @@ public sealed class TenantSessionTests
                 break;
             case "deleted": fixture.Db.Users.Remove(fixture.User); break;
             case "membership-removed": fixture.Db.OrgScopes.RemoveRange(fixture.Db.OrgScopes); break;
-            case "suspended": fixture.Options.IsActive = false; break;
+            case "suspended": fixture.Status = TenantStatus.Suspended; break;
         }
         await fixture.Db.SaveChangesAsync();
         Assert.Null(await fixture.ValidateAsync());
@@ -144,7 +144,7 @@ public sealed class TenantSessionTests
         var service = new AuthService(users.Object, fixture.Db, permissions.Object,
             Mock.Of<IActiveDirectoryAuthenticator>(), new Tenant(fixture.TenantId),
             Microsoft.Extensions.Options.Options.Create(settings),
-            Microsoft.Extensions.Options.Options.Create(new SsoSettings()), fixture.Monitor, TimeProvider.System);
+            Microsoft.Extensions.Options.Options.Create(new SsoSettings()), fixture.Context, TimeProvider.System);
 
         var result = await service.LoginAsync("tester", "password", default);
 
@@ -168,17 +168,13 @@ public sealed class TenantSessionTests
         public ApplicationUser User { get; } = new() { Id = Guid.NewGuid(), UserName = "tester", SecurityStamp = Guid.NewGuid().ToString() };
         public UserRefreshToken Session { get; private set; } = null!;
         public ClaimsPrincipal Principal { get; set; } = null!;
-        public TenantIsolationOptions Options { get; }
-        public IOptionsMonitor<TenantIsolationOptions> Monitor { get; }
+        public TenantStatus Status { get; set; } = TenantStatus.Active;
+        public ITenantContext Context => TestTenants.Fixed(new TenantInfo { Id = TenantId, Key = "alpha", Name = "Alpha", Status = Status });
 
         private Fixture()
         {
             Db = new AuthDbContext(new DbContextOptionsBuilder<AuthDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
-            Options = new TenantIsolationOptions { TenantId = TenantId };
-            var monitor = new Mock<IOptionsMonitor<TenantIsolationOptions>>();
-            monitor.SetupGet(x => x.CurrentValue).Returns(Options);
-            Monitor = monitor.Object;
         }
 
         public static async Task<Fixture> CreateAsync()
@@ -204,7 +200,7 @@ public sealed class TenantSessionTests
         }
 
         public Task<ClaimsPrincipal?> ValidateAsync() =>
-            new TenantSessionValidator(Db, new Tenant(TenantId), Monitor, TimeProvider.System)
+            new TenantSessionValidator(Db, new Tenant(TenantId), Context, TimeProvider.System)
                 .ValidateAsync(Principal, default);
 
         public void Dispose() => Db.Dispose();

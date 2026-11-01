@@ -1,43 +1,38 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Options;
 
 namespace NWFM.Shared.Storage;
 
 /// <summary>
-/// Local-disk <see cref="IFileStorage"/>. Everything is written under a single configured root,
-/// and every path is re-resolved against that root before use, so a crafted file name or relative
-/// path can never escape it.
+/// Local-disk <see cref="IFileStorage"/>. Every tenant writes under its own root
+/// (<see cref="TenantStorageLayout.TenantRoot"/>), bound to it by a marker file, and every path is
+/// re-resolved against that root before use, so a crafted file name or relative path can never escape it.
 /// </summary>
 public sealed class LocalFileStorage : IFileStorage
 {
     private const int BufferSize = 81920;
     private const string TenantBindingFile = ".nwfm-tenant";
 
-    private readonly string _root;
+    private readonly string _storageRoot;
+    private readonly string _contentRoot;
     private readonly long _maximumBytes;
+    private readonly ITenantContext _tenants;
+    private readonly ConcurrentDictionary<Guid, string> _boundRoots = new();
     private static StringComparison PathComparison =>
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-    public LocalFileStorage(IOptions<FileStorageOptions> options, IHostEnvironment environment,
-        IOptions<TenantIsolationOptions> tenant)
+    public LocalFileStorage(IOptions<FileStorageOptions> options, IHostEnvironment environment, ITenantContext tenants)
     {
-        if (tenant.Value.TenantId == Guid.Empty)
-            throw new InvalidOperationException("File storage requires a configured tenant.");
         if (options.Value.MaxFileSizeMb <= 0)
             throw new InvalidOperationException("File storage requires a positive file size limit.");
 
         _maximumBytes = (long)options.Value.MaxFileSizeMb * 1024 * 1024;
-        var configured = options.Value.Root;
-        var root = Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(environment.ContentRootPath, configured);
-
-        _root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
-        RejectRedirectedAncestors(_root);
-        Directory.CreateDirectory(_root);
-        RejectRedirectedAncestors(_root);
-        BindTenant(tenant.Value.TenantId);
+        _storageRoot = options.Value.Root;
+        _contentRoot = environment.ContentRootPath;
+        _tenants = tenants;
     }
 
     public async Task<StoredFile> SaveAsync(Stream content, string fileName, string contentType, string subPath, CancellationToken cancellationToken)
@@ -129,7 +124,22 @@ public sealed class LocalFileStorage : IFileStorage
 
     private static string SafeFileName(string fileName) => Path.GetFileName(fileName.Replace('\\', '/'));
 
-    /// <summary>Resolves a relative path against the root and rejects anything that escapes it.</summary>
+    /// <summary>The ambient tenant's root, created and bound on first use. An unbound flow has no storage.</summary>
+    private string CurrentRoot()
+    {
+        var tenant = _tenants.Current ?? throw TenantAccessException.Required();
+        return _boundRoots.GetOrAdd(tenant.Id, _ =>
+        {
+            var root = Path.TrimEndingDirectorySeparator(TenantStorageLayout.TenantRoot(_storageRoot, _contentRoot, tenant));
+            RejectRedirectedAncestors(root);
+            Directory.CreateDirectory(root);
+            RejectRedirectedAncestors(root);
+            BindTenant(root, tenant.Id);
+            return root;
+        });
+    }
+
+    /// <summary>Resolves a relative path against the tenant root and rejects anything that escapes it.</summary>
     private string ResolveInsideRoot(string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath)
@@ -143,15 +153,16 @@ public sealed class LocalFileStorage : IFileStorage
             || part.StartsWith(".nwfm-", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("The storage path contains an invalid component.");
 
-        var fullPath = Path.GetFullPath(Path.Combine(_root, Path.Combine(parts)));
-        if (!fullPath.StartsWith(_root + Path.DirectorySeparatorChar, PathComparison))
+        var root = CurrentRoot();
+        var fullPath = Path.GetFullPath(Path.Combine(root, Path.Combine(parts)));
+        if (!fullPath.StartsWith(root + Path.DirectorySeparatorChar, PathComparison))
         {
-            throw new InvalidOperationException("The storage path is outside the configured root.");
+            throw new InvalidOperationException("The storage path is outside the tenant root.");
         }
 
         // Lexical containment alone does not stop a symlink/junction under the storage root.
-        RejectRedirectedAncestors(_root);
-        var current = _root;
+        RejectRedirectedAncestors(root);
+        var current = root;
         foreach (var part in parts)
         {
             current = Path.Combine(current, part);
@@ -173,15 +184,15 @@ public sealed class LocalFileStorage : IFileStorage
             RejectLink(directory.FullName);
     }
 
-    private void BindTenant(Guid tenantId)
+    private static void BindTenant(string root, Guid tenantId)
     {
-        var marker = Path.Combine(_root, TenantBindingFile);
+        var marker = Path.Combine(root, TenantBindingFile);
         RejectLink(marker);
         if (!File.Exists(marker))
         {
-            // Publish a complete marker atomically; simultaneous starts must not observe
-            // an empty file or overwrite an existing deployment's tenant binding.
-            var temporary = Path.Combine(_root, ".nwfm-binding-" + Guid.NewGuid().ToString("N"));
+            // Publish a complete marker atomically; simultaneous first writes must not observe
+            // an empty file or overwrite another tenant's binding.
+            var temporary = Path.Combine(root, ".nwfm-binding-" + Guid.NewGuid().ToString("N"));
             try
             {
                 File.WriteAllText(temporary, tenantId.ToString("D"));

@@ -37,9 +37,12 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
         {
             try
             {
-                await ProcessDueTimersAsync(stoppingToken);
-                await ProcessOverdueRemindersAsync(stoppingToken);
-                await ProcessEscalationsAsync(stoppingToken);
+                await WorkflowTenantAdmission.ForEachTenantAsync(_scopeFactory, async ct =>
+                {
+                    await ProcessDueTimersAsync(ct);
+                    await ProcessOverdueRemindersAsync(ct);
+                    await ProcessEscalationsAsync(ct);
+                }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

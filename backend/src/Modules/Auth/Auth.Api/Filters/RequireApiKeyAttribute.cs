@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
 
 namespace Auth.Api.Filters;
 
@@ -29,8 +29,8 @@ public sealed class RequireApiKeyAttribute(string scope) : Attribute, IAsyncAuth
             .GetRequiredService<IOptions<ExternalConsumersOptions>>().Value;
         var tenant = context.HttpContext.RequestServices.GetRequiredService<ICurrentTenant>();
         var environment = context.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().EnvironmentName;
-        var active = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<TenantIsolationOptions>>()
-            .CurrentValue.IsActive;
+        var active = context.HttpContext.RequestServices.GetRequiredService<ITenantContext>()
+            .Current is { IsServing: true } current && current.Id == tenant.OrganizationId;
 
         var consumer = active ? options.FindAuthorizedConsumer(apiKey, tenant.OrganizationId, environment, scope) : null;
         if (consumer is null)

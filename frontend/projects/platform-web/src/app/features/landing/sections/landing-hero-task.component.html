@@ -1,0 +1,28 @@
+<ng-container *appI18n="let t">
+  <div class="head">
+    <span class="head-icon"><i class="pi pi-inbox"></i></span>
+    <span class="head-text">
+      <strong>{{ t('landing.mock.task.title') }}</strong>
+      <small>{{ t('landing.mock.task.context') }}</small>
+    </span>
+  </div>
+
+  <div class="sla">
+    <span class="sla-track"><span></span></span>
+    <small>{{ t('landing.mock.task.due') }}</small>
+  </div>
+
+  <span class="label">{{ t('landing.mock.task.amountLabel') }}</span>
+  <span class="input">{{ t('landing.mock.task.amountValue') }}</span>
+
+  <span class="label">{{ t('landing.mock.task.quoteLabel') }}</span>
+  <span class="file"><i class="pi pi-file-pdf"></i>{{ t('landing.mock.task.quoteValue') }}</span>
+
+  <span class="label">{{ t('landing.mock.task.commentLabel') }}</span>
+  <span class="input comment">{{ t('landing.mock.task.commentValue') }}</span>
+
+  <div class="actions">
+    <span class="act accept"><i class="pi pi-check"></i>{{ t('landing.mock.task.accept') }}</span>
+    <span class="act reject"><i class="pi pi-undo"></i>{{ t('landing.mock.task.reject') }}</span>
+  </div>
+</ng-container>

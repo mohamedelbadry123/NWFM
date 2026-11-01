@@ -3,32 +3,46 @@ using System.Security.Claims;
 using Auth.Domain.Constants;
 using Auth.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
-using NWFM.Shared.Options;
+using NWFM.Shared.MultiTenancy;
 
 namespace Auth.Infrastructure.Identity;
 
 /// <summary>
 /// Cryptographic token validation establishes the issuer, not current access.
-/// Recheck the dedicated tenant database and rebuild grants on every request.
+/// Recheck the tenant's own database and rebuild grants on every request.
 /// </summary>
 public sealed class TenantSessionValidator(
     AuthDbContext db,
     ICurrentTenant tenant,
-    IOptionsMonitor<TenantIsolationOptions> isolationOptions,
-    TimeProvider timeProvider)
+    ITenantContext tenantContext,
+    TimeProvider timeProvider,
+    ISupportSessionValidator? supportSessions = null)
 {
     public async Task<ClaimsPrincipal?> ValidateAsync(ClaimsPrincipal principal, CancellationToken ct)
     {
-        if (!isolationOptions.CurrentValue.IsActive ||
+        if (tenantContext.Current is not { IsServing: true } ||
             principal.Identity?.IsAuthenticated != true ||
             !Guid.TryParse(SingleClaim(principal, AppClaimTypes.TenantId), out var tenantId) ||
             tenantId == Guid.Empty || tenantId != tenant.OrganizationId ||
-            !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) ||
-            !long.TryParse(SingleClaim(principal, AppClaimTypes.SessionId), NumberStyles.None,
-                CultureInfo.InvariantCulture, out var sessionId) || sessionId <= 0)
+            !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
             return null;
+
+        // A platform support session is bounded by its catalog grant, not by a refresh-token row.
+        var supportClaim = SingleClaim(principal, TenantClaimTypes.SupportSessionId);
+        long sessionId = 0;
+        Guid supportSessionId = Guid.Empty;
+        if (supportClaim is not null)
+        {
+            if (!Guid.TryParse(supportClaim, out supportSessionId) || supportSessions is null ||
+                !await supportSessions.IsActiveAsync(supportSessionId, tenantId, ct))
+                return null;
+        }
+        else if (!long.TryParse(SingleClaim(principal, AppClaimTypes.SessionId), NumberStyles.None,
+                     CultureInfo.InvariantCulture, out sessionId) || sessionId <= 0)
+        {
+            return null;
+        }
 
         var stamp = SingleClaim(principal, AppClaimTypes.SecurityStamp);
         var now = timeProvider.GetUtcNow();
@@ -38,7 +52,7 @@ public sealed class TenantSessionValidator(
             (user.LockoutEnabled && user.LockoutEnd > now))
             return null;
 
-        if (!await db.UserRefreshTokens.AsNoTracking().AnyAsync(x =>
+        if (supportClaim is null && !await db.UserRefreshTokens.AsNoTracking().AnyAsync(x =>
                 x.Id == sessionId && x.UserId == userId.ToString() &&
                 x.RevokedAtUtc == null && x.ExpiresAtUtc > now.UtcDateTime, ct))
             return null;
@@ -73,9 +87,21 @@ public sealed class TenantSessionValidator(
             new(ClaimTypes.NameIdentifier, user.Id.ToString("D")),
             new(ClaimTypes.Name, user.UserName ?? user.Id.ToString("D")),
             new(AppClaimTypes.TenantId, tenantId.ToString("D")),
-            new(AppClaimTypes.SessionId, sessionId.ToString(CultureInfo.InvariantCulture)),
             new(AppClaimTypes.SecurityStamp, stamp)
         };
+        if (supportClaim is null)
+        {
+            claims.Add(new Claim(AppClaimTypes.SessionId, sessionId.ToString(CultureInfo.InvariantCulture)));
+        }
+        else
+        {
+            // The support identity travels with the rebuilt principal so the read-only gate and the
+            // audit trail still see who is acting.
+            claims.Add(new Claim(TenantClaimTypes.SupportSessionId, supportSessionId.ToString("D")));
+            foreach (var type in new[] { TenantClaimTypes.Actor, TenantClaimTypes.ActorName, TenantClaimTypes.SupportScope })
+                if (SingleClaim(principal, type) is { } value)
+                    claims.Add(new Claim(type, value));
+        }
         if (!string.IsNullOrWhiteSpace(user.Email))
             claims.Add(new Claim(ClaimTypes.Email, user.Email));
         if (user.TeamId is Guid currentTeam)

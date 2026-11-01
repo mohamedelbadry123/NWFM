@@ -4,11 +4,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using NWFM.Api.Services;
+using NWFM.Shared.MultiTenancy;
 using Workflow.Infrastructure.Persistence;
 
-public sealed record TenantDto(Guid Id, string Name);
+public sealed record TenantDto(Guid Id, string Key, string Name);
 public sealed record ParticipantContextDto(Guid Id, Guid ActorId, string DisplayName, string? DisplayNameAr);
 public sealed record AppContextDto(
     TenantDto Tenant,
@@ -19,13 +18,14 @@ public sealed record AppContextDto(
 [AllowAnonymous]
 [Route("api/app-context")]
 public sealed class AppContextController(
-    IOptions<ApplicationOptions> options,
+    ITenantContext tenants,
     WorkflowDbContext db) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<AppContextDto>> Get(CancellationToken ct)
     {
-        var tenant = new TenantDto(options.Value.TenantId, options.Value.TenantName);
+        var current = tenants.Current ?? throw TenantAccessException.Required();
+        var tenant = new TenantDto(current.Id, current.Key, current.Name);
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (User.Identity?.IsAuthenticated != true || string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
             return new AppContextDto(tenant, [], null);

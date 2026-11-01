@@ -19,10 +19,11 @@
     "module": "ES2022",
     "baseUrl": "./",
     "paths": {
-      "@core/*":     ["src/app/core/*"],
-      "@shared/*":   ["src/app/shared/*"],
+      "@core/*": ["src/app/core/*"],
+      "@shared/*": ["src/app/shared/*"],
       "@features/*": ["src/app/features/*"],
-      "@models":     ["src/app/shared/api-models.ts"]
+      "@models": ["src/app/shared/api-models.ts"],
+      "@platform/shared": ["projects/platform-web/src/app/shared/index.ts"]
     }
   },
   "angularCompilerOptions": {

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Options;
 
 namespace NWFM.Shared.Caching;
@@ -14,12 +15,9 @@ namespace NWFM.Shared.Caching;
 public sealed class HybridCacheService(
     HybridCache cache,
     IOptions<CacheSettings> settings,
-    IOptions<TenantIsolationOptions> tenantOptions,
+    ITenantContext tenantContext,
     IHostEnvironment environment) : ICacheService
 {
-    private readonly string _tenantPrefix = tenantOptions.Value.TenantId != Guid.Empty
-        ? $"environment:{environment.EnvironmentName}:tenant:{tenantOptions.Value.TenantId:D}:"
-        : throw new InvalidOperationException("A server-configured tenant is required for caching.");
     private readonly CacheEntryOptions _defaults = CacheEntryOptions.FromMinutes(
         settings.Value.DefaultExpirationMinutes,
         settings.Value.DefaultLocalExpirationMinutes);
@@ -50,12 +48,13 @@ public sealed class HybridCacheService(
     public ValueTask RemoveAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default) =>
         cache.RemoveAsync(keys.Select(ScopedKey), cancellationToken);
 
-    // All current entries contain deployment-owned data (including lookups and
-    // field definitions). There are deliberately no globally shared entries.
+    // All current entries contain tenant-owned data (including lookups and field definitions).
+    // There are deliberately no globally shared entries, so an unbound flow cannot use the cache.
     private string ScopedKey(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return _tenantPrefix + key;
+        var tenant = tenantContext.Current ?? throw TenantAccessException.Required();
+        return $"environment:{environment.EnvironmentName}:tenant:{tenant.Id:D}:{key}";
     }
 
     private HybridCacheEntryOptions ToHybridOptions(CacheEntryOptions? options)

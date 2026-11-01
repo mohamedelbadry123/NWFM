@@ -26,12 +26,11 @@ public sealed class TenantJwtConfigurationTests
         });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["JwtSettings:SigningKey"] = key,
-            ["Application:TenantId"] = Guid.NewGuid().ToString()
+            ["JwtSettings:SigningKey"] = key
         });
 
         var error = Assert.Throws<OptionsValidationException>(() =>
-            builder.AddAuthInfrastructure("Server=unused;Database=unused"));
+            builder.AddAuthInfrastructure());
 
         Assert.Contains("at least 32 UTF-8 bytes", error.Message);
         if (key.Length != 0) Assert.DoesNotContain(key, error.Message);

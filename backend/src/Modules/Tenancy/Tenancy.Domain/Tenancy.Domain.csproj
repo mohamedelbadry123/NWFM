@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The tenant catalog's model: tenants, their databases and hosts, plans and subscriptions,
+    signups, platform staff, support-access grants and sessions, and the platform audit trail.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\NWFM.Shared\NWFM.Shared.csproj" />
+  </ItemGroup>
+</Project>
