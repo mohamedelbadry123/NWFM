@@ -136,9 +136,24 @@ jobs:
       - run: dotnet restore backend/NWFM.sln
       - name: Dependency audit
         run: npm run security:dependencies
+      - name: Complete OWASP requirement inventory and upstream drift
+        if: ${{ !cancelled() }}
+        run: npm run security:tenancy -- --check-upstream
+      - name: Tenant security behavioral regressions
+        if: ${{ !cancelled() }}
+        run: dotnet test backend/NWFM.sln --configuration Release --no-restore --filter "FullyQualifiedName~Security|FullyQualifiedName~NWFM.Tests.Tenancy|FullyQualifiedName~NWFM.Tests.Platform|FullyQualifiedName~WorkflowIntegrationTests|FullyQualifiedName~SubmissionMediaIsolationTests" --logger "trx;LogFileName=tenant-security.trx"
       - name: Secret scan
         if: ${{ !cancelled() }}
         run: bash scripts/quality/scan-secrets.sh
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tenant-security-evidence
+          path: |
+            .e2e/security/
+            backend/**/TestResults/tenant-security.trx
+          include-hidden-files: true
+          retention-days: 7
 
   e2e:
     name: E2E

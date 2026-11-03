@@ -26,7 +26,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
         ILogger<WorkflowTimerHostedService> logger)
     {
         _scopeFactory = scopeFactory;
-        _logger       = logger;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,9 +37,12 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
         {
             try
             {
-                await ProcessDueTimersAsync(stoppingToken);
-                await ProcessOverdueRemindersAsync(stoppingToken);
-                await ProcessEscalationsAsync(stoppingToken);
+                await WorkflowTenantAdmission.ForEachTenantAsync(_scopeFactory, async ct =>
+                {
+                    await ProcessDueTimersAsync(ct);
+                    await ProcessOverdueRemindersAsync(ct);
+                    await ProcessEscalationsAsync(ct);
+                }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -64,6 +67,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
     private async Task ProcessDueTimersAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        if (!await WorkflowTenantAdmission.IsActiveAsync(scope.ServiceProvider, cancellationToken)) return;
         var timerRepo = scope.ServiceProvider.GetRequiredService<IWorkflowTimerRepository>();
         var engine = scope.ServiceProvider.GetRequiredService<IWorkflowRuntimeEngine>();
 
@@ -72,6 +76,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
 
         foreach (var timer in dueTimers)
         {
+            await WorkflowTenantAdmission.RequireMessageScopeAsync(scope.ServiceProvider, timer.OrganizationId, cancellationToken);
             try
             {
                 var result = await engine.ResumeFromTimerAsync(timer.Id, DateTime.UtcNow, cancellationToken);
@@ -92,6 +97,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
     private async Task ProcessOverdueRemindersAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        if (!await WorkflowTenantAdmission.IsActiveAsync(scope.ServiceProvider, cancellationToken)) return;
         var workItemRepo = scope.ServiceProvider.GetRequiredService<IWorkItemRepository>();
         var activityRepo = scope.ServiceProvider.GetRequiredService<IActivityInstanceRepository>();
         var eventRepo = scope.ServiceProvider.GetRequiredService<IWorkflowEventRepository>();
@@ -102,6 +108,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
 
         foreach (var item in overdue)
         {
+            await WorkflowTenantAdmission.RequireMessageScopeAsync(scope.ServiceProvider, item.OrganizationId, cancellationToken);
             try
             {
                 var instanceEvents = await eventRepo.GetByInstanceIdAsync(item.WorkflowInstanceId, cancellationToken);
@@ -137,6 +144,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
     private async Task ProcessEscalationsAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        if (!await WorkflowTenantAdmission.IsActiveAsync(scope.ServiceProvider, cancellationToken)) return;
         var workItemRepo = scope.ServiceProvider.GetRequiredService<IWorkItemRepository>();
         var activityRepo = scope.ServiceProvider.GetRequiredService<IActivityInstanceRepository>();
         var eventRepo = scope.ServiceProvider.GetRequiredService<IWorkflowEventRepository>();
@@ -153,6 +161,7 @@ internal sealed class WorkflowTimerHostedService : BackgroundService
 
         foreach (var item in overdue)
         {
+            await WorkflowTenantAdmission.RequireMessageScopeAsync(scope.ServiceProvider, item.OrganizationId, cancellationToken);
             try
             {
                 if (item.Status is WorkItemStatus.Completed or WorkItemStatus.Cancelled)

@@ -10,6 +10,12 @@ public interface IUserAccountService
     Task<Result<string>> UpdateUserAsync(string userId, EditedUserAccount account, CancellationToken ct);
     Task<Result<string>> SetUserEnabledAsync(string userId, bool isEnabled, CancellationToken ct);
     Task<Result<string>> ResetPasswordAsync(string userId, string newPassword, CancellationToken ct);
+
+    /// <summary>
+    /// Completes a password set-up link (a password-reset token the control plane generated when it
+    /// created the account). An invalid, expired or reused token fails without saying which.
+    /// </summary>
+    Task<Result<string>> CompletePasswordSetupAsync(string userId, string token, string newPassword, CancellationToken ct);
     Task<Result<IReadOnlyList<string>>> GetAssignableRolesAsync(CancellationToken ct);
 
     /// <summary>

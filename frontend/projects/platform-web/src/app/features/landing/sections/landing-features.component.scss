@@ -1,0 +1,109 @@
+@use '../landing-kit' as kit;
+
+:host {
+  @include kit.tokens;
+  @include kit.section-block;
+}
+
+:host-context([data-theme='dark']) {
+  @include kit.dark-tokens;
+}
+
+.container {
+  @include kit.container;
+}
+
+.section-head {
+  @include kit.section-head;
+}
+
+.eyebrow {
+  @include kit.eyebrow;
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.33rem;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1.67rem;
+  padding: 2rem;
+  @include kit.tile;
+
+  &.wide {
+    grid-column: span 2;
+
+    @media (max-width: 640px) {
+      grid-column: auto;
+    }
+  }
+
+  &:hover .mini {
+    transform: translateY(-2px);
+  }
+}
+
+.tile-copy {
+  h3 {
+    margin: 1.2rem 0 0.53rem;
+    font-size: 1.47rem;
+    font-weight: 700;
+    color: var(--lp-ink);
+  }
+
+  p {
+    max-width: 45.33rem;
+    margin: 0;
+    font-size: 1.24rem;
+    line-height: 1.6;
+    color: var(--p-text-muted-color);
+  }
+}
+
+.tile-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 3.33rem;
+  height: 3.33rem;
+  border-radius: 1rem;
+  background: var(--lp-gradient);
+  color: #ffffff;
+  box-shadow: 0 8px 18px -8px var(--lp-glow);
+
+  i {
+    font-size: 1.47rem;
+  }
+}
+
+// Every drawing sits on the same inset panel at the foot of its tile.
+.mini {
+  margin-top: auto;
+  padding: 1.33rem;
+  overflow: hidden;
+  background: var(--lp-inset);
+  border: 1px solid var(--app-border);
+  border-radius: 1.13rem;
+  transition: transform 0.25s ease;
+
+  &.flush {
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini {
+    transition: none;
+  }
+}

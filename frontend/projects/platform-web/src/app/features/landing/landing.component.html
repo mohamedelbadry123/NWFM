@@ -1,0 +1,87 @@
+<ng-container *appI18n="let t">
+  <div class="landing">
+    <app-landing-nav />
+
+    <section class="hero">
+      <div class="hero-backdrop" aria-hidden="true"></div>
+
+      <div class="hero-copy">
+        <button type="button" class="hero-badge" (click)="go(sections.features)">
+          <span class="badge-tag">{{ t('landing.hero.badgeTag') }}</span>
+          <span class="badge-text">{{ t('landing.hero.badge') }}</span>
+          <i class="pi pi-arrow-right rtl-flip"></i>
+        </button>
+
+        <h1>
+          {{ t('landing.hero.titleStart') }}
+          <span class="highlight">{{ t('landing.hero.titleHighlight') }}</span>
+        </h1>
+        <p class="lead">{{ t('landing.hero.subtitle') }}</p>
+
+        <div class="actions">
+          <p-button
+            [label]="t('landing.hero.primaryCta')"
+            icon="pi pi-arrow-right"
+            iconPos="right"
+            size="large"
+            routerLink="/signup"
+            styleClass="cta-main"
+          />
+          <p-button
+            [label]="t('landing.hero.secondaryCta')"
+            icon="pi pi-sign-in"
+            size="large"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="go(sections.workspaces)"
+          />
+        </div>
+
+        <ul class="points">
+          @for (point of heroPoints; track point) {
+            <li><i class="pi pi-check-circle"></i>{{ t(point) }}</li>
+          }
+        </ul>
+
+        @if (showProof()) {
+          <div class="proof">
+            <span class="avatar-stack">
+              @for (tenant of proofTenants(); track tenant.key) {
+                <span class="avatar" [title]="tenant.name">{{ initials(tenant.name) }}</span>
+              }
+            </span>
+            <span>{{ t('landing.hero.proof', { count: tenants().length }) }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="hero-visual">
+        <app-landing-hero-visual />
+      </div>
+    </section>
+
+    <section class="strip" [attr.aria-label]="t('landing.strip.label')">
+      <p class="strip-title">{{ t('landing.strip.title') }}</p>
+      <ul>
+        @for (item of capabilities; track item.key) {
+          <li><i [class]="item.icon"></i>{{ t(item.key) }}</li>
+        }
+      </ul>
+    </section>
+
+    <app-landing-features class="reveal" [attr.id]="sections.features" />
+    <app-landing-how class="reveal" [attr.id]="sections.how" />
+    <app-landing-trust class="reveal" />
+    <app-landing-pricing class="reveal" [attr.id]="sections.pricing" />
+    <app-landing-workspaces
+      [attr.id]="sections.workspaces"
+      [tenants]="tenants()"
+      [loading]="loading()"
+      [failed]="failed()"
+      (retry)="load()"
+    />
+    <app-landing-faq class="reveal" [attr.id]="sections.faq" />
+    <app-landing-cta class="reveal" />
+    <app-landing-footer class="footer" />
+  </div>
+</ng-container>

@@ -1,0 +1,47 @@
+<div class="denied-page">
+  <div class="denied-card">
+    <span class="denied-icon"><i class="pi pi-key"></i></span>
+    <h1>{{ 'tenancy.activate.title' | translate }}</h1>
+    @if (!linkValid) {
+      <p class="denied-message">{{ 'tenancy.activate.invalidLink' | translate }}</p>
+    } @else {
+      <p class="denied-message">{{ 'tenancy.activate.subtitle' | translate }}</p>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="flex flex-col gap-3 w-full">
+        <label for="newPassword">{{ 'tenancy.activate.newPassword' | translate }}</label>
+        <p-password
+          inputId="newPassword"
+          formControlName="newPassword"
+          [toggleMask]="true"
+          [feedback]="true"
+          styleClass="w-full"
+          inputStyleClass="w-full"
+        />
+        <label for="confirmPassword">{{ 'tenancy.activate.confirmPassword' | translate }}</label>
+        <p-password
+          inputId="confirmPassword"
+          formControlName="confirmPassword"
+          [toggleMask]="true"
+          [feedback]="false"
+          styleClass="w-full"
+          inputStyleClass="w-full"
+        />
+        @if (form.touched && form.hasError('mismatch')) {
+          <small class="text-red-600">{{ 'tenancy.activate.mismatch' | translate }}</small>
+        }
+        @if (form.controls.newPassword.touched && form.controls.newPassword.hasError('minlength')) {
+          <small class="text-red-600">{{ 'tenancy.activate.tooShort' | translate }}</small>
+        }
+        @if (error(); as message) {
+          <small class="text-red-600">{{ message }}</small>
+        }
+        <p-button
+          type="submit"
+          [label]="'tenancy.activate.submit' | translate"
+          [loading]="saving()"
+          [disabled]="saving()"
+          styleClass="w-full"
+        />
+      </form>
+    }
+  </div>
+</div>

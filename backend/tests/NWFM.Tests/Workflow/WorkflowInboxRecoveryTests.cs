@@ -1,16 +1,18 @@
 namespace NWFM.Tests.Modules.Workflow;
 
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
-using NWFM.Shared.Results;
 using global::Workflow.Application.Abstractions;
 using global::Workflow.Application.Commands.ReplayInboxMessage;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Domain.Repositories;
 using global::Workflow.Infrastructure.Background;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using NWFM.Shared.Abstractions;
+using NWFM.Shared.Results;
+using NWFM.Tests.Tenancy;
 
 public sealed class WorkflowInboxRecoveryTests
 {
@@ -68,6 +70,8 @@ public sealed class WorkflowInboxRecoveryTests
         var engine = new Mock<IWorkflowRuntimeEngine>();
 
         await using var services = new ServiceCollection()
+            .AddSingleton(TestTenants.Fixed(TestTenants.Active(organizationId)))
+            .AddSingleton(Mock.Of<ITenantAvailability>(a => a.IsActiveAsync(It.IsAny<CancellationToken>()) == Task.FromResult(true)))
             .AddSingleton(inbox.Object)
             .AddSingleton(instances.Object)
             .AddSingleton(engine.Object)

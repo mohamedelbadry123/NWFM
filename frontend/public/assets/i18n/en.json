@@ -3020,5 +3020,40 @@
     "updated": "Mapping updated.",
     "confirmActivate": "Activate the mapping for {{code}}?",
     "confirmDeactivate": "Deactivate the mapping for {{code}}? Its code falls back to the built-in rule."
+  },
+  "tenancy": {
+    "unavailable": {
+      "title": "Workspace unavailable",
+      "retry": "Try again",
+      "platform": "Go to the NWFM home page",
+      "reasons": {
+        "NotFound": "No workspace exists at this address. Check the link you were given.",
+        "Required": "This address does not name a workspace. Open your workspace's own link, for example acme.example.com.",
+        "Suspended": "This workspace is suspended. Contact your administrator or NWFM support.",
+        "Maintenance": "This workspace is under maintenance. Please try again shortly.",
+        "SchemaUpgradePending": "This workspace is being upgraded. Please try again in a few minutes.",
+        "Unverified": "This workspace's database failed its security checks and is unavailable until an operator fixes it.",
+        "SubscriptionInactive": "This workspace's subscription is not active. Contact your administrator.",
+        "Inactive": "This workspace is not active.",
+        "Unknown": "This workspace cannot be used right now."
+      }
+    },
+    "activate": {
+      "title": "Set your password",
+      "subtitle": "Choose a password to finish setting up your account. You will sign in with it next.",
+      "invalidLink": "This activation link is incomplete. Open the link from your e-mail again.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm password",
+      "mismatch": "The passwords do not match.",
+      "tooShort": "Use at least 8 characters.",
+      "submit": "Set password",
+      "done": "Your password is set. Sign in to continue."
+    },
+    "support": {
+      "signingIn": "Opening the support session...",
+      "failedTitle": "Support session unavailable",
+      "failed": "The support link has expired, was already used, or the workspace withdrew its consent.",
+      "toLogin": "Go to sign in"
+    }
   }
 }

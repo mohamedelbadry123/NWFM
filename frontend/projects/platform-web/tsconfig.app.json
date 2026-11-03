@@ -1,0 +1,14 @@
+/* The platform web app: landing page, subscription signup and the staff console. */
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../out-tsc/platform-web",
+    "types": [],
+    // Replaces the tenant app's aliases: this app never imports the tenant app's code.
+    "paths": {
+      "@platform/shared": ["projects/platform-web/src/app/shared/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

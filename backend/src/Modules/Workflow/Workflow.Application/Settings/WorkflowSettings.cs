@@ -6,6 +6,14 @@ public sealed class WorkflowSettings
 
     public bool IsEnabled { get; set; }
     public bool AllowPrivateConnections { get; set; }
+    /// <summary>Maximum active entries in each persisted tenant queue, including retries.</summary>
+    public int MaxPendingPerQueue { get; set; } = 10000;
+
+    /// <summary>
+    /// Per-tenant overrides of <see cref="MaxPendingPerQueue"/>, keyed by tenant id. One tenant API serves
+    /// every workspace, so a workspace that needs a tighter or looser bound gets it here.
+    /// </summary>
+    public Dictionary<string, int> MaxPendingPerQueueByTenant { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// When true, seeds the designer example workflow on startup.

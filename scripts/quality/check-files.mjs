@@ -9,19 +9,21 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2);
 const write = args.includes('--write');
+const changedFiles = (...range) =>
+  execFileSync('git', ['diff', '--name-only', '-z', '--diff-filter=ACMR', ...range], {
+    encoding: 'utf8',
+  })
+    .split('\0')
+    .filter(Boolean);
 let files;
 const baseIndex = args.indexOf('--base');
 if (baseIndex >= 0) {
   const base = args[baseIndex + 1];
   if (!/^[0-9a-f]{40,64}$/.test(base ?? ''))
     throw new Error('--base requires an immutable commit SHA.');
-  files = execFileSync(
-    'git',
-    ['diff', '--name-only', '-z', '--diff-filter=ACMR', base + '...HEAD'],
-    { encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean);
+  files = changedFiles(base + '...HEAD');
+} else if (args.includes('--staged')) {
+  files = changedFiles('--cached');
 } else {
   files = args.filter((arg) => arg !== '--write');
 }
@@ -59,12 +61,11 @@ for (const group of chunks(linted))
     ...group,
   ]);
 const csharp = files.filter((file) => file.endsWith('.cs'));
-if (csharp.length) {
+for (const group of chunks(csharp))
   run('dotnet', [
     'format',
     'backend/NWFM.sln',
     ...(write ? [] : ['--verify-no-changes']),
     '--include',
-    ...csharp,
+    ...group,
   ]);
-}

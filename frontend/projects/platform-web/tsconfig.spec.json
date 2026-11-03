@@ -1,0 +1,10 @@
+/* Unit tests of the platform web app. */
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "outDir": "../../out-tsc/platform-web-spec",
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts"],
+  "exclude": []
+}

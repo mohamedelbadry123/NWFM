@@ -8,6 +8,7 @@ namespace Auth.Application.Users.Commands.SetUserStatus;
 [Authorize(Policy = NwfmPolicies.ManageUsers)]
 public sealed record SetUserStatusCommand : IRequest<Result<string>>
 {
-    public string UserId { get; init; } = default!;
+    // The API supplies this from the route before command validation.
+    public string UserId { get; init; } = string.Empty;
     public bool IsEnabled { get; init; }
 }

@@ -1,0 +1,343 @@
+@use './landing-kit' as kit;
+
+// The app's root font is 12px for the dense console UI, so 1rem here is 12px: a marketing page
+// wants ~16px body type, so the page sets its own base and scales PrimeNG's buttons to match.
+:host {
+  display: block;
+  min-height: 100vh;
+  font-size: 1.33rem;
+  --p-button-lg-font-size: 1.33rem;
+  --p-button-lg-padding-x: 1.75rem;
+  --p-button-lg-padding-y: 1rem;
+  --p-button-sm-font-size: 1.1rem;
+  --p-button-sm-padding-x: 1.1rem;
+  --p-button-sm-padding-y: 0.6rem;
+  --lp-gridline: rgba(20, 94, 119, 0.07);
+  @include kit.tokens;
+}
+
+:host-context([data-theme='dark']) {
+  --lp-gridline: rgba(126, 202, 220, 0.06);
+  @include kit.dark-tokens;
+}
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--lp-page);
+  color: var(--p-text-color);
+}
+
+.footer {
+  margin-top: auto;
+}
+
+@include kit.rtl-flip;
+
+:host-context([dir='rtl']) ::ng-deep .p-button-icon.pi-arrow-right {
+  transform: scaleX(-1);
+}
+
+/* ================= Hero ================= */
+.hero {
+  position: relative;
+  padding: 6rem 0 3.33rem;
+
+  @media (max-width: 640px) {
+    padding-top: 4rem;
+  }
+}
+
+.hero-backdrop {
+  position: absolute;
+  inset: -4rem 0 auto;
+  height: 74.67rem;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(80rem 40rem at 50% -6rem, var(--lp-glow), transparent 70%),
+    radial-gradient(40rem 29.33rem at 88% 16rem, rgba(69, 173, 199, 0.14), transparent 70%),
+    radial-gradient(40rem 29.33rem at 8% 29.33rem, rgba(20, 94, 119, 0.1), transparent 70%);
+
+  // A faint blueprint grid that fades out from the top centre.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--lp-gridline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--lp-gridline) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 55% at 50% 10%, #000 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 10%, #000 25%, transparent 75%);
+  }
+}
+
+.hero-copy {
+  position: relative;
+  max-width: 74.67rem;
+  text-align: center;
+  animation: rise 0.7s ease-out both;
+  @include kit.container;
+
+  h1 {
+    margin: 0 0 1.67rem;
+    font-size: clamp(3.13rem, 6vw, 5.67rem);
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    color: var(--lp-ink);
+    text-wrap: balance;
+  }
+
+  .lead {
+    max-width: 53.33rem;
+    margin: 0 auto 2.67rem;
+    font-size: clamp(1.4rem, 1.6vw, 1.6rem);
+    line-height: 1.65;
+    color: var(--p-text-muted-color);
+    text-wrap: pretty;
+  }
+}
+
+// Arabic needs room above and below its letters, and no tracking.
+:host-context([dir='rtl']) .hero-copy h1 {
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+// The gradient paints only the span's box; the bottom padding keeps descenders (Arabic ح, English y)
+// inside it, otherwise they are clipped.
+.highlight {
+  padding-bottom: 0.15em;
+  background: var(--lp-text-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: 100%;
+  margin-bottom: 2rem;
+  padding: 0.4rem;
+  padding-inline-end: 1.2rem;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-surface) 75%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--app-shadow-sm);
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 1.13rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+
+  i {
+    font-size: 0.93rem;
+    color: var(--p-text-muted-color);
+    transition: translate 0.2s ease;
+  }
+
+  // `translate`, not `transform`, so the nudge composes with the RTL flip instead of undoing it.
+  &:hover {
+    border-color: var(--p-primary-color);
+
+    i {
+      translate: 2px 0;
+    }
+  }
+}
+
+:host-context([dir='rtl']) .hero-badge:hover i {
+  translate: -2px 0;
+}
+
+.badge-tag {
+  flex-shrink: 0;
+  padding: 0.2rem 0.8rem;
+  border-radius: 999px;
+  background: var(--lp-gradient);
+  color: #ffffff;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.badge-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+:host ::ng-deep .cta-main {
+  box-shadow: 0 12px 28px -12px var(--lp-glow);
+}
+
+.points {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.67rem 1.87rem;
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.53rem;
+    font-size: 1.17rem;
+    color: var(--p-text-muted-color);
+  }
+
+  i {
+    color: var(--acc-success-fg);
+    font-size: 1.13rem;
+  }
+}
+
+.proof {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2.33rem;
+  font-size: 1.17rem;
+  color: var(--p-text-muted-color);
+}
+
+.avatar-stack {
+  display: inline-flex;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 2.67rem;
+  height: 2.67rem;
+  border: 2px solid var(--lp-page);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--aqua), var(--water-deep));
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 700;
+
+  & + & {
+    margin-inline-start: -0.55rem;
+  }
+}
+
+.hero-visual {
+  position: relative;
+  max-width: 93.33rem;
+  margin-top: 5rem;
+  animation: rise 0.9s 0.15s ease-out both;
+  @include kit.container;
+
+  // Brand-coloured glow the window floats on.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 12% 10% auto;
+    height: 60%;
+    background: var(--lp-gradient);
+    filter: blur(90px);
+    opacity: 0.22;
+    pointer-events: none;
+  }
+
+  app-landing-hero-visual {
+    position: relative;
+  }
+}
+
+/* ================= Capability strip ================= */
+.strip {
+  padding-top: 2rem;
+  padding-bottom: 2.67rem;
+  text-align: center;
+  @include kit.container;
+
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.87rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.67rem;
+    padding: 0.73rem 1.33rem;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--lp-ink);
+  }
+
+  i {
+    color: var(--p-primary-color);
+  }
+}
+
+.strip-title {
+  margin: 0 0 1.47rem;
+  font-size: 1.07rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-text-muted-color);
+}
+
+:host-context([dir='rtl']) .strip-title {
+  letter-spacing: 0;
+}
+
+/* ================= Motion ================= */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.33rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Sections ease in as they scroll into view where the browser supports scroll-driven
+// animations; elsewhere they are simply there.
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy,
+  .hero-visual {
+    animation: none;
+  }
+}

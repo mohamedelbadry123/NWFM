@@ -120,7 +120,7 @@ internal static class TaskSeedData
         await context.SaveChangesAsync(ct);
     }
 
-    public static async Task SeedAsync(IServiceScopeFactory scopeFactory, ILogger logger, CancellationToken ct)
+    public static async Task SeedAsync(IServiceScopeFactory scopeFactory, ILogger logger, CancellationToken ct, bool includeExampleTasks = true)
     {
         using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
@@ -156,6 +156,12 @@ internal static class TaskSeedData
         }
 
         await context.SaveChangesAsync(ct);
+
+        // A new workspace gets the types only; the example tasks are development data.
+        if (!includeExampleTasks)
+        {
+            return;
+        }
 
         var toFill = new List<(FieldTask Task, IReadOnlyDictionary<string, object?> Answers)>();
 

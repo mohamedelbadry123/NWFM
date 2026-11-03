@@ -1,0 +1,80 @@
+<ng-container *appI18n="let t">
+  <figure class="visual" role="img" [attr.aria-label]="t('landing.mock.label')">
+    <div class="window">
+      <div class="window-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="address"><i class="pi pi-lock"></i>{{ t('landing.mock.address') }}</span>
+        <span class="bar-spacer"></span>
+      </div>
+
+      <div class="window-body">
+        <aside class="side">
+          <img [src]="logoMark" alt="" class="side-logo" />
+          @for (item of nav; track item.key) {
+            <span class="side-item" [class.active]="item.active">
+              <i [class]="item.icon"></i>
+              <span>{{ t('landing.mock.nav.' + item.key) }}</span>
+            </span>
+          }
+        </aside>
+
+        <div class="main">
+          <div class="main-head">
+            <div class="main-title">
+              <strong>{{ t('landing.mock.title') }}</strong>
+              <small>{{ t('landing.mock.subtitle') }}</small>
+            </div>
+            <span class="live"><span class="pulse"></span>{{ t('landing.mock.live') }}</span>
+          </div>
+
+          <div class="kpis">
+            @for (kpi of kpis; track kpi.key) {
+              <div class="kpi">
+                <small>{{ t('landing.mock.kpi.' + kpi.key) }}</small>
+                <strong>{{ kpi.value }}</strong>
+                <span [class]="'app-badge app-badge--' + kpi.tone">{{ kpi.trend }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="split">
+            <div class="flow">
+              <span class="flow-chip"
+                ><i class="pi pi-clock"></i>{{ t('landing.mock.slaChip') }}</span
+              >
+              <ol class="flow-steps">
+                @for (step of steps; track step.key) {
+                  <li [class]="'flow-step ' + step.state">
+                    <span class="flow-node"><i [class]="step.icon"></i></span>
+                    <span class="flow-text">
+                      <strong>{{ t('landing.mock.steps.' + step.key + '.title') }}</strong>
+                      <small>{{ t('landing.mock.steps.' + step.key + '.meta') }}</small>
+                    </span>
+                  </li>
+                }
+              </ol>
+            </div>
+
+            <div class="feed">
+              <small class="feed-title">{{ t('landing.mock.feedTitle') }}</small>
+              @for (row of feed; track row.key) {
+                <div class="feed-row">
+                  <span class="feed-icon"><i class="pi pi-sitemap"></i></span>
+                  <span class="feed-text">
+                    <strong>{{ t('landing.mock.feed.' + row.key) }}</strong>
+                    <small>{{ t('landing.mock.feedMeta.' + row.key) }}</small>
+                  </span>
+                  <span [class]="'app-badge app-badge--' + row.tone">{{
+                    t('landing.mock.status.' + row.status)
+                  }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <app-landing-hero-task class="task" />
+  </figure>
+</ng-container>

@@ -1,0 +1,8 @@
+/* Tailwind 4 for the platform app, layered so PrimeNG sits between the reset and the utilities. */
+@layer tailwind-base, primeng, tailwind-utilities;
+
+@import 'tailwindcss/theme.css' layer(tailwind-base);
+@import 'tailwindcss/preflight.css' layer(tailwind-base);
+@import 'tailwindcss/utilities.css' layer(tailwind-utilities);
+
+@source '../app';

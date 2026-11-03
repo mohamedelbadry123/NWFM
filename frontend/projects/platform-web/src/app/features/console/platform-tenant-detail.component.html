@@ -1,0 +1,523 @@
+<ng-container *appI18n="let t">
+  @if (loading() && !tenant()) {
+    <div class="detail-grid">
+      <p-skeleton height="12rem" />
+      <p-skeleton height="12rem" />
+      <p-skeleton height="10rem" />
+      <p-skeleton height="10rem" />
+    </div>
+  } @else if (tenant(); as current) {
+    <div class="mb-3">
+      <a routerLink="/console/tenants" class="back-link"
+        ><i class="pi pi-arrow-left rtl-flip"></i> {{ t('platform.tenants.back') }}</a
+      >
+    </div>
+
+    <div class="detail-grid">
+      <!-- Workspace -->
+      <section class="card p-4">
+        <div class="section-head">
+          <h3>{{ current.name }}</h3>
+          <p-tag [value]="current.status" [severity]="severity(current.status)" />
+          <span class="flex-1"></span>
+          @if (store.isAdmin()) {
+            <p-button
+              [label]="t('common.edit')"
+              icon="pi pi-pencil"
+              size="small"
+              [outlined]="true"
+              [pTooltip]="t('platform.tips.editWorkspace')"
+              tooltipPosition="top"
+              (onClick)="editOpen.set(true)"
+            />
+          }
+        </div>
+        <dl class="facts">
+          <dt>{{ t('platform.tenants.key') }}</dt>
+          <dd>
+            <code>{{ current.key }}</code>
+          </dd>
+          <dt>{{ t('platform.tenants.seedProfile') }}</dt>
+          <dd>{{ seedProfileLabel(current.seedProfile) }}</dd>
+          <dt>{{ t('platform.tenants.edit.contactName') }}</dt>
+          <dd>{{ current.contactName || '—' }}</dd>
+          <dt>{{ t('platform.tenants.edit.contactEmail') }}</dt>
+          <dd>{{ current.contactEmail }}</dd>
+          <dt>{{ t('platform.tenants.edit.contactPhone') }}</dt>
+          <dd>{{ current.contactPhone || '—' }}</dd>
+          <dt>{{ t('platform.tenants.edit.language') }}</dt>
+          <dd>
+            {{
+              current.settings.defaultLanguage === 'ar' ? t('common.arabic') : t('common.english')
+            }}
+          </dd>
+          <dt>{{ t('platform.tenants.created') }}</dt>
+          <dd>{{ current.createdAtUtc | date: 'medium' }}</dd>
+          <dt>{{ t('platform.tenants.activated') }}</dt>
+          <dd>{{ (current.activatedAtUtc | date: 'medium') || '—' }}</dd>
+          <dt>{{ t('platform.tenants.edit.hosts') }}</dt>
+          <dd>{{ current.hosts.length ? current.hosts.join(', ') : '—' }}</dd>
+          <dt>{{ t('platform.tenants.edit.integrations') }}</dt>
+          <dd class="flex flex-wrap gap-1">
+            <p-tag
+              [value]="'SSO'"
+              [severity]="current.settings.ssoEnabled ? 'success' : 'secondary'"
+            />
+          </dd>
+        </dl>
+      </section>
+
+      <!-- Subscription -->
+      <section class="card p-4">
+        <div class="section-head">
+          <h3>
+            {{ t('platform.subscription.title')
+            }}<app-help-tip [text]="t('platform.tips.subscriptionStatus')" />
+          </h3>
+          @if (current.subscription; as sub) {
+            <p-tag [value]="sub.status" [severity]="severity(sub.status)" />
+          }
+          <span class="flex-1"></span>
+          @if (store.isAdmin()) {
+            <p-button
+              [label]="t('platform.subscription.manage')"
+              icon="pi pi-credit-card"
+              size="small"
+              [outlined]="true"
+              [pTooltip]="t('platform.tips.manageSubscription')"
+              tooltipPosition="top"
+              (onClick)="subscriptionOpen.set(true)"
+            />
+          }
+        </div>
+        @if (current.subscription; as sub) {
+          <dl class="facts">
+            <dt>{{ t('platform.tenants.plan') }}</dt>
+            <dd>
+              {{ sub.planCode }} —
+              {{ language.current() === 'ar' ? sub.planNameAr : sub.planNameEn }}
+            </dd>
+            <dt>{{ t('platform.subscription.started') }}</dt>
+            <dd>{{ sub.startedAtUtc | date: 'mediumDate' }}</dd>
+            <dt>{{ t('platform.subscription.trialEnds') }}</dt>
+            <dd>{{ (sub.trialEndsAtUtc | date: 'mediumDate') || '—' }}</dd>
+            <dt>{{ t('platform.subscription.periodEnds') }}</dt>
+            <dd>
+              {{
+                (sub.periodEndsAtUtc | date: 'mediumDate') || t('platform.subscription.openEnded')
+              }}
+            </dd>
+            <dt>{{ t('platform.plans.maxUsers') }}</dt>
+            <dd>{{ sub.maxUsers ?? '∞' }}</dd>
+            <dt>{{ t('platform.plans.maxTeams') }}</dt>
+            <dd>{{ sub.maxTeams ?? '∞' }}</dd>
+            <dt>{{ t('platform.plans.storage') }}</dt>
+            <dd>{{ sub.maxStorageGb ?? '∞' }}</dd>
+            <dt>{{ t('platform.subscription.notes') }}</dt>
+            <dd>{{ sub.notes || '—' }}</dd>
+          </dl>
+        } @else {
+          <p class="muted">{{ t('platform.subscription.none') }}</p>
+        }
+      </section>
+
+      <!-- Workspace status -->
+      <section class="card p-4">
+        <div class="section-head">
+          <h3>
+            {{ t('platform.tenants.statusTitle')
+            }}<app-help-tip [text]="t('platform.tips.statusSection')" />
+          </h3>
+        </div>
+        @if (current.statusReason) {
+          <p class="muted">{{ t('platform.tenants.reason') }}: {{ current.statusReason }}</p>
+        }
+        @if (store.isAdmin()) {
+          <textarea
+            pTextarea
+            [(ngModel)]="reason"
+            [placeholder]="t('platform.tenants.reasonHint')"
+            rows="2"
+            class="w-full mb-3"
+          ></textarea>
+          <div class="flex flex-wrap gap-2">
+            <p-button
+              [label]="t('common.activate')"
+              [pTooltip]="t('platform.tips.activate')"
+              tooltipPosition="top"
+              icon="pi pi-play"
+              [loading]="statusBusy() === statusActions.Activate"
+              [disabled]="statusBusy() !== null"
+              (onClick)="changeStatus(statusActions.Activate)"
+            />
+            <p-button
+              [label]="t('platform.tenants.suspend')"
+              [pTooltip]="t('platform.tips.suspend')"
+              tooltipPosition="top"
+              icon="pi pi-ban"
+              severity="danger"
+              [loading]="statusBusy() === statusActions.Suspend"
+              [disabled]="statusBusy() !== null || !canChangeStatus(statusActions.Suspend)"
+              (onClick)="changeStatus(statusActions.Suspend)"
+            />
+            <p-button
+              [label]="t('platform.tenants.maintenance')"
+              [pTooltip]="t('platform.tips.maintenance')"
+              tooltipPosition="top"
+              icon="pi pi-wrench"
+              severity="warn"
+              [loading]="statusBusy() === statusActions.Maintenance"
+              [disabled]="statusBusy() !== null || !canChangeStatus(statusActions.Maintenance)"
+              (onClick)="changeStatus(statusActions.Maintenance)"
+            />
+          </div>
+        } @else {
+          <p class="muted">{{ t('platform.adminOnly') }}</p>
+        }
+      </section>
+
+      <!-- Database / schema -->
+      <section class="card p-4">
+        <div class="section-head">
+          <h3>
+            {{ t('platform.schema.title') }}<app-help-tip [text]="t('platform.tips.schema')" />
+          </h3>
+          <span class="flex-1"></span>
+          @if (store.isAdmin()) {
+            <p-button
+              [label]="t('platform.schema.migrate')"
+              [pTooltip]="t('platform.tips.migrate')"
+              tooltipPosition="top"
+              icon="pi pi-sync"
+              size="small"
+              [outlined]="true"
+              [loading]="migrating()"
+              [disabled]="migrating()"
+              (onClick)="migrate()"
+            />
+            <p-button
+              [label]="t('platform.schema.verify')"
+              [pTooltip]="t('platform.tips.verify')"
+              tooltipPosition="top"
+              icon="pi pi-shield"
+              size="small"
+              [outlined]="true"
+              [loading]="verifying()"
+              [disabled]="verifying()"
+              (onClick)="verifyDatabase()"
+            />
+          }
+        </div>
+        <dl class="facts">
+          <dt>{{ t('platform.schema.mode') }}</dt>
+          <dd>{{ current.database?.mode || '—' }}</dd>
+          <dt>{{ t('platform.schema.database') }}</dt>
+          <dd>
+            {{ current.database?.databaseName || current.database?.connectionStringName || '—' }}
+          </dd>
+          <dt>{{ t('platform.tenants.schema') }}</dt>
+          <dd>{{ current.database?.schemaVersion || '—' }}</dd>
+          <dt>{{ t('platform.schema.lastMigrated') }}</dt>
+          <dd>{{ (current.database?.lastMigratedAtUtc | date: 'medium') || '—' }}</dd>
+          <dt>{{ t('platform.schema.runtimePrincipal') }}</dt>
+          <dd>{{ current.database?.runtimePrincipal || '—' }}</dd>
+          <dt>{{ t('platform.schema.verifiedAt') }}</dt>
+          <dd>
+            {{
+              (current.database?.verifiedAtUtc | date: 'medium') || t('platform.schema.notVerified')
+            }}
+          </dd>
+        </dl>
+        @if (current.database?.lastMigrationError; as migrationError) {
+          <p class="error-text">{{ migrationError }}</p>
+        }
+        @if (store.isAdmin()) {
+          <div class="flex items-center gap-2 mt-3 mb-2">
+            <h4 class="m-0">
+              {{ t('platform.connection.title')
+              }}<app-help-tip [text]="t('platform.tips.connection')" />
+            </h4>
+            <span class="flex-1"></span>
+            @if (connection()) {
+              <p-button
+                [label]="t('platform.connection.reveal')"
+                [pTooltip]="t('platform.tips.reveal')"
+                tooltipPosition="top"
+                icon="pi pi-eye"
+                size="small"
+                severity="warn"
+                [outlined]="true"
+                (onClick)="revealOpen.set(true)"
+              />
+            }
+          </div>
+          @if (connectionLoading()) {
+            <p-skeleton height="1.5rem" />
+          } @else if (connection(); as conn) {
+            <dl class="facts">
+              <dt>{{ t('platform.connection.server') }}</dt>
+              <dd dir="ltr">
+                <code>{{ conn.server || '—' }}</code>
+              </dd>
+              <dt>{{ t('platform.connection.database') }}</dt>
+              <dd dir="ltr">
+                <code>{{ conn.database || '—' }}</code>
+              </dd>
+              <dt>{{ t('platform.connection.user') }}</dt>
+              <dd dir="ltr">
+                <code>{{
+                  conn.integratedSecurity ? t('platform.connection.integrated') : conn.userId || '—'
+                }}</code>
+              </dd>
+            </dl>
+            <code class="connection-string" dir="ltr">{{ conn.masked }}</code>
+          } @else {
+            <p class="muted">{{ t('platform.connection.unavailable') }}</p>
+          }
+        }
+        <h4 class="mt-3 mb-2">
+          {{ t('platform.schema.pending')
+          }}<app-help-tip [text]="t('platform.tips.pendingMigrations')" />
+        </h4>
+        @if (pendingLoading()) {
+          <p-skeleton height="1.5rem" />
+        } @else if (pendingMigrations() === null) {
+          <p class="muted">{{ t('platform.schema.pendingUnknown') }}</p>
+        } @else if (pendingMigrations()!.length === 0) {
+          <p class="muted">{{ t('platform.schema.upToDate') }}</p>
+        } @else {
+          <ul class="pending-list">
+            @for (migration of pendingMigrations(); track migration) {
+              <li>
+                <code>{{ migration }}</code>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </div>
+
+    <!-- Workspace administrators -->
+    <section class="card p-4 mt-3">
+      <div class="section-head">
+        <h3>{{ t('platform.admins.title') }}<app-help-tip [text]="t('platform.tips.admins')" /></h3>
+        <span class="flex-1"></span>
+        @if (store.isAdmin() && !adminsError()) {
+          <p-button
+            [label]="t('platform.admins.add')"
+            [pTooltip]="t('platform.tips.addAdmin')"
+            tooltipPosition="top"
+            icon="pi pi-user-plus"
+            size="small"
+            [disabled]="adminsLoading() || adminBusyId() !== null"
+            (onClick)="addAdminOpen.set(true)"
+          />
+        }
+      </div>
+      @if (adminsError(); as adminsErrorText) {
+        <p class="muted">{{ adminsErrorText }}</p>
+      } @else {
+        <p-table [value]="admins()" [loading]="adminsLoading()">
+          <ng-template #header>
+            <tr>
+              <th>{{ t('platform.admins.userName') }}</th>
+              <th>{{ t('platform.admins.phone') }}</th>
+              <th>
+                {{ t('platform.admins.status')
+                }}<app-help-tip [text]="t('platform.tips.adminStatus')" />
+              </th>
+              <th>{{ t('platform.admins.created') }}</th>
+              @if (store.isAdmin()) {
+                <th>{{ t('common.actions') }}</th>
+              }
+            </tr>
+          </ng-template>
+          <ng-template #body let-row>
+            <tr>
+              <td dir="ltr">{{ row.userName }}</td>
+              <td dir="ltr">{{ row.phoneNumber || '—' }}</td>
+              <td>
+                <p-tag [value]="adminStatusLabel(row.status)" [severity]="severity(row.status)" />
+              </td>
+              <td>{{ row.createdAt | date: 'mediumDate' }}</td>
+              @if (store.isAdmin()) {
+                <td class="flex flex-wrap gap-2">
+                  @if (row.status === adminStatuses.suspended) {
+                    <p-button
+                      [label]="t('platform.admins.reactivate')"
+                      [pTooltip]="t('platform.tips.reactivateAdmin')"
+                      tooltipPosition="top"
+                      icon="pi pi-play"
+                      size="small"
+                      [outlined]="true"
+                      [loading]="adminBusyId() === row.userId"
+                      [disabled]="adminBusyId() !== null"
+                      (onClick)="reactivateAdmin(row)"
+                    />
+                  } @else {
+                    <p-button
+                      [label]="t('platform.admins.resend')"
+                      [pTooltip]="t('platform.tips.resendCredentials')"
+                      tooltipPosition="top"
+                      icon="pi pi-envelope"
+                      size="small"
+                      [outlined]="true"
+                      [loading]="adminBusyId() === row.userId"
+                      [disabled]="adminBusyId() !== null"
+                      (onClick)="resendCredentials(row)"
+                    />
+                    <p-button
+                      [label]="t('platform.admins.suspend')"
+                      [pTooltip]="t('platform.tips.suspendAdmin')"
+                      tooltipPosition="top"
+                      icon="pi pi-ban"
+                      size="small"
+                      severity="danger"
+                      [outlined]="true"
+                      [disabled]="adminBusyId() !== null"
+                      (onClick)="openSuspend(row)"
+                    />
+                  }
+                </td>
+              }
+            </tr>
+          </ng-template>
+          <ng-template #emptymessage>
+            <tr>
+              <td [attr.colspan]="store.isAdmin() ? 5 : 4" class="text-center p-3">
+                {{ t('platform.admins.empty') }}
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </section>
+
+    <!-- Support -->
+    <section class="card p-4 mt-3">
+      <div class="section-head">
+        <h3>
+          {{ t('platform.support.title') }}<app-help-tip [text]="t('platform.tips.support')" />
+        </h3>
+        <span class="flex-1"></span>
+        <a
+          [routerLink]="['/console/audit']"
+          [queryParams]="{ tenantId: current.id }"
+          class="me-3"
+          >{{ t('platform.audit.forTenant') }}</a
+        >
+        <p-button
+          [label]="t('platform.support.start')"
+          icon="pi pi-sign-in"
+          size="small"
+          [pTooltip]="t('platform.tips.startSupport')"
+          tooltipPosition="top"
+          (onClick)="sessionOpen.set(true)"
+        />
+      </div>
+
+      <h4 class="mb-2">
+        {{ t('platform.support.grants') }}<app-help-tip [text]="t('platform.tips.supportGrants')" />
+      </h4>
+      <p-table [value]="grants()" [loading]="supportLoading()" styleClass="mb-4">
+        <ng-template #header>
+          <tr>
+            <th>{{ t('platform.support.scope') }}</th>
+            <th>{{ t('platform.support.reason') }}</th>
+            <th>{{ t('platform.support.expires') }}</th>
+            <th>{{ t('platform.tenants.status') }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-row>
+          <tr>
+            <td>{{ row.scope }}</td>
+            <td>{{ row.reason }}</td>
+            <td>{{ row.expiresAtUtc | date: 'short' }}</td>
+            <td>
+              <p-tag
+                [value]="
+                  row.isActive ? t('platform.support.active') : t('platform.support.inactive')
+                "
+                [severity]="row.isActive ? 'success' : 'secondary'"
+              />
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template #emptymessage>
+          <tr>
+            <td colspan="4" class="text-center p-3">{{ t('platform.support.noGrants') }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+
+      <h4 class="mb-2">{{ t('platform.support.sessions') }}</h4>
+      <p-table [value]="sessions()" [loading]="supportLoading()">
+        <ng-template #header>
+          <tr>
+            <th>{{ t('platform.support.agent') }}</th>
+            <th>{{ t('platform.support.asUser') }}</th>
+            <th>{{ t('platform.support.ticket') }}</th>
+            <th>{{ t('platform.support.started') }}</th>
+            <th>{{ t('common.actions') }}</th>
+          </tr>
+        </ng-template>
+        <ng-template #body let-row>
+          <tr>
+            <td>{{ row.platformUserName }}</td>
+            <td>{{ row.impersonatedUserName }}</td>
+            <td>{{ row.ticketReference }}</td>
+            <td>{{ row.startedAtUtc | date: 'short' }}</td>
+            <td>
+              @if (row.isActive) {
+                <p-button
+                  [label]="t('platform.support.end')"
+                  size="small"
+                  severity="secondary"
+                  [loading]="endingSessionId() === row.id"
+                  [disabled]="endingSessionId() !== null"
+                  (onClick)="endSession(row.id)"
+                />
+              }
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template #emptymessage>
+          <tr>
+            <td colspan="5" class="text-center p-3">{{ t('platform.support.noSessions') }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </section>
+
+    <app-platform-tenant-edit-dialog
+      [(visible)]="editOpen"
+      [tenant]="current"
+      (saved)="onTenantSaved($event)"
+    />
+    <app-platform-subscription-dialog
+      [(visible)]="subscriptionOpen"
+      [tenant]="current"
+      (saved)="onTenantSaved($event)"
+    />
+    <app-platform-support-session-dialog [(visible)]="sessionOpen" [tenant]="current" />
+    @if (store.isAdmin()) {
+      <app-platform-connection-string-dialog [(visible)]="revealOpen" [tenant]="current" />
+      <app-platform-tenant-admin-dialog
+        [(visible)]="addAdminOpen"
+        [tenant]="current"
+        (saved)="onAdminCreated($event)"
+      />
+      <app-platform-tenant-admin-suspend-dialog
+        [(visible)]="suspendOpen"
+        [tenant]="current"
+        [admin]="suspendTarget()"
+        (saved)="onAdminSuspended($event)"
+      />
+    }
+  } @else {
+    <div class="card p-4 text-center">
+      <p>{{ t('platform.tenants.notFound') }}</p>
+      <a routerLink="/console/tenants">{{ t('platform.tenants.back') }}</a>
+    </div>
+  }
+</ng-container>

@@ -1,19 +1,20 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('backend', 'frontend')]
+    [ValidateSet('backend', 'frontend', 'platform', 'platform-web')]
     [string]$Component
 )
 
 # Exit codes: 0 = free, 1 = healthy NWFM service, 2 = conflict or unhealthy service.
 $ErrorActionPreference = 'Stop'
-$port = if ($Component -eq 'backend') { 5081 } else { 4200 }
+$port = switch ($Component) { 'backend' { 5081 } 'platform' { 5180 } 'platform-web' { 4300 } default { 4200 } }
+$application = if ($Component -eq 'platform') { 'NWFM.Platform' } else { 'NWFM' }
 try {
     $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
     if (-not ($listeners | Where-Object { $_.Port -eq $port })) { exit 0 }
 
-    if ($Component -eq 'backend') {
+    if ($Component -in 'backend', 'platform') {
         $health = Invoke-RestMethod "http://localhost:$port/health" -TimeoutSec 5
-        if ($health.application -eq 'NWFM' -and $health.status -eq 'ok') {
+        if ($health.application -eq $application -and $health.status -eq 'ok') {
             Write-Host "NWFM backend is already running on port $port."
             exit 1
         }
@@ -30,5 +31,5 @@ try {
 
 Write-Host "ERROR: Port $port is occupied, but a healthy NWFM $Component could not be verified."
 Write-Host 'Resolve the conflicting application or unhealthy server, then rerun start-dev.bat.'
-Write-Host 'NWFM development uses frontend 4200 and backend 5081. No alternate port will be selected.'
+Write-Host 'NWFM development uses frontend 4200, backend 5081, platform-web 4300 and platform 5180. No alternate port will be selected.'
 exit 2

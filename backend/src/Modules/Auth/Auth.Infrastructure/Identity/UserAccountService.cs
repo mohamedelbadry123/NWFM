@@ -169,6 +169,8 @@ public sealed class UserAccountService(
         if (!enabledLockout.Succeeded) return Failed(enabledLockout);
 
         var result = await userManager.SetLockoutEndDateAsync(user, isEnabled ? null : PermanentLockout);
+        if (result.Succeeded && !isEnabled)
+            result = await userManager.UpdateSecurityStampAsync(user);
         return result.Succeeded ? Result<string>.Success(user.Id.ToString()) : Failed(result);
     }
 
@@ -182,6 +184,24 @@ public sealed class UserAccountService(
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
         var result = await userManager.ResetPasswordAsync(user, token, newPassword);
         return result.Succeeded ? Result<string>.Success(user.Id.ToString()) : Failed(result);
+    }
+
+    public async Task<Result<string>> CompletePasswordSetupAsync(
+        string userId, string token, string newPassword, CancellationToken ct)
+    {
+        var invalid = Result<string>.Failure(Application.Constants.AuthErrors.ActivationInvalid);
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+            return invalid;
+
+        var result = await userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!result.Succeeded)
+            return result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.InvalidToken)) ? invalid : Failed(result);
+
+        // A reset token is single-use only because the stamp moves; confirm the address the link reached.
+        user.EmailConfirmed = true;
+        var confirmed = await userManager.UpdateAsync(user);
+        return confirmed.Succeeded ? Result<string>.Success(user.Id.ToString()) : Failed(confirmed);
     }
 
     public async Task<Result<IReadOnlyList<string>>> GetAssignableRolesAsync(CancellationToken ct)

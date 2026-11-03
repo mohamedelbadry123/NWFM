@@ -9,6 +9,8 @@
     <ProjectReference Include="../Modules/Tasks/Tasks.Infrastructure/Tasks.Infrastructure.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Api/Workflow.Api.csproj" />
     <ProjectReference Include="../Modules/Workflow/Workflow.Infrastructure/Workflow.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Tenancy/Tenancy.Api/Tenancy.Api.csproj" />
+    <ProjectReference Include="../Modules/Tenancy/Tenancy.Infrastructure/Tenancy.Infrastructure.csproj" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design"><PrivateAssets>all</PrivateAssets></PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" />

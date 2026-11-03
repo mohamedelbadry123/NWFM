@@ -90,7 +90,11 @@ node_modules/
 .e2e/sessions/
 
 .e2e/scan/
+.e2e/security/
 
 # Browser unit-test failure evidence
 frontend/src/**/__screenshots__/
 frontend/.vitest-attachments/
+
+# Development e-mails written by the mock sender (signup and activation links)
+data/

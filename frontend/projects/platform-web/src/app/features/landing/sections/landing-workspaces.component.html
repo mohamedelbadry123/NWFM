@@ -1,0 +1,70 @@
+<ng-container *appI18n="let t">
+  <div class="container">
+    <div class="panel">
+      <div class="head">
+        <div>
+          <span class="eyebrow">{{ t('landing.workspaces.eyebrow') }}</span>
+          <h2>{{ t('landing.workspaces.title') }}</h2>
+          <p>{{ t('landing.workspaces.subtitle') }}</p>
+        </div>
+        <span class="search">
+          <i class="pi pi-search"></i>
+          <input
+            pInputText
+            type="search"
+            [ngModel]="query()"
+            (ngModelChange)="onQueryChange($event)"
+            (keyup.enter)="find()"
+            [placeholder]="t('landing.workspaces.searchPlaceholder')"
+            [attr.aria-label]="t('landing.workspaces.searchPlaceholder')"
+            [disabled]="loading() || failed()"
+          />
+        </span>
+      </div>
+
+      @if (loading()) {
+        <div class="grid">
+          @for (i of skeletons; track i) {
+            <div class="card"><p-skeleton width="100%" height="3rem" /></div>
+          }
+        </div>
+      } @else if (failed()) {
+        <div class="state">
+          <i class="pi pi-exclamation-triangle"></i>
+          <p>{{ t('landing.workspaces.loadFailed') }}</p>
+          <p-button
+            [label]="t('landing.workspaces.retry')"
+            icon="pi pi-refresh"
+            [outlined]="true"
+            (onClick)="retry.emit()"
+          />
+        </div>
+      } @else if (tenants().length === 0) {
+        <div class="state">
+          <i class="pi pi-building"></i>
+          <p>{{ t('landing.workspaces.empty') }}</p>
+          <p-button [label]="t('landing.nav.cta')" icon="pi pi-plus" routerLink="/signup" />
+        </div>
+      } @else {
+        @if (filtered().length === 0 || notFound()) {
+          <p class="no-match">{{ t('landing.workspaces.noMatch', { query: query() }) }}</p>
+        }
+        <div class="grid">
+          @for (tenant of filtered(); track tenant.key) {
+            <a class="card link" [href]="tenant.loginUrl">
+              <span class="avatar">{{ initials(tenant.name) }}</span>
+              <span class="body">
+                <strong>{{ tenant.name }}</strong>
+                <small>{{ host(tenant.loginUrl) }}</small>
+              </span>
+              <span class="go">
+                {{ t('landing.workspaces.signIn') }}
+                <i class="pi pi-arrow-right rtl-flip"></i>
+              </span>
+            </a>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</ng-container>

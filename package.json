@@ -28,11 +28,12 @@
     "test:unit": "npm run test:tooling && node scripts/quality/test-unit.mjs",
     "test:frontend": "node scripts/quality/test-frontend.mjs",
     "test:backend": "dotnet test backend/NWFM.sln --configuration Release --logger trx",
-    "build:frontend": "npm --prefix frontend run build:prod",
+    "build:frontend": "npm --prefix frontend run build:prod && npm --prefix frontend run build:platform",
     "build:backend": "dotnet build backend/NWFM.sln --configuration Release",
     "test:e2e:replay": "NWFM_E2E_REPLAY=1 node scripts/e2e/run.mjs --strict-cache --reporter list,junit",
     "typecheck": "tsc --noEmit",
-    "security:dependencies": "node scripts/quality/audit.mjs"
+    "security:dependencies": "node scripts/quality/audit.mjs",
+    "security:tenancy": "node scripts/security/tenant-coverage.mjs"
   },
   "name": "nwfm-quality",
   "version": "0.0.0",

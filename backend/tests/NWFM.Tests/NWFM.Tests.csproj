@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\NWFM.Api\NWFM.Api.csproj" />
     <ProjectReference Include="..\..\src\NWFM.Shared\NWFM.Shared.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Workflow.Domain\Workflow.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Workflow\Workflow.Application\Workflow.Application.csproj" />
@@ -36,6 +37,8 @@
     <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Application\Tasks.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Infrastructure\Tasks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Tasks\Tasks.Api\Tasks.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Platform\Platform.Infrastructure\Platform.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Platform\Platform.Api\Platform.Api.csproj" />
   </ItemGroup>
 
 </Project>

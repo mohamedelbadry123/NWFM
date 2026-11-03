@@ -94,7 +94,8 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "proxyConfig": "proxy.conf.json"
+            "proxyConfig": "proxy.conf.json",
+            "allowedHosts": ["localhost", ".localhost"]
           },
           "configurations": {
             "production": {
@@ -113,6 +114,91 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "tsConfig": "tsconfig.spec.json",
+            "browsers": ["chromium"],
+            "runnerConfig": "vitest.config.ts"
+          }
+        }
+      }
+    },
+    "platform-web": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss",
+          "skipTests": true
+        }
+      },
+      "root": "projects/platform-web",
+      "sourceRoot": "projects/platform-web/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/platform-web",
+            "index": "projects/platform-web/src/index.html",
+            "browser": "projects/platform-web/src/main.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "projects/platform-web/tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "projects/platform-web/public"
+              }
+            ],
+            "styles": [
+              "projects/platform-web/src/styles/tailwind.css",
+              "projects/platform-web/src/styles/styles.scss"
+            ],
+            "stylePreprocessorOptions": {
+              "includePaths": ["projects/platform-web/src/styles"]
+            }
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "12kB",
+                  "maximumError": "24kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "port": 4300,
+            "proxyConfig": "proxy.platform.conf.json"
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "platform-web:build:production"
+            },
+            "development": {
+              "buildTarget": "platform-web:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/platform-web/tsconfig.spec.json",
             "browsers": ["chromium"],
             "runnerConfig": "vitest.config.ts"
           }

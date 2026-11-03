@@ -1,0 +1,17 @@
+<div class="denied-page">
+  <div class="denied-card">
+    <span class="denied-icon"><i class="pi pi-building"></i></span>
+    <h1>{{ 'tenancy.unavailable.title' | translate }}</h1>
+    <p class="denied-message">{{ reasonKey() | translate }}</p>
+    <p-button
+      (onClick)="retry()"
+      [label]="'tenancy.unavailable.retry' | translate"
+      styleClass="w-full"
+    />
+    @if (platformUrl) {
+      <a class="denied-account" [href]="platformUrl">{{
+        'tenancy.unavailable.platform' | translate
+      }}</a>
+    }
+  </div>
+</div>

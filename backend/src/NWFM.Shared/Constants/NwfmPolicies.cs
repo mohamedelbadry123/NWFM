@@ -22,6 +22,9 @@ public static class NwfmPolicies
     public const string ManageUsers = nameof(ManageUsers);
     public const string ManageTeams = nameof(ManageTeams);
 
+    /// <summary>Granting and revoking time-boxed platform support access to this workspace.</summary>
+    public const string ManageSupportAccess = nameof(ManageSupportAccess);
+
     public const string ViewForms = nameof(ViewForms);
     public const string ManageForms = nameof(ManageForms);
     public const string SubmitForms = nameof(SubmitForms);
@@ -98,6 +101,7 @@ public static class NwfmPolicies
         ManageLookups,
         ManageUsers,
         ManageTeams,
+        ManageSupportAccess,
         ViewForms,
         ManageForms,
         SubmitForms,

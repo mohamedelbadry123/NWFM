@@ -18,6 +18,7 @@
 - [ ] Complete backend and frontend unit suites pass locally.
 - [ ] Builds and changed-file formatting/lint checks pass.
 - [ ] E2E lifecycle passes and any changed replay recordings were reviewed.
+- [ ] Tenant security inventory, behavioral regressions and two-tenant E2E pass; deployment-only requirements are reported explicitly.
 
 ## Review
 

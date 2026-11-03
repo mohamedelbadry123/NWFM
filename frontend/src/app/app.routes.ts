@@ -3,11 +3,33 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard, permissionGuard } from './core/guards/auth.guard';
 import { PERMISSIONS } from './core/auth/permissions';
 import { DashboardLayoutComponent } from './layout/dashboard-layout/dashboard-layout.component';
+import { workspaceAvailableGuard } from './core/tenancy/workspace-available.guard';
 
 export const routes: Routes = [
   {
+    path: 'workspace-unavailable',
+    loadComponent: () =>
+      import('./features/auth/workspace-unavailable/workspace-unavailable.component').then(
+        (m) => m.WorkspaceUnavailableComponent,
+      ),
+  },
+  {
+    path: 'activate',
+    canActivate: [workspaceAvailableGuard],
+    loadComponent: () =>
+      import('./features/auth/activate/activate.component').then((m) => m.ActivateComponent),
+  },
+  {
+    path: 'auth/support',
+    canActivate: [workspaceAvailableGuard],
+    loadComponent: () =>
+      import('./features/auth/support-handoff/support-handoff.component').then(
+        (m) => m.SupportHandoffComponent,
+      ),
+  },
+  {
     path: 'login',
-    canActivate: [guestGuard],
+    canActivate: [workspaceAvailableGuard, guestGuard],
     loadComponent: () =>
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
@@ -28,7 +50,7 @@ export const routes: Routes = [
   {
     path: '',
     component: DashboardLayoutComponent,
-    canActivate: [authGuard],
+    canActivate: [workspaceAvailableGuard, authGuard],
     canActivateChild: [workflowWorkspaceGuard],
     children: [
       {

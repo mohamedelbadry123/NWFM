@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Tenant-side slices over the master catalog: the current workspace's public info and the
+    workspace's own support-access consent (grant, revoke, redeem a handoff, end a session).
+    Control-plane slices live in Platform.Application, which the tenant API never references.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tenancy.Domain\Tenancy.Domain.csproj" />
+  </ItemGroup>
+</Project>

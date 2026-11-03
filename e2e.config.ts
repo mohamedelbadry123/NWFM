@@ -2,6 +2,7 @@ import type { E2EConfig } from 'e2e';
 import { web } from '@e2e-dev/web';
 import { chatgpt } from 'e2e/oauth/chatgpt';
 import { replayOnly } from './scripts/e2e/replay-only.js';
+import { replayReceipt } from './scripts/e2e/replay-receipt.js';
 
 const replay =
   process.env.NWFM_E2E_REPLAY === '1' ||
@@ -14,6 +15,7 @@ export default {
   timeout: 600_000,
   assertionTimeout: 30_000,
   trace: 'on',
+  reporters: ['list', replayReceipt],
   cache: { mode: replay ? 'read-only' : 'read-write', strict: replay },
   agents: {
     default: {
@@ -23,8 +25,33 @@ export default {
     },
   },
   credentials: {
+    ...Object.fromEntries(
+      [
+        'forms-routing',
+        'forms-designer',
+        'forms-publish',
+        'forms-preview',
+        'forms-history',
+        'forms-claim',
+      ].map((name) => [
+        name,
+        { username: name + '@localhost', password: () => process.env.NWFM_TEST_PASSWORD ?? '' },
+      ]),
+    ),
     admin: {
       username: 'administrator@localhost',
+      password: () => process.env.NWFM_TEST_PASSWORD ?? '',
+    },
+    securityAdmin: {
+      username: 'security-admin@localhost',
+      password: () => process.env.NWFM_TEST_PASSWORD ?? '',
+    },
+    securityReviewer: {
+      username: 'security-reviewer@localhost',
+      password: () => process.env.NWFM_TEST_PASSWORD ?? '',
+    },
+    securityDisabled: {
+      username: 'security-disabled@localhost',
       password: () => process.env.NWFM_TEST_PASSWORD ?? '',
     },
   },
@@ -44,7 +71,7 @@ export default {
           executable: 'node',
           args: ['scripts/e2e/start-app.mjs'],
           env: { NWFM_E2E_ISOLATED: '1', DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
-          startupTimeout: 360_000,
+          startupTimeout: 720_000,
           shutdownTimeout: 30_000,
           log: '.e2e/logs/app.log',
         },

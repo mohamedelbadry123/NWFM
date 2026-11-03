@@ -6,13 +6,12 @@ using FormEngine.Domain.Options;
 using FormEngine.Infrastructure.Integration;
 using FormEngine.Infrastructure.Persistence;
 using FormEngine.Infrastructure.Submissions;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NWFM.Shared.Integration.Forms;
+using NWFM.Shared.MultiTenancy;
 using NWFM.Shared.Options;
 using NWFM.Shared.Persistence;
 using NWFM.Shared.Storage;
@@ -21,13 +20,11 @@ namespace FormEngine.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static void AddFormEngineInfrastructure(
-        this IHostApplicationBuilder builder,
-        string connectionString)
+    public static void AddFormEngineInfrastructure(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddDbContext<FormEngineDbContext>(options => options
+        builder.Services.AddDbContext<FormEngineDbContext>((sp, options) => options
             .UseSqlServer(
-                connectionString,
+                sp.GetRequiredService<ITenantConnectionStringResolver>().ResolveForCurrentTenant(),
                 sql => sql.MigrationsHistoryTable(FormEngineSchema.MigrationsHistoryTable, FormEngineSchema.Name))
             // Published versions are what pinned consumers resolve against, so nothing may rewrite one.
             .AddInterceptors(new ImmutableEntityInterceptor()));
@@ -38,8 +35,6 @@ public static class DependencyInjection
             builder.Configuration.GetSection(FormEngineOptions.SectionName));
         builder.Services.Configure<FileStorageOptions>(
             builder.Configuration.GetSection(FileStorageOptions.SectionName));
-        builder.Services.Configure<DatabaseStartupOptions>(
-            builder.Configuration.GetSection(DatabaseStartupOptions.SectionName));
 
         // Shared with any module that later needs to store a file.
         builder.Services.TryAddSingleton<IFileStorage, LocalFileStorage>();
@@ -54,18 +49,6 @@ public static class DependencyInjection
         // How other modules — Tasks, a workflow task screen — read and fill forms without referencing this one.
         builder.Services.AddScoped<IFormGateway, FormGateway>();
 
-        builder.Services.AddScoped<FormEngineDatabaseInitializer>();
-    }
-
-    /// <summary>
-    /// Runs the FormEngine database initialiser (migrate, submission tables, seed) using the
-    /// three-flag <see cref="DatabaseStartupOptions"/> pattern. Call after <c>builder.Build()</c>,
-    /// before <c>app.Run()</c>.
-    /// </summary>
-    public static async Task InitialiseFormEngineDatabaseAsync(this WebApplication app)
-    {
-        using var scope = app.Services.CreateScope();
-        var initialiser = scope.ServiceProvider.GetRequiredService<FormEngineDatabaseInitializer>();
-        await initialiser.InitialiseAsync();
+        builder.Services.AddSingleton<ITenantDatabaseModule, FormEngineTenantDatabase>();
     }
 }

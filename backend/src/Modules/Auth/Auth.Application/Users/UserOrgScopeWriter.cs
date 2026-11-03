@@ -9,6 +9,9 @@ namespace Auth.Application.Users;
 /// <summary>A user's own org scope rows. Team scopes are written by the teams screen.</summary>
 internal static class UserOrgScopeWriter
 {
+    public static Result<bool> Validate(string userId, IReadOnlyList<OrgScopeAssignmentDto>? scopes) =>
+        OrgScopeRows.Validate(OrgScopeOwnerTypes.User, userId, scopes);
+
     public static Task<IReadOnlyList<OrgScopeAssignmentDto>> ListAsync(
         IAuthDbContext db, string userId, CancellationToken ct) =>
         OrgScopeRows.ListAsync(db, OrgScopeOwnerTypes.User, userId, ct);

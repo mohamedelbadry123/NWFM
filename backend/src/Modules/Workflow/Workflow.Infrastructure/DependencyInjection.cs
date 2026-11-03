@@ -3,29 +3,34 @@ namespace Workflow.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NWFM.Shared.MultiTenancy;
 using Workflow.Application.Abstractions;
+using Workflow.Application.Integrations;
 using Workflow.Application.Settings;
 using Workflow.Domain.Repositories;
 using Workflow.Infrastructure.Background;
 using Workflow.Infrastructure.Persistence;
 using Workflow.Infrastructure.Persistence.Repositories;
 using Workflow.Infrastructure.Services;
-using Workflow.Application.Integrations;
 
 public static class DependencyInjection
 {
     public static IServiceCollection AddWorkflowInfrastructure(
         this IServiceCollection services,
-        string connectionString,
         IConfiguration configuration)
     {
-        services.Configure<WorkflowSettings>(
-            configuration.GetSection(WorkflowSettings.SectionName));
+        services.AddOptions<WorkflowSettings>()
+            .Bind(configuration.GetSection(WorkflowSettings.SectionName))
+            .Validate(o => o.MaxPendingPerQueue is >= 1 and <= 100000
+                && o.MaxPendingPerQueueByTenant.Values.All(v => v is >= 1 and <= 100000),
+                "Workflow queue capacity must be between 1 and 100000.")
+            .ValidateOnStart();
 
-        services.AddDbContext<WorkflowDbContext>(options =>
+        services.AddDbContext<WorkflowDbContext>((sp, options) =>
             options.UseSqlServer(
-                connectionString,
+                sp.GetRequiredService<ITenantConnectionStringResolver>().ResolveForCurrentTenant(),
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", "Workflow")));
+        services.AddSingleton<ITenantDatabaseModule, WorkflowTenantDatabase>();
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
         services.AddScoped<Workflow.Application.Workspace.IWorkspaceSla, WorkspaceSla>();
@@ -98,7 +103,15 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowSmtpEmailSender, WorkflowSmtpEmailSender>();
         services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowNotificationPublisher, AuditingWorkflowNotificationPublisher>();
         // NullWorkflowNotificationPublisher retained for tests that opt in explicitly.
+        return services;
+    }
 
+    /// <summary>
+    /// Timer, outbox, inbox and integration workers. Registered by the tenant API only; each pass fans
+    /// out over the serving tenants through <see cref="ITenantFanOut"/>.
+    /// </summary>
+    public static IServiceCollection AddWorkflowWorkers(this IServiceCollection services)
+    {
         services.AddHostedService<WorkflowTimerHostedService>();
         services.AddHostedService<WorkflowOutboxHostedService>();
         services.AddHostedService<WorkflowInboxHostedService>();

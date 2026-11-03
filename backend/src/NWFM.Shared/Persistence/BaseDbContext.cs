@@ -20,8 +20,14 @@ public abstract class BaseDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries<ITenantAware>())
             if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            {
                 if (entry.Entity.OrganizationId != CurrentTenant.OrganizationId || CurrentTenant.OrganizationId == Guid.Empty)
                     throw new InvalidOperationException("A record cannot be written outside the active tenant.");
+                if (entry.State != EntityState.Added
+                    && entry.Property(nameof(ITenantAware.OrganizationId)).OriginalValue is Guid originalTenant
+                    && originalTenant != CurrentTenant.OrganizationId)
+                    throw new InvalidOperationException("A record cannot be reassigned from another tenant.");
+            }
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -44,6 +50,11 @@ public abstract class BaseDbContext : DbContext
             {
                 modelBuilder.Entity(entityType.ClrType)
                     .HasQueryFilter(BuildTenantFilter(entityType.ClrType));
+                // Include ownership in UPDATE/DELETE predicates as well as SELECT filters.
+                // This prevents a detached object with a foreign primary key and a forged
+                // current-tenant value from updating a row it did not load.
+                modelBuilder.Entity(entityType.ClrType)
+                    .Property(nameof(ITenantAware.OrganizationId)).IsConcurrencyToken();
             }
         }
 
@@ -65,7 +76,9 @@ public abstract class BaseDbContext : DbContext
         var currentTenantAccess = Expression.Field(dbContextRef, currentTenantField);
         var currentOrgId = Expression.Property(currentTenantAccess, nameof(ICurrentTenant.OrganizationId));
 
-        var body = Expression.Equal(tenantId, currentOrgId);
+        var body = Expression.AndAlso(
+            Expression.NotEqual(currentOrgId, Expression.Constant(Guid.Empty)),
+            Expression.Equal(tenantId, currentOrgId));
         return Expression.Lambda(body, param);
     }
 }

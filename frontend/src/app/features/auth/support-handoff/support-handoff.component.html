@@ -1,0 +1,13 @@
+<div class="denied-page">
+  <div class="denied-card">
+    @if (failed()) {
+      <span class="denied-icon"><i class="pi pi-times-circle"></i></span>
+      <h1>{{ 'tenancy.support.failedTitle' | translate }}</h1>
+      <p class="denied-message">{{ 'tenancy.support.failed' | translate }}</p>
+      <a routerLink="/login">{{ 'tenancy.support.toLogin' | translate }}</a>
+    } @else {
+      <p-progressSpinner />
+      <p class="denied-message">{{ 'tenancy.support.signingIn' | translate }}</p>
+    }
+  </div>
+</div>

@@ -25,3 +25,16 @@ export interface SsoStatus {
   enabled: boolean;
   allowLocalLoginForAdministrators: boolean;
 }
+
+/** A workspace token minted for platform support from a redeemed handoff code. */
+export interface SupportSessionToken {
+  accessToken: string;
+  expiresInSeconds: number;
+  sessionId: string;
+  tenantKey: string;
+  supportScope: string;
+  impersonatedUserName: string;
+  actorName: string;
+  roles: string[];
+  permissions: string[];
+}

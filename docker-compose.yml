@@ -1,33 +1,96 @@
-name: nwfm
+name: ${NWFM_COMPOSE_PROJECT:-nwfm-local}
+
+# The local multi-tenant stack. SQL Server is NOT a container: every service reaches the SQL Server
+# installed on the host (host.docker.internal,1433 by default) with SQL logins.
+#   platform      control plane: catalog, signup, provisioning and every tenant migration (owner login)
+#   backend       tenant API: serves every workspace, one database each, restricted logins only
+#   frontend      the tenant app, at http://localhost:4200 (nwfm) and http://<key>.localhost:4200
+#   platform-web  landing page, signup and staff console, at http://localhost:4300
+# Run start-docker.bat: it creates the owner login on the host, starts the control plane (which
+# migrates the catalog and the bootstrap workspace), provisions the restricted logins with
+# scripts/provision-local-runtime.ps1, then starts everything else and opens the apps.
+
 services:
-  database:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+  # The control plane holds the owner credential: it migrates the catalog, registers the bootstrap
+  # workspace under its existing id, migrates and seeds tenant databases, and provisions new ones.
+  platform:
+    build:
+      context: ./backend
+      args:
+        APP: NWFM.Platform.Api
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${NWFM_SQL_PASSWORD:?Set NWFM_SQL_PASSWORD in .env}
+      ASPNETCORE_ENVIRONMENT: Development
+      Urls: http://+:8080
+      AllowedHosts: localhost;127.0.0.1;platform
+      ConnectionStrings__CatalogConnection: Server=${NWFM_SQL_HOST:-host.docker.internal},${NWFM_SQL_PORT:-1433};Database=NWFM_Catalog;User Id=${NWFM_SQL_OWNER_USER:-nwfm_docker_owner};Password=${NWFM_SQL_OWNER_PASSWORD:?Set NWFM_SQL_OWNER_PASSWORD in .env};TrustServerCertificate=True
+      ConnectionStrings__DefaultConnection: Server=${NWFM_SQL_HOST:-host.docker.internal},${NWFM_SQL_PORT:-1433};Database=NWFM;User Id=${NWFM_SQL_OWNER_USER:-nwfm_docker_owner};Password=${NWFM_SQL_OWNER_PASSWORD};TrustServerCertificate=True
+      Tenancy__ConfigurationTenants__0__Id: ${NWFM_TENANT_ID:?Set the immutable NWFM_TENANT_ID in .env}
+      Tenancy__ConfigurationTenants__0__StoragePath: /var/nwfm/media/nwfm
+      Tenancy__ConfigurationTenants__0__Hosts__0: localhost
+      Tenancy__ConfigurationTenants__0__Hosts__1: 127.0.0.1
+      PlatformJwt__SigningKey: ${NWFM_PLATFORM_JWT_SIGNING_KEY:?Set a random NWFM_PLATFORM_JWT_SIGNING_KEY in .env}
+      Platform__BootstrapAdmin__Password: ${NWFM_PLATFORM_ADMIN_PASSWORD:?Set NWFM_PLATFORM_ADMIN_PASSWORD in .env}
+      Email__MockFolder: /var/nwfm/emails
+      CorsOrigins__0: http://localhost:4300
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     volumes:
-      - nwfm-sql:/var/opt/mssql
+      # Signup and activation e-mails, readable on the host like in development.
+      - ./data/emails:/var/nwfm/emails
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      # The port opens only after the catalog and configured tenants are migrated (no curl in the image).
+      test: ['CMD-SHELL', 'bash -c "</dev/tcp/127.0.0.1/8080"']
       interval: 10s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
+    ports:
+      - '127.0.0.1:5180:8080'
+
   backend:
     build: ./backend
     environment:
+      ASPNETCORE_ENVIRONMENT: Development
       Urls: http://+:8080
-      AllowedHosts: localhost;127.0.0.1;backend
-      ConnectionStrings__DefaultConnection: Server=database;Database=NWFM;User Id=sa;Password=${NWFM_SQL_PASSWORD};TrustServerCertificate=True
+      AllowedHosts: localhost;127.0.0.1;*.localhost;backend
+      ConnectionStrings__CatalogConnection: Server=${NWFM_SQL_HOST:-host.docker.internal},${NWFM_SQL_PORT:-1433};Database=NWFM_Catalog;User Id=nwfm_catalog_reader;Password=${NWFM_CATALOG_READER_PASSWORD:?Set a separate NWFM_CATALOG_READER_PASSWORD in .env};TrustServerCertificate=True;Max Pool Size=20
+      ConnectionStrings__DefaultConnection: Server=${NWFM_SQL_HOST:-host.docker.internal},${NWFM_SQL_PORT:-1433};Database=NWFM;User Id=nwfm_request;Password=${NWFM_RUNTIME_PASSWORD:?Set a separate NWFM_RUNTIME_PASSWORD in .env};TrustServerCertificate=True;Max Pool Size=20
+      JwtSettings__SigningKey: ${NWFM_JWT_SIGNING_KEY:?Set a random NWFM_JWT_SIGNING_KEY in .env}
+      FileStorage__Root: /var/nwfm/media
+      CorsOrigins__0: http://localhost:4200
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - nwfm-media:/var/nwfm/media
+    healthcheck:
+      test: ['CMD-SHELL', 'bash -c "</dev/tcp/127.0.0.1/8080"']
+      interval: 10s
+      retries: 30
+      start_period: 30s
     depends_on:
-      database:
+      platform:
         condition: service_healthy
     ports:
-      - "127.0.0.1:5081:8080"
+      - '127.0.0.1:5081:8080'
+
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        APP: frontend
     ports:
-      - "127.0.0.1:4200:80"
+      - '127.0.0.1:4200:80'
     depends_on:
       - backend
+
+  platform-web:
+    build:
+      context: ./frontend
+      args:
+        APP: platform-web
+    ports:
+      - '127.0.0.1:4300:80'
+    depends_on:
+      - platform
+
 volumes:
-  nwfm-sql:
+  nwfm-media:

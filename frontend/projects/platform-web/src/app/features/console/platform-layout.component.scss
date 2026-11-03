@@ -1,0 +1,16 @@
+@use 'app-shell';
+
+// Tells staff at a glance they are in the operator console, not inside a workspace.
+.platform-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--acc-brand-bg);
+  color: var(--acc-brand-fg);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  @media (max-width: 640px) {
+    display: none;
+  }
+}

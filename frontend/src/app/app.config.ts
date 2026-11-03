@@ -1,4 +1,9 @@
-import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  provideAppInitializer,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -14,25 +19,40 @@ import { AppConfigService } from './core/config/app-config.service';
 import { contextInterceptor } from './core/context/context.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { tenantInterceptor } from './core/tenancy/tenant.interceptor';
+import { TenantContextService } from './core/tenancy/tenant-context.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' })),
-    provideHttpClient(withInterceptors([authInterceptor, contextInterceptor, errorInterceptor])),
+    provideRouter(
+      routes,
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
+    ),
+    provideHttpClient(
+      withInterceptors([authInterceptor, tenantInterceptor, contextInterceptor, errorInterceptor]),
+    ),
     provideAnimationsAsync(),
     providePrimeNG({
       theme: {
         preset: WaterPreset,
-        options: { darkModeSelector: '.dark' }
-      }
+        options: { darkModeSelector: '.dark' },
+      },
     }),
     provideApiConfiguration(''),
     provideTranslateService({ fallbackLang: 'en' }),
     provideTranslateHttpLoader({ prefix: '/assets/i18n/', suffix: '.json' }),
     provideLocaleInitializer(),
     // Runtime config (the Maps key) has to be in hand before the first map is drawn.
-    provideAppInitializer(() => inject(AppConfigService).load()),
-    provideAppInitializer(() => inject(AppContextService).load()),
-  ]
+    provideAppInitializer(async () => {
+      // Injected up front: an initializer leaves its injection context at the first await.
+      const config = inject(AppConfigService);
+      const tenancy = inject(TenantContextService);
+      const context = inject(AppContextService);
+      await config.load();
+      // The workspace comes from the host; resolved before the first API call asks for it.
+      tenancy.initialize();
+      await context.load();
+    }),
+  ],
 };

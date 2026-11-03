@@ -1,0 +1,816 @@
+{
+  "common": {
+    "appName": "NWFM",
+    "appFullName": "NWFM — Workflow & field operations",
+    "poweredBy": "Powered by",
+    "language": "Language",
+    "arabic": "العربية",
+    "english": "English",
+    "logout": "Logout",
+    "search": "Search",
+    "loading": "Loading...",
+    "toggleTheme": "Toggle theme",
+    "success": "Success",
+    "error": "Error",
+    "cancel": "Cancel",
+    "save": "Save",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "actions": "Actions",
+    "all": "All",
+    "none": "None",
+    "reset": "Reset",
+    "confirm": "Confirm",
+    "download": "Download",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  },
+  "validation": {
+    "required": "This field is required",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be at most {{max}} characters",
+    "min": "Must be greater than or equal to {{min}}",
+    "max": "Must be less than or equal to {{max}}",
+    "pattern": "The value does not match the expected format",
+    "integer": "Must be a whole number",
+    "calendarWithHoursRange": "Set both a start and an end time for every selected day",
+    "dateAfterToday": "Must be a date after today",
+    "dateOnOrAfterToday": "Must be today or a later date",
+    "dateBeforeToday": "Must be a date before today",
+    "dateOnOrBeforeToday": "Must be today or an earlier date",
+    "dateTimeAfterNow": "Must be later than the current time",
+    "dateTimeOnOrAfterNow": "Must be the current time or later",
+    "dateTimeBeforeNow": "Must be earlier than the current time",
+    "dateTimeOnOrBeforeNow": "Must be the current time or earlier",
+    "dateMin": "Must not be before {{date}}",
+    "dateMax": "Must not be after {{date}}"
+  },
+  "auth": {
+    "welcome": "Welcome back",
+    "subtitle": "Sign in to your field survey workspace.",
+    "heroEyebrow": "Field survey management",
+    "heroTitle": "NWFM",
+    "heroSubtitle": "Plan surveys, record readings, and review results for every water site.",
+    "heroPoints": {
+      "sitesTitle": "Water sites",
+      "sitesText": "A current register of every site under survey.",
+      "readingsTitle": "Readings",
+      "readingsText": "Field measurements captured and reviewed in place.",
+      "reportsTitle": "Reports",
+      "reportsText": "Progress and outcomes, ready to review and export."
+    },
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "rememberMe": "Remember me",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "usernameRequired": "Username is required",
+    "passwordRequired": "Password is required",
+    "loginFailed": "Login failed",
+    "loginSuccess": "Signed in successfully",
+    "platformStaffSignIn": "NWFM staff sign-in",
+    "sso": {
+      "signInWithSso": "Sign in with SSO",
+      "redirecting": "Redirecting...",
+      "completingSignIn": "Completing sign-in",
+      "pleaseWait": "Just a moment while we finish signing you in.",
+      "or": "or",
+      "administratorSignIn": "Administrator sign-in",
+      "denied": {
+        "title": "Access denied",
+        "account": "Signed in at SSO as",
+        "tryAgain": "Try again",
+        "notProvisioned": "You signed in successfully, but this account has not been set up in NWFM yet. Ask an administrator to create it for you.",
+        "inactive": "This account is deactivated. Ask an administrator to reactivate it.",
+        "noScope": "This account has no territory assigned, so there is nothing it can work on yet. Ask an administrator to assign one.",
+        "crewAccount": "Field crew accounts sign in through the mobile app with their team code, not through SSO.",
+        "exchangeFailed": "The sign-in link has expired or was already used. Please try signing in again.",
+        "noNameId": "SSO did not return a username we could use. Please try again, or contact support if this keeps happening.",
+        "unknown": "You could not be signed in. Please try again, or contact support if this keeps happening."
+      }
+    }
+  },
+  "landing": {
+    "nav": {
+      "label": "Main",
+      "features": "Features",
+      "how": "How it works",
+      "pricing": "Plans",
+      "faq": "FAQ",
+      "signIn": "Sign in",
+      "cta": "Get started",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
+    },
+    "hero": {
+      "badgeTag": "New",
+      "badge": "Workflow engine, form engine and field teams in one workspace",
+      "titleStart": "Run your workflows, forms and field teams",
+      "titleHighlight": "from one live workspace",
+      "subtitle": "NWFM brings together a workflow engine, a no-code form engine and field-team task management — with live monitoring of every request and permissions you set for each role.",
+      "primaryCta": "Create your workspace",
+      "secondaryCta": "Sign in to your workspace",
+      "pointTrial": "Free trial available",
+      "pointHosting": "Hosted for you, or on your own SQL Server",
+      "pointLanguages": "Arabic and English",
+      "proof": "{{count}} organisations run their workflows and field work on NWFM"
+    },
+    "mock": {
+      "label": "Preview of the NWFM Instances screen following a request live, with the assignee's task beside it",
+      "address": "NWFM · Instances",
+      "nav": {
+        "workflows": "Workflows",
+        "instances": "Instances",
+        "forms": "Forms",
+        "fieldTasks": "Field tasks",
+        "teams": "Field teams",
+        "workload": "Workload"
+      },
+      "title": "Instances",
+      "subtitle": "Today · all workflows",
+      "live": "Live",
+      "kpi": {
+        "open": "Open instances",
+        "completed": "Completed this week",
+        "waiting": "Waiting on my team",
+        "overdue": "Past SLA"
+      },
+      "slaChip": "REQ-2041 · SLA on track",
+      "steps": {
+        "submit": {
+          "title": "Submit request",
+          "meta": "Requester · 09:12"
+        },
+        "review": {
+          "title": "Department review",
+          "meta": "Accepted · 10:40"
+        },
+        "finance": {
+          "title": "Finance approval",
+          "meta": "Finance team · due in 3 h"
+        },
+        "notify": {
+          "title": "Notify requester",
+          "meta": "Email · waiting"
+        }
+      },
+      "feedTitle": "Latest instances",
+      "feed": {
+        "one": "Purchase request — REQ-2041",
+        "two": "Leave request — REQ-2038",
+        "three": "Contract review — REQ-2035",
+        "four": "IT access request — REQ-2033"
+      },
+      "feedMeta": {
+        "one": "Finance approval",
+        "two": "Completed 11:02",
+        "three": "Returned to requester",
+        "four": "Escalated to IT lead"
+      },
+      "status": {
+        "inProgress": "In progress",
+        "completed": "Completed",
+        "returned": "Returned",
+        "overdue": "Overdue"
+      },
+      "task": {
+        "title": "Finance approval",
+        "context": "Purchase request · REQ-2041",
+        "due": "3 h left",
+        "amountLabel": "Amount",
+        "amountValue": "48,500",
+        "quoteLabel": "Supplier quote",
+        "quoteValue": "quote-2041.pdf",
+        "commentLabel": "Comment",
+        "commentValue": "Within budget for Q4.",
+        "accept": "Accept",
+        "reject": "Reject"
+      }
+    },
+    "strip": {
+      "label": "Platform capabilities",
+      "title": "One platform for processes, forms and field work",
+      "workflow": "Workflow engine",
+      "forms": "Form engine",
+      "teams": "Field teams",
+      "monitoring": "Live monitoring",
+      "permissions": "Dynamic roles & permissions"
+    },
+    "features": {
+      "eyebrow": "Platform",
+      "title": "Everything your operation needs, in one workspace",
+      "subtitle": "Design the process, build its forms, hand the work to people and field teams, and watch it all happen live — no email chains, no spreadsheets, no chasing for updates.",
+      "designer": {
+        "title": "Workflow engine",
+        "text": "Design workflows on a visual canvas — tasks, decisions, timers, nested activities and integrations — then publish versions that run reliably, with retries, incident handling and a full history.",
+        "palette": {
+          "userTask": "User task",
+          "mainActivity": "Main activity",
+          "decision": "Decision",
+          "timer": "Timer",
+          "apiRequest": "API request",
+          "email": "Email"
+        },
+        "nodes": {
+          "review": {
+            "title": "Department review",
+            "meta": "User task · Procurement"
+          },
+          "finance": {
+            "title": "Finance approval",
+            "meta": "User task · Finance team"
+          },
+          "notify": {
+            "title": "Notify requester",
+            "meta": "Email"
+          }
+        },
+        "condition": "When Amount > 10,000"
+      },
+      "forms": {
+        "title": "Form engine",
+        "text": "Build forms without code — text, numbers, dates, choices, files, photos, signatures and locations — with rules that show or require fields. Publish versions and attach them to workflow steps and field tasks.",
+        "fieldAmount": "Amount",
+        "fieldQuote": "Supplier quote",
+        "fieldReason": "Justification",
+        "rule": "Required when Amount > 10,000"
+      },
+      "teams": {
+        "title": "Field teams and tasks",
+        "text": "Hand each task to the team that covers its territory, then track who has it, when it was filled and why it was returned.",
+        "tasks": {
+          "one": {
+            "title": "Meter inspection",
+            "meta": "Team 3 · North district"
+          },
+          "two": {
+            "title": "Leak check",
+            "meta": "Team 1 · Sector B"
+          },
+          "three": {
+            "title": "Site visit",
+            "meta": "Team 4 · Plot 44"
+          }
+        },
+        "status": {
+          "filled": "Filled",
+          "returned": "Returned",
+          "completed": "Completed"
+        }
+      },
+      "monitoring": {
+        "title": "Live monitoring",
+        "text": "Follow each request on its live workflow graph, watch open, overdue and completed work for every group on the workload dashboard, and pick up incidents the moment they happen.",
+        "kpi": {
+          "open": "Open",
+          "overdue": "Overdue",
+          "completedToday": "Completed today"
+        },
+        "groups": {
+          "one": "Procurement",
+          "two": "Finance",
+          "three": "Field operations"
+        },
+        "rowMeta": "{{pending}} pending · {{overdue}} overdue"
+      },
+      "permissions": {
+        "title": "Dynamic roles and permissions",
+        "text": "Choose exactly what each role can do — design, start, review, monitor or administer — and change it at any time from the Role permissions screen.",
+        "roles": {
+          "admin": "Admin",
+          "supervisor": "Supervisor",
+          "monitor": "Monitor"
+        },
+        "perms": {
+          "design": "Design workflows",
+          "review": "Review field tasks",
+          "monitor": "Monitor instances",
+          "teams": "Manage teams"
+        }
+      },
+      "sla": {
+        "title": "SLAs on your calendar",
+        "text": "Set deadlines in hours or business days on your own working hours and holidays. NWFM sends a reminder before a deadline and escalates when it passes.",
+        "rows": {
+          "one": "Department review",
+          "two": "Finance approval",
+          "three": "IT access"
+        },
+        "state": {
+          "one": "On track",
+          "two": "Reminder sent",
+          "three": "Overdue · escalated"
+        }
+      },
+      "integrations": {
+        "title": "Connect your other systems",
+        "text": "Call REST and SOAP services, send email and SMS, and wait for a webhook callback — with credentials kept out of the workflow and every delivery logged.",
+        "connectors": {
+          "rest": "REST",
+          "soap": "SOAP",
+          "email": "Email",
+          "sms": "SMS",
+          "webhook": "Webhook"
+        }
+      }
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "From process to running work in three steps",
+      "subtitle": "Set it up once, then let NWFM carry every request and field task from start to sign-off.",
+      "stepLabel": "Step {{n}}",
+      "step1Title": "Design workflows and forms",
+      "step1Text": "Draw the workflow, build the forms its steps and field tasks collect, and set what each role can do. Publish when it is ready.",
+      "step2Title": "Assign the work",
+      "step2Text": "Requests land in the right group's inbox, and field tasks go to the team that covers their territory.",
+      "step3Title": "Monitor it live",
+      "step3Text": "Follow every request and task as it moves, with workload views, SLA reminders and escalations when something slips."
+    },
+    "trust": {
+      "eyebrow": "Security & control",
+      "title": "Your data stays yours",
+      "subtitle": "Each organisation gets its own workspace and its own database — and decides who gets in.",
+      "databaseTitle": "A database per workspace",
+      "databaseText": "Your workflow data is never mixed with another organisation's. Each workspace runs on its own database.",
+      "byoTitle": "Bring your own SQL Server",
+      "byoText": "Prefer to keep data on your own infrastructure? Connect your own SQL Server during signup.",
+      "ssoTitle": "Single sign-on",
+      "ssoText": "Staff sign in with your organisation's identity provider over SAML, with role-based permissions inside.",
+      "supportTitle": "Support only with consent",
+      "supportText": "NWFM support can enter your workspace only when your administrator grants time-limited access, which can be revoked at any time."
+    },
+    "pricing": {
+      "eyebrow": "Plans",
+      "title": "Start small, grow when you are ready",
+      "subtitle": "Pick a plan to create your workspace. Plans can change as your organisation grows.",
+      "featured": "Start here",
+      "usersUnit": "users",
+      "unlimited": "Unlimited",
+      "trial": "{{days}}-day free trial",
+      "teams": "Up to {{count}} field teams",
+      "unlimitedTeams": "Unlimited field teams",
+      "storage": "{{count}} GB file storage",
+      "unlimitedStorage": "Unlimited file storage",
+      "startTrial": "Start free trial",
+      "choose": "Choose this plan",
+      "includedTitle": "Every plan includes",
+      "included": {
+        "designer": "Workflow engine & designer",
+        "forms": "Form engine",
+        "teams": "Field teams & tasks",
+        "monitoring": "Live monitoring & workload",
+        "permissions": "Roles & permissions",
+        "languages": "Arabic & English"
+      },
+      "loadFailed": "We could not load the plans.",
+      "retry": "Try again"
+    },
+    "workspaces": {
+      "eyebrow": "Already a customer?",
+      "title": "Find your workspace",
+      "subtitle": "Pick your organisation to open its sign-in page.",
+      "searchPlaceholder": "Search by organisation name",
+      "signIn": "Sign in",
+      "loadFailed": "We could not load the workspace list.",
+      "retry": "Try again",
+      "empty": "No workspaces are open yet. Be the first to create one.",
+      "noMatch": "No workspace matches \"{{query}}\"."
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title": "Questions, answered",
+      "subtitle": "Everything you need to know before you start.",
+      "q1": "Where is our data stored?",
+      "a1": "Every workspace has its own database. We host it for you, or you can connect your own SQL Server when you sign up.",
+      "q2": "What does NWFM include?",
+      "a2": "A workflow engine with a visual designer, a no-code form engine, task management for your field teams, live monitoring with a workload dashboard, and permissions you set for each role — all in one workspace, in Arabic and English.",
+      "q3": "How do field teams use NWFM?",
+      "a3": "Each field team has its own login code and sees the tasks for its territory. The team fills the task's form — with photos, files and location — and submits it. A supervisor approves it or returns it with a reason.",
+      "q4": "Can we control who sees and does what?",
+      "a4": "Yes. Each role — such as Supervisor, Monitor or Field Team — has its own permissions, which administrators switch on or off at any time. Staff can also sign in with your organisation's accounts over SAML single sign-on.",
+      "q5": "Does NWFM work in Arabic?",
+      "a5": "Yes. Every screen is available in Arabic and English, with a full right-to-left layout for Arabic. Each user can switch language at any time.",
+      "q6": "Can NWFM staff see our data?",
+      "a6": "Only when your administrator grants support access. That access is time-limited, records a reason, and can be revoked at any time.",
+      "q7": "How do we get started?",
+      "a7": "Create a workspace, choose a plan and confirm your email. We prepare your workspace and give you its sign-in link."
+    },
+    "cta": {
+      "title": "Run your workflows and field work in one place",
+      "subtitle": "Create a workspace for your organisation and publish your first workflow on NWFM.",
+      "primary": "Create your workspace",
+      "secondary": "Sign in to your workspace"
+    },
+    "footer": {
+      "tagline": "Workflow engine, form engine and field-team management — with live monitoring and role-based permissions, in one workspace.",
+      "product": "Product",
+      "getStarted": "Get started",
+      "team": "NWFM team",
+      "staffSignIn": "Staff sign-in",
+      "copyright": "© {{year}} {{app}}. All rights reserved."
+    }
+  },
+  "platform": {
+    "title": "NWFM platform",
+    "login": {
+      "title": "Platform sign-in",
+      "subtitle": "Staff access to tenants, plans and signups.",
+      "email": "Email",
+      "password": "Password",
+      "tenantSignIn": "Workspace sign-in"
+    },
+    "nav": {
+      "tenants": "Tenants",
+      "plans": "Plans",
+      "signups": "Signups",
+      "databaseServers": "Database servers",
+      "users": "Staff users",
+      "audit": "Audit log"
+    },
+    "tenants": {
+      "key": "Key",
+      "name": "Name",
+      "status": "Status",
+      "plan": "Plan",
+      "open": "Open",
+      "detail": "Tenant",
+      "schema": "Schema",
+      "reason": "Reason",
+      "suspend": "Suspend",
+      "maintenance": "Maintenance",
+      "subtitle": "Every workspace, its status and plan.",
+      "detailSubtitle": "Configure the workspace, its subscription and support access.",
+      "allStatuses": "All statuses",
+      "created": "Created",
+      "activated": "Activated",
+      "empty": "No workspaces match.",
+      "back": "Back to tenants",
+      "notFound": "Workspace not found.",
+      "seedProfile": "Seed data",
+      "seedProfiles": {
+        "Standard": "Standard",
+        "Dk": "Digital Key"
+      },
+      "statusTitle": "Workspace status",
+      "reasonHint": "Reason (required to suspend or enter maintenance)",
+      "statusChanged": "The workspace is now {{status}}.",
+      "migrateAll": "Migrate all",
+      "migrateAllQueued": "Migration queued for every active workspace. Results land in the audit log.",
+      "create": {
+        "open": "Add workspace",
+        "title": "Add a workspace",
+        "hint": "We create and host the database, load the standard data and e-mail the administrator a link to set a password. Progress shows on the Signups page.",
+        "keyRule": "3–32 lowercase letters, digits or single hyphens, starting with a letter.",
+        "defaultPlan": "Default plan",
+        "submit": "Create workspace",
+        "queued": "Workspace {{key}} is being created."
+      },
+      "edit": {
+        "title": "Edit workspace",
+        "profile": "Profile",
+        "contactName": "Contact name",
+        "contactEmail": "Contact e-mail",
+        "contactPhone": "Contact phone",
+        "language": "Default language",
+        "integrations": "Integrations",
+        "sso": "Single sign-on",
+        "ssoEnabled": "SSO enabled",
+        "ssoEntityId": "Service provider entity ID",
+        "ssoIdpEntityId": "Identity provider entity ID",
+        "ssoMetadataUrl": "Identity provider metadata URL",
+        "hosts": "Extra hosts",
+        "hostsHint": "One host per line, without scheme, port or path. The workspace subdomain always works.",
+        "saved": "Workspace saved.",
+        "listedPublicly": "List on the landing page"
+      }
+    },
+    "plans": {
+      "add": "Add plan",
+      "edit": "Plan",
+      "code": "Code",
+      "name": "Name",
+      "nameEn": "English name",
+      "nameAr": "Arabic name",
+      "trialDays": "Trial days",
+      "tenants": "Tenants",
+      "maxUsers": "Max users",
+      "maxTeams": "Max teams",
+      "storage": "Storage (GB)",
+      "public": "Public",
+      "active": "Active",
+      "subtitle": "Plans offered at signup and their limits."
+    },
+    "signups": {
+      "retry": "Retry",
+      "reject": "Reject",
+      "approve": "Approve",
+      "approved": "Signup {{key}} approved.",
+      "rejectReason": "Reason (internal, not sent to the customer)",
+      "allStatuses": "All statuses",
+      "awaitingApprovalHint": "Confirmed signups wait here until you approve or reject them.",
+      "subtitle": "Self-service and staff-created workspaces while they are provisioned."
+    },
+    "connection": {
+      "title": "Connection string",
+      "server": "Server",
+      "database": "Database",
+      "user": "User",
+      "integrated": "Integrated security",
+      "unavailable": "The connection string cannot be read for this workspace.",
+      "reveal": "Reveal",
+      "revealTitle": "Reveal connection string",
+      "revealHint": "The full connection string includes the database password. Every reveal is recorded in the audit log with your reason.",
+      "reason": "Reason",
+      "revealSubmit": "Reveal",
+      "copy": "Copy",
+      "copied": "Copied to the clipboard."
+    },
+    "admins": {
+      "title": "Workspace administrators",
+      "add": "Add administrator",
+      "addTitle": "Add a workspace administrator",
+      "addHint": "The new administrator receives an e-mail with a temporary password and a set-password link. The plan's user limit applies.",
+      "email": "E-mail (also the user name)",
+      "phone": "Phone (optional)",
+      "userName": "User name",
+      "status": "Status",
+      "statuses": {
+        "Active": "Active",
+        "Suspended": "Suspended",
+        "PendingActivation": "Pending activation"
+      },
+      "created": "Created",
+      "empty": "No administrators found.",
+      "suspend": "Suspend",
+      "reactivate": "Reactivate",
+      "resend": "Resend credentials",
+      "suspendTitle": "Suspend administrator",
+      "suspendHint": "The administrator can no longer sign in until reactivated. The last active administrator cannot be suspended.",
+      "reason": "Reason",
+      "suspended": "{{user}} is suspended.",
+      "reactivated": "{{user}} is active again.",
+      "delivery": {
+        "Sent": "Credentials e-mailed.",
+        "WrittenToMockFolder": "Credentials written to the mock e-mail folder.",
+        "EmailDisabled": "E-mail is switched off: no credentials were sent and the account was not changed."
+      },
+      "unavailable": "Administrators can be managed once the workspace is provisioned."
+    },
+    "support": {
+      "start": "Start support session",
+      "end": "End session",
+      "grants": "Grants",
+      "sessions": "Sessions",
+      "scope": "Scope",
+      "reason": "Reason",
+      "expires": "Expires",
+      "active": "Active",
+      "inactive": "Inactive",
+      "agent": "Support agent",
+      "asUser": "Act as",
+      "ticket": "Ticket",
+      "started": "Started",
+      "title": "Support access",
+      "noGrants": "This workspace has not granted support access.",
+      "noSessions": "No support sessions yet."
+    },
+    "adminOnly": "Only platform administrators can change this.",
+    "subscription": {
+      "title": "Subscription",
+      "manage": "Manage",
+      "status": "Subscription",
+      "action": "Action",
+      "actions": {
+        "activate": "Activate",
+        "activateHint": "Paid or approved: service until the period end, or open-ended when left empty.",
+        "extendTrial": "Extend trial",
+        "extendTrialHint": "Adds days to the current trial.",
+        "changePlan": "Change plan",
+        "changePlanHint": "Moves the workspace to another plan and its limits.",
+        "suspend": "Suspend",
+        "suspendHint": "Stops service until the subscription is activated again.",
+        "cancel": "Cancel",
+        "cancelHint": "Ends the subscription."
+      },
+      "trialDays": "Days to add",
+      "periodEnds": "Period ends",
+      "periodEndsHint": "Leave empty for no end date.",
+      "notes": "Notes",
+      "started": "Started",
+      "trialEnds": "Trial ends",
+      "openEnded": "Open-ended",
+      "none": "No subscription yet. Activate one to start service.",
+      "saved": "Subscription updated."
+    },
+    "schema": {
+      "title": "Database",
+      "mode": "Mode",
+      "database": "Database",
+      "lastMigrated": "Last migrated",
+      "pending": "Pending migrations",
+      "pendingUnknown": "Could not read pending migrations — the database may not be reachable.",
+      "upToDate": "Up to date.",
+      "migrate": "Migrate this tenant",
+      "migrated": "Migrated to {{version}}.",
+      "verify": "Verify database",
+      "verified": "The runtime credential is confined to this workspace's database.",
+      "runtimePrincipal": "Runtime login",
+      "verifiedAt": "Isolation verified",
+      "notVerified": "Not verified yet"
+    },
+    "databaseServers": {
+      "subtitle": "SQL Servers that managed workspaces are created on.",
+      "add": "Register server",
+      "edit": "Database server",
+      "name": "Name",
+      "connectionString": "Admin connection string",
+      "connectionStringHint": "Used only to create databases and logins. Stored encrypted and never shown again.",
+      "connectionStringKeep": "Leave empty to keep the stored connection string.",
+      "maxDatabases": "Database limit",
+      "usage": "Databases",
+      "containedUsers": "Contained users",
+      "active": "Active",
+      "inactive": "Inactive",
+      "empty": "No database servers registered.",
+      "noneWarning": "No database server is registered. Managed workspaces — from signup or Add workspace — cannot be created until one is.",
+      "saved": "Database server saved."
+    },
+    "users": {
+      "subtitle": "NWFM staff accounts for this console.",
+      "add": "Add user",
+      "edit": "Staff user",
+      "displayName": "Display name",
+      "role": "Role",
+      "roles": {
+        "PlatformAdmin": "Platform admin",
+        "PlatformSupport": "Support"
+      },
+      "passwordHint": "At least {{min}} characters.",
+      "passwordKeep": "Leave empty to keep the current password (at least {{min}} characters if changed).",
+      "active": "Active",
+      "inactive": "Inactive",
+      "lastLogin": "Last sign-in",
+      "empty": "No staff users.",
+      "saved": "User saved."
+    },
+    "audit": {
+      "subtitle": "Every staff and system action on the platform, newest first.",
+      "searchHint": "Actor, target or details",
+      "allActions": "All actions",
+      "groups": {
+        "tenant": "Tenants",
+        "subscription": "Subscriptions",
+        "signup": "Signups",
+        "support": "Support",
+        "plan": "Plans",
+        "database_server": "Database servers",
+        "platform_user": "Staff users",
+        "tenant_admin": "Workspace administrators",
+        "platform": "Sign-ins"
+      },
+      "tenantFilter": "This workspace only",
+      "forTenant": "Audit log",
+      "at": "When",
+      "actor": "Actor",
+      "action": "Action",
+      "tenant": "Workspace",
+      "target": "Target",
+      "details": "Details",
+      "ip": "IP",
+      "empty": "No audit entries."
+    },
+    "tips": {
+      "tenantStatus": "Active workspaces serve their users. Suspended or Maintenance refuses every sign-in and request until the workspace is activated again. Data is never deleted.",
+      "subscriptionStatus": "Billing state. A suspended, expired or cancelled subscription, or a trial that has run out, stops service even when the workspace is Active.",
+      "schema": "The last database update applied to this workspace. A workspace behind the current release answers \"unavailable\" until it is migrated.",
+      "migrateAll": "Applies pending database updates to every active workspace in the background. Users may see brief errors while their workspace updates; results land in the audit log.",
+      "addWorkspace": "Creates a workspace with a hosted database straight away (no approval step). The administrator is e-mailed a temporary password and a set-password link.",
+      "tenantKey": "The workspace address (for example acme → acme.eye360…). It is used in every link and cannot be changed later.",
+      "plan": "Decides the trial length and the user, team and storage limits the workspace gets.",
+      "editWorkspace": "Change the workspace name, contact details, default language, single sign-on and extra host names.",
+      "manageSubscription": "Activate after payment, extend a trial, move to another plan (new limits) or suspend / cancel. Suspending or cancelling stops service for every user.",
+      "statusSection": "Turns the whole workspace on or off for all of its users. Nothing is deleted.",
+      "activate": "Opens the workspace to its users again.",
+      "suspend": "Blocks every user and request of this workspace within about a minute — for non-payment or abuse. Data is kept. A reason is required and recorded.",
+      "maintenance": "Blocks users while you work on the workspace, for example a database repair. Data is kept. A reason is required and recorded.",
+      "migrate": "Applies pending database updates to this workspace now. Its users may see brief errors while it runs.",
+      "pendingMigrations": "Database updates this release needs that the workspace database does not have yet. While any are pending the workspace answers \"unavailable\".",
+      "connection": "Where this workspace's database lives. The password stays hidden unless you reveal it.",
+      "reveal": "Shows the full connection string, including the database password. You must give a reason, and every reveal is written to the audit log.",
+      "admins": "The administrators inside this workspace. They manage its users, teams and settings from the workspace app.",
+      "addAdmin": "Creates another administrator and e-mails a temporary password plus a set-password link. Counts towards the plan's user limit.",
+      "resendCredentials": "Issues a new temporary password and set-password link and e-mails them. Any password or link sent earlier stops working.",
+      "suspendAdmin": "Stops this administrator from signing in. Other users are not affected. The last active administrator cannot be suspended.",
+      "reactivateAdmin": "Lets this administrator sign in again.",
+      "adminStatus": "Pending activation: still on the temporary password (or never set one). Suspended: cannot sign in.",
+      "support": "Lets the support team open the workspace as one of its users to troubleshoot. It needs an active grant from the workspace, and every session is audited on both sides.",
+      "startSupport": "Opens the workspace in a new tab as the chosen user. Everything you do there is done as that user and recorded in the workspace audit log.",
+      "supportGrants": "Permission the workspace gave the support team, with a scope and an expiry. Without an active grant no support session can start.",
+      "supportTicket": "Your support ticket reference. It is recorded in both the platform and the workspace audit logs.",
+      "supportAsUser": "Whose permissions the session uses. Leave empty to act as the first administrator.",
+      "approveSignup": "Accepts the request. A hosted-database signup starts provisioning immediately; a bring-your-own-database one moves on to the database step.",
+      "retrySignup": "Runs provisioning again from the last step that finished. Use it after fixing what made it fail.",
+      "rejectSignup": "Declines the request and e-mails the customer a polite notice. Your reason stays internal. This cannot be undone.",
+      "signupStatus": "Awaiting approval: e-mail confirmed, waiting for you. Awaiting database: the customer still has to give working database details. Failed: provisioning stopped — Retry resumes it.",
+      "addPlan": "Creates a plan that can be offered at signup or assigned to workspaces.",
+      "planCode": "Permanent identifier used in signup links and the API. Changing it breaks links that use the old code.",
+      "trialDays": "Free days a new subscription on this plan gets. 0 starts the subscription as Active straight away.",
+      "maxUsers": "Most accounts a workspace on this plan may have. Empty means unlimited. Lowering it never removes users; it only blocks adding new ones.",
+      "maxTeams": "Most field teams a workspace on this plan may have. Empty means unlimited.",
+      "maxStorage": "Storage for uploaded files, in GB. Empty means unlimited.",
+      "planPublic": "Offered on the public signup page. A non-public plan can still be assigned by staff.",
+      "planActive": "Inactive plans cannot be picked for new signups or plan changes. Workspaces already on the plan keep it.",
+      "addServer": "Registers a SQL Server that new hosted workspace databases are created on.",
+      "serverConnection": "A SQL login allowed to create databases and logins (dbcreator and securityadmin). Stored encrypted and never shown again.",
+      "serverLimit": "How many workspace databases may be created on this server. When it is full, new workspaces go to another active server.",
+      "containedUsers": "Creates each workspace's login inside its own database (a contained user) instead of on the server. The server must allow contained database authentication.",
+      "serverActive": "Only active servers receive new workspace databases. Databases already on the server keep working.",
+      "addStaff": "Creates a staff account for this console.",
+      "staffRole": "Platform admin can change everything. Support can view workspaces, signups and the audit log, and start support sessions.",
+      "staffActive": "Inactive staff cannot sign in to this console.",
+      "sso": "Lets the workspace's users sign in through their organisation's identity provider. While it is on, password sign-in is closed to everyone except administrators.",
+      "hosts": "Extra domain names that open this workspace, such as the customer's own domain. Its DNS must point to us.",
+      "language": "The default language of the workspace and of the e-mails it sends.",
+      "contactEmail": "Where platform notices for this workspace are sent. It does not change anyone's sign-in.",
+      "verify": "Signs in as the runtime login and checks it cannot administer this database, open another one or impersonate anyone.",
+      "listedPublicly": "Show this workspace on the landing page's sign-in list. Off unless the customer asks for it."
+    }
+  },
+  "signup": {
+    "title": "Create a workspace",
+    "subtitle": "Start a workspace for your workflows, forms and field teams.",
+    "createWorkspace": "Create a workspace",
+    "haveAccount": "Already have an account? Sign in",
+    "steps": {
+      "workspace": "Workspace",
+      "admin": "Administrator",
+      "database": "Database"
+    },
+    "organizationName": "Organisation name",
+    "tenantKey": "Workspace address",
+    "workspaceWillBe": "Your workspace will be {{url}}",
+    "keyAvailable": "This address is available.",
+    "keyTaken": "This address is not available.",
+    "tenantKeyPlaceholder": "your-organisation",
+    "generateKey": "Generate from organisation name",
+    "keyFormat": "Use 3–32 lowercase letters, numbers or single hyphens, starting with a letter and not ending with a hyphen.",
+    "keyReasons": {
+      "invalid": "This address is not valid.",
+      "reserved": "This address is reserved. Please choose another.",
+      "taken": "This address is already taken. Please choose another."
+    },
+    "plan": "Plan",
+    "language": "Language",
+    "adminFullName": "Administrator name",
+    "adminEmail": "Administrator email",
+    "adminPhone": "Phone (optional)",
+    "databaseMode": "Database",
+    "managedDb": "Create and host the database for us",
+    "byoDb": "We will bring our own SQL Server",
+    "next": "Next",
+    "back": "Back",
+    "submit": "Create workspace",
+    "failed": "Signup failed",
+    "verify": {
+      "title": "Confirm your email",
+      "success": "Email confirmed. We are preparing the workspace.",
+      "awaitingApproval": "Email confirmed. Our team will review your request and e-mail your sign-in details once it is approved.",
+      "missing": "This confirmation link is incomplete. Open it again from the email.",
+      "continue": "Continue",
+      "resend": "Resend confirmation email"
+    },
+    "status": {
+      "title": "Workspace status",
+      "current": "Status: {{status}}",
+      "checkEmail": "Check your email and follow the confirmation link.",
+      "continueDatabase": "Continue with your database details",
+      "ready": "The workspace is ready.",
+      "awaitingApproval": "Your request is being reviewed. You will receive your sign-in details by e-mail once it is approved.",
+      "rejected": "We could not accept this request. Please contact our team if you have any questions."
+    },
+    "database": {
+      "title": "Bring your own database",
+      "subtitle": "Open our outbound addresses on your SQL Server, then test the connection.",
+      "egress": "Allow connections from these addresses:",
+      "server": "Server",
+      "port": "Port",
+      "name": "Database",
+      "user": "Owner user (migrates the schema)",
+      "password": "Password",
+      "trustCert": "Trust server certificate",
+      "script": "Generate SQL script",
+      "test": "Test connection",
+      "save": "Save and continue",
+      "tokenRequired": "Open this page from the confirmation email so we can verify it is you.",
+      "runtimeUser": "Runtime user (serves requests)",
+      "runtimePassword": "Runtime user password",
+      "runtimeHint": "NWFM uses two logins: the owner creates and upgrades the schema; the runtime user, which holds no role, is what the application runs as. The setup script creates both."
+    }
+  }
+}
