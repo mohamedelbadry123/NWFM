@@ -4,6 +4,7 @@ using FormEngine.Application.Common.Schema;
 using FormEngine.Application.Constants;
 using FormEngine.Application.Submissions.Models;
 using FormEngine.Domain.Options;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Exceptions;
@@ -22,10 +23,24 @@ public sealed class FormSubmissionService(
     ICurrentUser user,
     TimeProvider timeProvider,
     IOptions<FileStorageOptions> fileStorageOptions,
-    IOptions<FormEngineOptions> formEngineOptions) : IFormSubmissionService
+    IOptions<FormEngineOptions> formEngineOptions,
+    IEnumerable<NWFM.Shared.Integration.Forms.IFormSubmissionGuard>? guards = null,
+    NWFM.Shared.Integration.Forms.TrustedFormSubmissionActor? trustedActor = null) : IFormSubmissionService
 {
     public async Task<Result<FormSubmissionCreatedDto>> SubmitAsync(FormSubmissionRequest request, CancellationToken ct)
     {
+        var attribution = trustedActor?.Resolve(request.ContextType, request.ContextId, user.Id);
+        var submitter = attribution?.EffectiveActorId.ToString() ?? user.Id;
+        foreach (var guard in guards ?? [])
+        {
+            var permitted = await guard.ValidateAsync(request.FormDefinitionId, request.VersionNo, request.ContextType,
+                request.ContextId, request.ClientSubmissionId, request.Answers, submitter, ct);
+            if (permitted.IsFailure) return Result.Failure<FormSubmissionCreatedDto>(permitted.Error);
+        }
+        var workflowReceipt = string.Equals(request.ContextType, "WorkItem", StringComparison.OrdinalIgnoreCase);
+        if (!workflowReceipt && request.ClientSubmissionId is Guid reservedKey
+            && await context.WorkflowReceiptKeys.AnyAsync(k => k.ClientSubmissionId == reservedKey, ct))
+            return Result.Failure<FormSubmissionCreatedDto>(new Error("Workflow.Form.Context", "This receipt key is reserved for a workflow submission."));
         var resolved = await FormSchemaLoader.LoadAsync(context, request.FormDefinitionId, request.VersionNo, ct);
 
         if (resolved is null)
@@ -63,7 +78,7 @@ public sealed class FormSubmissionService(
             var recorded = await submissionStore.FindByClientIdAsync(table, clientKey, ct);
             if (recorded is Guid existingId)
             {
-                return Result.Success(new FormSubmissionCreatedDto(existingId, versionNo, IsReplay: true));
+                return await ReplayAsync(table, existingId, versionNo, request, submitter, ct);
             }
         }
 
@@ -110,8 +125,8 @@ public sealed class FormSubmissionService(
                     VersionNo = versionNo,
                     ContextType = request.ContextType,
                     ContextId = request.ContextId,
-                    SubmittedBy = user.Id,
-                    SubmittedByName = user.UserName,
+                    SubmittedBy = submitter,
+                    SubmittedByName = attribution?.DisplayName ?? user.UserName,
                     ClientSubmissionId = request.ClientSubmissionId,
                     Answers = answers,
                 },
@@ -130,6 +145,9 @@ public sealed class FormSubmissionService(
                 utcNow.UtcDateTime,
                 ct);
 
+            if (workflowReceipt && request.ClientSubmissionId is Guid acceptedKey
+                && !await context.WorkflowReceiptKeys.AnyAsync(k => k.ClientSubmissionId == acceptedKey, ct))
+                context.WorkflowReceiptKeys.Add(new FormEngine.Domain.Entities.WorkflowReceiptKey(acceptedKey));
             await context.SaveChangesAsync(ct);
 
             if (transaction is not null)
@@ -143,7 +161,7 @@ public sealed class FormSubmissionService(
             var recorded = await submissionStore.FindByClientIdAsync(table, duplicate.ClientSubmissionId, ct);
 
             return recorded is Guid existingId
-                ? Result.Success(new FormSubmissionCreatedDto(existingId, versionNo, IsReplay: true))
+                ? await ReplayAsync(table, existingId, versionNo, request, submitter, ct)
                 : Result.Failure<FormSubmissionCreatedDto>(
                     FormEngineErrors.Submission.AnswerRejected(duplicate.Message));
         }
@@ -154,6 +172,27 @@ public sealed class FormSubmissionService(
         }
 
         return Result.Success(new FormSubmissionCreatedDto(submissionId, versionNo, IsReplay: false));
+    }
+
+    private async Task<Result<FormSubmissionCreatedDto>> ReplayAsync(FormTable table, Guid id, int version,
+        FormSubmissionRequest request, string? submitter, CancellationToken ct)
+    {
+        // The owning workflow transaction can roll back after this immutable receipt committed.
+        // Its stored context remains authoritative even if the workflow reservation rolled back.
+        var row = await submissionStore.GetByIdAsync(table, id, ct);
+        var storedContext = row?.GetValueOrDefault("ContextType") as string;
+        if (string.Equals(storedContext, "WorkItem", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(request.ContextType, "WorkItem", StringComparison.OrdinalIgnoreCase))
+        {
+            var owner = row?.GetValueOrDefault("SubmittedBy") as string;
+            if (row is null || !string.Equals(storedContext, request.ContextType, StringComparison.OrdinalIgnoreCase)
+                || !Equals(row.GetValueOrDefault("ContextId"), request.ContextId)
+                || !Equals(row.GetValueOrDefault("VersionNo"), version)
+                || (!string.IsNullOrWhiteSpace(owner) && (!Guid.TryParse(owner, out var recordedActor)
+                    || !Guid.TryParse(submitter, out var currentActor) || recordedActor != currentActor)))
+                return Result.Failure<FormSubmissionCreatedDto>(new Error("Workflow.Form.Context", "The completion receipt does not belong to this workflow submission."));
+        }
+        return Result.Success(new FormSubmissionCreatedDto(id, version, IsReplay: true));
     }
 
     /// <summary>

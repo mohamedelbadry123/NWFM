@@ -16,18 +16,26 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkflowVersionRepository _versionRepo;
     private readonly IWorkflowXmlCompiler _compiler;
+    private readonly IWorkflowDraftLock? _draftLock;
+    private readonly Microsoft.Extensions.Options.IOptions<Settings.WorkflowSettings>? _settings;
 
     public SaveWorkflowDraftXmlCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowVersionRepository versionRepo,
-        IWorkflowXmlCompiler compiler)
+        IWorkflowXmlCompiler compiler,
+        Microsoft.Extensions.Options.IOptions<Settings.WorkflowSettings>? settings = null, IWorkflowDraftLock? draftLock = null)
     {
         _gate = gate;
         _versionRepo = versionRepo;
         _compiler = compiler;
+        _settings = settings;
+        _draftLock = draftLock;
     }
 
-    public async Task<Result<WorkflowVersionDto>> Handle(
+    public Task<Result<WorkflowVersionDto>> Handle(SaveWorkflowDraftXmlCommand request, CancellationToken cancellationToken) =>
+        _draftLock is null ? SaveAsync(request, cancellationToken) : _draftLock.RunAsync(request.VersionId, () => SaveAsync(request, cancellationToken), cancellationToken);
+
+    private async Task<Result<WorkflowVersionDto>> SaveAsync(
         SaveWorkflowDraftXmlCommand request, CancellationToken cancellationToken)
     {
         var gateResult = _gate.EnsureEnabled();
@@ -41,6 +49,9 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
         if (!version.IsDraft)
             return Result.Failure<WorkflowVersionDto>(WorkflowErrors.Version.NotDraft);
 
+        if (Routing.RoutingDefinition.Enabled(version.WorkspaceJson) && request.ExpectedRevision != Routing.RoutingDraftRevision.Of(version))
+            return Result.Failure<WorkflowVersionDto>(new Error("Workflow.Draft.Conflict", "A newer draft exists. Your local changes are retained; reload the server version before saving again."));
+
         string normalizedXml;
         try { normalizedXml = Workspace.WorkspaceDesign.NormalizeDraft(request.XmlContent); }
         catch (Exception ex) when (ex is System.Xml.XmlException or System.Text.Json.JsonException or InvalidOperationException)
@@ -50,6 +61,19 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
             return Result.Failure<WorkflowVersionDto>(compileResult.Error);
 
         var doc = compileResult.Value!;
+        if (ScopeRowProblem(doc.WorkspaceJson) is { } scopeRowProblem)
+            return Result.Failure<WorkflowVersionDto>(new Error(WorkflowScopeRows.InvalidCode, scopeRowProblem));
+        if (Routing.RoutingDefinition.Enabled(doc.WorkspaceJson))
+        {
+            if (!Routing.RoutingDefinition.Enabled(version.WorkspaceJson) && !string.IsNullOrEmpty(version.XmlContent) && !request.AllowRoutingUpgrade)
+                return Result.Failure<WorkflowVersionDto>(new Error("Routing.UpgradeRequired", "Use the upgrade preview to convert this draft and retain its previous definition."));
+            if (_settings?.Value.RoutingV4Enabled != true)
+                return Result.Failure<WorkflowVersionDto>(new Error("Routing.Disabled", "Routing version 4 authoring is not enabled."));
+            if (request.ExpectedRevision != Routing.RoutingDraftRevision.Of(version))
+                return Result.Failure<WorkflowVersionDto>(new Error("Workflow.Draft.Conflict", "The draft has changed. Reload before saving."));
+        }
+        else if (Routing.RoutingDefinition.Enabled(version.WorkspaceJson))
+            return Result.Failure<WorkflowVersionDto>(new Error("Routing.Downgrade", "A version 4 draft cannot silently revert to legacy routing."));
         var now = DateTime.UtcNow;
 
         version.UpdateXml(normalizedXml, canonicalHash, now);
@@ -66,6 +90,16 @@ public sealed class SaveWorkflowDraftXmlCommandHandler
         await _versionRepo.SaveChangesAsync(cancellationToken);
 
         return Result.Success(CreateWorkflowDraftCommandHandler.MapToDto(version));
+    }
+
+    /// <summary>
+    /// Scope entries a draft carries must expand to the canonical scopes it saves beside them. Settings that cannot be
+    /// read at all are left to publish validation, as before; only a readable document with inconsistent entries is refused.
+    /// </summary>
+    private static string? ScopeRowProblem(string? workspaceJson)
+    {
+        try { return WorkflowScopeRows.Validate(WorkflowWorkspaceDefinition.Read(workspaceJson)); }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     /// <summary>The designer and operator-import path use identical XML-to-domain projection rules.</summary>

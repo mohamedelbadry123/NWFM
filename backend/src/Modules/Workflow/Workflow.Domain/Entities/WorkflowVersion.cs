@@ -62,6 +62,34 @@ public sealed class WorkflowVersion : Entity
         };
     }
 
+    public WorkflowVersion CopyForValidation(string xml, string? designer, string? workspace,
+        IEnumerable<ActivityDefinition> activities, IEnumerable<WorkflowTransition> transitions,
+        IEnumerable<WorkflowVariableDefinition> variables, IEnumerable<ActivityAssignmentRule>? rules = null,
+        IEnumerable<ActivityOutcomeDefinition>? outcomes = null, IEnumerable<ActivityActionDefinition>? actions = null)
+    {
+        var copy = new WorkflowVersion
+        {
+            Id = Id,
+            WorkflowDefinitionId = WorkflowDefinitionId,
+            VersionNumber = VersionNumber,
+            Status = Status,
+            XmlContent = xml,
+            DesignerJson = designer,
+            WorkspaceJson = workspace,
+            PinnedChildVersionsJson = PinnedChildVersionsJson
+        };
+        copy._activities.AddRange(activities); copy._transitions.AddRange(transitions); copy._variables.AddRange(variables);
+        if (rules is not null || outcomes is not null || actions is not null)
+        {
+            var assignments = (rules ?? []).ToList(); var results = (outcomes ?? []).ToList(); var operations = (actions ?? []).ToList();
+            copy._outcomes.AddRange(results); copy._actions.AddRange(operations);
+            foreach (var activity in copy._activities)
+                activity.PopulateValidationRelations(assignments.Where(r => r.ActivityDefinitionId == activity.Id), results.Where(r => r.ActivityDefinitionId == activity.Id), operations.Where(r => r.ActivityDefinitionId == activity.Id));
+        }
+
+        return copy;
+    }
+
     public bool IsDraft => Status == WorkflowVersionStatus.Draft;
 
     public void UpdateDesignerJson(string designerJson, DateTime updatedAt)

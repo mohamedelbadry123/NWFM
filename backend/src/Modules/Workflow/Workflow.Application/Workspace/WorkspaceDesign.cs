@@ -14,7 +14,12 @@ public static class WorkspaceDesign
     public static JsonObject Configuration(string? json) => JsonNode.Parse(json ?? "{}") as JsonObject ?? new();
     public static bool IsSimplified(string? json)
     {
-        try { return Configuration(json)["designerVersion"]?.GetValue<int>() == 2; }
+        try { return Configuration(json)["designerVersion"]?.GetValue<int>() is 2 or 3 or 4; }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException) { return false; }
+    }
+    public static bool IsHierarchical(string? json)
+    {
+        try { return Configuration(json)["designerVersion"]?.GetValue<int>() is 3 or 4; }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException) { return false; }
     }
     public static EventTriggerBinding? Binding(string? json)

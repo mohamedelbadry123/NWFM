@@ -19,6 +19,18 @@ public static class IntegrationConfigurationRules
             if (kind == "Http")
             {
                 var c = IntegrationJson.Read<HttpActivityConfiguration>(json);
+                using var configurationDocument = JsonDocument.Parse(json);
+                Check(c.MappingMode is "Legacy" or "Typed", "Select Legacy or Typed mapping mode.");
+                if (c.MappingMode == "Typed")
+                {
+                    Check(c.Protocol == "Rest" && c.TypedMapping?.Endpoint is not null, "Typed mapping requires a REST endpoint schema.");
+                    Check(c.ContentType == "application/json", "Typed request bodies use application/json.");
+                    Check(c.OutputMappings.Count == 0 && c.Headers.Count == 0 && c.Query.Count == 0 && c.Body is null, "Typed and legacy mappings cannot be combined.");
+                    if (c.TypedMapping?.Endpoint is not null) Workflow.Application.Mapping.MappingValidation.Endpoint(c.TypedMapping.Endpoint);
+                    if (!string.IsNullOrWhiteSpace(c.IdempotencyHeader)) Workflow.Application.Mapping.MappingValidation.Header(c.IdempotencyHeader, "operation");
+                    Check(c.MaxAttempts <= 1 || c.TypedMapping?.Endpoint?.Method is "GET" or "HEAD" or "OPTIONS" || !string.IsNullOrWhiteSpace(c.IdempotencyHeader), "Typed retries require an idempotency header.");
+                }
+                else Check(!configurationDocument.RootElement.TryGetProperty("typedMapping", out _), "A typed mapping cannot run in Legacy mode.");
                 Check(c.Protocol is "Rest" or "Soap" or "Sms", "Select REST, SOAP or SMS.");
                 if (c.Protocol == "Soap")
                 {
@@ -67,7 +79,7 @@ public static class IntegrationConfigurationRules
                 else Check(c.FailurePolicy != "Retry", "Retry requires the Email channel; in-app notifications are stored immediately.");
             }
         }
-        catch (Exception ex) when (ex is JsonException or NotSupportedException or System.Xml.XmlException or System.Xml.XPath.XPathException) { errors.Add("Integration configuration contains an invalid value, request body or XML mapping."); }
+        catch (Exception ex) when (ex is JsonException or FormatException or NotSupportedException or System.Xml.XmlException or System.Xml.XPath.XPathException) { errors.Add("Integration configuration contains an invalid value, request body or XML mapping."); }
         return errors;
     }
 }

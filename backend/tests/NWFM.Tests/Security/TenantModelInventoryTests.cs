@@ -29,6 +29,8 @@ public sealed class TenantModelInventoryTests
             "WorkflowIncident", "WorkflowInstance", "WorkflowIntegrationConnection", "WorkflowIntegrationInbox",
             "WorkflowIntegrationJob", "WorkflowIntegrationOutbox", "WorkflowNotificationLog", "WorkflowParticipant",
             "WorkflowRequest", "WorkflowTimer", "WorkflowVariable", "WorkflowWorkspaceAction",
+            "WorkflowMappingInvocation", "WorkflowFormReceiptReservation", "WorkflowRoutingScope",
+            "WorkflowRoutingResult", "WorkflowRoutingActivation", "WorkflowRoutingUpgradeSnapshot",
         ];
         string[] parentScoped =
         [
@@ -59,7 +61,7 @@ public sealed class TenantModelInventoryTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
         using var tasks = new TasksDbContext(new DbContextOptionsBuilder<TasksDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
-        Assert.Equal(new[] { "FormDefinition", "FormField", "FormVersion", "SubmissionFile" }.Order(),
+        Assert.Equal(new[] { "FormDefinition", "FormField", "FormVersion", "SubmissionFile", "WorkflowReceiptKey" }.Order(),
             forms.Model.GetEntityTypes().Select(e => e.ClrType.Name).Order());
         Assert.Equal(new[] { "C2mActionMapping", "C2mDispatchLog", "FieldTask", "TaskAssignment",
             "TaskComputedValue", "TaskForm", "TaskStatusHistory", "TaskType", "TaskTypeForm" }.Order(),

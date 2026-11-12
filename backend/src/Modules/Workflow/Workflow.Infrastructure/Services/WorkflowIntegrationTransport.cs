@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Workflow.Application.Integrations;
+using Workflow.Application.Mapping;
 using Workflow.Domain.Entities;
 
 internal sealed class WorkflowIntegrationTransport
@@ -14,12 +15,13 @@ internal sealed class WorkflowIntegrationTransport
     public const int MaxResponseBytes = 262144;
     public async Task<IntegrationResult> SendHttpAsync(WorkflowIntegrationConnection connection,
         Dictionary<string, string> credentials, HttpActivityConfiguration config, Dictionary<string, JsonElement> variables,
-        string operationKey, CancellationToken ct)
+        string operationKey, CancellationToken ct, PreparedMappingRequest? prepared = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(config.TimeoutSeconds, 1, 120)));
         try
         {
+            if (prepared is not null) MappingRequestPreparation.ValidatePrepared(prepared);
             if (config.Protocol == "Sms")
             {
                 variables = new(variables);
@@ -27,27 +29,27 @@ internal sealed class WorkflowIntegrationTransport
                 variables["smsMessage"] = JsonSerializer.SerializeToElement(IntegrationValueMapper.Render(config.SmsMessage, variables));
             }
             var baseUri = new Uri(connection.Address, UriKind.Absolute);
-            var uri = new Uri(baseUri, IntegrationValueMapper.Render(config.Path, variables));
+            var uri = new Uri(baseUri, prepared?.Path ?? IntegrationValueMapper.Render(config.Path, variables));
             if (uri.Scheme != baseUri.Scheme || uri.Host != baseUri.Host || uri.Port != baseUri.Port || !string.IsNullOrEmpty(uri.UserInfo))
                 return new(false, null, "", "Request URL must remain on the configured connection origin.");
             if (uri.Scheme != "https" && !(connection.AllowPrivateNetwork && uri.Scheme == "http"))
                 return new(false, null, "", "HTTPS is required unless this connection explicitly allows a private test network.");
-            var query = string.Join("&", config.Query.Select(p => Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(IntegrationValueMapper.Render(p.Value, variables))));
+            var query = string.Join("&", (prepared?.Query ?? config.Query).Select(p => Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(prepared is null ? IntegrationValueMapper.Render(p.Value, variables) : p.Value)));
             if (query.Length > 0) uri = new UriBuilder(uri) { Query = uri.Query.TrimStart('?') + (uri.Query.Length > 0 ? "&" : "") + query }.Uri;
             using var handler = CreateHandler(connection.AllowPrivateNetwork);
             using var client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-            using var request = new HttpRequestMessage(new HttpMethod(config.Method.ToUpperInvariant()), uri);
-            foreach (var (name, value) in config.Headers)
+            using var request = new HttpRequestMessage(new HttpMethod(prepared?.Method ?? config.Method.ToUpperInvariant()), uri);
+            foreach (var (name, value) in prepared?.Headers ?? config.Headers)
             {
                 if (new[] { "Authorization", "Proxy-Authorization", "Cookie", "Host", "Content-Length" }.Contains(name, StringComparer.OrdinalIgnoreCase))
                     return new(false, null, "", $"Header '{name}' must be configured through the connection or request body settings.");
-                request.Headers.Add(name, IntegrationValueMapper.Render(value, variables));
+                request.Headers.Add(name, prepared is null ? IntegrationValueMapper.Render(value, variables) : value);
             }
             if (!string.IsNullOrWhiteSpace(config.IdempotencyHeader)) request.Headers.Add(config.IdempotencyHeader, operationKey);
-            if (config.Body is not null)
+            if (prepared is not null ? prepared.Body.ValueKind != JsonValueKind.Undefined : config.Body is not null)
             {
-                var body = config.Protocol == "Soap" ? SoapMessage.Render(config.Body, variables) : config.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
-                    ? IntegrationValueMapper.RenderJson(config.Body, variables) : IntegrationValueMapper.Render(config.Body, variables);
+                var body = prepared is not null ? prepared.Body.GetRawText() : config.Protocol == "Soap" ? SoapMessage.Render(config.Body!, variables) : config.ContentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                    ? IntegrationValueMapper.RenderJson(config.Body!, variables) : IntegrationValueMapper.Render(config.Body!, variables);
                 if (Encoding.UTF8.GetByteCount(body) > MaxResponseBytes) return new(false, null, "", "Request body exceeds 256 KB.");
                 request.Content = new StringContent(body, Encoding.UTF8, config.Protocol == "Soap" ? config.SoapVersion == "1.2" ? "application/soap+xml" : "text/xml" : config.ContentType);
                 if (config.Protocol == "Soap")
@@ -105,7 +107,9 @@ internal sealed class WorkflowIntegrationTransport
 
     internal static SocketsHttpHandler CreateHandler(bool allowPrivate) => new()
     {
-        AllowAutoRedirect = false, UseProxy = false, AutomaticDecompression = DecompressionMethods.None,
+        AllowAutoRedirect = false,
+        UseProxy = false,
+        AutomaticDecompression = DecompressionMethods.None,
         ConnectCallback = async (context, ct) =>
         {
             var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, ct);
@@ -145,8 +149,13 @@ internal sealed class WorkflowIntegrationTransport
         {
             using var client = new SmtpClient(connection.Address, connection.Port) { EnableSsl = connection.UseTls, UseDefaultCredentials = false, Timeout = 60000 };
             if (connection.Authentication == "Basic") client.Credentials = new NetworkCredential(credentials.GetValueOrDefault("username"), credentials.GetValueOrDefault("password"));
-            using var message = new MailMessage { From = new MailAddress(credentials.GetValueOrDefault("fromAddress") ?? ""),
-                Subject = IntegrationValueMapper.Render(config.Subject, variables), Body = IntegrationValueMapper.Render(config.Body, variables), IsBodyHtml = config.IsHtml };
+            using var message = new MailMessage
+            {
+                From = new MailAddress(credentials.GetValueOrDefault("fromAddress") ?? ""),
+                Subject = IntegrationValueMapper.Render(config.Subject, variables),
+                Body = IntegrationValueMapper.Render(config.Body, variables),
+                IsBodyHtml = config.IsHtml
+            };
             foreach (var address in SplitAddresses(IntegrationValueMapper.Render(config.To, variables))) message.To.Add(address);
             foreach (var address in SplitAddresses(IntegrationValueMapper.Render(config.Cc, variables))) message.CC.Add(address);
             foreach (var address in SplitAddresses(IntegrationValueMapper.Render(config.Bcc, variables))) message.Bcc.Add(address);

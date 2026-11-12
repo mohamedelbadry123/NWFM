@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { packageCommand } from './process.mjs';
 
 export function inspectNuget(report) {
   if (
@@ -38,15 +39,29 @@ export function inspectNuget(report) {
   }
   if (findings.length) throw new Error(findings.join('\n'));
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+export function auditDependencies({
+  spawn = spawnSync,
+  command = packageCommand,
+  logError = console.error,
+} = {}) {
   let failed = false;
   for (const directory of ['.', 'frontend']) {
-    const result = spawnSync('npm', ['--prefix', directory, 'audit', '--audit-level=high'], {
-      stdio: 'inherit',
-    });
-    if (result.error || result.status !== 0) failed = true;
+    try {
+      const [executable, args] = command('npm', [
+        '--prefix',
+        directory,
+        'audit',
+        '--audit-level=high',
+      ]);
+      const result = spawn(executable, args, { stdio: 'inherit' });
+      if (result.error) logError(result.error.message);
+      if (result.error || result.status !== 0) failed = true;
+    } catch (error) {
+      logError(error.message);
+      failed = true;
+    }
   }
-  const audit = spawnSync(
+  const audit = spawn(
     'dotnet',
     [
       'list',
@@ -64,8 +79,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       throw new Error(audit.error?.message || audit.stderr || 'NuGet audit failed.');
     inspectNuget(JSON.parse(audit.stdout));
   } catch (error) {
-    console.error(error.message);
+    logError(error.message);
     failed = true;
   }
-  process.exitCode = failed ? 1 : 0;
+  return failed ? 1 : 0;
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = auditDependencies();
 }

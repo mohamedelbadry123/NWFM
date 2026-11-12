@@ -41,6 +41,7 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString));
         builder.Services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AuthDbContext>());
         builder.Services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowReferenceData, WorkflowReferenceData>();
+        builder.Services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowRoleDirectory, WorkflowRoleDirectory>();
 
         builder.Services
             .AddIdentity<ApplicationUser, ApplicationRole>()
@@ -65,6 +66,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 
         // Territory for the modules that narrow work to it (Tasks), without referencing Auth.
+        builder.Services.AddScoped<NWFM.Shared.Integration.Workflow.IWorkflowActorAccess, WorkflowActorAccessProvider>();
         builder.Services.AddScoped<OrgScopeProvider>();
         builder.Services.AddScoped<IOrgScopeProvider>(sp => sp.GetRequiredService<OrgScopeProvider>());
         builder.Services.AddScoped<IOrgDirectory>(sp => sp.GetRequiredService<OrgScopeProvider>());

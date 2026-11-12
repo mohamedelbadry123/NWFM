@@ -1,0 +1,103 @@
+<section class="designer-context" [attr.aria-label]="t('Workflow context', 'سياق سير العمل')">
+  <nav class="context-path" [attr.aria-label]="t('Workflow hierarchy', 'تسلسل سير العمل')">
+    @if (!embedded) {
+      <button type="button" (click)="libraryRequested.emit()">
+        {{ t('Workflows', 'مسارات العمل') }}</button
+      ><span aria-hidden="true">/</span>
+    }
+    @if (child()) {
+      @if (settings.parentDefinitionId || embedded) {
+        <button type="button" (click)="parentRequested.emit()">
+          {{ parentName || resolvedParent() || t('Parent workflow', 'سير العمل الرئيسي') }}</button
+        ><span aria-hidden="true">/</span>
+      }
+    }
+    <span aria-current="page">{{
+      child()
+        ? t('Child workflow designer', 'مصمم سير العمل الفرعي')
+        : t('Main workflow designer', 'مصمم سير العمل الرئيسي')
+    }}</span>
+  </nav>
+  <div class="context-title">
+    <h1>{{ name || t('Workflow', 'سير العمل') }}</h1>
+    <span class="level-badge">{{
+      child() ? t('Child workflow', 'سير عمل فرعي') : t('Main workflow', 'سير عمل رئيسي')
+    }}</span>
+    <span class="version-label"
+      >{{ t('Version', 'الإصدار') }} {{ versionNumber }} ·
+      {{
+        status === 'Draft'
+          ? t('Draft', 'مسودة')
+          : status === 'Published'
+            ? t('Published · read only', 'منشور · للقراءة فقط')
+            : t('Retired · read only', 'متقاعد · للقراءة فقط')
+      }}</span
+    >
+  </div>
+  <div class="context-details">
+    <div>
+      <span class="detail-label">{{
+        child() ? t('Task Type', 'نوع المهمة') : t('Activity', 'النشاط')
+      }}</span
+      ><strong>{{ classification() }}</strong>
+    </div>
+    <div class="context-scope">
+      <span class="detail-label">{{ t('Organization scope', 'النطاق التنظيمي') }}</span>
+      <app-workflow-scope-summary
+        [labels]="scopeLabels()"
+        [empty]="
+          child() && settings.schemaVersion !== 2
+            ? t('Inherited from parent at execution', 'موروث من المسار الرئيسي عند التنفيذ')
+            : t('Not configured', 'غير محدد')
+        "
+      />
+    </div>
+    <button type="button" class="settings-link" (click)="settingsRequested.emit()">
+      {{
+        status === 'Draft'
+          ? t('Review setup', 'مراجعة الإعدادات')
+          : t('View setup', 'عرض الإعدادات')
+      }}
+    </button>
+  </div>
+  @if (labelsFailed()) {
+    <p class="lookup-warning" role="status">
+      {{
+        t(
+          'Names could not be loaded. Saved codes are shown.',
+          'تعذر تحميل الأسماء. تظهر الرموز المحفوظة.'
+        )
+      }}
+      <button type="button" (click)="loadLabels()">{{ t('Retry', 'إعادة المحاولة') }}</button>
+    </p>
+  }
+  @if (selectedName) {
+    <p class="editing-context context-next">{{ selectionType() }}: {{ selectedName }}</p>
+  }
+  @if (!configured() || (!workCount && status === 'Draft')) {
+    <p class="context-next">
+      {{
+        !configured()
+          ? t(
+              'Next: choose activity and organization scope.',
+              'التالي: اختر النشاط والنطاق التنظيمي.'
+            )
+          : child()
+            ? t('Next: add a Step and choose its form.', 'التالي: أضف خطوة واختر نموذجها.')
+            : t(
+                'Next: add a Task Type to create its child workflow.',
+                'التالي: أضف نوع مهمة لإنشاء سير عمله الفرعي.'
+              )
+      }}
+    </p>
+  }
+  @if (configured() && !workCount && status === 'Draft') {
+    <button
+      type="button"
+      class="add-link"
+      (click)="addRequested.emit(child() ? 'UserTask' : 'MainActivity')"
+    >
+      {{ child() ? t('Add Step', 'إضافة خطوة') : t('Add Task Type', 'إضافة نوع مهمة') }}
+    </button>
+  }
+</section>

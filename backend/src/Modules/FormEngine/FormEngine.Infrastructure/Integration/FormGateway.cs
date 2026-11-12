@@ -208,6 +208,18 @@ internal sealed class FormGateway(
         return row is null ? null : ToRecord(formId, row);
     }
 
+    public async Task<FormSubmissionRecord?> GetByClientIdAsync(Guid formId, Guid clientSubmissionId,
+        string contextType, string contextId, CancellationToken cancellationToken)
+    {
+        var table = await FormTableLoader.LoadAsync(context, formId, cancellationToken);
+        if (table is null) return null;
+        var id = await submissionStore.FindByClientIdAsync(table, clientSubmissionId, cancellationToken);
+        var row = id is Guid receipt ? await submissionStore.GetByIdAsync(table, receipt, cancellationToken) : null;
+        if (row is null || !row.TryGetValue("ContextType", out var type) || !Equals(type, contextType)
+            || !row.TryGetValue("ContextId", out var ownerContext) || !Equals(ownerContext, contextId)) return null;
+        return ToRecord(formId, row);
+    }
+
     public async Task<IReadOnlyList<FormSubmissionRecord>> ListByContextAsync(
         Guid formId,
         string contextType,

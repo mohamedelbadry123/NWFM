@@ -49,9 +49,18 @@ test('a workflow progresses through child approvals to persisted completion', as
     await expect(parent.getByText('Awaiting approval')).toBeVisible();
     await expect(child.getByRole('button', 'Accept')).toHaveCount(0);
     if (stage === 'Closure') {
-      await agent.act(
-        'Complete the workflow by accepting the parent Closure activity. Required events finish asynchronously; use Refresh while they are processing until the page header shows Completed.',
-      );
+      await parent.getByRole('button', 'Accept').click();
+      await expect
+        .poll(
+          async () => {
+            await screen.getByRole('button', 'Refresh', { exact: true }).click();
+            return browser
+              .locator('app-workflow-instance-workspace header > div > p')
+              .textContent();
+          },
+          { timeout: 30000 },
+        )
+        .toContain('Completed');
       await expect(
         browser.locator('app-workflow-instance-workspace header > div > p'),
       ).toContainText('Completed');

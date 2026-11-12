@@ -32,6 +32,7 @@ builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<AppContex
 builder.Services.AddScoped<IWorkflowActorContext>(sp => sp.GetRequiredService<AppContext>());
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<StartupActorContext>();
 
 builder.AddAuthInfrastructure(connectionString);
 builder.Services.AddWorkflowInfrastructure(connectionString, builder.Configuration);
@@ -151,6 +152,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", application = "NWFM"
 
 if (databaseStartup.InitializeOnly)
 {
+    // Workflow schema is required by cross-module submission guards during seeding.
+    await using (var migrationScope = app.Services.CreateAsyncScope())
+        await DatabaseInitializer.MigrateAsync(migrationScope.ServiceProvider);
+
     // Auth database: migrate, SQL objects, seed — controlled by DatabaseStartup flags.
     await app.InitialiseAuthDatabaseAsync();
 
@@ -163,8 +168,12 @@ if (databaseStartup.InitializeOnly)
     // Workflow database: migration and seed operations respect the same initialization flags.
     await using (var scope = app.Services.CreateAsyncScope())
     {
-        await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
-        await WorkflowWorkspaceDemo.InitializeAsync(scope.ServiceProvider, app.Configuration);
+        await DatabaseInitializer.SeedAsync(scope.ServiceProvider);
+        if (databaseStartup.SeedData)
+        {
+            await WorkflowWorkspaceDemo.InitializeAsync(scope.ServiceProvider, app.Configuration);
+            await UnrcWorkflowDemo.InitializeAsync(scope.ServiceProvider, app.Configuration, app.Environment);
+        }
     }
     return;
 }

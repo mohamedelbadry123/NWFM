@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowVersionDto as NwfmSharedResultsPaginatedResultOfWorkflowVersionDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-version-dto';
+import { WorkflowVersionDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowVersionDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-version-dto';
 
 export interface ApiWorkflowDefinitionsDefinitionIdVersionsGet$Params {
   definitionId: string;
@@ -15,7 +15,7 @@ export interface ApiWorkflowDefinitionsDefinitionIdVersionsGet$Params {
   pageSize?: number;
 }
 
-export function apiWorkflowDefinitionsDefinitionIdVersionsGet(http: HttpClient, rootUrl: string, params: ApiWorkflowDefinitionsDefinitionIdVersionsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowVersionDto>> {
+export function apiWorkflowDefinitionsDefinitionIdVersionsGet(http: HttpClient, rootUrl: string, params: ApiWorkflowDefinitionsDefinitionIdVersionsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowVersionDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowDefinitionsDefinitionIdVersionsGet.PATH, 'get');
   if (params) {
     rb.path('definitionId', params.definitionId, {});
@@ -28,7 +28,7 @@ export function apiWorkflowDefinitionsDefinitionIdVersionsGet(http: HttpClient, 
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowVersionDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowVersionDto>;
     })
   );
 }

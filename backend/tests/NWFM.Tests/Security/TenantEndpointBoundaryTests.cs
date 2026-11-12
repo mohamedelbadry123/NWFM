@@ -43,7 +43,8 @@ public sealed class TenantEndpointBoundaryTests
             "WorkflowIntegrationsController", "WorkflowModuleCatalogController", "WorkflowNotificationsController",
             "WorkflowParticipantsController", "WorkflowRequestsController", "WorkflowRuntimeController",
             "WorkflowVersionsController", "WorkflowWorkloadController", "WorkflowWorkspaceController",
-            "WorkItemsController", "WorkspaceActivityFormsController", "WorkspaceSlaController"
+            "WorkItemsController", "WorkspaceActivityFormsController", "WorkspaceSlaController",
+            "WorkflowMappingController", "WorkflowMappingInvocationsController", "WorkflowRoutingController"
         ];
         Assert.Equal(classifiedControllers.Order(), controllers.Select(x => x.Name).Order());
 

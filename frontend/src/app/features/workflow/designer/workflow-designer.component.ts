@@ -1,5 +1,40 @@
+import { WorkflowPropertySectionComponent } from './workflow-property-section.component';
+import { workflowElementLabel, workflowIssueLabel } from './workflow-element-presentation';
+import { WorkflowDesignDiagnostics } from './workflow-design-diagnostics';
 import { WorkflowFormActionsComponent } from '../workspace/workflow-form-actions.component';
+import {
+  WorkflowRoutingEditorComponent,
+  RoutingEditorChange,
+  conditionSourceConnection,
+} from './workflow-routing-editor.component';
+import {
+  WorkflowRoutingService,
+  RoutingContext,
+  RoutingConfiguration,
+  isRoutingGate,
+  newConditionRouting,
+  routingDefaults,
+} from './workflow-routing.service';
+import { EdgeOrder, edgeOrders } from './workflow-routing-order';
+import { WorkflowRoutingSimulationComponent } from './workflow-routing-simulation.component';
+import { WorkflowRoutingOutputsComponent } from './workflow-routing-outputs.component';
+import { WorkflowRoleAssignmentComponent } from './workflow-role-assignment.component';
+import { WorkflowDesignerContextComponent } from './workflow-designer-context.component';
+import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
+import { A11yModule } from '@angular/cdk/a11y';
+import { WorkflowHierarchyPaletteComponent } from './workflow-hierarchy-palette.component';
 import { activityFormSteps } from '../workspace/workflow-form-routing.types';
+import {
+  ActivityClassification,
+  PinnedForm,
+  isClassified,
+  pinFormToStep,
+  replacesFormWithRules,
+} from '../workspace/workflow-activity-form-pin';
+import type { FormEditorContext } from '../workspace/workflow-embedded-form-editor.component';
+import type { ActivityForm } from '../workspace/workflow-activity-forms.service';
+import { AuthStore } from '@core/auth/auth.store';
+import { ADMINISTRATOR_ROLE, PERMISSIONS } from '@core/auth/permissions';
 import { WorkflowChildPreviewComponent } from './workflow-child-preview.component';
 import { WorkflowTaskPaletteComponent } from './workflow-task-palette.component';
 import {
@@ -17,23 +52,33 @@ import {
 import { WorkflowFormPreviewComponent } from '../workspace/workflow-form-preview.component';
 import type { SlaRule } from '../workspace/workflow-sla-rules.service';
 import {
+  afterNextRender,
+  Injector,
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  untracked,
   DestroyRef,
   ElementRef,
   HostListener,
   inject,
+  Input,
   OnDestroy,
   OnInit,
   signal,
+  TemplateRef,
+  Type,
   ViewChild,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { highlightXml } from './workflow-xml-highlight';
+import { WORKFLOW_MAPPING_HOST, type WorkflowMappingHost } from '../mapping/mapping-host';
+import { WorkflowStepMappingComponent } from '../mapping/workflow-step-mapping.component';
 import { toLocalDateTime, toUtcDateTime } from './workflow-date.util';
 import { WorkflowIntegrationEditorComponent } from '../integrations/workflow-integration-editor.component';
 import { WorkflowBusinessActivityComponent } from '../workspace/workflow-business-activity.component';
@@ -42,10 +87,23 @@ import {
   WorkspaceSettings,
   ReferenceItem,
   normalizeWorkspaceSettings,
+  WorkflowWorkspaceService,
+  WorkspaceWorkflow,
 } from '../workspace/workflow-workspace.service';
 import { WorkflowVariableEditorComponent } from './workflow-variable-editor.component';
-import { catchError, debounceTime, Observable, of, Subject, switchMap, throwError } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import {
+  takeUntil,
+  catchError,
+  map,
+  of,
+  debounceTime,
+  defer,
+  firstValueFrom,
+  Observable,
+  Subject,
+  switchMap,
+  throwError,
+} from 'rxjs';
 import {
   canvasWorldSize,
   layoutWorkflowGraph,
@@ -62,7 +120,6 @@ import { WorkflowSlaPoliciesService } from '../workflow-sla-policies.service';
 import type { ActivityDefinitionDto } from '@shared/models/models/Workflow/Application/DTOs/activity-definition-dto';
 import type { WorkflowVersionDetailDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-version-detail-dto';
 import type { WorkflowVersionDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-version-dto';
-import type { WorkflowValidationResultDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-validation-result-dto';
 import type { WorkflowActionCatalogEntryDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-action-catalog-entry-dto';
 import type { WorkflowAssignmentGroupDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-assignment-group-dto';
 import type { SlaPolicyDto } from '@shared/models/models/Workflow/Application/DTOs/sla-policy-dto';
@@ -103,8 +160,16 @@ export interface FormFieldRow {
 export type TimerTypeOption = 'DueDate' | 'Duration' | 'ExternalSignal';
 export type NotificationFailurePolicyOption = 'Continue' | 'Retry' | 'FailWorkflow';
 export type InspectorTab =
-  'general' | 'assignment' | 'outcomes' | 'sla' | 'data' | 'form' | 'actions' | 'advanced';
-export type BottomTab = 'variables' | 'validation';
+  | 'general'
+  | 'assignment'
+  | 'outcomes'
+  | 'sla'
+  | 'data'
+  | 'form'
+  | 'actions'
+  | 'values'
+  | 'advanced';
+export type BottomTab = 'variables' | 'validation' | 'simulation';
 
 export interface CanvasOutcome {
   id: string;
@@ -152,6 +217,8 @@ export interface CanvasVariable {
 }
 
 export interface CanvasNode {
+  /** Canvas-only user intent; not an executable activity setting. */
+  automaticConditionSourceSuppressed?: boolean;
   id: string;
   nodeKey: string;
   type: NodeType;
@@ -169,6 +236,8 @@ export interface CanvasNode {
 }
 
 export interface CanvasEdge {
+  /** Designer ownership only; never included in executable XML. */
+  automaticConditionSource?: { conditionNodeKey: string; sourceNodeKey: string };
   id: string;
   fromNodeId: string;
   toNodeId: string;
@@ -343,12 +412,70 @@ function escXml(s: string): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+export interface ChildEditorContext {
+  definitionId: string;
+  versionId: string;
+  changed: (versionId: string) => void;
+  close: () => void;
+  save?: () => Promise<void>;
+  parentName?: string;
+  /**
+   * The Department and Field Activity Type of the Task Type Step this child belongs to (or of its main workflow).
+   * A child workflow cannot store its own, so new Steps and the forms made for them inherit this.
+   */
+  classification?: ActivityClassification;
+  /**
+   * Set by the child designer: settles every unsaved editor inside it before it is closed or left — each dirty
+   * form window offers Save draft, Discard or Keep editing. Resolves false to keep editing.
+   */
+  resolveLeave?: () => Promise<boolean>;
+  /** Set by the child designer: whether a form editor inside it, at any depth, has unsaved changes. */
+  hasDirtyForms?: () => boolean;
+  /** The pinned MAIN workflow of the tree this child belongs to, read when needed because versions can be cloned. */
+  treeRoot?: () => { definitionId: string; versionId: string };
+  /** Saves the parent designer's draft (and its own ancestors) so the server sees the whole current tree. */
+  ensureSaved?: () => Promise<void>;
+}
+/**
+ * A retained editor window: a child workflow's designer, or the form editor opened from a Step. Both share the
+ * minimize, maximize, dock and focus behaviour; a form window is keyed `form:<node id>` and carries its own
+ * component and context instead of an `editorContext`.
+ */
+interface ChildEditorWindow {
+  nodeId: string;
+  taskTypeId: string | undefined;
+  name: string;
+  minimized: boolean;
+  maximized: boolean;
+  /** Absent for a child workflow, which renders the designer itself. */
+  component?: Type<unknown>;
+  formContext?: FormEditorContext;
+  inputs: { editorContext?: ChildEditorContext } & Record<string, unknown>;
+}
+
 @Component({
   selector: 'app-workflow-designer',
   standalone: true,
+  providers: [
+    WorkflowDesignDiagnostics,
+    {
+      provide: WORKFLOW_MAPPING_HOST,
+      useFactory: () => inject(WorkflowDesignerComponent).mappingHost,
+    },
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgComponentOutlet,
+    NgTemplateOutlet,
+    A11yModule,
+    WorkflowHierarchyPaletteComponent,
+    WorkflowRoleAssignmentComponent,
+    WorkflowDesignerContextComponent,
     WorkflowFormActionsComponent,
+    WorkflowRoutingEditorComponent,
+    WorkflowPropertySectionComponent,
+    WorkflowRoutingSimulationComponent,
+    WorkflowRoutingOutputsComponent,
     WorkflowChildPreviewComponent,
     WorkflowTaskPaletteComponent,
     WorkflowActivitySlaComponent,
@@ -359,6 +486,7 @@ function escXml(s: string): string {
     TranslateModule,
     RouterLink,
     WorkflowIntegrationEditorComponent,
+    WorkflowStepMappingComponent,
     WorkflowVariableEditorComponent,
     WorkflowBusinessActivityComponent,
     WorkflowLocationComponent,
@@ -367,6 +495,885 @@ function escXml(s: string): string {
   styleUrls: ['./workflow-designer.component.css'],
 })
 export class WorkflowDesignerComponent implements OnInit, OnDestroy {
+  @Input() editorContext?: ChildEditorContext;
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+  private readonly workspaceApi = inject(WorkflowWorkspaceService);
+  protected readonly hierarchical = computed(() =>
+    [3, 4].includes(this.workspace()?.designerVersion ?? 0),
+  );
+  protected readonly paletteView = signal<'elements' | 'outline'>('elements');
+  protected readonly routingV4 = computed(() => this.workspace()?.designerVersion === 4);
+  private readonly routingApi = inject(WorkflowRoutingService);
+  protected readonly routingContext = signal<RoutingContext | null>(null);
+  protected readonly routingProblem = signal('');
+  protected readonly routingBusy = signal(false);
+  protected readonly routingPreview = signal<{
+    canUpgrade: boolean;
+    conditionsAdded: number;
+    revision: string;
+    diagnostics: { message: string }[];
+  } | null>(null);
+  protected readonly isRoutingGate = isRoutingGate;
+  private readonly diagnostics = inject(WorkflowDesignDiagnostics);
+  protected readonly checkState = this.diagnostics.state;
+  protected readonly routingGroupNodes = computed(() => {
+    const selected = this.selectedNode();
+    const result = new Set<string>();
+    if (selected?.type !== 'JoinGateway') return result;
+    const fork = this.nodes().find(
+      (n) =>
+        ['ParallelGateway', 'InclusiveGateway'].includes(n.type) &&
+        (
+          this.parseConfig(n.configurationJson || '{}')['routing'] as
+            { joinNodeKey?: string } | undefined
+        )?.joinNodeKey === selected.nodeKey,
+    );
+    if (!fork) return result;
+    const pending = [fork.id];
+    while (pending.length) {
+      const id = pending.pop()!;
+      if (result.has(id)) continue;
+      result.add(id);
+      if (id !== selected.id)
+        this.edges()
+          .filter((e) => e.fromNodeId === id)
+          .forEach((e) => pending.push(e.toNodeId));
+    }
+    return result;
+  });
+  private readonly checkEdits = new Subject<void>();
+  private readonly checkCancelled = new Subject<void>();
+  protected readonly pendingConnection = signal<{ sourceId: string; targetId: string } | null>(
+    null,
+  );
+  protected readonly issuesReviewed = signal(false);
+  protected reviewIssues(): void {
+    this.issuesReviewed.set(true);
+    this.bottomTab.set('validation');
+    this.showBottomDrawer.set(true);
+  }
+  protected retryDesignCheck(): void {
+    this.checkCancelled.next();
+    this.checkState.set('checking');
+    this.checkEdits.next();
+  }
+  protected friendlyType(type: string): string {
+    return workflowElementLabel(type, this.locale.isRtl());
+  }
+  protected friendlyIssue(
+    message: string | null | undefined,
+    code?: string | null,
+    nodeKey?: string | null,
+  ): string {
+    return workflowIssueLabel(
+      message || '',
+      code,
+      this.nodes().find((n) => n.nodeKey === nodeKey)?.name,
+      this.locale.isRtl(),
+    );
+  }
+  private readonly propertyChoices = signal<Record<string, string>>({});
+  private readonly rememberPropertySection = effect(() => {
+    if (!this.routingV4()) return;
+    const id = this.selectedNodeId();
+    const version = this.versionId();
+    if (id)
+      untracked(() => {
+        if (!this.propertyChoices()[version + ':' + id])
+          this.openPropertySection(this.nextPropertySection() || 'general');
+      });
+  });
+  protected readonly propertySection = computed(() => {
+    const key = this.versionId() + ':' + this.selectedNodeId();
+    return this.propertyChoices()[key] || this.nextPropertySection() || 'general';
+  });
+  protected propertySections(): string[] {
+    const type = this.selectedNode()?.type;
+    // Typed Step values are authored against the hierarchical tree, the same condition the legacy Values tab has.
+    const values = this.hierarchical() ? ['values'] : [];
+    if (type === 'UserTask')
+      return ['general', 'form', ...values, 'assignment', 'actions', 'advanced'];
+    if (type === 'MainActivity')
+      return ['general', 'child', ...values, 'assignment', 'actions', 'advanced'];
+    if (type === 'Start') return ['general', 'actions', 'advanced'];
+    if (type === 'End') return ['general', 'advanced'];
+    return ['general', 'event', 'outputs', 'actions', 'advanced'];
+  }
+  protected nextPropertySection(): string | null {
+    const n = this.selectedNode();
+    if (!n) return null;
+    const c = this.parseConfig(n.configurationJson || '{}');
+    if (!n.name.trim()) return 'general';
+    if (n.type === 'UserTask' && (!Array.isArray(c['formSteps']) || !c['formSteps'].length))
+      return 'form';
+    if (n.type === 'MainActivity' && (!c['taskTypeId'] || !c['versionId'])) return 'child';
+    if (
+      ['UserTask', 'MainActivity'].includes(n.type) &&
+      !(Array.isArray(c['assignmentRoleIds']) && c['assignmentRoleIds'].length) &&
+      !n.assignmentGroupId
+    )
+      return 'assignment';
+    if (n.type === 'ServiceTask' && !c['connectionId']) return 'event';
+    if (n.type !== 'End' && !isRoutingGate(n.type) && !this.outgoingEdgesOf(n.id).length)
+      return 'actions';
+    return null;
+  }
+  protected openPropertySection(section: string): void {
+    this.propertyChoices.update((v) => ({
+      ...v,
+      [this.versionId() + ':' + this.selectedNodeId()]: section,
+    }));
+    if (['general', 'form', 'assignment', 'actions'].includes(section))
+      this.inspectorTab.set(section as InspectorTab);
+  }
+  protected propertyTitle(section: string): string {
+    const titles: Record<string, [string, string]> = {
+      general: ['Identity', 'التعريف'],
+      child: ['Child workflow', 'سير العمل الفرعي'],
+      form: ['Form', 'النموذج'],
+      assignment: ['Assignment', 'التكليف'],
+      values: ['Values', 'القيم'],
+      actions: ['Routing', 'التوجيه'],
+      advanced: ['Advanced', 'متقدم'],
+      event: ['Action and inputs', 'الإجراء والمدخلات'],
+      outputs: ['Outputs', 'المخرجات'],
+    };
+    return (titles[section] || [section, section])[this.locale.isRtl() ? 1 : 0];
+  }
+  protected propertySummary(section: string): string {
+    const n = this.selectedNode();
+    if (!n) return '';
+    const c = this.parseConfig(n.configurationJson || '{}');
+    const t = (en: string, ar: string) => (this.locale.isRtl() ? ar : en);
+    if (section === 'general') return n.name;
+    if (section === 'form')
+      return Array.isArray(c['formSteps']) && c['formSteps'].length
+        ? t('Form selected · preview or change', 'تم اختيار النموذج · معاينة أو تغيير')
+        : t('Choose the information to collect', 'اختر المعلومات المطلوب جمعها');
+    if (section === 'assignment') {
+      const count = Array.isArray(c['assignmentRoleIds']) ? c['assignmentRoleIds'].length : 0;
+      return count
+        ? t(count + ' roles selected', count + ' أدوار محددة')
+        : t('Choose who receives this work', 'اختر من يتلقى هذا العمل');
+    }
+    if (section === 'values')
+      return t('Fill form fields from earlier work', 'املأ حقول النموذج من العمل السابق');
+    if (section === 'actions')
+      return this.outgoingEdgesOf(n.id).length
+        ? this.outgoingEdgesOf(n.id)
+            .map((e) => this.getNodeName(e.toNodeId))
+            .join(' · ')
+        : t('Choose where to continue', 'اختر الوجهة التالية');
+    if (section === 'advanced')
+      return t(
+        'Time targets, data and technical settings',
+        'المدد المستهدفة والبيانات والإعدادات التقنية',
+      );
+    if (section === 'child') return t('Build the steps for this Task Type', 'صمم خطوات نوع المهمة');
+    if (section === 'outputs')
+      return t('Values available to later conditions', 'القيم المتاحة للشروط اللاحقة');
+    return t('Configure the automated action', 'اضبط الإجراء الآلي');
+  }
+  protected elementPurpose(type: string): string {
+    const hints: Record<string, [string, string]> = {
+      UserTask: ['Collect information using a form.', 'اجمع المعلومات باستخدام نموذج.'],
+      MainActivity: ['Organize steps inside a child workflow.', 'نظم الخطوات داخل سير عمل فرعي.'],
+      ServiceTask: ['Run an automated action.', 'نفذ إجراءً آلياً.'],
+      ExclusiveGateway: ['Choose where to go based on data.', 'اختر الوجهة بناءً على البيانات.'],
+      ParallelGateway: ['Start several branches together.', 'ابدأ عدة فروع معاً.'],
+      InclusiveGateway: [
+        'Start the branches whose conditions match.',
+        'ابدأ الفروع التي تطابق شروطها.',
+      ],
+      JoinGateway: ['Wait for branches before continuing.', 'انتظر الفروع قبل المتابعة.'],
+    };
+    const hint = hints[type] ?? ['Connect this element to continue.', 'صل العنصر للمتابعة.'];
+    return hint[this.locale.isRtl() ? 1 : 0];
+  }
+  protected setupChecklist(node: CanvasNode): { label: string; done: boolean }[] {
+    const config = this.parseConfig(node.configurationJson || '{}');
+    const t = (en: string, ar: string) => (this.locale.isRtl() ? ar : en);
+    const list: { label: string; done: boolean }[] = [];
+    if (node.type === 'UserTask')
+      list.push({
+        label: t('Choose one form', 'اختر نموذجاً واحداً'),
+        done: Array.isArray(config['formSteps']) && config['formSteps'].length === 1,
+      });
+    if (node.type === 'MainActivity') {
+      list.push({
+        label: t('Choose the Task Type', 'اختر نوع المهمة'),
+        done: !!config['taskTypeId'],
+      });
+      list.push({
+        label: t('Create or open its child workflow', 'أنشئ أو افتح سير العمل الفرعي'),
+        done: !!config['versionId'],
+      });
+    }
+    if (['MainActivity', 'UserTask'].includes(node.type))
+      list.push({
+        label: t('Choose the assigned roles', 'اختر الأدوار المكلفة'),
+        done:
+          (Array.isArray(config['assignmentRoleIds']) && config['assignmentRoleIds'].length > 0) ||
+          !!node.assignmentGroupId,
+      });
+    if (node.type === 'ServiceTask')
+      list.push({
+        label: t('Choose the integration connection', 'اختر اتصال التكامل'),
+        done: !!config['connectionId'],
+      });
+    if (node.type !== 'End')
+      list.push({
+        label: t('Choose where to continue', 'اختر الوجهة التالية'),
+        done: this.edges().some((e) => e.fromNodeId === node.id),
+      });
+    return list;
+  }
+  protected edgeIssue(edge: CanvasEdge) {
+    return this.diagnostics.byConnection().get(edge.transitionKey);
+  }
+  /** Route order of each connection leaving an ordered Condition; follows every change to the nodes and edges. */
+  protected readonly edgeOrder = computed(() => edgeOrders(this.nodes(), this.edges()));
+  protected orderOf(edge: CanvasEdge): EdgeOrder | undefined {
+    return this.edgeOrder().get(edge.id);
+  }
+  protected orderLabel(order: EdgeOrder): string {
+    return order.otherwise ? (this.locale.isRtl() ? 'وإلا' : 'Else') : String(order.position);
+  }
+  protected orderDescription(order: EdgeOrder): string {
+    if (order.otherwise)
+      return this.locale.isRtl() ? 'يُستخدم عندما لا يتطابق أي مسار' : 'Used when no route matches';
+    return this.locale.isRtl()
+      ? `المسار ${order.position} من ${order.total}`
+      : `Route ${order.position} of ${order.total}`;
+  }
+  /** The badge sits just before the connection's caption so the two never overlap. */
+  protected orderBadgeX(edge: CanvasEdge, order: EdgeOrder): number {
+    const caption = this.edgeCaption(edge);
+    const half = caption ? Math.min(caption.length, 40) * 2.6 + 4 : 0;
+    return this.edgeLabelPos(edge).x - half - (order.otherwise ? 20 : 12);
+  }
+  protected nodeIssues(key: string) {
+    return this.diagnostics.byNode().get(key) ?? [];
+  }
+  protected chooseConnection(conditional: boolean): void {
+    const pending = this.pendingConnection();
+    if (!pending) return;
+    this.pendingConnection.set(null);
+    this.connectRoutingNodes(pending.sourceId, pending.targetId, conditional);
+  }
+  private serverRevision = '';
+  private saveFailureReported = false;
+  protected async openRoutingSimulation(): Promise<void> {
+    await this.refreshRoutingContext();
+    if (this.routingProblem()) return;
+    this.bottomTab.set('simulation');
+    this.showBottomDrawer.set(true);
+    this.drawerHeight.set(420);
+  }
+  protected focusRoutingNode(key: string): void {
+    const node = this.nodes().find((n) => n.nodeKey === key);
+    if (node) {
+      this.selectNode(node.id);
+      this.centerOnNode(node.id);
+    }
+  }
+
+  /** Where the mapping editor reads and writes: this designer's selected event, addressed through the tree's main root. */
+  readonly mappingHost: WorkflowMappingHost = {
+    owner: () => {
+      const node = this.selectedNode();
+      return node && this.definitionId() && this.versionId()
+        ? {
+            workflowDefinitionId: this.definitionId(),
+            workflowVersionId: this.versionId(),
+            nodeKey: node.nodeKey,
+          }
+        : null;
+    },
+    root: () => (this.definitionId() && this.versionId() ? this.treeRoot() : null),
+    readonly: () => this.isReadonly(),
+    isChild: () => !!this.editorContext,
+    ensureSaved: () => this.ensureSaved(),
+  };
+
+  private treeRoot(): { definitionId: string; versionId: string } {
+    return (
+      this.editorContext?.treeRoot?.() ?? {
+        definitionId: this.definitionId(),
+        versionId: this.versionId(),
+      }
+    );
+  }
+
+  /** Saves this draft, then every ancestor, so server-side catalogs match what the author sees. */
+  private async ensureSaved(): Promise<void> {
+    if (!this.isReadonly() && this.saveStatus() !== 'saved')
+      await firstValueFrom(this.saveToBackend());
+    await this.editorContext?.ensureSaved?.();
+  }
+
+  protected async refreshRoutingContext(): Promise<void> {
+    try {
+      if (this.saveStatus() !== 'saved') await firstValueFrom(this.saveToBackend());
+      this.routingContext.set(
+        await firstValueFrom(this.routingApi.context(this.definitionId(), this.versionId())),
+      );
+      this.routingProblem.set('');
+    } catch (error) {
+      this.routingProblem.set(workflowApiErrorMessage(error, this.translate));
+    }
+  }
+  protected async previewRoutingUpgrade(): Promise<void> {
+    this.routingBusy.set(true);
+    try {
+      await firstValueFrom(this.saveToBackend());
+      this.routingPreview.set(
+        await firstValueFrom(this.routingApi.preview(this.definitionId(), this.versionId())),
+      );
+    } catch (error) {
+      this.routingProblem.set(workflowApiErrorMessage(error, this.translate));
+    } finally {
+      this.routingBusy.set(false);
+    }
+  }
+  protected async upgradeRouting(): Promise<void> {
+    const preview = this.routingPreview();
+    if (!preview?.canUpgrade || this.isReadonly()) return;
+    this.routingBusy.set(true);
+    try {
+      await firstValueFrom(
+        this.routingApi.upgrade(this.definitionId(), this.versionId(), preview.revision),
+      );
+      this.routingPreview.set(null);
+      this.loadVersion();
+    } catch (error) {
+      this.routingProblem.set(workflowApiErrorMessage(error, this.translate));
+    } finally {
+      this.routingBusy.set(false);
+    }
+  }
+  protected applyRoutingChange(change: RoutingEditorChange): void {
+    const node = this.selectedNode();
+    if (!node || node.id !== change.nodeId || this.isReadonly()) return;
+    let edges = [
+      ...this.edges().filter((edge) => edge.fromNodeId !== node.id),
+      ...change.edges.filter((edge) => edge.fromNodeId === node.id).map((edge) => ({ ...edge })),
+    ];
+    const routing = this.parseConfig(change.configuration)['routing'] as RoutingConfiguration;
+    const updatedNode = {
+      ...node,
+      type: change.type,
+      configurationJson: change.configuration,
+      automaticConditionSourceSuppressed: change.reconnectSource
+        ? undefined
+        : node.automaticConditionSourceSuppressed,
+    };
+    const connection =
+      this.routingV4() && routing
+        ? conditionSourceConnection(updatedNode, this.nodes(), edges, routing)
+        : {};
+    if (connection.sourceId) {
+      const source = this.nodes().find((candidate) => candidate.id === connection.sourceId)!;
+      edges = edges.filter((edge) => edge.id !== connection.replaceEdgeId);
+      edges.push({
+        id: crypto.randomUUID(),
+        fromNodeId: source.id,
+        toNodeId: node.id,
+        transitionKey: `route_${crypto.randomUUID()}`,
+        labelEn: '',
+        labelAr: '',
+        descriptionEn: '',
+        outcomeKey: '',
+        conditionExpression: '',
+        isDefault: false,
+        priority: 0,
+        automaticConditionSource: { conditionNodeKey: node.nodeKey, sourceNodeKey: source.nodeKey },
+      });
+    }
+    this.pushUndo();
+    this.nodes.update((nodes) => nodes.map((n) => (n.id === node.id ? updatedNode : n)));
+    this.edges.set(edges);
+    this.patchPropsFromNode(this.selectedNode()!);
+    this.markUnsaved();
+  }
+  private selectNode(id: string): void {
+    this.onNodeClick(new Event('click'), id);
+  }
+  protected selectRoutingSource(id: string): void {
+    this.selectNode(id);
+  }
+  protected editRouting(): void {
+    const node = this.selectedNode();
+    if (!node) return;
+    const next = this.edges().find((e) => e.fromNodeId === node.id);
+    const gate = next && this.nodes().find((n) => n.id === next.toNodeId && isRoutingGate(n.type));
+    if (gate) this.selectNode(gate.id);
+    else {
+      this.addNode('ExclusiveGateway', node.x + 240, node.y);
+      const added = this.selectedNode();
+      if (added) this.connectRoutingNodes(node.id, added.id);
+    }
+    void this.refreshRoutingContext();
+  }
+  private connectRoutingNodes(sourceId: string, targetId: string, conditional?: boolean): void {
+    const source = this.nodes().find((n) => n.id === sourceId);
+    if (!source || this.isReadonly()) return;
+    const target = this.nodes().find((n) => n.id === targetId);
+    if (!target) return;
+    const edge = (from: string, to: string) => ({
+      id: crypto.randomUUID(),
+      fromNodeId: from,
+      toNodeId: to,
+      transitionKey: `route_${crypto.randomUUID()}`,
+      labelEn: '',
+      labelAr: '',
+      descriptionEn: '',
+      outcomeKey: '',
+      conditionExpression: '',
+      isDefault: false,
+      priority: 0,
+    });
+    if (
+      !isRoutingGate(source.type) &&
+      source.type !== 'Start' &&
+      !['ExclusiveGateway', 'ParallelGateway', 'InclusiveGateway'].includes(target.type)
+    ) {
+      if (conditional === undefined) {
+        this.pendingConnection.set({ sourceId, targetId });
+        return;
+      }
+      if (!conditional) {
+        this.edges.update((edges) => [
+          ...edges.filter((e) => e.fromNodeId !== sourceId),
+          { ...edge(sourceId, targetId), labelEn: 'Always', isDefault: true },
+        ]);
+        this.markUnsaved();
+        return;
+      }
+    }
+    let gate = source;
+    if (!isRoutingGate(source.type)) {
+      if (
+        source.type === 'Start' ||
+        ['ExclusiveGateway', 'ParallelGateway', 'InclusiveGateway'].includes(target.type)
+      ) {
+        this.edges.update((edges) => [
+          ...edges.filter((e) => e.fromNodeId !== source.id),
+          edge(source.id, target.id),
+        ]);
+        this.markUnsaved();
+        return;
+      }
+      const existing = this.edges().find((e) => e.fromNodeId === source.id);
+      const current =
+        existing &&
+        this.nodes().find((n) => n.id === existing.toNodeId && n.type === 'ExclusiveGateway');
+      if (current) gate = current;
+      else {
+        this.addNode('ExclusiveGateway', source.x + 240, source.y);
+        gate = this.selectedNode()!;
+        this.edges.update((edges) => [
+          ...edges.filter((e) => e.fromNodeId !== source.id),
+          edge(source.id, gate.id),
+        ]);
+      }
+    }
+    const data = this.parseConfig(gate.configurationJson || '{}');
+    const config = { ...routingDefaults(), ...((data['routing'] as RoutingConfiguration) || {}) };
+    const added = edge(gate.id, target.id);
+    if (gate.type === 'JoinGateway')
+      this.edges.update((edges) =>
+        edges.filter(
+          (e) => e.fromNodeId !== gate.id || e.transitionKey === config.failureTransitionKey,
+        ),
+      );
+    else if (
+      ['ParallelGateway', 'InclusiveGateway'].includes(gate.type) &&
+      config.routes.some((r) => !this.edges().some((e) => e.transitionKey === r.transitionKey))
+    ) {
+      added.transitionKey = config.routes.find(
+        (r) => !this.edges().some((e) => e.transitionKey === r.transitionKey),
+      )!.transitionKey;
+    } else
+      config.routes.push({
+        transitionKey: added.transitionKey,
+        always: gate.type === 'ParallelGateway',
+        when: { match: 'All', conditions: [], groups: [] },
+      });
+    data['routing'] = config;
+    this.nodes.update((nodes) =>
+      nodes.map((n) => (n.id === gate.id ? { ...n, configurationJson: JSON.stringify(data) } : n)),
+    );
+    this.edges.update((edges) => [...edges, added]);
+    this.selectNode(gate.id);
+    this.markUnsaved();
+    void this.refreshRoutingContext();
+  }
+  protected readonly childWindows = signal<ChildEditorWindow[]>([]);
+  protected readonly minimizedChildren = computed(() =>
+    this.childWindows().filter((child) => child.minimized),
+  );
+  private readonly childFocusInjector = inject(Injector);
+  protected readonly childBusy = signal(false);
+  protected readonly childDesigner = WorkflowDesignerComponent;
+  protected readonly activeChild = signal<string | null>(null);
+
+  protected openChildEditor(): void {
+    const node = this.selectedNode();
+    if (!node || node.type !== 'MainActivity' || this.childBusy()) return;
+    const taskTypeId = this.parseConfig(node.configurationJson || '{}')['taskTypeId'] as
+      string | undefined;
+    const existing = this.childWindows().find((w) => w.nodeId === node.id);
+    if (existing) {
+      if (existing.taskTypeId === taskTypeId) this.restoreChild(node.id);
+      else
+        void this.closeChild(node.id).then(() => {
+          if (!this.childWindows().some((w) => w.nodeId === node.id)) this.openChildEditor();
+        });
+      return;
+    }
+    this.childBusy.set(true);
+    let parentSaved = false;
+    this.saveToBackend()
+      .pipe(
+        switchMap(() => {
+          parentSaved = true;
+          return this.workspaceApi.openChild(this.versionId(), node.nodeKey);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (child) => {
+          this.childBusy.set(false);
+          this.linkChild(node.id, child, child.versionId, taskTypeId);
+          this.childWindows.update((windows) => [
+            ...windows,
+            {
+              nodeId: node.id,
+              taskTypeId,
+              name: node.name,
+              minimized: false,
+              maximized: false,
+              inputs: {
+                editorContext: {
+                  definitionId: child.id,
+                  versionId: child.versionId,
+                  parentName: this.definitionName(),
+                  classification: this.stepClassification(
+                    this.parseConfig(node.configurationJson || '{}'),
+                  ),
+                  changed: (versionId) => this.linkChild(node.id, child, versionId, taskTypeId),
+                  close: () => void this.closeChild(node.id),
+                  treeRoot: () => this.treeRoot(),
+                  ensureSaved: () => this.ensureSaved(),
+                },
+              },
+            },
+          ]);
+          this.activeChild.set(node.id);
+        },
+        error: (error: unknown) => {
+          this.childBusy.set(false);
+          // The save path already reports its actionable error and retains local edits.
+          if (!parentSaved) return;
+          this.toast.error(
+            workflowApiErrorMessage(error, this.translate, 'workflow.designer.child_open_failed'),
+          );
+        },
+      });
+  }
+
+  private linkChild(
+    nodeId: string,
+    child: WorkspaceWorkflow,
+    versionId: string,
+    taskTypeId: string | undefined,
+  ): void {
+    if (this.isReadonly()) return;
+    const owner = this.nodes().find((node) => node.id === nodeId);
+    if (!owner || this.parseConfig(owner.configurationJson || '{}')['taskTypeId'] !== taskTypeId)
+      return;
+    this.nodes.update((nodes) =>
+      nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              configurationJson: JSON.stringify({
+                ...this.parseConfig(node.configurationJson || '{}'),
+                definitionKey: child.definitionKey,
+                versionId,
+                waitForCompletion: true,
+              }),
+            }
+          : node,
+      ),
+    );
+    const selected = this.selectedNode();
+    if (selected?.id === nodeId) this.patchPropsFromNode(selected);
+    this.markUnsaved();
+  }
+
+  protected minimizeChild(nodeId: string): void {
+    this.childWindows.update((windows) =>
+      windows.map((w) => (w.nodeId === nodeId ? { ...w, minimized: true } : w)),
+    );
+    if (this.activeChild() === nodeId) this.activeChild.set(null);
+    // The dock sits behind an open Properties modal, so focus stays in the modal instead.
+    if (this.inspectorVisible()) {
+      this.focusPropertiesTitle();
+      return;
+    }
+    afterNextRender(
+      () => {
+        const dockButton = Array.from(
+          this.host.nativeElement.querySelectorAll<HTMLButtonElement>(
+            '.child-editor-dock [data-child-id]',
+          ),
+        ).find((button) => button.dataset['childId'] === nodeId);
+        dockButton?.focus();
+      },
+      { injector: this.childFocusInjector },
+    );
+  }
+  protected restoreChild(nodeId: string): void {
+    this.childWindows.update((windows) =>
+      windows.map((w) => (w.nodeId === nodeId ? { ...w, minimized: false } : w)),
+    );
+    this.activeChild.set(nodeId);
+    afterNextRender(
+      () => {
+        const dialog = Array.from(
+          this.host.nativeElement.querySelectorAll<HTMLElement>('.child-editor-overlay'),
+        ).find((overlay) => overlay.style.display !== 'none');
+        dialog?.querySelector<HTMLButtonElement>('[cdkFocusInitial]')?.focus();
+      },
+      { injector: this.childFocusInjector },
+    );
+  }
+  protected maximizeChild(nodeId: string): void {
+    this.childWindows.update((windows) =>
+      windows.map((w) => (w.nodeId === nodeId ? { ...w, maximized: !w.maximized } : w)),
+    );
+  }
+  protected async closeChild(nodeId: string): Promise<void> {
+    const child = this.childWindows().find((w) => w.nodeId === nodeId);
+    try {
+      if (child?.formContext) {
+        // Unsaved form changes offer Save draft, Discard or Keep editing; keeping (or a failed save) leaves it open.
+        if (!(await (child.formContext.requestClose?.() ?? true))) return;
+      } else if (child?.inputs.editorContext) {
+        // A child workflow settles every form editor inside it first (at any depth), then saves itself.
+        const context = child.inputs.editorContext;
+        if (context.resolveLeave) {
+          if (!(await context.resolveLeave())) return;
+        } else await context.save?.();
+      }
+      this.childWindows.update((windows) => windows.filter((w) => w.nodeId !== nodeId));
+      if (this.activeChild() === nodeId) this.activeChild.set(null);
+      // The modal underneath becomes interactive again only after this render, so focus is returned to it explicitly.
+      if (this.inspectorVisible()) this.focusPropertiesTitle();
+    } catch {
+      /* Keep the editor open when its save fails. */
+    }
+  }
+  // ── Form editor windows (opened from a Step's form picker) ───────────────────
+
+  private readonly auth = inject(AuthStore);
+  /** Creating or changing a form for a Step needs both form and Task Type management; reading either is not enough. */
+  protected readonly canAuthorForms = computed(
+    () =>
+      this.auth.roles().includes(ADMINISTRATOR_ROLE) ||
+      (this.auth.hasPermission(PERMISSIONS.manageForms) &&
+        this.auth.hasPermission(PERMISSIONS.manageTaskTypes)),
+  );
+  /** Bumped per Step when its form changed, so only that Step's form list and pinned version are read again. */
+  private readonly formRevisions = signal<Record<string, number>>({});
+  protected formRevision(nodeId: string): number {
+    return this.formRevisions()[nodeId] ?? 0;
+  }
+  private formEditor?: Type<unknown>;
+
+  protected async openFormEditor(request: {
+    mode: 'create' | 'edit' | 'duplicate';
+    form?: ActivityForm;
+  }): Promise<void> {
+    const node = this.selectedNode();
+    if (!node || this.isReadonly() || !this.canAuthorForms()) return;
+    const config = this.parseConfig(node.configurationJson || '{}');
+    const taskTypeId = config['taskTypeId'] as string | undefined;
+    if (!taskTypeId || (request.mode !== 'create' && !request.form)) return;
+    const key = 'form:' + node.id;
+    if (this.childWindows().some((w) => w.nodeId === key)) {
+      this.restoreChild(key);
+      this.toast.error(
+        this.locale.isRtl()
+          ? 'محرر النموذج مفتوح بالفعل لهذه الخطوة. أنهِ العمل فيه أو أغلقه أولاً.'
+          : 'A form editor is already open for this Step. Finish or close it first.',
+      );
+      return;
+    }
+    // A new form replaces the Step's current one, so its rules would be reset: say so before any work is done.
+    if (
+      request.mode !== 'edit' &&
+      replacesFormWithRules(config, '', this.hierarchical()) &&
+      !confirm(
+        this.locale.isRtl()
+          ? 'سيحل النموذج الجديد محل نموذج الخطوة الحالي وتُعاد ضبط قواعده. المتابعة؟'
+          : 'The new form will replace this Step’s current form and reset its form rules. Continue?',
+      )
+    )
+      return;
+    const { WorkflowEmbeddedFormEditorComponent } =
+      await import('../workspace/workflow-embedded-form-editor.component');
+    this.formEditor = WorkflowEmbeddedFormEditorComponent;
+    const context: FormEditorContext = {
+      mode: request.mode,
+      taskTypeId,
+      stepName: node.name,
+      form: request.form,
+      classification: this.stepClassification(config),
+      use: (pinned) => this.useFormInStep(node.id, pinned),
+      close: () => void this.closeChild(key),
+    };
+    this.childWindows.update((windows) => [
+      ...windows,
+      {
+        nodeId: key,
+        taskTypeId,
+        name: node.name,
+        minimized: false,
+        maximized: false,
+        component: this.formEditor,
+        formContext: context,
+        inputs: { context },
+      },
+    ]);
+    this.activeChild.set(key);
+  }
+
+  /**
+   * What classifies a workflow of this designer: its own Activity Type, or — for a child workflow, which cannot
+   * hold one — the classification of the Task Type Step it was opened from.
+   */
+  private inheritedClassification(): ActivityClassification | undefined {
+    const own = {
+      departmentCode: this.workspace()?.departmentCode,
+      fieldActivityCode: this.workspace()?.fieldActivityCode,
+    };
+    return isClassified(own) ? own : this.editorContext?.classification;
+  }
+  /** A Step's own Department and Field Activity Type when it has both, else the one it inherits. */
+  private stepClassification(config: Record<string, unknown>): ActivityClassification | undefined {
+    const own = {
+      departmentCode: config['departmentCode'] as string | undefined,
+      fieldActivityCode: config['fieldActivityCode'] as string | undefined,
+    };
+    return isClassified(own) ? own : this.inheritedClassification();
+  }
+
+  /**
+   * Whether any form editor in this designer, including those inside child workflow windows, has unsaved changes
+   * or is still publishing/attaching (leaving then would destroy the result and its feedback).
+   */
+  protected hasDirtyForms(): boolean {
+    return this.childWindows().some((child) =>
+      child.formContext
+        ? !!child.formContext.isDirty?.() || !!child.formContext.isBusy?.()
+        : !!child.inputs.editorContext?.hasDirtyForms?.(),
+    );
+  }
+
+  /**
+   * Settles every unsaved editor in this designer before it is closed or left. Each dirty form window — open or
+   * minimized, at any depth — is brought forward and offers Save draft, Discard or Keep editing; then the workflow
+   * itself is saved. Resolves false (and nothing is left) when a choice is Keep editing or a save fails.
+   */
+  protected async resolveLeave(): Promise<boolean> {
+    for (const child of this.childWindows()) {
+      if (child.formContext) {
+        // Every form's own guard decides, clean or not: a busy window (publishing, attaching) refuses to be left so
+        // its result, pin and failure feedback are not destroyed behind a minimized window.
+        const needsAnswer = !!child.formContext.isDirty?.() || !!child.formContext.isBusy?.();
+        const wasMinimized = child.minimized;
+        if (needsAnswer) this.bringForward(child.nodeId);
+        const leave = await (child.formContext.requestClose?.() ?? true);
+        if (!leave) return false;
+        if (wasMinimized && needsAnswer) this.setMinimized(child.nodeId);
+      } else if (child.inputs.editorContext?.resolveLeave) {
+        const wasMinimized = child.minimized;
+        const dirty = !!child.inputs.editorContext.hasDirtyForms?.();
+        if (dirty) this.bringForward(child.nodeId);
+        if (!(await child.inputs.editorContext.resolveLeave())) return false;
+        if (wasMinimized && dirty) this.setMinimized(child.nodeId);
+      } else if (child.inputs.editorContext?.save) {
+        try {
+          await child.inputs.editorContext.save();
+        } catch {
+          return false;
+        }
+      }
+    }
+    try {
+      await firstValueFrom(this.saveToBackend());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /** Shows a window (for a question it has to ask) without moving focus to its title bar. */
+  private bringForward(nodeId: string): void {
+    this.childWindows.update((windows) =>
+      windows.map((w) => (w.nodeId === nodeId ? { ...w, minimized: false } : w)),
+    );
+    this.activeChild.set(nodeId);
+  }
+  private setMinimized(nodeId: string): void {
+    this.childWindows.update((windows) =>
+      windows.map((w) => (w.nodeId === nodeId ? { ...w, minimized: true } : w)),
+    );
+    if (this.activeChild() === nodeId) this.activeChild.set(null);
+  }
+
+  /** Pins the published version in the Step the window was opened from — no other Step, and no running instance, is touched. */
+  private useFormInStep(nodeId: string, pinned: PinnedForm): void {
+    const owner = this.nodes().find((node) => node.id === nodeId);
+    if (!owner || this.isReadonly()) return;
+    const config = pinFormToStep(
+      this.parseConfig(owner.configurationJson || '{}'),
+      pinned,
+      this.hierarchical(),
+    );
+    this.nodes.update((nodes) =>
+      nodes.map((node) =>
+        node.id === nodeId ? { ...node, configurationJson: JSON.stringify(config) } : node,
+      ),
+    );
+    // The Step the window was opened from is the one that changed: show it, even if another was selected meanwhile.
+    if (this.selectedNodeId() !== nodeId) {
+      this.selectedNodeId.set(nodeId);
+      this.selectedNodeIds.set([nodeId]);
+      this.selectedEdgeId.set(null);
+    }
+    const origin = this.nodes().find((node) => node.id === nodeId);
+    if (origin) this.patchPropsFromNode(origin);
+    this.formRevisions.update((revisions) => ({
+      ...revisions,
+      [nodeId]: (revisions[nodeId] ?? 0) + 1,
+    }));
+    this.markUnsaved();
+  }
+
+  protected windowNoun(child: ChildEditorWindow, title = false): string {
+    const form = !!child.formContext;
+    if (this.locale.isRtl()) return form ? 'محرر النموذج' : 'سير العمل الفرعي';
+    return form ? (title ? 'Form' : 'form editor') : title ? 'Child workflow' : 'child workflow';
+  }
+  protected dockLabel(): string {
+    const onlyWorkflows = this.minimizedChildren().every((child) => !child.formContext);
+    if (this.locale.isRtl()) return onlyWorkflows ? 'مسارات العمل المصغرة' : 'المحررات المصغرة';
+    return onlyWorkflows ? 'Minimized child workflows' : 'Minimized editors';
+  }
+
   @ViewChild('canvasSvg') canvasSvgRef!: ElementRef<SVGSVGElement>;
   @ViewChild('canvasScroll') canvasScrollRef?: ElementRef<HTMLDivElement>;
 
@@ -401,11 +1408,61 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   protected readonly retiring = signal(false);
 
   // ── Save state
-  protected readonly saveStatus = signal<'saved' | 'unsaved' | 'saving'>('saved');
+  protected readonly saveStatus = signal<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
   private readonly autosave$ = new Subject<void>();
+  private editRevision = 0;
+  private activeSave: Promise<WorkflowVersionDto | null> | null = null;
+  private savingVersion = '';
 
   // ── Canvas state
   protected readonly workspace = signal<WorkspaceSettings | undefined>(undefined);
+  protected readonly settingsOpen = signal(false);
+  /** An organization scope entry that was started in setup but not yet added or cancelled. */
+  protected readonly scopePending = signal(false);
+  /** Explicit Save, Validate and Publish refuse while a scope entry is unfinished; autosave only ever sees completed entries. */
+  private blockedByScopeEntry(): boolean {
+    if (!this.scopePending() || this.isReadonly()) return false;
+    this.settingsOpen.set(true);
+    this.toast.error(
+      this.locale.isRtl()
+        ? 'أضف إدخال النطاق التنظيمي الجاري أو ألغه أولاً.'
+        : 'Add or cancel the organization scope entry in progress first.',
+    );
+    return true;
+  }
+  protected readonly workCount = computed(
+    () =>
+      this.nodes().filter(
+        (node) => node.type === (this.workspace()?.kind === 'Child' ? 'UserTask' : 'MainActivity'),
+      ).length,
+  );
+  protected async navigateContext(parent = false): Promise<void> {
+    if (parent && this.editorContext) {
+      // The window host settles this child — and every form editor inside it — before it closes.
+      this.editorContext.close();
+      return;
+    }
+    const id = parent ? this.workspace()?.parentDefinitionId : undefined;
+    await this.leaveTo(
+      id ? ['/admin/workflow/definitions', id, 'versions'] : ['/admin/workflow/definitions'],
+    );
+  }
+  /** Set while a toolbar action that already settled every editor navigates, so the route guard does not ask again. */
+  private leaveSettled = false;
+  /** Whether the route may be left: every unsaved form editor offers Save draft, Discard or Keep editing first. */
+  async canLeaveRoute(): Promise<boolean> {
+    if (this.leaveSettled || this.editorContext) return true;
+    return this.resolveLeave();
+  }
+  private async leaveTo(commands: unknown[]): Promise<void> {
+    if (!(await this.resolveLeave())) return;
+    this.leaveSettled = true;
+    try {
+      await this.router.navigate(commands);
+    } finally {
+      this.leaveSettled = false;
+    }
+  }
   protected updateWorkspace(settings: WorkspaceSettings): void {
     if (!this.isReadonly()) {
       this.workspace.set(settings);
@@ -581,6 +1638,11 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
         labelKey: 'workflow.designer.tab_sla',
         helpKey: 'workflow.designer.tab_help_sla',
       },
+      {
+        id: 'values',
+        labelKey: 'workflow.designer.tab_values',
+        helpKey: 'workflow.designer.tab_help_values',
+      },
     ];
   /** The tabs an activity of this type shows; empty for nodes that have a single settings panel. */
   static tabsFor(
@@ -591,7 +1653,12 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     return [];
   }
   protected readonly userTaskTabs = computed(() =>
-    WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type),
+    WorkflowDesignerComponent.tabsFor(this.selectedNode()?.type).filter(
+      (t) =>
+        !(this.hierarchical() && this.selectedNode()?.type === 'MainActivity' && t.id === 'form') &&
+        // Typed step values need the hierarchical tree the mapping catalog is built from.
+        !(t.id === 'values' && !this.hierarchical()),
+    ),
   );
   /** Non-business nodes fall back to General. */
   protected readonly activeInspectorTab = computed<InspectorTab>(() =>
@@ -732,7 +1799,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   });
 
   // ── Validation
-  protected readonly validationResult = signal<WorkflowValidationResultDto | null>(null);
+  protected readonly validationResult = this.diagnostics.result;
   protected readonly validating = signal(false);
 
   // ── Active main tab (designer | xml)
@@ -749,6 +1816,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   protected readonly connectGuideDismissed = signal(false);
   protected readonly showConnectGuide = computed(
     () =>
+      !this.hierarchical() &&
       !this.isReadonly() &&
       this.activeTab() === 'designer' &&
       this.nodes().length >= 2 &&
@@ -806,10 +1874,119 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     edgeId?: string;
   } | null>(null);
 
-  /** Properties panel only when a node or edge is selected. */
+  // ── Properties modal
+  // Opening is an explicit user action (click, diagnostic, context menu); closing never touches the selection, the
+  // pan/zoom or the draft, so the same element reopens exactly as it was left.
+  private static nextPropertiesModalId = 0;
+  private readonly propertiesModalId = WorkflowDesignerComponent.nextPropertiesModalId++;
+  protected readonly propertiesTitleId = `wf-properties-title-${this.propertiesModalId}`;
+  protected readonly propertiesBodyId = `wf-properties-body-${this.propertiesModalId}`;
+  protected readonly propertiesModal = viewChild<TemplateRef<unknown>>('propertiesModal');
+  protected readonly propertiesOpen = signal(false);
   protected readonly inspectorVisible = computed(
-    () => !!this.selectedNode() || !!this.selectedEdge(),
+    () => this.propertiesOpen() && (!!this.selectedNode() || !!this.selectedEdge()),
   );
+  /** Deleting the selected element (or undo removing it) leaves nothing to show, so the modal closes with it. */
+  private readonly closePropertiesWithoutSelection = effect(() => {
+    if (this.selectedNode() || this.selectedEdge()) return;
+    untracked(() => {
+      if (!this.propertiesOpen()) return;
+      this.propertiesOpen.set(false);
+      this.restoreCanvasFocus();
+    });
+  });
+  protected propertiesHeading(): { kind: string; title: string } {
+    const node = this.selectedNode();
+    if (node) {
+      const kind = this.friendlyType(node.type);
+      return { kind, title: node.name || kind };
+    }
+    const edge = this.selectedEdge();
+    if (!edge) return { kind: '', title: '' };
+    return {
+      kind: this.locale.isRtl() ? 'مسار' : 'Route',
+      title: `${this.getNodeName(edge.fromNodeId)} → ${this.getNodeName(edge.toNodeId)}`,
+    };
+  }
+  /**
+   * Opens (or re-targets) Properties for the current selection and moves focus to its title. Focus is placed here rather
+   * than by the focus trap's auto-capture so a diagnostic can still send it on to the field that needs attention.
+   */
+  private openProperties(): void {
+    this.propertiesOpen.set(true);
+    this.focusPropertiesTitle();
+  }
+  protected closeProperties(): void {
+    if (!this.propertiesOpen()) return;
+    this.propertiesOpen.set(false);
+    this.restoreCanvasFocus();
+  }
+  protected onPropertiesKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    // Topmost first: Escape must not also reach the canvas, a parent designer or its child-workflow window.
+    event.preventDefault();
+    event.stopPropagation();
+    this.closeProperties();
+  }
+  /** Focus can be dropped (a button that disappeared); Escape then still closes the visible, topmost Properties. */
+  @HostListener('document:keydown.escape', ['$event'])
+  protected onOrphanedEscape(event: Event): void {
+    if (
+      event.defaultPrevented ||
+      event.target !== document.body ||
+      !this.inspectorVisible() ||
+      this.activeChild() ||
+      this.slaEditor() ||
+      this.formPreview() ||
+      !this.host.nativeElement.getClientRects().length
+    )
+      return;
+    event.preventDefault();
+    this.closeProperties();
+  }
+  private propertiesPointerStartedOnBackdrop = false;
+  protected onPropertiesBackdropDown(event: MouseEvent): void {
+    this.propertiesPointerStartedOnBackdrop = event.target === event.currentTarget;
+  }
+  /** Only a press that both starts and ends on the backdrop closes it, so a text selection dragged out of a field never does. */
+  protected onPropertiesBackdropClick(event: MouseEvent): void {
+    const closes = this.propertiesPointerStartedOnBackdrop && event.target === event.currentTarget;
+    this.propertiesPointerStartedOnBackdrop = false;
+    if (closes) this.closeProperties();
+  }
+  private focusPropertiesTitle(): void {
+    afterNextRender(
+      () => {
+        const body = this.editorElement(this.propertiesBodyId);
+        if (body) body.scrollTop = 0;
+        this.editorElement(this.propertiesTitleId)?.focus({ preventScroll: true });
+      },
+      { injector: this.childFocusInjector },
+    );
+  }
+  /** Back on the canvas, land on the element that was being edited rather than on the page. */
+  private restoreCanvasFocus(): void {
+    afterNextRender(
+      () => {
+        const own = (attribute: string, id: string | null): SVGElement | undefined =>
+          id
+            ? Array.from(
+                this.host.nativeElement.querySelectorAll<SVGElement>(
+                  `[${attribute}="${CSS.escape(id)}"]`,
+                ),
+              ).find((element) => this.ownsElement(element))
+            : undefined;
+        const target: HTMLElement | SVGElement | undefined | null =
+          own('data-node-id', this.selectedNodeId()) ??
+          own('data-edge-id', this.selectedEdgeId()) ??
+          this.canvasScrollRef?.nativeElement;
+        target?.focus({ preventScroll: true });
+      },
+      { injector: this.childFocusInjector },
+    );
+  }
+  /** A node drag ends in a click on the node; that click must select it without opening Properties. */
+  private nodeDragMoved = false;
 
   // ── Tool mode
   protected readonly activeTool = signal<'select' | 'pan'>('select');
@@ -827,11 +2004,10 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     Math.round(((this.tourStep() + 1) / this.tourTotal) * 100),
   );
 
-  // ── Inspector
-  protected readonly inspectorWidth = signal(460);
-
   // ── Palette collapse
-  protected readonly paletteCollapsed = signal(false);
+  protected readonly paletteCollapsed = signal(
+    typeof window !== 'undefined' && window.innerWidth <= 900,
+  );
 
   // ── Fullscreen (covers admin shell with fixed overlay)
   protected readonly isFullscreen = signal(false);
@@ -843,13 +2019,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   protected readonly drawerHeight = signal(260);
   protected readonly MIN_DRAWER_H = 120;
   protected readonly MAX_DRAWER_H = 500;
-  protected readonly MIN_INSPECTOR_W = 400;
-  protected readonly MAX_INSPECTOR_W = 640;
 
   // ── Resize state (mutable – updated at 60fps, not signals)
-  private inspectorResizing = false;
-  private inspectorResizeStartX = 0;
-  private inspectorResizeStartW = 0;
   private drawerResizing = false;
   private drawerResizeStartY = 0;
   private drawerResizeStartH = 0;
@@ -864,6 +2035,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       : '';
   }
   protected childExpanded(n: CanvasNode): boolean {
+    if (this.hierarchical()) return false;
     const version = this.childVersion(n);
     return !!version && this.collapsedChildren()[n.id] !== version;
   }
@@ -909,24 +2081,90 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   protected readonly GATEWAY_R = GATEWAY_R;
 
   ngOnInit(): void {
-    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      this.definitionId.set(params.get('definitionId') ?? '');
-      this.versionId.set(params.get('versionId') ?? '');
+    this.propsForm.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.applyProps());
+    this.edgeForm.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.applyEdgeProps());
+    if (this.editorContext) {
+      // The toolbar Save of an ancestor calls this: it must reach the forms and child designers nested below too.
+      this.editorContext.save = () => this.saveEditors();
+      this.editorContext.resolveLeave = () => this.resolveLeave();
+      this.editorContext.hasDirtyForms = () => this.hasDirtyForms();
+    }
+    const open = (definitionId: string, versionId: string) => {
+      this.definitionId.set(definitionId);
+      this.versionId.set(versionId);
       this.selectedNodeId.set(null);
       this.selectedEdgeId.set(null);
       this.selectedNodeIds.set([]);
+      this.checkCancelled.next();
       this.validationResult.set(null);
       this.saveStatus.set('saved');
+      this.editRevision++;
+      this.checkState.set('idle');
       this.undoStack = [];
       this.redoStack = [];
       this.loadVersion();
       this.loadDefinitionName();
-    });
+    };
+    if (this.editorContext) open(this.editorContext.definitionId, this.editorContext.versionId);
+    else
+      this.route.paramMap
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((params) =>
+          open(params.get('definitionId') ?? '', params.get('versionId') ?? ''),
+        );
     this.loadActionCatalog();
     this.loadSlaPolicies();
 
-    this.autosave$.pipe(debounceTime(2000), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      this.saveToBackend().subscribe();
+    this.checkEdits
+      .pipe(
+        debounceTime(600),
+        switchMap(() => {
+          const versionId = this.versionId();
+          const editId = this.editRevision;
+          if (!this.routingV4() || this.isReadonly()) return of(null);
+          const state: CanvasState = {
+            nodes: this.nodes(),
+            edges: this.edges(),
+            variables: this.variables(),
+            workspace: this.workspace(),
+          };
+          return this.routingApi
+            .validateDesign(
+              this.definitionId(),
+              versionId,
+              buildNWFMXml(state),
+              JSON.stringify(state),
+              editId,
+            )
+            .pipe(
+              takeUntil(this.checkCancelled),
+              map((response) => ({ response, versionId, editId })),
+              catchError(() => {
+                if (versionId === this.versionId() && editId === this.editRevision)
+                  this.checkState.set('error');
+                return of(null);
+              }),
+            );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((value) => {
+        if (
+          !value ||
+          value.versionId !== this.versionId() ||
+          value.editId !== this.editRevision ||
+          value.response.editId !== value.editId
+        )
+          return;
+        this.validationResult.set(value.response.result);
+        this.checkState.set(value.response.result.isValid ? 'ready' : 'issues');
+      });
+    this.autosave$.pipe(debounceTime(800), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.saveStatus() !== 'saved') this.saveToBackend().subscribe({ error: () => undefined });
     });
   }
 
@@ -936,7 +2174,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   @HostListener('window:beforeunload', ['$event'])
   onBeforeUnload(event: BeforeUnloadEvent): void {
-    if (this.saveStatus() === 'unsaved') event.preventDefault();
+    // Unsaved form designs — open or minimized, at any depth — count as much as the workflow itself.
+    if (this.saveStatus() !== 'saved' || this.hasDirtyForms()) event.preventDefault();
   }
 
   protected toggleFullscreen(): void {
@@ -945,7 +2184,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   private setFullscreen(on: boolean): void {
     this.isFullscreen.set(on);
-    document.body.style.overflow = on ? 'hidden' : '';
+    if (!this.editorContext) document.body.style.overflow = on ? 'hidden' : '';
   }
 
   // ── Load ─────────────────────────────────────────────────────────────────
@@ -955,11 +2194,36 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     const requestedVersion = this.versionId();
     this.versionsService
       .getById(this.definitionId(), requestedVersion)
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .pipe(
+        switchMap((v) => {
+          let workspace: { designerVersion?: number } = {};
+          try {
+            workspace = JSON.parse(v.workspaceJson || '{}');
+          } catch {
+            /* Invalid settings are reported by validation. */
+          }
+          if (v.status !== 'Draft' || workspace.designerVersion !== 3) return of(v);
+          return this.routingApi.context(this.definitionId(), requestedVersion).pipe(
+            switchMap((context) => {
+              if (!context.enabled) return of(v);
+              return this.routingApi
+                .prepare(this.definitionId(), requestedVersion, context.revision)
+                .pipe(
+                  switchMap(() =>
+                    this.versionsService.getById(this.definitionId(), requestedVersion),
+                  ),
+                );
+            }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (v) => {
           if (this.versionId() !== requestedVersion) return;
           this.version.set(v);
+          this.serverRevision =
+            (v as WorkflowVersionDetailDto & { revision?: string }).revision || '';
           try {
             this.workspace.set(
               v.workspaceJson ? normalizeWorkspaceSettings(JSON.parse(v.workspaceJson)) : undefined,
@@ -969,13 +2233,18 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
           }
           this.isLoading.set(false);
           this.initCanvasFromVersion(v);
+          if (this.routingV4()) void this.refreshRoutingContext();
           if (v.status === 'Draft' && this.workspace()) {
-            this.workspace.update((w) => ({ ...w!, designerVersion: 2 }));
+            this.workspace.update((w) => ({
+              ...w!,
+              designerVersion: w?.designerVersion === 4 ? 4 : w?.designerVersion === 3 ? 3 : 2,
+            }));
             this.ensureSimpleActions();
             this.convertEmbeddedEvents();
           }
           this.relayoutIfCollapsed();
           this.makeRoomForChildren();
+          if (this.routingV4() && v.status === 'Draft') this.retryDesignCheck();
           if (v.status !== 'Draft') {
             this.xmlContent.set(
               buildNWFMXml({
@@ -1125,6 +2394,11 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     for (const n of state.nodes) {
       const backendId = idMap.get(n.id);
       if (!backendId) continue;
+      if ((state as CanvasState & { preparedFromLegacy?: boolean }).preparedFromLegacy) {
+        const activity = activities.find((a) => a.id === backendId)!;
+        nodes.push({ ...n, ...this.activityToCanvasNode(activity, nodes.length), x: n.x, y: n.y });
+        continue;
+      }
       const configurationJson = published?.get(backendId);
       nodes.push(
         configurationJson ? { ...n, id: backendId, configurationJson } : { ...n, id: backendId },
@@ -1225,6 +2499,47 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected readonly selectedAssignmentRoleIds = computed(() => {
+    const values = this.parseConfig(this.selectedNode()?.configurationJson || '{}')[
+      'assignmentRoleIds'
+    ];
+    return Array.isArray(values) ? values.filter((id): id is string => typeof id === 'string') : [];
+  });
+  protected onAssignmentRolesChange(roleIds: string[]): void {
+    if (this.isReadonly()) return;
+    const node = this.selectedNode();
+    if (!node) return;
+    this.pushUndo();
+    const configuration: Record<string, unknown> = {
+      ...this.parseConfig(node.configurationJson || '{}'),
+      assignmentRoleIds: roleIds,
+    };
+    this.propsForm.patchValue(
+      {
+        assignmentGroupId: '',
+        assignmentKey: '',
+        assignmentPurpose: '',
+        fallbackAssignmentKey: '',
+      },
+      { emitEvent: false },
+    );
+    delete configuration['fallbackAssignmentKey'];
+    this.nodes.update((nodes) =>
+      nodes.map((n) =>
+        n.id === node.id
+          ? {
+              ...n,
+              configurationJson: JSON.stringify(configuration),
+              assignmentGroupId: '',
+              assignmentKey: '',
+              assignmentPurpose: '',
+            }
+          : n,
+      ),
+    );
+    this.markUnsaved();
+  }
+
   private loadSlaPolicies(): void {
     this.slaPoliciesLoading.set(true);
     this.slaPoliciesService
@@ -1302,7 +2617,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   // ── Publish / Clone / Retire ──────────────────────────────────────────────
 
   protected publishVersion(): void {
-    if (this.publishing() || this.isReadonly()) return;
+    if (this.publishing() || this.isReadonly() || this.blockedByScopeEntry()) return;
     const v = this.version();
     if (!v) return;
     this.publishing.set(true);
@@ -1329,6 +2644,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
         next: (published) => {
           this.version.set({ ...v, status: published.status });
           this.publishing.set(false);
+          this.editorContext?.changed(this.versionId());
           this.toast.success(this.translate.instant('workflow.designer.publish_ok'));
         },
         error: (err: unknown) => {
@@ -1350,6 +2666,12 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (cloned) => {
           this.cloning.set(false);
+          if (this.editorContext && cloned.id) {
+            this.versionId.set(cloned.id);
+            this.loadVersion();
+            this.editorContext.changed(cloned.id);
+            return;
+          }
           this.toast.success('Draft clone created. Opening…');
           this.router.navigate([
             '/admin/workflow/definitions',
@@ -1388,35 +2710,112 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   // ── Toolbar actions ──────────────────────────────────────────────────────
 
-  protected save(): void {
-    this.saveToBackend().subscribe();
+  protected async save(): Promise<void> {
+    if (this.blockedByScopeEntry()) return;
+    try {
+      await this.saveEditors();
+    } catch {
+      /* The failed editor reports its save error. */
+    }
+  }
+
+  private async saveEditors(): Promise<void> {
+    // Saving never publishes or closes a form window; an unsaved form design is kept as its draft.
+    for (const child of this.childWindows()) {
+      if (child.formContext) {
+        if (child.formContext.isDirty?.() && !(await child.formContext.saveDraft?.()))
+          throw new Error('The form draft could not be saved.');
+      } else await child.inputs.editorContext?.save?.();
+    }
+    await firstValueFrom(this.saveToBackend());
   }
 
   private saveToBackend(): Observable<WorkflowVersionDto | null> {
-    if (this.isReadonly()) return of(null);
-    this.ensureSimpleActions();
-    this.saveStatus.set('saving');
-    const state: CanvasState = {
-      nodes: this.nodes(),
-      edges: this.edges(),
-      variables: this.variables(),
-      workspace: this.workspace(),
-    };
-    const xml = buildNWFMXml(state);
-    const designerJson = JSON.stringify(state);
-    return this.versionsService
-      .saveXml(this.definitionId(), this.versionId(), xml, designerJson)
-      .pipe(
-        tap(() => this.saveStatus.set('saved')),
-        catchError(() => {
-          this.saveStatus.set('unsaved');
-          this.toast.error(this.translate.instant('workflow.designer.save_failed'));
-          return throwError(() => new Error('save-failed'));
-        }),
-      );
+    return defer(() => this.persistDraft());
+  }
+
+  private async persistDraft(): Promise<WorkflowVersionDto | null> {
+    if (this.isReadonly()) return null;
+    if (this.activeSave) {
+      const versionId = this.savingVersion;
+      const result = await this.activeSave;
+      return versionId === this.versionId() ? result : this.persistDraft();
+    }
+    this.savingVersion = this.versionId();
+    this.activeSave = this.drainDraftSaves(this.definitionId(), this.versionId());
+    try {
+      return await this.activeSave;
+    } finally {
+      this.activeSave = null;
+    }
+  }
+
+  private async drainDraftSaves(
+    definitionId: string,
+    versionId: string,
+  ): Promise<WorkflowVersionDto | null> {
+    let result: WorkflowVersionDto | null = null;
+    try {
+      // Serialize requests and drain edits made during an in-flight save. An older response
+      // must never mark a newer edit saved or overwrite it with a later-arriving request.
+      while (this.versionId() === versionId && !this.isReadonly()) {
+        this.ensureSimpleActions();
+        const revision = this.editRevision;
+        const state: CanvasState = {
+          nodes: this.nodes(),
+          edges: this.edges(),
+          variables: this.variables(),
+          workspace: this.workspace(),
+        };
+        this.saveStatus.set('saving');
+        result = await firstValueFrom(
+          this.versionsService.saveXml(
+            definitionId,
+            versionId,
+            buildNWFMXml(state),
+            JSON.stringify(state),
+            this.serverRevision,
+          ),
+        );
+        if (this.versionId() !== versionId) return result;
+        this.serverRevision =
+          (result as WorkflowVersionDto & { revision?: string }).revision || this.serverRevision;
+        if (revision === this.editRevision) {
+          this.saveStatus.set('saved');
+          this.saveFailureReported = false;
+          if (this.routingV4())
+            this.routingApi
+              .context(definitionId, versionId)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: (context) => {
+                  if (this.versionId() === versionId && revision === this.editRevision)
+                    this.routingContext.set(context);
+                },
+                error: () => undefined,
+              });
+          return result;
+        }
+      }
+      return result;
+    } catch (error) {
+      if (this.versionId() === versionId) this.saveStatus.set('error');
+      if (!this.saveFailureReported)
+        this.toast.error(
+          workflowApiErrorMessage(error, this.translate, 'workflow.designer.save_failed'),
+        );
+      this.saveFailureReported = true;
+      throw new Error('save-failed', { cause: error });
+    }
   }
 
   protected validate(): void {
+    if (this.blockedByScopeEntry()) return;
+    if (this.routingV4()) {
+      this.reviewIssues();
+      this.retryDesignCheck();
+      return;
+    }
     if (this.validating()) return;
     this.validating.set(true);
     this.saveToBackend()
@@ -1534,6 +2933,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.nodes.update((nodes) =>
       nodes.map((n) => {
         if (n.type !== 'UserTask' && n.type !== 'MainActivity') return n;
+        if (this.hierarchical() && n.type === 'MainActivity') return { ...n, outcomes: [] };
         if (n.outcomes.some((o) => !['APPROVE', 'REJECT'].includes(o.key))) return n;
         const outcomes: CanvasOutcome[] = ['APPROVE', 'REJECT'].map((key, i) => ({
           ...n.outcomes.find((o) => o.key === key),
@@ -1617,9 +3017,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   /** The SLA tab re-renders while it reloads the rule, so wait briefly for its action before settling on its heading. */
   private restoreSlaFocus(attempts: number): void {
     setTimeout(() => {
-      const action = document.getElementById('wf-activity-sla-action');
-      if (action || attempts <= 0)
-        (action ?? document.getElementById('wf-activity-sla-title'))?.focus();
+      const action = this.editorElement('wf-activity-sla-action');
+      if (action || attempts <= 0) (action ?? this.editorElement('wf-activity-sla-title'))?.focus();
       else this.restoreSlaFocus(attempts - 1);
     }, 50);
   }
@@ -1658,8 +3057,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.formPreview.set(null);
     setTimeout(() =>
       (
-        document.getElementById(`wf-form-preview-${formId}`) ??
-        document.getElementById('wf-activity-forms-title')
+        this.editorElement(`wf-form-preview-${formId}`) ??
+        this.editorElement('wf-activity-forms-title')
       )?.focus(),
     );
   }
@@ -1676,10 +3075,22 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   /** General renders after the tab switch, so the field may not exist yet on the first try. */
   private focusWhenRendered(id: string, attempts: number): void {
     setTimeout(() => {
-      const field = document.getElementById(id);
+      const field = this.editorElement(id);
       if (field || attempts <= 0) field?.focus();
       else this.focusWhenRendered(id, attempts - 1);
     }, 50);
+  }
+  private editorElement(id: string): HTMLElement | undefined {
+    return Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('[id]')).find(
+      (element) => element.id === id && this.ownsElement(element),
+    );
+  }
+  /** True for this designer's own DOM, false for anything inside a nested (child workflow) designer or outside it. */
+  private ownsElement(target: EventTarget | null): boolean {
+    const host: HTMLElement = this.host.nativeElement;
+    if (!(target instanceof Element) || !host.contains(target)) return false;
+    const nearest = target.closest('app-workflow-designer');
+    return !nearest || nearest === host || !host.contains(nearest);
   }
   protected eventTriggerLabel(trigger: string) {
     const labels: Record<string, [string, string]> = {
@@ -1695,7 +3106,15 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     return labels[trigger]?.[this.locale.locale() === 'ar' ? 1 : 0] || trigger;
   }
   protected routingNodes() {
-    return this.nodes().filter((n) => ['UserTask', 'MainActivity', 'End'].includes(n.type));
+    return this.nodes().filter(
+      (n) =>
+        [
+          'UserTask',
+          'MainActivity',
+          'End',
+          ...(this.hierarchical() ? ['ServiceTask', 'WaitEvent', 'NotificationTask'] : []),
+        ].includes(n.type) && !this.parseConfig(n.configurationJson || '{}')['triggerBinding'],
+    );
   }
   protected formRouteLinks() {
     const links: {
@@ -1709,7 +3128,11 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     for (const n of this.nodes())
       for (const step of activityFormSteps(this.parseConfig(n.configurationJson))) {
         const destinations = [
-          ...step.rules.map((r) => ({ id: r.id, label: r.name, destination: r.destination })),
+          ...(step.rules ?? []).map((r) => ({
+            id: r.id,
+            label: r.name,
+            destination: r.destination,
+          })),
           {
             id: 'otherwise',
             label: this.locale.isRtl() ? 'وإلا' : 'Otherwise',
@@ -1717,7 +3140,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
           },
         ];
         for (const route of destinations) {
-          if (route.destination.kind !== 'Activity') continue;
+          if (route.destination?.kind !== 'Activity') continue;
           const target = this.nodes().find((t) => t.nodeKey === route.destination.target);
           if (!target) continue;
           const x = n.x + 105,
@@ -1793,11 +3216,27 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     task?: ReferenceItem,
   ): void {
     if (this.isReadonly()) return;
+    if (
+      this.hierarchical() &&
+      ((![
+        'Start',
+        'End',
+        'MainActivity',
+        'UserTask',
+        'ServiceTask',
+        'NotificationTask',
+        'WaitEvent',
+      ].includes(type) &&
+        !(this.routingV4() && isRoutingGate(type))) ||
+        (type === 'UserTask' && this.workspace()?.kind === 'Main') ||
+        (type === 'MainActivity' && this.workspace()?.kind === 'Child'))
+    )
+      return;
     if (task && (this.workspace()?.kind !== 'Main' || type !== 'MainActivity' || !task.id)) return;
     const count = this.nodes().length;
     const px = x ?? 160 + (count % 4) * 48;
     const py = y ?? 140 + (count % 4) * 48;
-    const key = `${type.toLowerCase()}_${Date.now()}`;
+    const key = `${type.toLowerCase()}_${crypto.randomUUID()}`;
     const node: CanvasNode = {
       id: crypto.randomUUID(),
       nodeKey: key,
@@ -1815,12 +3254,26 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       actions: [],
     };
     this.pushUndo();
+    if (this.hierarchical() && (type === 'UserTask' || type === 'MainActivity')) {
+      node.name = type === 'UserTask' ? 'Step' : 'Task Type';
+      node.configurationJson = JSON.stringify({
+        taskTypeId: type === 'UserTask' ? this.workspace()?.taskTypeId : task?.id,
+        // A child workflow cannot hold a classification: its Steps take the one of the Task Type Step it belongs to.
+        departmentCode: this.inheritedClassification()?.departmentCode,
+        fieldActivityCode: this.inheritedClassification()?.fieldActivityCode,
+        ...(this.routingV4() ? {} : { rejectTargetNodeKey: node.nodeKey }),
+      });
+    }
     if (task) {
       node.name = task.nameEn;
       node.nameAr = task.nameAr || '';
-      node.configurationJson = JSON.stringify({ taskTypeId: task.id });
+      node.configurationJson = JSON.stringify({
+        ...this.parseConfig(node.configurationJson || '{}'),
+        taskTypeId: task.id,
+      });
     }
     if (type === 'ServiceTask') {
+      if (this.hierarchical()) node.name = 'Event';
       node.actionKey = 'http.request';
       node.configurationJson = JSON.stringify({
         protocol: protocol || 'Rest',
@@ -1840,6 +3293,43 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
         failurePolicy: 'Retry',
         maxAttempts: 3,
       });
+    if (this.routingV4() && isRoutingGate(type)) {
+      node.name =
+        type === 'ExclusiveGateway' ? 'Condition' : type === 'JoinGateway' ? 'Join / Wait' : 'Fork';
+      node.configurationJson = JSON.stringify({
+        routing:
+          type === 'ExclusiveGateway'
+            ? // A new Condition tries its routes in order and the first match wins (contract version 2).
+              newConditionRouting()
+            : {
+                ...routingDefaults(),
+                matchMode:
+                  type === 'ParallelGateway' || type === 'InclusiveGateway' ? 'All' : 'Unique',
+              },
+      });
+    }
+    if (this.routingV4() && (type === 'ParallelGateway' || type === 'InclusiveGateway')) {
+      const join: CanvasNode = {
+        ...node,
+        id: crypto.randomUUID(),
+        nodeKey: `join_${crypto.randomUUID()}`,
+        type: 'JoinGateway',
+        name: 'Wait for branches',
+        x: px + 420,
+        y: py,
+        configurationJson: JSON.stringify({ routing: routingDefaults() }),
+      };
+      const config = routingDefaults();
+      config.matchMode = 'All';
+      config.joinNodeKey = join.nodeKey;
+      config.routes = [0, 1].map(() => ({
+        transitionKey: `route_${crypto.randomUUID()}`,
+        always: type === 'ParallelGateway',
+        when: { match: 'All', conditions: [], groups: [] },
+      }));
+      node.configurationJson = JSON.stringify({ routing: config });
+      this.nodes.update((ns) => [...ns, join]);
+    }
     this.nodes.update((ns) => [...ns, node]);
     this.ensureSimpleActions();
     this.selectedNodeId.set(node.id);
@@ -1847,6 +3337,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.inspectorTab.set('general');
     this.patchPropsFromNode(node);
     this.markUnsaved();
+    this.openProperties();
   }
 
   protected onPaletteDragStart(event: DragEvent, type: NodeType, protocol?: string): void {
@@ -1880,7 +3371,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     event.preventDefault();
   }
 
-  protected onNodeClick(event: MouseEvent, nodeId: string): void {
+  protected onNodeClick(event: Event & { shiftKey?: boolean }, nodeId: string): void {
     event.stopPropagation();
     this.contextMenu.set(null);
     if (this.drawingEdge()) {
@@ -1913,6 +3404,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     }
 
     // Normal click: single-select (clear multi-select)
+    const afterDrag = this.nodeDragMoved;
+    this.nodeDragMoved = false;
     if (
       this.selectedNodeId() !== nodeId &&
       !WorkflowDesignerComponent.tabsFor(node?.type).some((t) => t.id === this.inspectorTab())
@@ -1923,8 +3416,12 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.selectedNodeId.set(nodeId);
     this.selectedEdgeId.set(null);
     if (node) this.patchPropsFromNode(node);
+    if (this.routingV4() && !this.propertyChoices()[this.versionId() + ':' + nodeId])
+      this.openPropertySection(this.nextPropertySection() || 'general');
     // Blur property fields so Delete/Backspace shortcuts work immediately
     this.blurActiveField();
+    if (event.currentTarget instanceof SVGElement) event.currentTarget.focus();
+    if (!afterDrag) this.openProperties();
   }
 
   private blurActiveField(): void {
@@ -1948,7 +3445,25 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.selectedNodeIds.set([]);
   }
 
-  protected onEdgeClick(event: MouseEvent, edgeId: string): void {
+  protected routeOwner(): CanvasNode | undefined {
+    const edge = this.selectedEdge();
+    return this.nodes().find(
+      (n) => (n.id === edge?.fromNodeId || n.id === edge?.toNodeId) && isRoutingGate(n.type),
+    );
+  }
+  protected openSelectedRoute(): void {
+    const owner = this.routeOwner();
+    if (owner) {
+      this.selectNode(owner.id);
+      return;
+    }
+    const edge = this.selectedEdge();
+    if (edge) {
+      this.selectNode(edge.fromNodeId);
+      this.openPropertySection('actions');
+    }
+  }
+  protected onEdgeClick(event: Event, edgeId: string): void {
     event.stopPropagation();
     this.contextMenu.set(null);
     this.selectedEdgeId.set(edgeId);
@@ -1956,6 +3471,9 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.selectedNodeIds.set([]);
     const edge = this.edges().find((e) => e.id === edgeId);
     if (edge) this.patchEdgeForm(edge);
+    this.blurActiveField();
+    if (event.currentTarget instanceof SVGElement) event.currentTarget.focus();
+    this.openProperties();
   }
 
   protected onNodeContextMenu(event: MouseEvent, nodeId: string): void {
@@ -2017,6 +3535,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     if (t?.classList?.contains('port-hit') || t?.closest?.('.port-hit')) return;
     if (this.drawingEdge()) return;
     event.stopPropagation();
+    this.nodeDragMoved = false;
     const ns = this.nodes();
     const node = ns.find((n) => n.id === nodeId);
     if (!node) return;
@@ -2034,15 +3553,6 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent): void {
-    if (this.inspectorResizing) {
-      const dx = event.clientX - this.inspectorResizeStartX;
-      const newW = Math.min(
-        this.MAX_INSPECTOR_W,
-        Math.max(this.MIN_INSPECTOR_W, this.inspectorResizeStartW - dx),
-      );
-      this.inspectorWidth.set(newW);
-      return;
-    }
     if (this.drawerResizing) {
       const dy = event.clientY - this.drawerResizeStartY;
       const newH = Math.min(
@@ -2060,6 +3570,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     if (this.dragging) {
       const dx = (event.clientX - this.dragging.startX) / this.zoom();
       const dy = (event.clientY - this.dragging.startY) / this.zoom();
+      if (Math.abs(dx) + Math.abs(dy) > 3) this.nodeDragMoved = true;
       const orig = this.dragging.origPositions;
       this.nodes.update((ns) =>
         ns.map((n) => {
@@ -2096,10 +3607,6 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   @HostListener('document:mouseup', ['$event'])
   onMouseUp(event: MouseEvent): void {
-    if (this.inspectorResizing) {
-      this.inspectorResizing = false;
-      return;
-    }
     if (this.drawerResizing) {
       this.drawerResizing = false;
       return;
@@ -2447,6 +3954,13 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       this.connectHoverNodeId.set(null);
       return;
     }
+    if (this.routingV4()) {
+      this.pushUndo();
+      this.connectRoutingNodes(de.fromNodeId, toNodeId);
+      this.drawingEdge.set(null);
+      this.connectHoverNodeId.set(null);
+      return;
+    }
     const exists = this.edges().some(
       (e) => e.fromNodeId === de.fromNodeId && e.toNodeId === toNodeId,
     );
@@ -2558,6 +4072,27 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   protected deleteEdge(edgeId: string): void {
     if (this.isReadonly()) return;
     this.pushUndo();
+    const edge = this.edges().find((e) => e.id === edgeId);
+    if (this.routingV4() && edge)
+      this.nodes.update((nodes) =>
+        nodes.map((node) => {
+          if (
+            node.id === edge.toNodeId &&
+            edge.automaticConditionSource?.conditionNodeKey === node.nodeKey
+          )
+            return { ...node, automaticConditionSourceSuppressed: true };
+          if (node.id !== edge.fromNodeId || !isRoutingGate(node.type)) return node;
+          const config = this.parseConfig(node.configurationJson || '{}');
+          const routing = config['routing'] as RoutingConfiguration | undefined;
+          if (!routing) return node;
+          routing.routes = routing.routes.filter((r) => r.transitionKey !== edge.transitionKey);
+          if (routing.fallbackTransitionKey === edge.transitionKey)
+            routing.fallbackTransitionKey = null;
+          if (routing.failureTransitionKey === edge.transitionKey)
+            routing.failureTransitionKey = null;
+          return { ...node, configurationJson: JSON.stringify(config) };
+        }),
+      );
     this.edges.update((es) => es.filter((e) => e.id !== edgeId));
     if (this.selectedEdgeId() === edgeId) this.selectedEdgeId.set(null);
     this.markUnsaved();
@@ -2814,6 +4349,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
           const edge = this.edges().find((e) => e.id === edgeId);
           if (edge) this.patchEdgeForm(edge);
         }
+        this.openProperties();
         break;
       case 'center-node':
         if (nodeId) this.centerOnNode(nodeId);
@@ -2826,7 +4362,15 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
         break;
       case 'add-user-task':
         if (!this.isReadonly())
-          this.addNode('UserTask', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
+          this.addNode(
+            this.hierarchical() && this.workspace()?.kind === 'Main' ? 'MainActivity' : 'UserTask',
+            menu?.canvasX ?? 200,
+            menu?.canvasY ?? 120,
+          );
+        break;
+      case 'add-event':
+        if (!this.isReadonly())
+          this.addNode('ServiceTask', menu?.canvasX ?? 200, menu?.canvasY ?? 120);
         break;
       case 'add-decision':
         if (!this.isReadonly())
@@ -2893,13 +4437,24 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
+    if (event.target && !this.ownsElement(event.target)) return;
     // The SLA editor and form preview are modal: Escape, Delete or undo pressed inside them must not act on the canvas behind.
-    if (this.slaEditor() || this.formPreview()) return;
+    if (this.slaEditor() || this.formPreview() || this.activeChild()) return;
     const target = event.target as HTMLElement | null;
     const tag = target?.tagName ?? '';
     const inInput =
       tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
     const ctrl = event.ctrlKey || event.metaKey;
+
+    if (ctrl && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void this.save();
+      return;
+    }
+
+    // Properties is modal: keep canvas shortcuts suspended, including from a focused button.
+    // Escape is closed by the dialog itself (or onOrphanedEscape); typing in fields keeps its native behaviour.
+    if (this.inspectorVisible()) return;
 
     if (ctrl && event.key === '0') {
       event.preventDefault();
@@ -3018,6 +4573,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       variables: structuredClone(this.variables()),
     });
     this.redoStack = [];
+    if (this.undoStack.length > 100) this.undoStack.shift();
   }
 
   protected undo(): void {
@@ -3031,6 +4587,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.nodes.set(state.nodes);
     this.edges.set(state.edges);
     this.variables.set(state.variables ?? []);
+    this.refreshSelectedForms();
     this.markUnsaved();
   }
 
@@ -3045,18 +4602,30 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.nodes.set(state.nodes);
     this.edges.set(state.edges);
     this.variables.set(state.variables ?? []);
+    this.refreshSelectedForms();
     this.markUnsaved();
   }
 
   // ── Node props form ───────────────────────────────────────────────────────
 
   protected applyProps(): void {
+    if (this.isReadonly()) return;
     const nodeId = this.selectedNodeId();
     if (!nodeId) return;
     const node = this.nodes().find((n) => n.id === nodeId);
     if (!node) return;
     const v = this.propsForm.value;
     const configurationJson = this.buildConfigurationJson(node.type, v);
+    if (
+      node.name === (v.name ?? node.name) &&
+      node.nameAr === (v.nameAr ?? '') &&
+      node.actionKey === (v.actionKey ?? '') &&
+      node.assignmentKey === (v.assignmentKey ?? '') &&
+      node.assignmentGroupId === (v.assignmentGroupId ?? '') &&
+      node.assignmentPurpose === (v.assignmentPurpose ?? '') &&
+      node.configurationJson === configurationJson
+    )
+      return;
     this.pushUndo();
     this.nodes.update((ns) =>
       ns.map((n) =>
@@ -3111,15 +4680,20 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   // ── Edge props form ───────────────────────────────────────────────────────
 
   protected applyEdgeProps(): void {
+    if (this.isReadonly()) return;
     const edgeId = this.selectedEdgeId();
     if (!edgeId) return;
     const v = this.edgeForm.value;
+    const edge = this.selectedEdge();
+    if (!edge || Object.entries(v).every(([key, value]) => edge[key as keyof CanvasEdge] === value))
+      return;
     this.pushUndo();
     this.edges.update((es) =>
       es.map((e) =>
         e.id === edgeId
           ? {
               ...e,
+              automaticConditionSource: undefined,
               transitionKey: v.transitionKey ?? e.transitionKey,
               labelEn: v.labelEn ?? e.labelEn,
               labelAr: v.labelAr ?? e.labelAr,
@@ -3456,7 +5030,14 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   // ── Validation click-to-navigate ──────────────────────────────────────────
 
-  protected navigateToError(nodeKey: string | undefined | null, errorCode?: string | null): void {
+  protected routingIssueField(issue: object): string | null {
+    return (issue as { field?: string }).field || null;
+  }
+  protected navigateToError(
+    nodeKey: string | undefined | null,
+    errorCode?: string | null,
+    field?: string | null,
+  ): void {
     if (!nodeKey) return;
     const node = this.nodes().find((n) => n.nodeKey === nodeKey);
     if (!node) return;
@@ -3465,11 +5046,47 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.selectedEdgeId.set(null);
     this.patchPropsFromNode(node);
     this.centerOnNode(node.id);
+    this.openProperties();
 
     const tab = this.inferTabFromCode(errorCode);
+    this.openPropertySection(tab === 'sla' ? 'advanced' : tab);
     this.inspectorTab.set(
       WorkflowDesignerComponent.tabsFor(node.type).some((t) => t.id === tab) ? tab : 'general',
     );
+    if (!errorCode?.startsWith('ROUTING_')) {
+      setTimeout(() => {
+        const panel = this.host.nativeElement.querySelector('#wf-activity-panel');
+        const component = panel?.querySelector(
+          tab === 'assignment'
+            ? 'app-workflow-role-assignment'
+            : tab === 'form'
+              ? 'app-workflow-activity-forms'
+              : tab === 'sla'
+                ? 'app-workflow-activity-sla'
+                : 'app-workflow-business-activity, app-workflow-integration-editor',
+        );
+        component?.closest('details')?.setAttribute('open', '');
+        const target = component?.querySelector<HTMLElement>(
+          'select:not([disabled]), input:not([disabled]):not([readonly]), button:not([disabled])',
+        );
+        target?.scrollIntoView({ block: 'nearest' });
+        target?.focus();
+      });
+    }
+    if (errorCode?.startsWith('ROUTING_'))
+      setTimeout(() => {
+        const editor = this.host.nativeElement.querySelector('app-workflow-routing-editor');
+        const controls = Array.from(
+          editor?.querySelectorAll<HTMLElement>('[data-routing-field]') || [],
+        );
+        const target =
+          controls.find((control) => control.dataset['routingField'] === field) ||
+          editor?.querySelector<HTMLElement>('select, input, button');
+        const disclosure = target?.closest('details');
+        if (disclosure) disclosure.open = true;
+        target?.scrollIntoView({ block: 'nearest' });
+        target?.focus();
+      });
   }
 
   private inferTabFromCode(code?: string | null): InspectorTab {
@@ -3477,7 +5094,9 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     if (code.startsWith('ROUTING_')) return 'actions';
     if (code.startsWith('ACTIVITY_FORM_')) return 'form';
     const lower = code.toLowerCase();
-    if (lower.includes('assignment') || lower.includes('assignmentkey')) return 'assignment';
+    if (lower.includes('assignment') || lower.includes('role') || lower.includes('group'))
+      return 'assignment';
+    if (lower.includes('form')) return 'form';
     if (lower.includes('sla') || lower.includes('timer')) return 'sla';
     return 'general';
   }
@@ -3485,6 +5104,9 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private markUnsaved(): void {
+    this.editRevision++;
+    this.validationResult.set(null);
+    if (this.routingV4()) this.retryDesignCheck();
     this.saveStatus.set('unsaved');
     this.autosave$.next();
   }
@@ -3510,7 +5132,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       case 'End':
         return 'End';
       case 'ExclusiveGateway':
-        return 'Decision';
+        return this.routingV4() ? 'Condition' : 'Decision';
       case 'InclusiveGateway':
         return 'Inclusive Gateway';
       case 'ParallelGateway':
@@ -3536,73 +5158,76 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   private patchPropsFromNode(node: CanvasNode): void {
     const cfg = this.parseConfig(node.configurationJson);
-    this.propsForm.patchValue({
-      name: node.name,
-      nameAr: node.nameAr,
-      description: typeof cfg['description'] === 'string' ? (cfg['description'] as string) : '',
-      descriptionAr:
-        typeof cfg['descriptionAr'] === 'string' ? (cfg['descriptionAr'] as string) : '',
-      instructionsEn:
-        typeof cfg['instructionsEn'] === 'string' ? (cfg['instructionsEn'] as string) : '',
-      instructionsAr:
-        typeof cfg['instructionsAr'] === 'string' ? (cfg['instructionsAr'] as string) : '',
-      nodePriority: typeof cfg['nodePriority'] === 'number' ? (cfg['nodePriority'] as number) : 0,
-      actionKey: node.actionKey,
-      assignmentKey: node.assignmentKey,
-      assignmentGroupId: node.assignmentGroupId ?? '',
-      assignmentPurpose: node.assignmentPurpose ?? '',
-      fallbackAssignmentKey:
-        typeof cfg['fallbackAssignmentKey'] === 'string'
-          ? (cfg['fallbackAssignmentKey'] as string)
-          : '',
-      requiresClaim:
-        typeof cfg['requiresClaim'] === 'boolean' ? (cfg['requiresClaim'] as boolean) : false,
-      allowSelfClaim:
-        typeof cfg['allowSelfClaim'] === 'boolean' ? (cfg['allowSelfClaim'] as boolean) : false,
-      configJson: node.configurationJson || '',
-      timerType: (cfg['timerType'] as TimerTypeOption) || 'Duration',
-      dueAt: typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
-      duration: typeof cfg['duration'] === 'string' ? (cfg['duration'] as string) : '',
-      signalKey: typeof cfg['signalKey'] === 'string' ? (cfg['signalKey'] as string) : '',
-      templateKey: typeof cfg['templateKey'] === 'string' ? (cfg['templateKey'] as string) : '',
-      failurePolicy: (cfg['failurePolicy'] as NotificationFailurePolicyOption) || 'Continue',
-      slaPolicyId: typeof cfg['slaPolicyId'] === 'string' ? (cfg['slaPolicyId'] as string) : '',
-      slaDurationHours:
-        typeof cfg['slaDurationHours'] === 'number' ? (cfg['slaDurationHours'] as number) : 0,
-      slaEscalationKey:
-        typeof cfg['slaEscalationKey'] === 'string' ? (cfg['slaEscalationKey'] as string) : '',
-      inputMappingJson:
-        typeof cfg['inputMappingJson'] === 'string' ? (cfg['inputMappingJson'] as string) : '',
-      outputMappingJson:
-        typeof cfg['outputMappingJson'] === 'string' ? (cfg['outputMappingJson'] as string) : '',
-      formKey: typeof cfg['formKey'] === 'string' ? (cfg['formKey'] as string) : '',
-      formSchemaJson:
-        typeof cfg['formSchemaJson'] === 'string'
-          ? (cfg['formSchemaJson'] as string)
-          : cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
-            ? JSON.stringify(cfg['formSchemaJson'], null, 2)
+    this.propsForm.patchValue(
+      {
+        name: node.name,
+        nameAr: node.nameAr,
+        description: typeof cfg['description'] === 'string' ? (cfg['description'] as string) : '',
+        descriptionAr:
+          typeof cfg['descriptionAr'] === 'string' ? (cfg['descriptionAr'] as string) : '',
+        instructionsEn:
+          typeof cfg['instructionsEn'] === 'string' ? (cfg['instructionsEn'] as string) : '',
+        instructionsAr:
+          typeof cfg['instructionsAr'] === 'string' ? (cfg['instructionsAr'] as string) : '',
+        nodePriority: typeof cfg['nodePriority'] === 'number' ? (cfg['nodePriority'] as number) : 0,
+        actionKey: node.actionKey,
+        assignmentKey: node.assignmentKey,
+        assignmentGroupId: node.assignmentGroupId ?? '',
+        assignmentPurpose: node.assignmentPurpose ?? '',
+        fallbackAssignmentKey:
+          typeof cfg['fallbackAssignmentKey'] === 'string'
+            ? (cfg['fallbackAssignmentKey'] as string)
             : '',
-      setVariablesJson: this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
-      eventKey:
-        typeof cfg['eventKey'] === 'string'
-          ? cfg['eventKey']
-          : typeof cfg['signalKey'] === 'string'
-            ? cfg['signalKey']
+        requiresClaim:
+          typeof cfg['requiresClaim'] === 'boolean' ? (cfg['requiresClaim'] as boolean) : false,
+        allowSelfClaim:
+          typeof cfg['allowSelfClaim'] === 'boolean' ? (cfg['allowSelfClaim'] as boolean) : false,
+        configJson: node.configurationJson || '',
+        timerType: (cfg['timerType'] as TimerTypeOption) || 'Duration',
+        dueAt: typeof cfg['dueAt'] === 'string' ? toLocalDateTime(cfg['dueAt']) : '',
+        duration: typeof cfg['duration'] === 'string' ? (cfg['duration'] as string) : '',
+        signalKey: typeof cfg['signalKey'] === 'string' ? (cfg['signalKey'] as string) : '',
+        templateKey: typeof cfg['templateKey'] === 'string' ? (cfg['templateKey'] as string) : '',
+        failurePolicy: (cfg['failurePolicy'] as NotificationFailurePolicyOption) || 'Continue',
+        slaPolicyId: typeof cfg['slaPolicyId'] === 'string' ? (cfg['slaPolicyId'] as string) : '',
+        slaDurationHours:
+          typeof cfg['slaDurationHours'] === 'number' ? (cfg['slaDurationHours'] as number) : 0,
+        slaEscalationKey:
+          typeof cfg['slaEscalationKey'] === 'string' ? (cfg['slaEscalationKey'] as string) : '',
+        inputMappingJson:
+          typeof cfg['inputMappingJson'] === 'string' ? (cfg['inputMappingJson'] as string) : '',
+        outputMappingJson:
+          typeof cfg['outputMappingJson'] === 'string' ? (cfg['outputMappingJson'] as string) : '',
+        formKey: typeof cfg['formKey'] === 'string' ? (cfg['formKey'] as string) : '',
+        formSchemaJson:
+          typeof cfg['formSchemaJson'] === 'string'
+            ? (cfg['formSchemaJson'] as string)
+            : cfg['formSchemaJson'] && typeof cfg['formSchemaJson'] === 'object'
+              ? JSON.stringify(cfg['formSchemaJson'], null, 2)
+              : '',
+        setVariablesJson: this.formatSetVariables(cfg['setVariables'] ?? cfg['assignments']),
+        eventKey:
+          typeof cfg['eventKey'] === 'string'
+            ? cfg['eventKey']
+            : typeof cfg['signalKey'] === 'string'
+              ? cfg['signalKey']
+              : '',
+        correlationVariable:
+          typeof cfg['correlationVariable'] === 'string'
+            ? (cfg['correlationVariable'] as string)
             : '',
-      correlationVariable:
-        typeof cfg['correlationVariable'] === 'string'
-          ? (cfg['correlationVariable'] as string)
-          : '',
-      definitionKey:
-        typeof cfg['definitionKey'] === 'string' ? (cfg['definitionKey'] as string) : '',
-      waitForCompletion:
-        typeof cfg['waitForCompletion'] === 'boolean'
-          ? (cfg['waitForCompletion'] as boolean)
-          : true,
-      callVersionId: typeof cfg['versionId'] === 'string' ? (cfg['versionId'] as string) : '',
-      callInputMappingsJson: JSON.stringify(cfg['inputMappings'] || {}, null, 2),
-      callOutputMappingsJson: JSON.stringify(cfg['outputMappings'] || {}, null, 2),
-    });
+        definitionKey:
+          typeof cfg['definitionKey'] === 'string' ? (cfg['definitionKey'] as string) : '',
+        waitForCompletion:
+          typeof cfg['waitForCompletion'] === 'boolean'
+            ? (cfg['waitForCompletion'] as boolean)
+            : true,
+        callVersionId: typeof cfg['versionId'] === 'string' ? (cfg['versionId'] as string) : '',
+        callInputMappingsJson: JSON.stringify(cfg['inputMappings'] || {}, null, 2),
+        callOutputMappingsJson: JSON.stringify(cfg['outputMappings'] || {}, null, 2),
+      },
+      { emitEvent: false },
+    );
     this.formFields.set(this.parseFormFields(cfg['formFields']));
   }
 
@@ -3640,11 +5265,13 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
         required: false,
       },
     ]);
+    this.applyProps();
   }
 
   protected removeFormField(id: string): void {
     if (this.isReadonly()) return;
     this.formFields.update((fields) => fields.filter((f) => f.id !== id));
+    this.applyProps();
   }
 
   protected updateFormField(
@@ -3656,6 +5283,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.formFields.update((fields) =>
       fields.map((f) => (f.id === id ? { ...f, [field]: value } : f)),
     );
+    this.applyProps();
   }
 
   private formatSetVariables(value: unknown): string {
@@ -3669,16 +5297,26 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   }
 
   private patchEdgeForm(edge: CanvasEdge): void {
-    this.edgeForm.patchValue({
-      transitionKey: edge.transitionKey,
-      labelEn: edge.labelEn,
-      labelAr: edge.labelAr,
-      descriptionEn: edge.descriptionEn,
-      outcomeKey: edge.outcomeKey,
-      conditionExpression: edge.conditionExpression,
-      isDefault: edge.isDefault,
-      priority: edge.priority,
-    });
+    this.edgeForm.patchValue(
+      {
+        transitionKey: edge.transitionKey,
+        labelEn: edge.labelEn,
+        labelAr: edge.labelAr,
+        descriptionEn: edge.descriptionEn,
+        outcomeKey: edge.outcomeKey,
+        conditionExpression: edge.conditionExpression,
+        isDefault: edge.isDefault,
+        priority: edge.priority,
+      },
+      { emitEvent: false },
+    );
+  }
+
+  private refreshSelectedForms(): void {
+    const node = this.selectedNode();
+    const edge = this.selectedEdge();
+    if (node) this.patchPropsFromNode(node);
+    else if (edge) this.patchEdgeForm(edge);
   }
 
   private parseConfig(json: string): Record<string, unknown> {
@@ -4037,6 +5675,27 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     return this.buildOrthogonalPath(a.x1, a.y1, a.fromSide, a.x2, a.y2, a.toSide, lane);
   }
 
+  protected edgeCaption(edge: CanvasEdge): string {
+    if (!this.routingV4())
+      return edge.labelEn || (edge.outcomeKey !== edge.transitionKey ? edge.outcomeKey : '');
+    if (edge.labelEn)
+      return edge.labelEn === 'Always' && this.locale.isRtl() ? 'دائماً' : edge.labelEn;
+    const source = this.nodes().find((n) => n.id === edge.fromNodeId);
+    if (source && !isRoutingGate(source.type)) return this.locale.isRtl() ? 'دائماً' : 'Always';
+    const routing =
+      source &&
+      (this.parseConfig(source.configurationJson || '{}')['routing'] as
+        RoutingConfiguration | undefined);
+    if (routing?.fallbackTransitionKey === edge.transitionKey)
+      return this.locale.isRtl() ? 'خلاف ذلك' : 'Otherwise';
+    if (source?.type === 'JoinGateway')
+      return this.locale.isRtl() ? 'المتابعة مرة واحدة' : 'Continue once';
+    return routing?.routes.find((r) => r.transitionKey === edge.transitionKey)?.always
+      ? this.locale.isRtl()
+        ? 'دائماً'
+        : 'Always'
+      : '';
+  }
   protected edgeLabelPos(e: CanvasEdge): { x: number; y: number } {
     const a = this.edgeAnchors(e);
     if (!a) return { x: 0, y: 0 };
@@ -4193,8 +5852,12 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     return item.id;
   }
 
-  protected goBack(): void {
-    this.router.navigate(['/admin/workflow/definitions', this.definitionId(), 'versions']);
+  protected async goBack(): Promise<void> {
+    if (this.editorContext) {
+      this.editorContext.close();
+      return;
+    }
+    await this.leaveTo(['/admin/workflow/definitions', this.definitionId(), 'versions']);
   }
 
   protected readonly canHaveEdge = (type: NodeType): boolean => type !== 'End';
@@ -4206,6 +5869,9 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   protected nodeSubLabel(n: CanvasNode): string {
     if (n.type === 'UserTask' || n.type === 'MainActivity') {
+      const roles = this.parseConfig(n.configurationJson || '{}')['assignmentRoleIds'];
+      if (Array.isArray(roles) && roles.length)
+        return roles.length + (this.locale.locale() === 'ar' ? ' أدوار' : ' roles');
       return this.selectedAssignmentGroupName(n.assignmentGroupId) || n.assignmentKey || '';
     }
     if (n.type === 'ServiceTask' && n.actionKey) return n.actionKey;
@@ -4239,13 +5905,6 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   // ── Panel resize handles ──────────────────────────────────────────────────
 
-  protected startInspectorResize(event: MouseEvent): void {
-    event.preventDefault();
-    this.inspectorResizing = true;
-    this.inspectorResizeStartX = event.clientX;
-    this.inspectorResizeStartW = this.inspectorWidth();
-  }
-
   protected startDrawerResize(event: MouseEvent): void {
     event.preventDefault();
     this.drawerResizing = true;
@@ -4268,6 +5927,13 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     if (!sourceId) return;
     const source = this.nodes().find((n) => n.id === sourceId);
     if (!source) return;
+    if (this.hierarchical()) {
+      this.addNode(type, source.x, source.y + this.nodeHeight(source) + 100, protocol);
+      const target = this.selectedNode();
+      if (target && target.id !== sourceId) this.connectHierarchyNodes(sourceId, target.id);
+      this.quickAddSourceId.set(null);
+      return;
+    }
     const gap = this.isGateway(source.type) ? GATEWAY_R * 2 + 100 : NODE_W + 100;
     const x = source.x + gap;
     const y = source.y;
@@ -4325,7 +5991,8 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
       });
     this.nodes.update((ns) => [...ns, newNode]);
     this.ensureSimpleActions();
-    this.edges.update((es) => [...es, edge]);
+    if (this.routingV4()) this.connectRoutingNodes(sourceId, id);
+    else this.edges.update((es) => [...es, edge]);
     this.quickAddSourceId.set(null);
     this.selectedNodeId.set(id);
     this.selectedNodeIds.set([id]);
@@ -4333,6 +6000,63 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
     this.inspectorTab.set('general');
     this.patchPropsFromNode(newNode);
     this.markUnsaved();
+    this.openProperties();
+  }
+
+  private connectHierarchyNodes(sourceId: string, targetId: string): void {
+    if (this.routingV4()) {
+      this.connectRoutingNodes(sourceId, targetId);
+      return;
+    }
+    this.edges.update((edges) => [
+      ...edges.filter(
+        (e) => e.fromNodeId !== sourceId || !!e.conditionExpression || !!e.outcomeKey,
+      ),
+      {
+        id: crypto.randomUUID(),
+        fromNodeId: sourceId,
+        toNodeId: targetId,
+        transitionKey: `route_${crypto.randomUUID()}`,
+        labelEn: '',
+        labelAr: '',
+        descriptionEn: '',
+        outcomeKey: '',
+        conditionExpression: '',
+        isDefault: true,
+        priority: 0,
+      },
+    ]);
+    this.markUnsaved();
+  }
+
+  protected connectToEnd(): void {
+    const sourceId = this.quickAddSourceId();
+    const end = this.nodes().find((n) => n.type === 'End');
+    if (sourceId && end && !this.isReadonly()) {
+      this.pushUndo();
+      this.connectHierarchyNodes(sourceId, end.id);
+    }
+    this.quickAddSourceId.set(null);
+  }
+  protected hierarchyDestinations(): CanvasNode[] {
+    return this.nodes().filter(
+      (node) =>
+        node.id !== this.quickAddSourceId() &&
+        node.type !== 'Start' &&
+        !this.parseConfig(node.configurationJson || '{}')['triggerBinding'],
+    );
+  }
+  protected connectToExisting(targetId: string): void {
+    const sourceId = this.quickAddSourceId();
+    if (
+      sourceId &&
+      this.hierarchyDestinations().some((node) => node.id === targetId) &&
+      !this.isReadonly()
+    ) {
+      this.pushUndo();
+      this.connectHierarchyNodes(sourceId, targetId);
+    }
+    this.quickAddSourceId.set(null);
   }
 }
 

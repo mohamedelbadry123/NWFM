@@ -6,4 +6,5 @@ export interface RegisterParticipantRequest {
   displayNameAr?: string | null;
   email?: string | null;
   employeeNumber?: string | null;
+  userId?: string | null;
 }

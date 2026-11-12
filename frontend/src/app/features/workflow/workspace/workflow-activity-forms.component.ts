@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, OnChanges, Output, inject, signal } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivityFormStep, activityFormSteps } from './workflow-form-routing.types';
 import { LocaleService } from '@core/i18n/locale.service';
@@ -22,14 +31,23 @@ export interface ActivityFormPreviewRequest {
     [attr.aria-busy]="loading()"
   >
     <h3 id="wf-activity-forms-title" tabindex="-1" class="text-sm font-semibold">
-      {{ t('Configure activity forms', 'إعداد نماذج النشاط') }}
+      {{
+        singleForm
+          ? t('Step form', 'نموذج الخطوة')
+          : t('Configure activity forms', 'إعداد نماذج النشاط')
+      }}
     </h3>
     <p class="text-xs wf-muted">
       {{
-        t(
-          'The first form opens when this activity starts. Configure every form’s destinations in Actions. List order is used only when you choose Next form; explicit destinations can skip, return, or leave the activity.',
-          'يفتح النموذج الأول عند بدء النشاط. اضبط وجهات كل نموذج في الإجراءات. يُستخدم ترتيب القائمة فقط عند اختيار النموذج التالي؛ ويمكن للوجهات المحددة تخطي النماذج أو الرجوع أو مغادرة النشاط.'
-        )
+        singleForm
+          ? t(
+              'Link one published form belonging to this Task Type. Configure the next step or event in Actions.',
+              'اربط نموذجاً منشوراً واحداً تابعاً لنوع المهمة، ثم حدد الخطوة أو الحدث التالي في الإجراءات.'
+            )
+          : t(
+              'The first form opens when this activity starts. Configure every form’s destinations in Actions. List order is used only when you choose Next form; explicit destinations can skip, return, or leave the activity.',
+              'يفتح النموذج الأول عند بدء النشاط. اضبط وجهات كل نموذج في الإجراءات. يُستخدم ترتيب القائمة فقط عند اختيار النموذج التالي؛ ويمكن للوجهات المحددة تخطي النماذج أو الرجوع أو مغادرة النشاط.'
+            )
       }}
     </p>
     @if (reviewRequired) {
@@ -54,24 +72,26 @@ export interface ActivityFormPreviewRequest {
               <p role="alert">{{ t('Review this form version', 'راجع إصدار النموذج') }}</p>
             }
             <div class="flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="wf-btn-secondary"
-                [disabled]="readonly || i === 0"
-                (click)="move(i, -1)"
-                [attr.aria-label]="t('Move form earlier', 'تقديم النموذج')"
-              >
-                &#8593;
-              </button>
-              <button
-                type="button"
-                class="wf-btn-secondary"
-                [disabled]="readonly || i === steps.length - 1"
-                (click)="move(i, 1)"
-                [attr.aria-label]="t('Move form later', 'تأخير النموذج')"
-              >
-                &#8595;
-              </button>
+              @if (!singleForm) {
+                <button
+                  type="button"
+                  class="wf-btn-secondary"
+                  [disabled]="readonly || i === 0"
+                  (click)="move(i, -1)"
+                  [attr.aria-label]="t('Move form earlier', 'تقديم النموذج')"
+                >
+                  &#8593;
+                </button>
+                <button
+                  type="button"
+                  class="wf-btn-secondary"
+                  [disabled]="readonly || i === steps.length - 1"
+                  (click)="move(i, 1)"
+                  [attr.aria-label]="t('Move form later', 'تأخير النموذج')"
+                >
+                  &#8595;
+                </button>
+              }
               <label
                 >{{ t('Published version', 'الإصدار المنشور') }}
                 <select
@@ -138,6 +158,11 @@ export interface ActivityFormPreviewRequest {
           {{ t('A form selection is required before publishing.', 'يجب اختيار نموذج قبل النشر.') }}
         </p>
       }
+      @if (canAuthor && !readonly) {
+        <button type="button" class="wf-btn-secondary" (click)="author.emit({ mode: 'create' })">
+          {{ t('Create form', 'إنشاء نموذج') }}
+        </button>
+      }
       <div
         class="space-y-3"
         role="group"
@@ -161,7 +186,11 @@ export interface ActivityFormPreviewRequest {
             }
             @if (isSelected(f.id)) {
               <p class="text-sm font-semibold" role="status">
-                {{ t('Added to sequence', 'مضاف للتسلسل') }}
+                {{
+                  singleForm
+                    ? t('Selected step form', 'نموذج الخطوة المحدد')
+                    : t('Added to sequence', 'مضاف للتسلسل')
+                }}
               </p>
             }
             <div class="flex flex-wrap gap-2">
@@ -182,8 +211,31 @@ export interface ActivityFormPreviewRequest {
                 [attr.aria-pressed]="isSelected(f.id)"
                 (click)="select(f)"
               >
-                {{ isSelected(f.id) ? t('Added', 'مضاف') : t('Add form', 'إضافة نموذج') }}
+                {{
+                  isSelected(f.id)
+                    ? t('Selected', 'محدد')
+                    : singleForm
+                      ? t('Select form', 'اختيار النموذج')
+                      : t('Add form', 'إضافة نموذج')
+                }}
               </button>
+              @if (canAuthor && !readonly) {
+                <button
+                  type="button"
+                  class="wf-btn-secondary"
+                  [disabled]="!canEdit(f)"
+                  (click)="author.emit({ mode: 'edit', form: f })"
+                >
+                  {{ t('Edit shared form', 'تعديل النموذج المشترك') }}
+                </button>
+                <button
+                  type="button"
+                  class="wf-btn-secondary"
+                  (click)="author.emit({ mode: 'duplicate', form: f })"
+                >
+                  {{ t('Duplicate for this Step', 'تكرار لهذه الخطوة') }}
+                </button>
+              }
             </div>
           </article>
         } @empty {
@@ -204,9 +256,19 @@ export class WorkflowActivityFormsComponent implements OnChanges {
   @Input() configuration = '{}';
   @Input() readonly = false;
   @Input() legacy = false;
+  @Input() singleForm = false;
+  /** True when the user may manage both forms and Task Types; only then are Create, Edit and Duplicate offered. */
+  @Input() canAuthor = false;
+  /** Changes when the forms of this Step's Task Type changed elsewhere (a form was created, published or filed), so the list is read again. */
+  @Input() refreshToken = 0;
   @Output() configurationChange = new EventEmitter<string>();
   @Output() editContext = new EventEmitter<'taskTypeId'>();
   @Output() preview = new EventEmitter<ActivityFormPreviewRequest>();
+  /** Asks the host to open the form editor for this Step. */
+  @Output() author = new EventEmitter<{
+    mode: 'create' | 'edit' | 'duplicate';
+    form?: ActivityForm;
+  }>();
   private api = inject(WorkflowActivityFormsService);
   private locale = inject(LocaleService);
   private request = 0;
@@ -236,7 +298,11 @@ export class WorkflowActivityFormsComponent implements OnChanges {
     const name = names[f.status.toUpperCase()];
     return name ? this.t(...name) : f.status;
   }
-  ngOnChanges() {
+  /** A deprecated or archived form can no longer be edited, only copied. */
+  canEdit(f: ActivityForm) {
+    return !['DEPRECATED', 'ARCHIVED'].includes(f.status.toUpperCase());
+  }
+  ngOnChanges(changes?: SimpleChanges) {
     try {
       this.config = JSON.parse(this.configuration || '{}') ?? {};
     } catch {
@@ -247,7 +313,8 @@ export class WorkflowActivityFormsComponent implements OnChanges {
     this.selectedVersion = Number(this.config['formVersionNo'] || 0);
     this.steps = activityFormSteps(this.config);
     this.reviewRequired = !!this.config['formStepsReviewRequired'];
-    if (this.loadedType !== this.taskTypeId) {
+    const refreshed = !!changes?.['refreshToken'] && !changes['refreshToken'].firstChange;
+    if (this.loadedType !== this.taskTypeId || (refreshed && this.taskTypeId)) {
       this.loadedType = this.taskTypeId;
       this.load();
     }
@@ -305,7 +372,7 @@ export class WorkflowActivityFormsComponent implements OnChanges {
       });
   }
   move(index: number, offset: number) {
-    if (this.readonly || !this.steps[index + offset]) return;
+    if (this.readonly || this.singleForm || !this.steps[index + offset]) return;
     [this.steps[index], this.steps[index + offset]] = [
       this.steps[index + offset],
       this.steps[index],
@@ -344,6 +411,18 @@ export class WorkflowActivityFormsComponent implements OnChanges {
       this.isSelected(f.id)
     )
       return;
+    if (
+      this.singleForm &&
+      this.steps.length &&
+      !confirm(
+        this.t(
+          'Replace this step’s form and reset its form rules?',
+          'استبدال نموذج الخطوة وإعادة ضبط قواعده؟',
+        ),
+      )
+    )
+      return;
+    if (this.singleForm) this.steps = [];
     this.steps.push({
       id: crypto.randomUUID(),
       formId: f.id,

@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Workflow.Application.Abstractions;
 using Workflow.Domain.Enums;
 using Workflow.Infrastructure.Persistence;
 
@@ -10,8 +9,9 @@ internal sealed class WorkflowWorkspaceProcessor(WorkflowDbContext db, WorkflowR
     public async Task ProcessAsync(CancellationToken ct)
     {
         var ids = await db.ActivityInstances.AsNoTracking().Where(a => a.Status == ActivityInstanceStatus.Active
-            && ((a.Phase == "WaitingForEnterEvents" || a.Phase == "WaitingForOutcomeEvents")
-                && !db.IntegrationJobs.Any(j => j.ActivityInstanceId == a.Id && j.IsActivityEvent && j.Required && j.Status != "Completed")
+            && ((a.Phase == "WaitingForEnterEvents" || a.Phase == "WaitingForOutcomeEvents" || a.Phase == "WaitingForTaskTypeEvents")
+                && !db.IntegrationJobs.Any(j => j.ActivityInstanceId == a.Id && j.ExecutionKind != "Callable" && j.IsActivityEvent && j.Required && j.Status != "Completed")
+                && !db.MappingInvocations.Any(i => i.OriginActivityId == a.Id && i.ExecutionKind == "RequiredEvent" && !i.Applied)
                 || a.DueAt <= DateTime.UtcNow && a.SlaBreachedAt == null || a.NextSlaAlertAt <= DateTime.UtcNow)
             && db.WorkflowInstances.Any(i => i.Id == a.WorkflowInstanceId && i.Status == WorkflowInstanceStatus.Running))
             .OrderBy(a => a.StartedAt).Take(100).Select(a => new { a.Id, a.WorkflowInstanceId }).ToListAsync(ct);

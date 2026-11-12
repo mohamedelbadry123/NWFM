@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowIncidentDto as NwfmSharedResultsPaginatedResultOfWorkflowIncidentDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-incident-dto';
+import { WorkflowIncidentDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIncidentDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-incident-dto';
 import { WorkflowIncidentStatus as WorkflowDomainEnumsWorkflowIncidentStatus } from '../../models/Workflow/Domain/Enums/workflow-incident-status';
 
 export interface ApiWorkflowIncidentsGet$Params {
@@ -17,7 +17,7 @@ export interface ApiWorkflowIncidentsGet$Params {
   status?: WorkflowDomainEnumsWorkflowIncidentStatus;
 }
 
-export function apiWorkflowIncidentsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIncidentsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIncidentDto>> {
+export function apiWorkflowIncidentsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIncidentsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIncidentDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowIncidentsGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -31,7 +31,7 @@ export function apiWorkflowIncidentsGet(http: HttpClient, rootUrl: string, param
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIncidentDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIncidentDto>;
     })
   );
 }

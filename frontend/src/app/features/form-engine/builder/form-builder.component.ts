@@ -1,4 +1,15 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -19,13 +30,22 @@ import { JsonOutputComponent } from './components/json-output.component';
 import { ComputedColumnsDialogComponent } from './components/computed-columns-dialog.component';
 import type { RuleFieldOption } from './components/rules-dialog.component';
 import { FORM_BUILDER_SAMPLE_FILES, formBuilderSampleUrl } from './data/form-builder-samples';
-import { DROP_IDS, ELEMENT_TYPES, type ElementType } from '../../../shared/form-schema/form-schema.types';
+import {
+  DROP_IDS,
+  ELEMENT_TYPES,
+  type ElementType,
+} from '../../../shared/form-schema/form-schema.types';
 import { FormsService } from '../../../core/form-engine/forms.service';
 import { formEngineErrorMessage } from '../../../core/form-engine/form-engine-api-error';
+import type { FormDetail } from '../../../core/form-engine/form-engine.models';
 
 /**
  * The form designer. With a `:id` route parameter it edits that form's working schema; without one
  * it is a sandbox that loads the sample document and saves nothing.
+ *
+ * A host (the workflow designer's form window) can instead pass `embeddedFormId`: the builder then edits
+ * that form without reading the route, leaves saving and publishing to the host — which calls
+ * {@link saveDraft} and {@link publishForm} — and never navigates away to the form list.
  */
 @Component({
   selector: 'app-form-builder',
@@ -58,8 +78,31 @@ export class FormBuilderComponent implements OnInit {
   private readonly router = inject(Router);
   protected readonly store = inject(FormBuilderStore);
 
+  /** Set by a host that embeds the builder: the form to edit, instead of the route's `:id`. */
+  @Input() embeddedFormId: string | null = null;
+  /** True while the design on screen differs from what was last loaded or saved. */
+  @Output() dirtyChange = new EventEmitter<boolean>();
+
   /** The form being designed, or null in the sandbox. */
   protected readonly formId = signal<string | null>(null);
+
+  /** The design as last loaded or saved, to tell whether anything has changed since. */
+  private readonly baseline = signal<string | null>(null);
+  readonly dirty = computed(() => {
+    const saved = this.baseline();
+    return saved !== null && this.store.json() !== saved;
+  });
+  /** Lifecycle status and current published version of the form, as the server last reported them. */
+  readonly formStatus = signal<string | null>(null);
+  readonly currentVersionNo = signal<number | null>(null);
+
+  constructor() {
+    effect(() => this.dirtyChange.emit(this.dirty()));
+  }
+
+  protected get embedded(): boolean {
+    return this.embeddedFormId !== null;
+  }
 
   protected readonly editorVisible = signal(false);
   protected readonly editingKey = signal<string | null>(null);
@@ -77,7 +120,10 @@ export class FormBuilderComponent implements OnInit {
       .filter((el) => el.type !== ELEMENT_TYPES.Section && el.data_name?.trim())
       .map((el) => ({
         data_name: el.data_name.trim(),
-        label: (this.translate.currentLang === 'ar' ? el.label_ar : el.label_en) || el.label_en || el.data_name,
+        label:
+          (this.translate.currentLang === 'ar' ? el.label_ar : el.label_en) ||
+          el.label_en ||
+          el.data_name,
       })),
   );
 
@@ -89,11 +135,14 @@ export class FormBuilderComponent implements OnInit {
   /** CDK drop-list ids the palette items can drop onto (root plus top-level sections). */
   protected readonly listIds = computed<string[]>(() => [
     DROP_IDS.CanvasRoot,
-    ...this.store.elements().filter((el) => el.type === ELEMENT_TYPES.Section).map((el) => el.key),
+    ...this.store
+      .elements()
+      .filter((el) => el.type === ELEMENT_TYPES.Section)
+      .map((el) => el.key),
   ]);
 
   async ngOnInit(): Promise<void> {
-    const id = this.route.snapshot.paramMap.get('id');
+    const id = this.embeddedFormId ?? this.route.snapshot.paramMap.get('id');
     this.formId.set(id);
 
     if (id) {
@@ -122,6 +171,9 @@ export class FormBuilderComponent implements OnInit {
       if (form?.nameAr) {
         this.store.setNameAr(form.nameAr);
       }
+
+      this.baseline.set(this.store.json());
+      this.reported(form);
     } catch (error) {
       this.error('formBuilder.loadError', error);
     } finally {
@@ -130,45 +182,78 @@ export class FormBuilderComponent implements OnInit {
   }
 
   protected async save(): Promise<void> {
+    await this.saveDraft();
+  }
+
+  protected async publish(): Promise<void> {
+    await this.publishForm();
+  }
+
+  /** Saves the design as the form's working draft. Resolves false, with the error shown, when it could not be saved. */
+  async saveDraft(): Promise<boolean> {
     const id = this.formId();
     if (id === null || this.busy()) {
-      return;
+      return false;
     }
 
     this.saving.set(true);
+    const sent = this.store.json();
     try {
-      await firstValueFrom(this.formsApi.saveSchema(id, this.store.json()));
+      this.reported((await firstValueFrom(this.formsApi.saveSchema(id, sent))).value);
+      this.baseline.set(sent);
       this.success('formBuilder.saveSuccess');
+      return true;
     } catch (error) {
       this.error('formBuilder.saveError', error);
+      return false;
     } finally {
       this.saving.set(false);
     }
   }
 
-  protected async publish(): Promise<void> {
+  /** Saves, then freezes the design as a new published version. Resolves the form as published, or null when it failed. */
+  async publishForm(): Promise<FormDetail | null> {
     const id = this.formId();
     if (id === null || this.busy()) {
-      return;
+      return null;
     }
 
     this.publishing.set(true);
+    const sent = this.store.json();
     try {
       // Save first, so the version that is frozen is the design on screen.
-      await firstValueFrom(this.formsApi.saveSchema(id, this.store.json()));
-      await firstValueFrom(this.formsApi.publish(id));
+      await firstValueFrom(this.formsApi.saveSchema(id, sent));
+      const published = (await firstValueFrom(this.formsApi.publish(id))).value ?? null;
+      this.baseline.set(sent);
+      this.reported(published);
       this.success('formBuilder.publishSuccess');
+      return published;
     } catch (error) {
       // Publish refusals are specific — a reused data name, an illegal one — so the server's own
       // message is worth more here than a generic failure.
       this.error('formBuilder.publishError', error);
+      return null;
     } finally {
       this.publishing.set(false);
     }
   }
 
   protected backToForms(): void {
+    // Embedded, there is no form list to go back to: the host owns closing.
+    if (this.embedded) {
+      return;
+    }
+
     void this.router.navigate(['/forms']);
+  }
+
+  private reported(form: FormDetail | null | undefined): void {
+    if (!form) {
+      return;
+    }
+
+    this.formStatus.set(form.status ?? null);
+    this.currentVersionNo.set(form.currentVersionNo ?? null);
   }
 
   protected async loadSample(): Promise<void> {

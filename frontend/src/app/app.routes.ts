@@ -87,6 +87,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/workflow/definitions/new',
+        data: { workspaceView: 'workflows', createWorkflow: true },
+        canActivate: [permissionGuard(PERMISSIONS.manageDefinitions)],
+        loadComponent: () =>
+          import('./features/workflow/workspace/workflow-workspace.component').then(
+            (m) => m.WorkflowWorkspaceComponent,
+          ),
+      },
+      {
         path: 'admin/workflow/definitions',
         data: { workspaceView: 'workflows' },
         canActivate: [permissionGuard(PERMISSIONS.manageDefinitions)],

@@ -6,7 +6,10 @@ namespace Workflow.Application.Workspace;
 
 public sealed class BusinessActivityConfiguration
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Workflow.Application.Mapping.DesignerMappingConfiguration? TypedMapping { get; set; }
     public Guid? TaskTypeId { get; set; }
+    public List<Guid> AssignmentRoleIds { get; set; } = [];
     public Guid? FormDefinitionId { get; set; }
     public int? FormVersionNo { get; set; }
     public List<ActivityFormStep> FormSteps { get; set; } = [];

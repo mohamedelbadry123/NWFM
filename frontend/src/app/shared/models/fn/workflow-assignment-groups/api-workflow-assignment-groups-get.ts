@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowAssignmentGroupDto as NwfmSharedResultsPaginatedResultOfWorkflowAssignmentGroupDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-assignment-group-dto';
+import { WorkflowAssignmentGroupDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowAssignmentGroupDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-assignment-group-dto';
 
 export interface ApiWorkflowAssignmentGroupsGet$Params {
   page?: number;
@@ -15,7 +15,7 @@ export interface ApiWorkflowAssignmentGroupsGet$Params {
   search?: string;
 }
 
-export function apiWorkflowAssignmentGroupsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowAssignmentGroupsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowAssignmentGroupDto>> {
+export function apiWorkflowAssignmentGroupsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowAssignmentGroupsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowAssignmentGroupDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowAssignmentGroupsGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -28,7 +28,7 @@ export function apiWorkflowAssignmentGroupsGet(http: HttpClient, rootUrl: string
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowAssignmentGroupDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowAssignmentGroupDto>;
     })
   );
 }

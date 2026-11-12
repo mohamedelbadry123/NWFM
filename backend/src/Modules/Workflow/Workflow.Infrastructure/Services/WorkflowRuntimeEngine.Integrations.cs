@@ -15,7 +15,9 @@ internal sealed partial class WorkflowRuntimeEngine
         if (_integrations is null) return Result.Failure(new Error("Workflow.Integration.Unavailable", "Integration runtime is unavailable."));
         var execution = await CreateActivityInstanceAsync(instance, activity, now, ct);
         execution.AttachToken(token?.Id);
-        var variables = BuildInputVariables(await _variableRepo.GetByInstanceIdAsync(instance.Id, ct));
+        var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, ct);
+        if (version is null) return Result.Failure(WorkflowErrors.Version.NotFound);
+        var variables = await ActivityInputsAsync(instance, version, token?.Id, ct);
         var result = await _integrations.QueueAsync(instance.Id, execution.Id, kind, activity.ConfigurationJson ?? "{}",
             variables, $"{instance.Id}:{execution.Id}", ct);
         if (result.IsFailure) { execution.Fail(result.Error.Message, now); return result; }
@@ -23,7 +25,21 @@ internal sealed partial class WorkflowRuntimeEngine
             activity.NodeKey, payloadJson: JsonSerializer.Serialize(new { operation = kind, execution.Id }), cancellationToken: ct);
         instance.AdvanceTo(activity.NodeKey, now);
         var settings = Workflow.Application.Workspace.WorkspaceDesign.Configuration(activity.ConfigurationJson);
-        var job = await _db.IntegrationJobs.SingleAsync(j => j.ActivityInstanceId == execution.Id, ct);
+        if (Workflow.Application.Integrations.IntegrationJson.Read<Workflow.Application.Integrations.HttpActivityConfiguration>(activity.ConfigurationJson).MappingMode == "Typed")
+        {
+            if (settings["required"]?.GetValue<bool>() == false)
+            {
+                var completed = await CompleteExternalActivityAsync(execution.Id, new Dictionary<string, object?>(), "success", null, now, ct);
+                if (completed.IsSuccess)
+                {
+                    var invocation = await _db.MappingInvocations.SingleAsync(i => i.OriginActivityId == execution.Id && i.ExecutionKind == "OptionalGraph", ct);
+                    invocation.MarkGraphAdvanced(); await _db.SaveChangesAsync(ct);
+                }
+                return completed;
+            }
+            return Result.Success();
+        }
+        var job = await _db.IntegrationJobs.SingleAsync(j => j.ActivityInstanceId == execution.Id && j.ExecutionKind != "Callable", ct);
         job.SetEventNode(activity.NodeKey);
         if (settings["required"]?.GetValue<bool>() == false)
         {
@@ -47,6 +63,23 @@ internal sealed partial class WorkflowRuntimeEngine
         var version = await LoadPinnedVersionAsync(instance.PinnedWorkflowVersionId, cancellationToken);
         var activity = version?.Activities.FirstOrDefault(a => a.NodeKey == ai.ActivityNodeKey);
         if (version is null || activity is null) return Result.Failure(WorkflowErrors.Version.NotFound);
+        var routingV4 = Workflow.Application.Routing.RoutingDefinition.Enabled(version.WorkspaceJson);
+        if (routingV4)
+        {
+            var routingToken = ai.ExecutionTokenId is Guid tid ? await _tokenRepo.GetByIdAsync(tid, cancellationToken) : null;
+            if (routingToken?.Status is ExecutionTokenStatus.Cancelled or ExecutionTokenStatus.Completed) return Result.Success();
+            await CaptureRoutingResultAsync(instance, ai, outputs, outcome, now, cancellationToken);
+            ai.Complete(now);
+            var nextEdge = version.Transitions.SingleOrDefault(t => t.FromActivityDefinitionId == activity.Id);
+            if (nextEdge is null) return await RoutingAttentionAsync(instance, activity, routingToken, error ?? "Configure the Event's continuation.", now, cancellationToken);
+            await _events.AppendAsync(instance.OrganizationId, instance.Id, WorkflowEventType.ActivityCompleted, now, ai.ActivityNodeKey,
+                payloadJson: JsonSerializer.Serialize(new { outcome, routing = true }), cancellationToken: cancellationToken);
+            var routed = await FollowRoutingConnectionAsync(instance, version, activity, nextEdge.TransitionKey, routingToken, now, cancellationToken);
+            if (routed.IsFailure) instance.Fail(routed.Error.Message, now);
+            await _db.SaveChangesAsync(cancellationToken);
+            await ProjectRequestAsync(instance, await _bindingRepo.GetByIdAsync(instance.WorkflowBindingId, cancellationToken), now, cancellationToken);
+            return Result.Success();
+        }
         foreach (var (key, value) in outputs)
             await UpsertVariableAsync(instance, key, JsonSerializer.Serialize(value), VariableDataType.Json, now, cancellationToken);
         foreach (var key in new[] { "outcome", "OutcomeKey", "LastActionTaken" })

@@ -20,15 +20,18 @@ public sealed partial class WorkflowDbContext
         // that change lease/retry metadata must not be counted twice.
         var admissions = new[]
         {
-            Admission<WorkflowIntegrationInbox>(x => x.Status == WorkflowInboxStatus.Pending || x.Status == WorkflowInboxStatus.Processing,
-                WorkflowInboxStatus.Pending, WorkflowInboxStatus.Processing),
-            Admission<WorkflowIntegrationOutbox>(x => x.Status == WorkflowOutboxStatus.Pending, WorkflowOutboxStatus.Pending),
-            Admission<WorkflowIntegrationJob>(x => x.Status == "Pending" || x.Status == "Running" || x.Status == "Delivered",
-                "Pending", "Running", "Delivered"),
-            Admission<WorkflowEventReceipt>(x => x.Status == "Received", "Received"),
-            Admission<WorkflowEventSubscription>(x => x.Status == "Waiting", "Waiting"),
-            Admission<WorkflowTimer>(x => x.Status == WorkflowTimerStatus.Pending || x.Status == WorkflowTimerStatus.Fired,
-                WorkflowTimerStatus.Pending, WorkflowTimerStatus.Fired),
+            Admission<WorkflowIntegrationInbox>(x => x.Status == WorkflowInboxStatus.Pending || x.Status == WorkflowInboxStatus.Processing),
+            Admission<WorkflowIntegrationOutbox>(x => x.Status == WorkflowOutboxStatus.Pending),
+            Admission<WorkflowIntegrationJob>(x => x.Status == "Pending" || x.Status == "Running" || x.Status == "Delivered"),
+            Admission<WorkflowMappingInvocation>(x => x.Status == "Preparing" || x.Status == "Waiting" || x.Status == "Prepared"
+                || x.Status == "Queued" || x.Status == "Delivered"
+                || x.Status == "Attention" && !(x.ExecutionKind == "Graph" && x.GraphAdvanced)),
+            // Join Attention is terminal: ResolveRoutingGateAsync refuses subsequent arrivals,
+            // and no routing retry endpoint resets it. Callable/OptionalGraph Attention remains replayable.
+            Admission<WorkflowRoutingActivation>(x => x.Status == "Waiting"),
+            Admission<WorkflowEventReceipt>(x => x.Status == "Received"),
+            Admission<WorkflowEventSubscription>(x => x.Status == "Waiting"),
+            Admission<WorkflowTimer>(x => x.Status == WorkflowTimerStatus.Pending || x.Status == WorkflowTimerStatus.Fired),
         }.Where(x => x.Additions > 0).ToArray();
 
         var needsTransaction = admissions.Length > 0 && Database.IsSqlServer();
@@ -52,6 +55,10 @@ public sealed partial class WorkflowDbContext
                 throw new WorkflowQueueCapacityException(admission.Name);
         }
 
+        // Reservations and queue writes share this transaction and the base tenant write guard.
+        if (asynchronous) await PrepareReceiptReservationsAsync(ct).ConfigureAwait(false);
+        else PrepareReceiptReservations();
+
         var result = asynchronous
             ? await base.SaveChangesAsync(acceptAll, ct).ConfigureAwait(false)
             : base.SaveChanges(acceptAll);
@@ -63,14 +70,17 @@ public sealed partial class WorkflowDbContext
         return result;
     }
 
-    private QueueAdmission Admission<TEntity>(Expression<Func<TEntity, bool>> predicate, params object[] activeStates)
+    private QueueAdmission Admission<TEntity>(Expression<Func<TEntity, bool>> predicate)
         where TEntity : class
     {
+        // Use the complete predicate for both snapshots. Status alone misses eligibility changes
+        // such as GraphAdvanced becoming true while Status remains Attention.
+        var active = predicate.Compile(preferInterpretation: true);
         var additions = ChangeTracker.Entries<TEntity>()
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Sum(entry =>
-                (entry.State != EntityState.Deleted && activeStates.Contains(entry.Property("Status").CurrentValue) ? 1 : 0)
-                - (entry.State != EntityState.Added && activeStates.Contains(entry.Property("Status").OriginalValue) ? 1 : 0));
+                (entry.State != EntityState.Deleted && active((TEntity)entry.CurrentValues.ToObject()) ? 1 : 0)
+                - (entry.State != EntityState.Added && active((TEntity)entry.OriginalValues.ToObject()) ? 1 : 0));
         var query = Set<TEntity>().AsNoTracking().Where(predicate);
         return new QueueAdmission(typeof(TEntity).Name, additions,
             (asynchronous, ct) => asynchronous ? query.CountAsync(ct) : Task.FromResult(query.Count()));

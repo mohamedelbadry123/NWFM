@@ -267,7 +267,7 @@ export class FormSchemaFormlyMapper {
     };
 
     const field: FormlyFieldConfig = {
-      key: element.data_name,
+      key: literalFieldKey(element.data_name),
       type: FORMLY_TYPE_BY_ELEMENT[element.type as Exclude<ElementType, 'section'>],
       wrappers: [FORMLY_WRAPPERS.FormField, FORMLY_WRAPPERS.FieldHelp],
       props,
@@ -537,10 +537,7 @@ export class FormSchemaFormlyMapper {
     const raw = element.default_value;
     // Media is captured, never pre-filled from a text default. A weekly shift grid
     // has no meaningful single-line default either, so it starts empty.
-    if (
-      isMediaType(element.type) ||
-      element.type === ELEMENT_TYPES.CalendarWithHours
-    ) {
+    if (isMediaType(element.type) || element.type === ELEMENT_TYPES.CalendarWithHours) {
       return undefined;
     }
 
@@ -570,7 +567,10 @@ export class FormSchemaFormlyMapper {
       case ELEMENT_TYPES.DateTime:
         return normalizeDateTime(raw) || undefined;
       case ELEMENT_TYPES.MultipleChoice:
-        return raw.split(',').map((item) => item.trim()).filter((item) => item.length > 0);
+        return raw
+          .split(',')
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0);
       case ELEMENT_TYPES.Geolocation:
         return parseCoordinate(raw);
       default:
@@ -616,4 +616,12 @@ function earliest(first: Date | undefined, second: Date | undefined): Date | und
   if (!first) return second;
   if (!second) return first;
   return first.getTime() <= second.getTime() ? first : second;
+}
+
+/**
+ * Formly reads a dotted string key as a nested path ("a.b" → { a: { b } }). A data name is a literal identity, so a name with
+ * a dot or bracket is bound as a one-segment path and stays one flat key in the model, the payload and the locks.
+ */
+export function literalFieldKey(name: string): string | string[] {
+  return /[.[\]]/.test(name) ? [name] : name;
 }

@@ -8,6 +8,7 @@ namespace Workflow.Application.Workspace;
 
 public sealed record WorkspaceDefinitionInput(string Name, string? NameAr, WorkflowWorkspaceDefinition Settings);
 public sealed record WorkspaceCreated(Guid DefinitionId, Guid VersionId);
+public sealed record WorkspaceChildInput(Guid ParentVersionId, string NodeKey);
 public sealed record WorkspaceStartInput(Guid RequestId, string? Reference, bool IsDemo = false, OrgLocation? Location = null);
 public sealed record WorkspaceActionInput(Guid RequestId, string Action, string? Comment = null, Dictionary<string, JsonElement>? FormValues = null, Guid? DemoActorId = null, Guid? FormVisitId = null);
 public sealed record WorkspaceWorkflow(Guid Id, string Name, string? NameAr, Guid VersionId, int VersionNumber, string? WorkspaceJson, string? DefinitionKey = null)
@@ -29,7 +30,9 @@ public sealed record WorkspaceDetail(Guid Id, bool IsDemo, IReadOnlyList<Workspa
 
 public interface IWorkflowWorkspace
 {
+    Task<WorkspaceLibraryPage> LibraryAsync(WorkspaceLibraryQuery query, CancellationToken ct);
     Task<Result<WorkspaceCreated>> CreateAsync(WorkspaceDefinitionInput input, Guid actor, CancellationToken ct);
+    Task<Result<WorkspaceWorkflow>> OpenChildAsync(WorkspaceChildInput input, Guid actor, CancellationToken ct);
     Task<IReadOnlyList<WorkspaceWorkflow>> CatalogAsync(CancellationToken ct);
     Task<IReadOnlyList<WorkspaceWorkflow>> ChildrenAsync(CancellationToken ct, Guid? selectedVersionId = null);
     Task<Result<Guid>> StartAsync(Guid definitionId, WorkspaceStartInput input, Guid actor, bool administrator, CancellationToken ct);

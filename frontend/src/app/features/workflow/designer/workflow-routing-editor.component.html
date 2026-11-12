@@ -1,0 +1,474 @@
+<fieldset [disabled]="readonly" (focusout)="touched = true">
+  @if (sourceConnectionMessage(); as message) {
+    <p class="hint" role="status">{{ message }}</p>
+  }
+  @if (canConnectSource()) {
+    <button type="button" data-routing-action="reconnect-source" (click)="save(true)">
+      {{ t('Connect source', 'توصيل المصدر') }}
+    </button>
+  }
+  @if (destinationProblem) {
+    <p class="hint" role="alert">{{ destinationProblem }}</p>
+  }
+  <details>
+    <summary>{{ t('Example', 'مثال') }}</summary>
+    <p class="hint">
+      {{
+        type === 'ExclusiveGateway'
+          ? t(
+              'When Customer name is present, continue to Go to Location.',
+              'عند وجود اسم العميل، انتقل إلى زيارة الموقع.'
+            )
+          : t(
+              'Run Registration and Event 16 in parallel, then wait for ALL or ANY before continuing.',
+              'شغل التسجيل والحدث 16 بالتوازي، ثم انتظر الكل أو أي فرع قبل المتابعة.'
+            )
+      }}
+    </p>
+  </details>
+  <details class="setup-review">
+    <summary>{{ t('Review setup', 'مراجعة الإعداد') }}</summary>
+    <ul aria-label="Setup checklist">
+      @for (check of checks(); track $index) {
+        <li [class.setup-missing]="(touched || reviewIssues) && !check.done">
+          {{ check.done ? '✓' : '○' }} {{ check.label }}
+        </li>
+      }
+    </ul>
+  </details>
+  @if (nextSetting()) {
+    <p class="summary">{{ t('Next: ', 'التالي: ') }}{{ nextSetting() }}</p>
+  }
+  @for (repair of repairs(); track repair.transitionKey) {
+    <section class="summary" role="note">
+      <p>{{ repair.message }}</p>
+      <p class="hint">
+        {{
+          t(
+            'The original rule was retained. Complete its replacement below.',
+            'تم الاحتفاظ بالقاعدة الأصلية. أكمل إعدادها أدناه.'
+          )
+        }}
+      </p>
+      <button
+        type="button"
+        [disabled]="!canResolve(repair.transitionKey)"
+        (click)="resolveRepair(repair.transitionKey)"
+      >
+        {{ t('Use configured route', 'استخدام المسار المحدد') }}
+      </button>
+    </section>
+  }
+
+  @if (type === 'JoinGateway') {
+    <details class="guided-section" open>
+      <summary>{{ t('Paired Fork', 'التفرع المرتبط') }}</summary>
+      @for (fork of pairedForks(); track fork.id) {
+        <button type="button" (click)="sourceRequested.emit(fork.id)">{{ fork.name }}</button>
+      } @empty {
+        <p class="hint">
+          {{
+            t(
+              'Choose this Join in a Fork’s Paired Join setting.',
+              'اختر هذا الانتظار في إعداد الالتقاء المرتبط بالتفرع.'
+            )
+          }}
+        </p>
+      }
+    </details>
+    <h2 class="heading">{{ t('What must finish first?', 'ما الذي يجب أن يكتمل أولاً؟') }}</h2>
+    <p class="hint">
+      {{
+        t(
+          'ALL / ANY coordinates completed branches. Each branch’s Condition controls whether it qualifies.',
+          'تحدد كل / أي الفروع المطلوب اكتمالها. يحدد شرط كل فرع مدى استيفائه للمتطلبات.'
+        )
+      }}
+    </p>
+    <label
+      ><span>{{ t('Wait for', 'انتظار') }}</span
+      ><select [(ngModel)]="config.waitFor" (ngModelChange)="save()">
+        <option value="All">{{ t('ALL activated branches', 'كل الفروع المفعلة') }}</option>
+        <option value="Any">{{ t('ANY qualifying branch', 'أي فرع مستوفٍ') }}</option>
+      </select></label
+    >
+    <ul [attr.aria-label]="t('Join prerequisites', 'متطلبات الالتقاء')">
+      @for (source of incoming(); track source.id) {
+        <li>
+          <button type="button" (click)="sourceRequested.emit(source.id)">{{ source.name }}</button>
+          <p class="hint">{{ prerequisite(source) }}</p>
+        </li>
+      } @empty {
+        <li class="hint">
+          {{
+            t('Connect the branches from the matching Fork.', 'صل الفروع من عنصر التفرع المطابق.')
+          }}
+        </li>
+      }
+    </ul>
+    <details>
+      <summary>{{ t('Advanced', 'إعدادات متقدمة') }}</summary>
+      @if (config.waitFor === 'Any') {
+        <label
+          ><span>{{ t('After the first qualifying result', 'بعد أول نتيجة مستوفية') }}</span
+          ><select [(ngModel)]="config.remainingBranches" (ngModelChange)="save()">
+            <option value="Continue">
+              {{ t('Keep remaining branches running', 'استمرار الفروع المتبقية') }}
+            </option>
+            <option value="Cancel">
+              {{ t('Cancel remaining branches', 'إلغاء الفروع المتبقية') }}
+            </option>
+          </select></label
+        >
+      }
+      <label
+        ><span>{{ t('Deadline in seconds (optional)', 'المهلة بالثواني (اختياري)') }}</span
+        ><input
+          type="number"
+          min="1"
+          max="31536000"
+          [(ngModel)]="config.deadlineSeconds"
+          (ngModelChange)="save()"
+          [placeholder]="t('No deadline', 'بدون مهلة')"
+      /></label>
+    </details>
+    <label
+      ><span>{{ t('Then continue once to', 'ثم الانتقال مرة واحدة إلى') }}</span
+      ><select
+        #continuationModel="ngModel"
+        [ngModel]="target(continuation())"
+        (ngModelChange)="setContinuation($event, continuationModel)"
+      >
+        <option value="">{{ t('Select destination', 'اختر الوجهة') }}</option>
+        @for (n of destinations(); track n.id) {
+          <option [value]="n.id">{{ n.name }}</option>
+        }
+      </select></label
+    >
+    <details>
+      <summary>{{ t('Failure handling', 'عند الفشل') }}</summary>
+      <label
+        ><span>{{
+          t('If requirements fail or time out', 'عند فشل المتطلبات أو انتهاء المهلة')
+        }}</span
+        ><select
+          #failureModel="ngModel"
+          [ngModel]="target(config.failureTransitionKey)"
+          (ngModelChange)="fallback($event, true, failureModel)"
+        >
+          <option value="">{{ t('Stop for attention', 'توقف للمراجعة') }}</option>
+          @for (n of destinations(); track n.id) {
+            <option [value]="n.id">{{ n.name }}</option>
+          }
+        </select></label
+      >
+    </details>
+    <div class="summary">
+      {{
+        config.waitFor === 'All'
+          ? t(
+              'Remember every qualifying result in this cycle; continue when all activated branches qualify.',
+              'تذكر كل نتيجة مستوفية في الدورة الحالية؛ الانتقال بعد استيفاء كل الفروع المفعلة.'
+            )
+          : t(
+              'Continue after the first qualifying result. Later results cannot start another continuation.',
+              'الانتقال بعد أول نتيجة مستوفية. النتائج اللاحقة لا تبدأ انتقالاً آخر.'
+            )
+      }}
+    </div>
+  } @else {
+    <h2 class="heading">
+      {{
+        type === 'ExclusiveGateway'
+          ? t('When should this route run?', 'متى يجب تشغيل هذا المسار؟')
+          : t('Which branches should start?', 'ما الفروع التي يجب أن تبدأ؟')
+      }}
+    </h2>
+    @if (type === 'ExclusiveGateway') {
+      @if (firstMatchWins()) {
+        <section class="mode" data-routing-mode="ordered" aria-labelledby="routing-mode-title">
+          <strong id="routing-mode-title">{{ t('Ordered routes', 'مسارات مرتبة') }}</strong>
+          <p>
+            {{
+              t(
+                'Routes are tried from top to bottom and the first route whose conditions match is used. Routes after it are not checked, so a source that is missing in a later route never blocks an earlier match. If no route matches, Otherwise applies.',
+                'تُجرَّب المسارات من الأعلى إلى الأسفل ويُستخدم أول مسار تتطابق شروطه. لا تُفحص المسارات التي بعده، فلا يعطّل مصدر مفقود في مسار لاحق مطابقة مسار أسبق. إن لم يتطابق أي مسار يُطبَّق خلاف ذلك.'
+              )
+            }}
+          </p>
+          <p class="hint">
+            {{
+              t(
+                'A source that a tried route needs but cannot provide is an error and stops the workflow for attention; it is not treated as “no match”. Drag a route by its handle, or use Move up and Move down.',
+                'المصدر الذي يحتاجه مسار مُجرَّب ولا يتوفر يُعد خطأً ويوقف سير العمل للمراجعة، ولا يُعامل كأنه غير مطابق. اسحب المسار من مقبضه أو استخدم نقل لأعلى ونقل لأسفل.'
+              )
+            }}
+          </p>
+        </section>
+      } @else {
+        <section class="mode" data-routing-mode="legacy" aria-labelledby="routing-mode-title">
+          <strong id="routing-mode-title">{{
+            t('Saved with the earlier routing rules', 'محفوظ بقواعد التوجيه السابقة')
+          }}</strong>
+          <p>
+            {{
+              config.matchMode === 'First'
+                ? t(
+                    'Every route’s conditions are checked each time, then the first matching route by priority is used. A source that is missing in any route can stop the workflow even when an earlier route matches.',
+                    'تُفحص شروط كل مسار في كل مرة، ثم يُستخدم أول مسار مطابق حسب الأولوية. قد يوقف مصدر مفقود في أي مسار سير العمل حتى لو تطابق مسار أسبق.'
+                  )
+                : t(
+                    'Every route’s conditions are checked each time and exactly one route must match. A source that is missing in any route can stop the workflow.',
+                    'تُفحص شروط كل مسار في كل مرة ويجب أن يتطابق مسار واحد فقط. قد يوقف مصدر مفقود في أي مسار سير العمل.'
+                  )
+            }}
+          </p>
+          <p class="hint">
+            {{
+              t(
+                'Nothing changes until you choose ordered routing. Published versions and running requests keep the rules they were published with.',
+                'لا يتغير شيء حتى تختار التوجيه المرتب. تحتفظ الإصدارات المنشورة والطلبات الجارية بالقواعد التي نُشرت بها.'
+              )
+            }}
+          </p>
+          @if (!readonly) {
+            <button type="button" data-routing-action="use-ordered" (click)="useOrderedRouting()">
+              {{
+                t(
+                  'Use ordered routing (first match wins)',
+                  'استخدام التوجيه المرتب (أول مطابق يُعتمد)'
+                )
+              }}
+            </button>
+          }
+        </section>
+        <details>
+          <summary>{{ t('Advanced · matching policy', 'متقدم · سياسة المطابقة') }}</summary>
+          <label
+            ><span>{{ t('Matching policy', 'سياسة المطابقة') }}</span
+            ><select
+              data-routing-field="matchMode"
+              [(ngModel)]="config.matchMode"
+              (ngModelChange)="save()"
+            >
+              <option value="Unique">
+                {{ t('Require exactly one match', 'تتطلب مطابقة واحدة فقط') }}
+              </option>
+              <option value="First">
+                {{ t('First matching rule by priority', 'أول قاعدة مطابقة حسب الأولوية') }}
+              </option>
+            </select></label
+          >
+        </details>
+      }
+    } @else {
+      <label
+        ><span>{{ t('Start branches', 'بدء الفروع') }}</span
+        ><select [ngModel]="type" (ngModelChange)="forkMode($event)">
+          <option value="ParallelGateway">{{ t('All branches', 'كل الفروع') }}</option>
+          <option value="InclusiveGateway">
+            {{ t('All matching branches', 'كل الفروع المطابقة') }}
+          </option>
+        </select></label
+      >
+      <label
+        ><span>{{ t('Paired Join', 'عنصر الانتظار المرتبط') }}</span
+        ><select
+          data-routing-field="joinNodeKey"
+          [(ngModel)]="config.joinNodeKey"
+          (ngModelChange)="save()"
+        >
+          <option value="">{{ t('Select Join / Wait', 'اختر عنصر الانتظار') }}</option>
+          @for (n of joins(); track n.nodeKey) {
+            <option [value]="n.nodeKey">{{ n.name }}</option>
+          }
+        </select></label
+      >
+    }
+    <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
+    <div
+      class="routes-list"
+      cdkDropList
+      cdkDropListLockAxis="y"
+      [cdkDropListDisabled]="readonly || !ordered()"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (rule of config.routes; track rule.transitionKey; let i = $index) {
+        <section
+          class="route"
+          cdkDrag
+          [cdkDragDisabled]="readonly || !ordered()"
+          [attr.data-route-key]="rule.transitionKey"
+          [attr.data-route-position]="i + 1"
+        >
+          <div class="route-head">
+            @if (ordered()) {
+              <span class="route-number" aria-hidden="true">{{ i + 1 }}</span>
+            }
+            <h3>
+              {{ t('Route', 'المسار') }} {{ i + 1 }}
+              @if (ordered()) {
+                <span class="hint"> · {{ t('of', 'من') }} {{ config.routes.length }}</span>
+              }
+            </h3>
+            @if (ordered() && !readonly) {
+              <span
+                class="drag-handle"
+                cdkDragHandle
+                data-route-handle
+                aria-hidden="true"
+                [title]="t('Drag to reorder', 'اسحب لإعادة الترتيب')"
+                >⠿</span
+              >
+            }
+          </div>
+          @if (type !== 'ParallelGateway') {
+            <details class="guided-section" open>
+              <summary>{{ t('Source and rule', 'المصدر والقاعدة') }}</summary>
+              <label
+                ><span>{{ t('Run when', 'التشغيل عندما') }}</span
+                ><select [(ngModel)]="rule.always" (ngModelChange)="save()">
+                  <option [ngValue]="false">{{ t('Conditions match', 'تطابق الشروط') }}</option>
+                  <option [ngValue]="true">
+                    {{ t('Always (explicit)', 'دائماً (اختيار صريح)') }}
+                  </option>
+                </select></label
+              >
+              @if (!rule.always) {
+                <app-workflow-routing-group
+                  [group]="rule.when"
+                  [fields]="fields"
+                  [readonly]="readonly"
+                  (changed)="ruleChanged()"
+                />
+              }
+            </details>
+          }
+          <details class="guided-section" open>
+            <summary>{{ t('Destination', 'الوجهة') }}</summary>
+            <label
+              ><span>{{ t('Destination', 'الوجهة') }}</span
+              ><select
+                #destinationModel="ngModel"
+                [attr.data-routing-field]="rule.transitionKey"
+                [attr.aria-invalid]="
+                  (touched || reviewIssues) && !target(rule.transitionKey) ? true : null
+                "
+                [ngModel]="target(rule.transitionKey)"
+                (ngModelChange)="routeTarget(rule, $event, destinationModel)"
+              >
+                <option value="">{{ t('Select destination', 'اختر الوجهة') }}</option>
+                @for (n of destinations(); track n.id) {
+                  <option [value]="n.id">{{ n.name }}</option>
+                }
+              </select></label
+            >
+            @if ((touched || reviewIssues) && !target(rule.transitionKey)) {
+              <p class="setup-missing">
+                {{ t('Choose a destination for this route.', 'اختر وجهة لهذا المسار.') }}
+              </p>
+            }
+          </details>
+          <div class="buttons">
+            <button type="button" (click)="removeRule(i)">
+              {{ t('Remove route', 'إزالة المسار') }}
+            </button>
+            @if (ordered()) {
+              <button
+                type="button"
+                data-move="up"
+                [disabled]="i === 0"
+                (click)="move(i, -1)"
+                [attr.aria-label]="
+                  t('Move route ' + (i + 1) + ' up', 'نقل المسار ' + (i + 1) + ' لأعلى')
+                "
+              >
+                ↑ {{ t('Move up', 'نقل لأعلى') }}</button
+              ><button
+                type="button"
+                data-move="down"
+                [disabled]="i === config.routes.length - 1"
+                (click)="move(i, 1)"
+                [attr.aria-label]="
+                  t('Move route ' + (i + 1) + ' down', 'نقل المسار ' + (i + 1) + ' لأسفل')
+                "
+              >
+                ↓ {{ t('Move down', 'نقل لأسفل') }}
+              </button>
+            }
+          </div>
+        </section>
+      } @empty {
+        <p class="summary">
+          {{
+            t(
+              'Add a rule or explicitly choose Always. This incomplete component is saved as a draft.',
+              'أضف قاعدة أو اختر دائماً بشكل صريح. يتم حفظ هذا العنصر غير المكتمل كمسودة.'
+            )
+          }}
+        </p>
+      }
+    </div>
+    <div class="buttons">
+      <button type="button" (click)="addRule()" [disabled]="config.routes.length >= 100">
+        {{ t('Add route', 'إضافة مسار') }}</button
+      ><button type="button" (click)="refreshRequested.emit()">
+        {{ t('Refresh available fields', 'تحديث الحقول المتاحة') }}
+      </button>
+    </div>
+    @if (type !== 'ParallelGateway') {
+      <details class="guided-section" open>
+        <summary>{{ t('Otherwise', 'وإلا') }}</summary>
+        <label
+          ><span>{{ t('If no rule matches', 'إذا لم تتطابق أي قاعدة') }}</span
+          ><select
+            #otherwiseModel="ngModel"
+            data-routing-field="otherwise"
+            [ngModel]="target(config.fallbackTransitionKey)"
+            (ngModelChange)="fallback($event, false, otherwiseModel)"
+          >
+            <option value="">{{ t('Stop for attention', 'توقف للمراجعة') }}</option>
+            @for (n of destinations(); track n.id) {
+              <option [value]="n.id">{{ n.name }}</option>
+            }
+          </select></label
+        >
+      </details>
+    }
+    @if (config.routes.length) {
+      <p class="summary">
+        @for (rule of config.routes; track rule.transitionKey; let last = $last) {
+          <span>
+            {{
+              rule.always
+                ? t('Always continue to ', 'الانتقال دائماً إلى ')
+                : t('When ', 'عندما ') +
+                  describe(rule.when) +
+                  t(', continue to ', '، الانتقال إلى ')
+            }}{{ destination(rule.transitionKey)
+            }}{{ type === 'ParallelGateway' && last ? '.' : t('; ', '؛ ') }}
+          </span>
+        }
+        @if (type !== 'ParallelGateway') {
+          <span>
+            {{
+              config.fallbackTransitionKey
+                ? t('otherwise, continue to ', 'وإلا، الانتقال إلى ') +
+                  destination(config.fallbackTransitionKey) +
+                  '.'
+                : t('otherwise, stop for attention.', 'وإلا، توقف للمراجعة.')
+            }}
+          </span>
+        }
+      </p>
+    }
+    <p class="hint">
+      {{
+        t(
+          'AND / OR combines data checks. Use Fork and Join to coordinate concurrent work.',
+          'تجمع و / أو شروط البيانات. استخدم التفرع والانتظار لتنسيق العمل المتزامن.'
+        )
+      }}
+    </p>
+  }
+</fieldset>

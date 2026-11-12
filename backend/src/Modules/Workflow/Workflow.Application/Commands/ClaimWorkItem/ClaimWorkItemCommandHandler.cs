@@ -11,6 +11,7 @@ using Workflow.Domain.Repositories;
 public sealed class ClaimWorkItemCommandHandler
     : IRequestHandler<ClaimWorkItemCommand, Result<WorkItemDto>>
 {
+    private readonly IWorkflowRoleAssignments? _roles;
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkItemRepository _workItemRepo;
     private readonly IWorkflowAssignmentGroupRepository _groupRepo;
@@ -26,15 +27,16 @@ public sealed class ClaimWorkItemCommandHandler
         IWorkflowParticipantRepository participantRepo,
         IWorkflowEventAppender events,
         IWorkItemDtoAssembler assembler,
-        IWorkflowRequestProjector projector)
+        IWorkflowRequestProjector projector, IWorkflowRoleAssignments? roles = null)
     {
-        _gate            = gate;
-        _workItemRepo    = workItemRepo;
-        _groupRepo       = groupRepo;
+        _roles = roles;
+        _gate = gate;
+        _workItemRepo = workItemRepo;
+        _groupRepo = groupRepo;
         _participantRepo = participantRepo;
-        _events          = events;
-        _assembler       = assembler;
-        _projector       = projector;
+        _events = events;
+        _assembler = assembler;
+        _projector = projector;
     }
 
     public async Task<Result<WorkItemDto>> Handle(
@@ -55,10 +57,11 @@ public sealed class ClaimWorkItemCommandHandler
         if (!isActiveParticipant)
             return Result.Failure<WorkItemDto>(WorkflowErrors.Participant.NotFound);
 
-        var isMember = await _groupRepo.IsUserMemberOfGroupAsync(
-            item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken);
+        var isMember = item.AssignmentGroupId == Guid.Empty
+            ? _roles is not null && await _roles.CanAccessAsync(item, request.UserId, cancellationToken)
+            : await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken);
         if (!isMember)
-            return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotGroupMember);
+            return Result.Failure<WorkItemDto>(item.AssignmentGroupId == Guid.Empty ? WorkflowErrors.WorkItem.NotAssignedRole : WorkflowErrors.WorkItem.NotGroupMember);
 
         var now = DateTime.UtcNow;
         try

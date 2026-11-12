@@ -1,5 +1,7 @@
 # Workflow activity forms and linked child previews
 
+This document describes the earlier activity-based designer. Newly created workflows use the [Task Type / Step / Events hierarchy](workflow-hierarchy.md), with one form per child Step and an embedded child editor. Published older versions retain the behavior below.
+
 Main Activities and User Tasks expose **General · Assignment · Form · Actions · SLA**. General selects the activity's own Task Type. Department and Field Activity Type are no longer manually selected there.
 
 ## Form selection
@@ -26,7 +28,7 @@ Form order is optional for routing: it determines the initial form and destinati
 
 Moving between forms keeps the work item, assignment and SLA open and does not run activity completion events. Leaving the activity follows the existing required event gates. A Main Activity's forms still wait for child completion, and its form configuration is independent from the child's. Reject, redirect and comment retain their behavior without submitting or evaluating a form.
 
-`FormProgressJson` stores active-step/visit state and immutable submission/routing history on the work item. Multi-form submissions use `ContextType=WorkItem`, context ID `{workItemId}:{visitId}`, and `ClientSubmissionId=visitId`. Both action endpoints carry `formVisitId`; stale visits are rejected and recorded visits replay without submitting or advancing twice. History retains each form's pinned schema and media context in the UI. Previously published single-form and inline-form workflows keep their execution behavior.
+`FormProgressJson` stores active-step/visit state and immutable submission/routing history on the work item. Multi-form submissions use `ContextType=WorkItem` and context ID `{workItemId}:{visitId}`. New submissions use the actor-owned `formReceiptKey` as `ClientSubmissionId`; legacy visit-ID receipts remain readable. Both action endpoints carry `formVisitId`; stale visits are rejected and recorded visits replay without submitting or advancing twice. History retains each form's pinned schema and media context in the UI. Previously published single-form and inline-form workflows keep their execution behavior. See [the designer release notes](workflow-designer-release.md) for draft continuity and receipt migration rollback boundaries.
 
 Apply the additive Workflow migration **20261009120000_ActivityFormProgress** before running the updated API. It adds a nullable `FormProgressJson` column; it does not rewrite existing instances.
 

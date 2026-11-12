@@ -9,7 +9,7 @@ using Workflow.Domain.Enums;
 using Workflow.Infrastructure.Persistence;
 
 internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, WorkflowIntegrations integrations,
-    WorkflowIntegrationTransport transport, IWorkflowRuntimeEngine engine, WorkflowActivityEvents? activityEvents = null)
+    WorkflowIntegrationTransport transport, IWorkflowRuntimeEngine engine, WorkflowActivityEvents? activityEvents = null, WorkflowMappingRuntime? mappings = null)
 {
     public async Task ProcessJobAsync(Guid id, CancellationToken ct)
     {
@@ -18,6 +18,25 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
         {
             var job = await db.IntegrationJobs.FindAsync([id], ct);
             if (job is null) return false;
+            if (job.InvocationId is Guid invocationId)
+            {
+                var invocation = await db.MappingInvocations.SingleAsync(i => i.Id == invocationId, ct);
+                if (invocation.ExecutionKind == "Graph" && invocation.GraphAdvanced)
+                {
+                    if (invocation.Applied) job.Complete(invocation.OutputsJson ?? "{}", job.StatusCode);
+                    else job.Cancel();
+                    await db.SaveChangesAsync(ct); return false;
+                }
+                if (!await (mappings ?? throw new InvalidOperationException("Mapping runtime is required.")).CanDeliverAsync(invocation, ct))
+                {
+                    if (invocation.Status == "Cancelled") job.Cancel();
+                    else if (invocation.Status == "Attention") job.Fail(invocation.Error ?? "Mapping requires attention.", job.StatusCode, null);
+                    await db.SaveChangesAsync(ct); return false;
+                }
+                if (job.Status == "Delivered") return true;
+                if (!(job.Status == "Pending" && job.NextAttemptAt <= DateTime.UtcNow || job.Status == "Running" && job.LeaseUntil <= DateTime.UtcNow)) return false;
+                job.Claim(owner, DateTime.UtcNow.AddMinutes(3)); await db.SaveChangesAsync(ct); return true;
+            }
             var instance = await db.WorkflowInstances.FindAsync([job.WorkflowInstanceId], ct);
             if (instance?.Status == WorkflowInstanceStatus.Cancelled || instance?.Status == WorkflowInstanceStatus.Completed && !(job.IsActivityEvent && !job.Required))
             { job.Cancel(); return false; }
@@ -36,9 +55,11 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
             var http = IntegrationJson.Read<HttpActivityConfiguration>(operation.ConfigurationJson);
             var email = IntegrationJson.Read<EmailActivityConfiguration>(operation.ConfigurationJson);
             var variables = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(operation.InputJson) ?? [];
+            var invocationRequest = operation.InvocationId is Guid iid ? await db.MappingInvocations.Where(i => i.Id == iid).Select(i => i.PreparedRequestJson).SingleAsync(ct) : null;
+            var prepared = invocationRequest is null ? null : JsonSerializer.Deserialize<Workflow.Application.Mapping.PreparedMappingRequest>(invocationRequest, IntegrationJson.Options);
             var result = connection is null ? new IntegrationResult(false, null, "", "Connection is unavailable.")
                 : operation.Kind == "Http"
-                    ? await transport.SendHttpAsync(connection, integrations.Credentials(connection), http, variables, operation.OperationKey, ct)
+                    ? await transport.SendHttpAsync(connection, integrations.Credentials(connection), http, variables, operation.OperationKey, ct, prepared)
                     : await transport.SendEmailAsync(connection, integrations.Credentials(connection), email, variables, operation.OperationKey, ct);
             await WorkflowExecutionLock.RunAsync(db, "job:" + id, async () =>
             {
@@ -56,6 +77,13 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
         await WorkflowExecutionLock.RunAsync(db, "instance:" + operation.WorkflowInstanceId, async () =>
         {
             await db.Entry(operation).ReloadAsync(ct);
+            if (operation.InvocationId is not null)
+            {
+                if (operation.Status != "Delivered") return false;
+                await (mappings ?? throw new InvalidOperationException("Mapping runtime is required.")).ApplyDeliveryAsync(operation,
+                    JsonSerializer.Deserialize<IntegrationResult>(operation.DeliveryResultJson!, IntegrationJson.Options)!, engine, ct, activityEvents);
+                return true;
+            }
             var instance = await db.WorkflowInstances.FindAsync([operation.WorkflowInstanceId], ct);
             if (instance is not null) await db.Entry(instance).ReloadAsync(ct);
             if (instance?.Status == WorkflowInstanceStatus.Cancelled || instance?.Status == WorkflowInstanceStatus.Completed && !(operation.IsActivityEvent && !operation.Required)) { operation.Cancel(); return false; }
@@ -155,21 +183,21 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
                 var wait = matches[0];
                 await WorkflowExecutionLock.RunAsync(db, "instance:" + wait.WorkflowInstanceId, async () =>
                 {
-                var instance = await db.WorkflowInstances.FindAsync([wait.WorkflowInstanceId], ct);
-                if (instance is not null && db.Entry(instance).State == EntityState.Unchanged) await db.Entry(instance).ReloadAsync(ct);
-                if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed)
-                { wait.Finish("Cancelled"); receipt.Finish("Rejected", error: "The workflow is terminal."); return false; }
-                if (instance?.Status != WorkflowInstanceStatus.Running) return false;
-                var config = IntegrationJson.Read<EventActivityConfiguration>(wait.ConfigurationJson);
-                try
-                {
-                    var outputs = IntegrationValueMapper.Map(receipt.PayloadJson, config.OutputMappings);
-                    var completion = await engine.CompleteExternalActivityAsync(wait.ActivityInstanceId, outputs, "received", null, DateTime.UtcNow, ct);
-                    if (completion.IsSuccess) { wait.Finish("Received"); receipt.Finish("Processed", wait.ActivityInstanceId); }
-                }
-                catch (Exception ex) when (ex is JsonException or InvalidOperationException)
-                { receipt.Finish("Rejected", error: ex.Message); }
-                return true;
+                    var instance = await db.WorkflowInstances.FindAsync([wait.WorkflowInstanceId], ct);
+                    if (instance is not null && db.Entry(instance).State == EntityState.Unchanged) await db.Entry(instance).ReloadAsync(ct);
+                    if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed)
+                    { wait.Finish("Cancelled"); receipt.Finish("Rejected", error: "The workflow is terminal."); return false; }
+                    if (instance?.Status != WorkflowInstanceStatus.Running) return false;
+                    var config = IntegrationJson.Read<EventActivityConfiguration>(wait.ConfigurationJson);
+                    try
+                    {
+                        var outputs = IntegrationValueMapper.Map(receipt.PayloadJson, config.OutputMappings);
+                        var completion = await engine.CompleteExternalActivityAsync(wait.ActivityInstanceId, outputs, "received", null, DateTime.UtcNow, ct);
+                        if (completion.IsSuccess) { wait.Finish("Received"); receipt.Finish("Processed", wait.ActivityInstanceId); }
+                    }
+                    catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+                    { receipt.Finish("Rejected", error: ex.Message); }
+                    return true;
                 }, ct);
             }
             var now = DateTime.UtcNow;
@@ -178,18 +206,18 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
             {
                 await WorkflowExecutionLock.RunAsync(db, "instance:" + wait.WorkflowInstanceId, async () =>
                 {
-                var instance = await db.WorkflowInstances.FindAsync([wait.WorkflowInstanceId], ct);
-                if (instance is not null && db.Entry(instance).State == EntityState.Unchanged) await db.Entry(instance).ReloadAsync(ct);
-                if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed) { wait.Finish("Cancelled"); return false; }
-                if (instance?.Status != WorkflowInstanceStatus.Running) return false;
-                // An on-time receipt already buffered while suspended takes precedence.
-                if (await db.EventReceipts.AnyAsync(r => r.Status == "Received" && r.ConnectionId == wait.ConnectionId && r.EventKey == wait.EventKey
-                    && r.CorrelationId == wait.CorrelationId && r.CreatedAt <= wait.ExpiresAt, ct)) return false;
-                var config = IntegrationJson.Read<EventActivityConfiguration>(wait.ConfigurationJson);
-                var completion = await engine.CompleteExternalActivityAsync(wait.ActivityInstanceId, new Dictionary<string, object?>(), config.TimeoutOutcome,
-                    "The event wait timed out.", now, ct);
-                if (completion.IsSuccess) wait.Finish("TimedOut");
-                return true;
+                    var instance = await db.WorkflowInstances.FindAsync([wait.WorkflowInstanceId], ct);
+                    if (instance is not null && db.Entry(instance).State == EntityState.Unchanged) await db.Entry(instance).ReloadAsync(ct);
+                    if (instance?.Status is WorkflowInstanceStatus.Cancelled or WorkflowInstanceStatus.Completed) { wait.Finish("Cancelled"); return false; }
+                    if (instance?.Status != WorkflowInstanceStatus.Running) return false;
+                    // An on-time receipt already buffered while suspended takes precedence.
+                    if (await db.EventReceipts.AnyAsync(r => r.Status == "Received" && r.ConnectionId == wait.ConnectionId && r.EventKey == wait.EventKey
+                        && r.CorrelationId == wait.CorrelationId && r.CreatedAt <= wait.ExpiresAt, ct)) return false;
+                    var config = IntegrationJson.Read<EventActivityConfiguration>(wait.ConfigurationJson);
+                    var completion = await engine.CompleteExternalActivityAsync(wait.ActivityInstanceId, new Dictionary<string, object?>(), config.TimeoutOutcome,
+                        "The event wait timed out.", now, ct);
+                    if (completion.IsSuccess) wait.Finish("TimedOut");
+                    return true;
                 }, ct);
             }
             await db.SaveChangesAsync(ct); return true;
@@ -215,7 +243,7 @@ internal sealed class WorkflowIntegrationProcessor(WorkflowDbContext db, Workflo
                 if (child.Status is not (WorkflowInstanceStatus.Running or WorkflowInstanceStatus.Suspended)) return false;
                 var now = DateTime.UtcNow;
                 child.Cancel(now);
-                foreach (var item in await db.WorkItems.Where(w => w.WorkflowInstanceId == child.Id && (w.Status == WorkItemStatus.Pending || w.Status == WorkItemStatus.Claimed)).ToListAsync(ct)) item.Cancel(now);
+                foreach (var item in await db.WorkItems.Where(w => w.WorkflowInstanceId == child.Id && (w.Status == WorkItemStatus.Pending || w.Status == WorkItemStatus.Claimed || w.Status == WorkItemStatus.Preparing)).ToListAsync(ct)) item.Cancel(now);
                 foreach (var timer in await db.WorkflowTimers.Where(t => t.WorkflowInstanceId == child.Id && (t.Status == WorkflowTimerStatus.Pending || t.Status == WorkflowTimerStatus.Fired)).ToListAsync(ct)) timer.Cancel(now);
                 foreach (var token in await db.WorkflowExecutionTokens.Where(t => t.WorkflowInstanceId == child.Id && t.Status == ExecutionTokenStatus.Active).ToListAsync(ct)) token.Cancel(now);
                 foreach (var wait in await db.EventSubscriptions.Where(w => w.WorkflowInstanceId == child.Id && w.Status == "Waiting").ToListAsync(ct)) wait.Finish("Cancelled");

@@ -71,7 +71,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(invalid
             ? Result.Failure<FormSubmitReceipt>(new Error("Form.Invalid", "Required field missing"))
             : Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 2, true)));
-        forms.Setup(f => f.GetLatestByContextAsync(formId, "WorkItem", item.Id.ToString(), default))
+        forms.Setup(f => f.GetByClientIdAsync(formId, item.FormReceiptKey(item.Id, actor), "WorkItem", item.Id.ToString(), default))
             .ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), formId, 2, actor.ToString(), "Actor", null, new Dictionary<string, object?> { ["answer"] = "stored" }));
         var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
         var engine = new Mock<IWorkflowRuntimeEngine>(); engine.Setup(e => e.AdvanceAsync(instance.Id, item.Id, It.IsAny<DateTime>(), default)).ReturnsAsync(Result.Success());
@@ -81,7 +81,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
             Mock.Of<IWorkflowCandidateFactory>(), Mock.Of<IWorkItemCandidateRepository>(), forms.Object);
         var result = await handler.Handle(new CompleteWorkItemCommand(item.Id, actor, _orgId, action, FormValues: new() { ["answer"] = JsonSerializer.SerializeToElement("new") }), default);
         if (action == "REJECT") forms.Verify(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default), Times.Never);
-        else forms.Verify(f => f.SubmitAsync(It.Is<FormSubmitRequest>(r => r.FormId == formId && r.VersionNo == 2 && r.ClientSubmissionId == item.Id && r.ContextType == "WorkItem" && r.ContextId == item.Id.ToString()), default), Times.Once);
+        else forms.Verify(f => f.SubmitAsync(It.Is<FormSubmitRequest>(r => r.FormId == formId && r.VersionNo == 2 && r.ClientSubmissionId == item.FormReceiptKey(item.Id, actor) && r.ContextType == "WorkItem" && r.ContextId == item.Id.ToString()), default), Times.Once);
         if (invalid) { result.IsFailure.Should().BeTrue(); item.Status.Should().Be(WorkItemStatus.Claimed); engine.Verify(e => e.AdvanceAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never); }
         else { item.Status.Should().Be(WorkItemStatus.Completed); if (action != "REJECT") item.FormDataJson.Should().Contain("stored"); }
     }

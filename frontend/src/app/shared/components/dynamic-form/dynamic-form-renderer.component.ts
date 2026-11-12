@@ -7,6 +7,7 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { FormGroup, ReactiveFormsModule, type AbstractControl } from '@angular/forms';
 import { FormlyModule, type FormlyFieldConfig, type FormlyFormOptions } from '@ngx-formly/core';
@@ -20,6 +21,13 @@ import {
   type PreviewValueKinds,
 } from '../../form-schema/form-schema-payload';
 import type { RuleModel } from '../../form-schema/form-schema-rules';
+import {
+  fieldKeyName,
+  lockedKeyIndex,
+  lockMatchingFields,
+  normalizeFieldKey,
+  withLockedValues,
+} from './locked-values';
 import {
   FORM_STATE_CONTEXT_ID,
   FORM_STATE_CONTEXT_TYPE,
@@ -136,16 +144,29 @@ import {
       :host ::ng-deep .dynamic-form--readonly textarea,
       :host ::ng-deep .dynamic-form--readonly img,
       :host ::ng-deep .dynamic-form--readonly a,
-      :host ::ng-deep .dynamic-form--readonly .app-media-thumb {
+      :host ::ng-deep .dynamic-form--readonly .app-media-thumb,
+      :host ::ng-deep .dynamic-field--locked textarea,
+      :host ::ng-deep .dynamic-field--locked img,
+      :host ::ng-deep .dynamic-field--locked a,
+      :host ::ng-deep .dynamic-field--locked .app-media-thumb {
         pointer-events: auto;
       }
       /* Disabled greys the text to the point of unreadability, which defeats a
          screen whose only job is reading the answers. */
       :host ::ng-deep .dynamic-form--readonly .p-disabled,
-      :host ::ng-deep .dynamic-form--readonly .p-inputtext:disabled {
+      :host ::ng-deep .dynamic-form--readonly .p-inputtext:disabled,
+      :host ::ng-deep .dynamic-field--locked .p-disabled,
+      :host ::ng-deep .dynamic-field--locked .p-inputtext:disabled {
         opacity: 1;
         color: var(--p-text-color);
         background: var(--app-surface-alt, transparent);
+      }
+      /* One field fixed by a workflow Step mapping: the same belt and braces as the whole-form lock, for
+         just that field, whichever control type draws it. */
+      :host ::ng-deep .dynamic-field--locked {
+        pointer-events: none;
+        border-inline-start: 3px solid var(--p-primary-color);
+        padding-inline-start: 0.6rem;
       }
 
       /* ── Validation ─────────────────────────────────────────────────── */
@@ -211,6 +232,21 @@ export class DynamicFormRendererComponent {
    */
   readonly readOnly = input(false);
 
+  /**
+   * Values fixed by the server for individual fields (`data_name` → exact typed JSON, `null` included).
+   * Those fields render locked, and `payload()` carries each value exactly as given — a control can only show a
+   * display form of it (a Yes/No control holds `'yes'`, a blank control cannot hold `null`), so the payload never
+   * reads them back from the control. A key the form does not define is still submitted.
+   */
+  readonly lockedValues = input<Record<string, unknown> | null>(null);
+
+  /**
+   * Keys whose `null` in `answers` is an exact value (a workflow Prefill of null), not "no answer". Those controls
+   * open empty even when the definition gives a default. A key that is merely absent from `answers` — or `null` but
+   * not listed here, as stored submissions use it — still keeps the default.
+   */
+  readonly nullKeys = input<readonly string[] | null>(null);
+
   /** The respondent pressed Enter / submitted the inner form; the host decides what that means. */
   readonly submitted = output<void>();
   /** Hosts can retain in-progress answers when switching tabs or refreshing task data. */
@@ -232,16 +268,32 @@ export class DynamicFormRendererComponent {
     },
   }));
 
+  private builtDefinition: Record<string, unknown> | null | undefined;
+  private builtSignature = '';
+
   constructor() {
-    // All three inputs feed the same build: seeding answers into an already-built model would leave
+    // All four inputs feed the same build: seeding answers into an already-built model would leave
     // Formly's controls holding the old values, since it binds to the object it was given, and
     // read-only is baked into the field configs rather than applied to the form afterwards.
-    effect(() => this.build(this.definition(), this.answers(), this.readOnly()));
+    // A host that re-sends an equal answers object (polling, a refreshed task) must not wipe what the
+    // respondent typed, so only a different definition or different CONTENT rebuilds.
+    effect(() => {
+      const definition = this.definition();
+      const answers = this.answers();
+      const readOnly = this.readOnly();
+      const locked = this.lockedValues();
+      const nullKeys = this.nullKeys();
+      const signature = JSON.stringify([answers, readOnly, locked, nullKeys]);
+      if (definition === this.builtDefinition && signature === this.builtSignature) return;
+      this.builtDefinition = definition;
+      this.builtSignature = signature;
+      untracked(() => this.build(definition, answers, readOnly, locked, nullKeys));
+    });
   }
 
-  /** JSON-ready answers, keyed by `data_name`. */
+  /** JSON-ready answers, keyed by `data_name`; locked fields carry their exact server-mandated value. */
   payload(): Record<string, unknown> {
-    return toPreviewPayload(this.model(), this.valueKinds());
+    return withLockedValues(toPreviewPayload(this.model(), this.valueKinds()), this.lockedValues());
   }
 
   /** Marks every control touched so errors show, and reports whether the form may be submitted. */
@@ -264,7 +316,13 @@ export class DynamicFormRendererComponent {
 
   /** Discards the current edits and rebuilds from the definition and seed answers. */
   rebuild(): void {
-    this.build(this.definition(), this.answers(), this.readOnly());
+    this.build(
+      this.definition(),
+      this.answers(),
+      this.readOnly(),
+      this.lockedValues(),
+      this.nullKeys(),
+    );
   }
 
   /**
@@ -278,6 +336,8 @@ export class DynamicFormRendererComponent {
     definition: Record<string, unknown> | null,
     answers: Record<string, unknown> | null,
     readOnly: boolean,
+    locked: Record<string, unknown> | null = null,
+    nullKeys: readonly string[] | null = null,
   ): void {
     this.form.set(new FormGroup({}));
 
@@ -290,14 +350,42 @@ export class DynamicFormRendererComponent {
 
     const preview = this.mapper.toPreview(deserializeSchema(definition));
     this.valueKinds.set(preview.valueKinds);
-    this.model.set(
-      answers
-        ? { ...preview.model, ...fromStoredAnswers(answers, preview.valueKinds) }
-        : preview.model,
-    );
+    const model: RuleModel = answers
+      ? { ...preview.model, ...fromStoredAnswers(answers, preview.valueKinds) }
+      : { ...preview.model };
+
+    for (const key of nullKeys ?? []) {
+      const field = findFieldKey(preview.fields, normalizeFieldKey(key));
+      if (field !== undefined) model[field] = null;
+    }
+
+    // A locked field shows the display form of the mandated value; the exact value stays in `lockedValues`.
+    // A mandated `null` is an exact value too: the control opens empty and conditions read `null`, never the
+    // definition's default (which Formly would restore if the key were simply left out of the model).
+    const shownOf = (key: string, value: unknown): Record<string, unknown> =>
+      value === null ? { [key]: null } : fromStoredAnswers({ [key]: value }, preview.valueKinds);
+    const index = lockedKeyIndex(locked);
+    if (index.size > 0 && locked) {
+      for (const key of Object.keys(model)) {
+        const original = index.get(key.trim().toLowerCase());
+        if (original === undefined) continue;
+        delete model[key];
+        const shown = shownOf(key, locked[original]);
+        if (key in shown) model[key] = shown[key];
+      }
+      for (const [normalized, original] of index) {
+        const field = findFieldKey(preview.fields, normalized);
+        if (field === undefined || field in model) continue;
+        const shown = shownOf(field, locked[original]);
+        if (field in shown) model[field] = shown[field];
+      }
+    }
+    this.model.set(model);
 
     if (readOnly) {
       lockFields(preview.fields);
+    } else if (index.size > 0) {
+      lockMatchingFields(preview.fields, index);
     }
 
     this.fields.set(preview.fields);
@@ -320,6 +408,17 @@ function lockFields(fields: FormlyFieldConfig[]): void {
       lockFields(field.fieldGroup);
     }
   }
+}
+
+/** The first field key (at any depth) whose normalised spelling is `normalized`. */
+function findFieldKey(fields: FormlyFieldConfig[], normalized: string): string | undefined {
+  for (const field of fields) {
+    const name = fieldKeyName(field);
+    if (name !== undefined && normalizeFieldKey(name) === normalized) return name;
+    const nested = field.fieldGroup ? findFieldKey(field.fieldGroup, normalized) : undefined;
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
 }
 
 function isBlank(value: unknown): boolean {

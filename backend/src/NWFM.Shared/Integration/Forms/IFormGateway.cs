@@ -54,6 +54,10 @@ public interface IFormGateway
         string contextId,
         CancellationToken cancellationToken);
 
+    /// <summary>The immutable receipt for a completion key, restricted to its owning context.</summary>
+    Task<FormSubmissionRecord?> GetByClientIdAsync(Guid formId, Guid clientSubmissionId,
+        string contextType, string contextId, CancellationToken cancellationToken);
+
     /// <summary>Every fill a context recorded against a form, newest first.</summary>
     Task<IReadOnlyList<FormSubmissionRecord>> ListByContextAsync(
         Guid formId,

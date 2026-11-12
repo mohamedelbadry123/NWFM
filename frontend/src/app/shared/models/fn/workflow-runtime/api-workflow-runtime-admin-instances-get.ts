@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowInstanceDto as NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-instance-dto';
+import { WorkflowInstanceDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-instance-dto';
 
 export interface ApiWorkflowRuntimeAdminInstancesGet$Params {
   page?: number;
@@ -15,7 +15,7 @@ export interface ApiWorkflowRuntimeAdminInstancesGet$Params {
   organizationId?: string;
 }
 
-export function apiWorkflowRuntimeAdminInstancesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowRuntimeAdminInstancesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto>> {
+export function apiWorkflowRuntimeAdminInstancesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowRuntimeAdminInstancesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowRuntimeAdminInstancesGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -28,7 +28,7 @@ export function apiWorkflowRuntimeAdminInstancesGet(http: HttpClient, rootUrl: s
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto>;
     })
   );
 }

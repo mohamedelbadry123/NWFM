@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Auth.Domain.Constants;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,40 @@ namespace NWFM.Tests.Security;
 
 public sealed class TenantDenialTelemetryTests
 {
+    [Theory]
+    [InlineData("verified", true)]
+    [InlineData("anonymous", false)]
+    [InlineData("foreign", false)]
+    [InlineData("missing-tenant", false)]
+    [InlineData("duplicate-actor", false)]
+    [InlineData("duplicate-tenant", false)]
+    public async Task FinalDenialRecordsOnlyVerifiedActorAndNeverRequestCredentials(string scenario, bool expectedActor)
+    {
+        using var fixture = new Fixture(); var actor = Guid.NewGuid(); var spoofed = Guid.NewGuid();
+        var response = new DeferredResponseFeature(); var http = Request(response);
+        http.TraceIdentifier = "server-trace";
+        http.Request.Headers["x-user-id"] = spoofed.ToString();
+        http.Request.Headers.Authorization = "Bearer secret-do-not-log";
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, actor.ToString()) };
+        if (scenario != "missing-tenant") claims.Add(new(AppClaimTypes.TenantId,
+            (scenario == "foreign" ? Guid.NewGuid() : fixture.TenantId).ToString()));
+        if (scenario == "duplicate-actor") claims.Add(new(ClaimTypes.NameIdentifier, spoofed.ToString()));
+        if (scenario == "duplicate-tenant") claims.Add(new(AppClaimTypes.TenantId, fixture.TenantId.ToString()));
+        var middleware = new TenantRequestBudgetMiddleware(context =>
+        {
+            // Actual authentication populates User after the outer budget registers OnStarting.
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, scenario == "anonymous" ? null : "Bearer"));
+            throw new UnauthorizedAccessException("private exception contents");
+        });
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => fixture.Invoke(middleware, http));
+        http.Response.Clear(); http.Response.StatusCode = 403; await response.StartAsync();
+        fixture.AssertSingleDenial(403); var message = Assert.Single(fixture.Logger.Events).Message;
+        Assert.Equal(expectedActor, message.Contains(actor.ToString(), StringComparison.Ordinal));
+        Assert.Contains("TraceId=server-trace", message);
+        Assert.DoesNotContain(spoofed.ToString(), message);
+        Assert.DoesNotContain("secret-do-not-log", message); Assert.DoesNotContain("private exception", message);
+    }
+
     [Theory]
     [InlineData(403)]
     [InlineData(429)]
@@ -135,6 +171,7 @@ public sealed class TenantDenialTelemetryTests
         private readonly ITenantAvailability _availability;
         private readonly TenantSecuritySignals _signals;
         public CaptureLogger Logger { get; } = new();
+        public Guid TenantId => _application.Value.TenantId;
         public TenantResourceLimits Limits { get; }
 
         public Fixture(TenantResourceOptions? limits = null)

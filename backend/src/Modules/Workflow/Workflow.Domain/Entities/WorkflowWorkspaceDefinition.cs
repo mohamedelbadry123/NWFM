@@ -23,10 +23,21 @@ public sealed record WorkflowWorkspaceDefinition(
 
     public int SchemaVersion { get; init; } = 1;
     public IReadOnlyList<WorkflowOrganizationScope>? OrganizationScopes { get; init; }
+
+    /// <summary>
+    /// Optional presentation of <see cref="OrganizationScopes"/> as authored entries. Null on older saves.
+    /// Never authoritative: <see cref="WorkflowScopeRows.Validate"/> requires them to expand to exactly the canonical scopes.
+    /// </summary>
+    public IReadOnlyList<WorkflowScopeRow>? ScopeRows { get; init; }
     public Guid? FieldActivityTypeId { get; init; }
     public string? DepartmentCode { get; init; }
     public string? FieldActivityCode { get; init; }
     public Guid? TaskTypeId { get; init; }
+    public Guid? ParentDefinitionId { get; init; }
+    public string? ParentNodeKey { get; init; }
+
+    [JsonIgnore]
+    public bool IsHierarchical => DesignerVersion is 3 or 4;
 
     [JsonIgnore]
     public bool HasScopeSettings => SchemaVersion >= 2 || OrganizationScopes is not null;
@@ -109,10 +120,13 @@ public sealed record WorkflowWorkspaceDefinition(
             HasLegacyConflict = conflict,
             SchemaVersion = settings["schemaVersion"]?.Deserialize<int?>() ?? 1,
             OrganizationScopes = settings["organizationScopes"]?.Deserialize<List<WorkflowOrganizationScope>>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true }),
+            ScopeRows = settings["scopeRows"]?.Deserialize<List<WorkflowScopeRow>>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true }),
             FieldActivityTypeId = settings["fieldActivityTypeId"]?.Deserialize<Guid?>(),
             DepartmentCode = Text("departmentCode"),
             FieldActivityCode = Text("fieldActivityCode"),
             TaskTypeId = settings["taskTypeId"]?.Deserialize<Guid?>(),
+            ParentDefinitionId = settings["parentDefinitionId"]?.Deserialize<Guid?>(),
+            ParentNodeKey = Text("parentNodeKey"),
         };
     }
 

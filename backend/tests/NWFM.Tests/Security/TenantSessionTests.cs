@@ -15,7 +15,7 @@ using NWFM.Shared.Options;
 
 namespace NWFM.Tests.Security;
 
-public sealed class TenantSessionTests
+public sealed partial class TenantSessionTests
 {
     [Fact]
     public async Task SameTenantSessionRebuildsCurrentGrantsInsteadOfTrustingTokenPermissions()

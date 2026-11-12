@@ -25,26 +25,34 @@ export class WorkflowVersionsService {
   private readonly http = inject(HttpClient);
   private readonly config = inject(ApiConfiguration);
 
-  getPaged(definitionId: string, page: number, pageSize: number): Observable<PaginatedResultOfWorkflowVersionDto> {
+  getPaged(
+    definitionId: string,
+    page: number,
+    pageSize: number,
+  ): Observable<PaginatedResultOfWorkflowVersionDto> {
     return apiWorkflowDefinitionsDefinitionIdVersionsGet(this.http, this.config.rootUrl, {
       definitionId,
       page,
       pageSize,
-    }).pipe(map(r => r.body as PaginatedResultOfWorkflowVersionDto));
+    }).pipe(map((r) => r.body as PaginatedResultOfWorkflowVersionDto));
   }
 
   getById(definitionId: string, versionId: string): Observable<WorkflowVersionDetailDto> {
     return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdGet(this.http, this.config.rootUrl, {
       definitionId,
       versionId,
-    }).pipe(map(r => r.body as WorkflowVersionDetailDto));
+    }).pipe(map((r) => r.body as WorkflowVersionDetailDto));
   }
 
   getXml(definitionId: string, versionId: string): Observable<string> {
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlGet(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-    }).pipe(map(r => r.body as string));
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlGet(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+      },
+    ).pipe(map((r) => r.body as string));
   }
 
   createDraft(definitionId: string, changeSummary?: string): Observable<WorkflowVersionDto> {
@@ -52,55 +60,87 @@ export class WorkflowVersionsService {
     return apiWorkflowDefinitionsDefinitionIdVersionsPost(this.http, this.config.rootUrl, {
       definitionId,
       body,
-    }).pipe(map(r => r.body as WorkflowVersionDto));
+    }).pipe(map((r) => r.body as WorkflowVersionDto));
   }
 
   saveXml(
     definitionId: string,
     versionId: string,
     xmlContent: string,
-    designerJson?: string
+    designerJson?: string,
+    expectedRevision?: string,
   ): Observable<WorkflowVersionDto> {
-    const body: SaveWorkflowDraftXmlRequest = { xmlContent, designerJson };
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlPut(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-      body,
-    }).pipe(map(r => r.body as WorkflowVersionDto));
+    const body: SaveWorkflowDraftXmlRequest & { expectedRevision?: string } = {
+      xmlContent,
+      designerJson,
+      expectedRevision,
+    };
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdXmlPut(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+        body,
+      },
+    ).pipe(map((r) => r.body as WorkflowVersionDto));
   }
 
   validate(definitionId: string, versionId: string): Observable<WorkflowValidationResultDto> {
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdValidatePost(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-    }).pipe(map(r => r.body as WorkflowValidationResultDto));
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdValidatePost(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+      },
+    ).pipe(map((r) => r.body as WorkflowValidationResultDto));
   }
 
   publish(definitionId: string, versionId: string): Observable<WorkflowVersionDto> {
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdPublishPost(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-    }).pipe(map(r => r.body as WorkflowVersionDto));
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdPublishPost(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+      },
+    ).pipe(map((r) => r.body as WorkflowVersionDto));
   }
 
-  clone(definitionId: string, versionId: string, changeSummary?: string): Observable<WorkflowVersionDto> {
+  clone(
+    definitionId: string,
+    versionId: string,
+    changeSummary?: string,
+  ): Observable<WorkflowVersionDto> {
     const body: CloneWorkflowVersionRequest = { changeSummary };
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdClonePost(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-      body,
-    }).pipe(map(r => r.body as WorkflowVersionDto));
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdClonePost(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+        body,
+      },
+    ).pipe(map((r) => r.body as WorkflowVersionDto));
   }
 
   retire(definitionId: string, versionId: string): Observable<WorkflowVersionDto> {
-    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdRetirePost(this.http, this.config.rootUrl, {
-      definitionId,
-      versionId,
-    }).pipe(map(r => r.body as WorkflowVersionDto));
+    return apiWorkflowDefinitionsDefinitionIdVersionsVersionIdRetirePost(
+      this.http,
+      this.config.rootUrl,
+      {
+        definitionId,
+        versionId,
+      },
+    ).pipe(map((r) => r.body as WorkflowVersionDto));
   }
 
   /** Hand-extended until OpenAPI regen — publish preview / DoD checklist. */
-  getPublishPreview(definitionId: string, versionId: string): Observable<WorkflowPublishPreviewView> {
+  getPublishPreview(
+    definitionId: string,
+    versionId: string,
+  ): Observable<WorkflowPublishPreviewView> {
     const url = `${this.config.rootUrl}/api/workflow/definitions/${definitionId}/versions/${versionId}/publish-preview`;
     return this.http.get<WorkflowPublishPreviewView>(url);
   }

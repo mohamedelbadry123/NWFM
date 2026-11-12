@@ -4,18 +4,19 @@
 import { WorkflowValidationStatus as WorkflowDomainEnumsWorkflowValidationStatus } from '../../../../models/Workflow/Domain/Enums/workflow-validation-status';
 import { WorkflowVersionStatus as WorkflowDomainEnumsWorkflowVersionStatus } from '../../../../models/Workflow/Domain/Enums/workflow-version-status';
 export interface WorkflowVersionDto {
-  workspaceJson?: string | null;
-  pinnedChildVersionsJson?: string | null;
   changeSummary?: string | null;
   createdAt?: string;
   createdByUserId?: string;
   id?: string;
+  pinnedChildVersionsJson?: string | null;
   publishedAt?: string | null;
   publishedByUserId?: string | null;
+  revision?: string | null;
   schemaVersion?: string | null;
   status?: WorkflowDomainEnumsWorkflowVersionStatus;
   updatedAt?: string;
   validationStatus?: WorkflowDomainEnumsWorkflowValidationStatus;
   versionNumber?: number;
   workflowDefinitionId?: string;
+  workspaceJson?: string | null;
 }

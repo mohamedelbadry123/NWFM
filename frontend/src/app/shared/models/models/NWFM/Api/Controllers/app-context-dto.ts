@@ -4,7 +4,7 @@
 import { ParticipantContextDto as NwfmApiControllersParticipantContextDto } from '../../../../models/NWFM/Api/Controllers/participant-context-dto';
 import { TenantDto as NwfmApiControllersTenantDto } from '../../../../models/NWFM/Api/Controllers/tenant-dto';
 export interface AppContextDto {
-  defaultParticipantId?: string;
+  defaultParticipantId?: string | null;
   participants?: Array<NwfmApiControllersParticipantContextDto> | null;
   tenant?: NwfmApiControllersTenantDto;
 }

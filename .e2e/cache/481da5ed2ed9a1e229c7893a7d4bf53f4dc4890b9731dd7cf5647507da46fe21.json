@@ -1,6 +1,6 @@
 {
   "schemaVersion": "trace-1",
-  "createdAt": "2026-10-12T04:17:57.754Z",
+  "createdAt": "2026-11-12T20:21:41.726Z",
   "payload": {
     "actions": [
       {
@@ -25,9 +25,13 @@
       "callIndex": 0,
       "agent": "default"
     },
-    "summary": "Accepted the parent Isolation Execution activity after its checklist was completed. The parent now shows Completed; the workflow advanced to Closure.",
-    "startPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
-    "endPath": "/admin/workflow/instances/c6e9ed3b-1291-45e3-b834-c2c117241a24",
+    "recordedBy": {
+      "provider": "chatgpt.responses",
+      "model": "gpt-6-luna"
+    },
+    "summary": "Accepted the Isolation Execution parent activity after its checklist completed. Isolation Execution now shows Completed; the workflow advanced to Closure, which is waiting for its child workflow.",
+    "startPath": "/admin/workflow/instances/48a74129-eb7d-4538-bc1f-df998cd93a3b",
+    "endPath": "/admin/workflow/instances/48a74129-eb7d-4538-bc1f-df998cd93a3b",
     "endAnchors": [
       {
         "text": "Task is completed or claimed by another user."
@@ -40,7 +44,7 @@
         "text": "Waiting for child workflow"
       },
       {
-        "text": "Assigned group: Demo — Closure team"
+        "text": "Assigned to: Demo — Closure team"
       },
       {
         "text": "Complete the child workflow before approving this activity."
@@ -53,7 +57,7 @@
         "name": "Closure checklist"
       },
       {
-        "text": "stage-2"
+        "text": "stage-1->stage-2"
       }
     ],
     "goneAnchors": [
@@ -63,11 +67,11 @@
       },
       {
         "role": "button",
-        "name": "Accept"
+        "name": "Reject"
       },
       {
         "role": "button",
-        "name": "Reject"
+        "name": "Accept"
       },
       {
         "role": "button",
@@ -77,7 +81,7 @@
         "text": "Comment"
       }
     ],
-    "endWaitMs": 12551,
+    "endWaitMs": 15273,
     "keyedBy": {
       "cacheSchema": "trace-1",
       "policyVersion": "conservative/6",

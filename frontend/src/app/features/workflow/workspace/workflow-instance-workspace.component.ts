@@ -1,5 +1,9 @@
 import { WorkflowFormProgressComponent } from './workflow-form-progress.component';
+import { WorkflowRoutingService, RoutingProgress } from '../designer/workflow-routing.service';
 import { WorkflowSelectedFormComponent } from './workflow-selected-form.component';
+import { WorkflowMappingInvocationsComponent } from '../mapping/workflow-mapping-invocations.component';
+import { StepMappingMemory, preparingReason } from '../mapping/workflow-step-mapping';
+import type { MappingInvocationDto } from '../mapping/mapping.models';
 import {
   QueryList,
   ViewChildren,
@@ -33,6 +37,7 @@ import {
   imports: [
     WorkflowFormProgressComponent,
     WorkflowSelectedFormComponent,
+    WorkflowMappingInvocationsComponent,
     FormsModule,
     DatePipe,
     RouterLink,
@@ -93,6 +98,33 @@ import {
         <section class="space-y-4" [attr.aria-label]="t('Workflow progress', 'تقدم سير العمل')">
           <ng-container *ngTemplateOutlet="execution; context: { $implicit: model.tree[0] }" />
         </section>
+        @if (coordination().length) {
+          <section
+            class="rounded-xl border bg-white dark:bg-dark-800 p-5 space-y-3"
+            aria-live="polite"
+          >
+            <h2 class="text-lg font-semibold">
+              {{ t('Routing and coordination', 'المسارات والتنسيق') }}
+            </h2>
+            @for (gate of coordination(); track gate.activationId) {
+              <article class="border rounded-lg p-3">
+                <strong>{{ gate.name }} · {{ gate.waitFor }} · {{ gate.status }}</strong>
+                <p class="mt-2">{{ gate.explanation }}</p>
+                <ul class="mt-2">
+                  @for (branch of gate.branches; track branch.tokenId) {
+                    <li>{{ branch.name }} — {{ branch.status }}</li>
+                  }
+                </ul>
+                @if (gate.skipped.length) {
+                  <p>{{ t('Not activated', 'لم يتم تفعيلها') }}: {{ gate.skipped.length }}</p>
+                }
+                @if (gate.deadlineAt) {
+                  <p>{{ t('Deadline', 'المهلة') }}: {{ gate.deadlineAt | date: 'medium' }}</p>
+                }
+              </article>
+            }
+          </section>
+        }
         <details class="rounded-xl border bg-white dark:bg-dark-800 p-5" open>
           <summary class="text-lg font-medium cursor-pointer">
             {{ t('Events and integrations', 'الأحداث والتكاملات') }}
@@ -149,6 +181,12 @@ import {
             }
           </div>
         </details>
+        <app-workflow-mapping-invocations
+          [rootInstanceId]="model.id"
+          [refreshToken]="model"
+          [canManage]="canManage()"
+          (loaded)="invocations.set($event)"
+        />
         <details class="rounded-xl border bg-white dark:bg-dark-800 p-5" open>
           <summary class="text-lg font-medium cursor-pointer">
             {{ t('History and comments', 'السجل والتعليقات') }}
@@ -205,7 +243,7 @@ import {
             </p>
             @if (activity.assignedGroup && !activity.tasks.length) {
               <p class="text-sm mt-2">
-                {{ t('Assigned group', 'المجموعة المسؤولة') }}: {{ activity.assignedGroup }}
+                {{ t('Assigned to', 'الإسناد إلى') }}: {{ activity.assignedGroup }}
               </p>
             }
             @if (activity.phase === 'WaitingForChild') {
@@ -241,7 +279,7 @@ import {
             @for (entry of activity.tasks; track entry.task.id) {
               <div class="mt-4 border-t pt-4 space-y-3">
                 <p class="text-sm">
-                  {{ t('Assigned group', 'المجموعة المسؤولة') }}:
+                  {{ t('Assigned to', 'الإسناد إلى') }}:
                   <strong>{{ entry.task.assignmentGroupName }}</strong>
                 </p>
                 <app-workflow-form-progress
@@ -256,6 +294,10 @@ import {
                     [selectedForm]="entry.task.selectedForm"
                     [workItemId]="entry.task.id"
                     [answers]="formValues[entry.task.id]"
+                    [mappingSnapshot]="entry.task.mappingSnapshot"
+                    [draftKey]="entry.task.formDraftKey"
+                    [serverAnswers]="entry.task.formValues"
+                    [actorKey]="demoActor"
                     (answersChange)="formValues[entry.task.id] = $event"
                     [readonly]="!entry.canAct"
                   />
@@ -358,6 +400,11 @@ import {
                       {{ t('Add comment', 'إضافة تعليق') }}
                     </button>
                   </div>
+                } @else if (entry.task.status === 'Preparing') {
+                  <p class="text-sm" role="status" data-testid="preparing-notice">
+                    <strong>{{ t('Preparing', 'قيد التجهيز') }}:</strong>
+                    {{ preparingNote(entry) }}
+                  </p>
                 } @else {
                   <p class="text-sm opacity-70">{{ entry.disabledReason }}</p>
                 }
@@ -370,13 +417,18 @@ import {
 })
 export class WorkflowInstanceWorkspaceComponent implements OnInit {
   private readonly api = inject(WorkflowWorkspaceService);
+  private readonly routingApi = inject(WorkflowRoutingService);
+  readonly coordination = signal<RoutingProgress[]>([]);
   private readonly integrations = inject(WorkflowIntegrationsService);
   private readonly route = inject(ActivatedRoute);
   private readonly locale = inject(LocaleService);
   private readonly destroy = inject(DestroyRef);
   private readonly auth = inject(AuthStore);
   private readonly translate = inject(TranslateService);
+  private readonly memory = inject(StepMappingMemory);
   readonly detail = signal<WorkspaceDetail | null>(null);
+  /** Mapping receipts for this instance tree (loaded by the receipts panel; empty without access). */
+  readonly invocations = signal<MappingInvocationDto[]>([]);
   readonly error = signal('');
   readonly loading = signal(false);
   readonly busy = signal(false);
@@ -384,6 +436,8 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
   comments: Record<string, string> = {};
   formValues: Record<string, Record<string, unknown>> = {};
   private visits: Record<string, string | undefined> = {};
+  /** Per task: the acting participant and ownership attempt its local answers were typed under. */
+  private scopes: Record<string, string> = {};
   private id = '';
   @ViewChildren(WorkflowSelectedFormComponent)
   selectedForms!: QueryList<WorkflowSelectedFormComponent>;
@@ -427,6 +481,12 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
                   this.visits[id] = entry.task.formVisitId;
                   this.formValues[id] = { ...entry.task.formValues };
                 }
+                // Another actor or ownership attempt (reassign, release, delegate) never inherits what was typed under
+                // the previous one; a claim by the same actor keeps the same attempt and so keeps the edits.
+                const scope = JSON.stringify([this.demoActor, entry.task.formDraftKey ?? null]);
+                if (this.scopes[id] !== undefined && this.scopes[id] !== scope)
+                  this.formValues[id] = { ...entry.task.formValues };
+                this.scopes[id] = scope;
                 if (
                   entry.task.status === 'Completed' &&
                   JSON.stringify(this.formValues[id]) !== JSON.stringify(entry.task.formValues)
@@ -436,6 +496,17 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
                 this.comments[id] ??= '';
               }
           this.detail.set(d);
+          this.routingApi
+            .progress(this.id)
+            .pipe(takeUntilDestroyed(this.destroy))
+            .subscribe({
+              next: (rows) => {
+                if (sequence === this.loadSequence) this.coordination.set(rows);
+              },
+              error: () => {
+                if (sequence === this.loadSequence) this.coordination.set([]);
+              },
+            });
           this.loading.set(false);
           if (!quiet) this.error.set('');
         },
@@ -445,6 +516,16 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
           this.error.set(e.error?.message || 'Could not load instance.');
         },
       });
+  }
+  /** Why a Preparing item cannot be acted on yet — not the generic "completed or claimed by another user". */
+  preparingNote(entry: WorkspaceTask) {
+    const receipt = this.invocations().find(
+      (i) =>
+        i.executionKind === 'Step' &&
+        i.originActivityId === entry.task.activityInstanceId &&
+        !['Completed', 'Cancelled'].includes(i.status),
+    );
+    return preparingReason((en, ar) => this.t(en, ar), receipt);
   }
   sourceName(id: string) {
     for (const run of this.detail()?.tree || []) {
@@ -514,6 +595,8 @@ export class WorkflowInstanceWorkspaceComponent implements OnInit {
       next: () => {
         this.pending = null;
         this.comments[entry.task.id!] = '';
+        // A comment leaves the form open; every other action submitted it, so its draft is finished.
+        if (action !== 'comment') this.memory.forget(entry.task.id!);
         this.busy.set(false);
         this.load();
       },

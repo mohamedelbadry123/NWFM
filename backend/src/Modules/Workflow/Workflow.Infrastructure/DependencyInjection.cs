@@ -3,6 +3,7 @@ namespace Workflow.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Integrations;
 using Workflow.Application.Settings;
@@ -31,6 +32,17 @@ public static class DependencyInjection
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", "Workflow")));
 
         services.AddScoped<IWorkflowFeatureGate, WorkflowFeatureGate>();
+        services.AddScoped<Workflow.Application.Mapping.IDesignerMappingCatalog, DesignerMappingCatalog>();
+        services.AddScoped<MappingSourceResolver>();
+        services.AddScoped<Workflow.Application.Mapping.IMappingSourceResolver>(sp => sp.GetRequiredService<MappingSourceResolver>());
+        services.AddScoped<WorkflowMappingRuntime>();
+        services.AddScoped<MappingPublicationValidator>();
+        services.AddScoped<Workflow.Application.Mapping.IStepMappingRuntime>(sp => sp.GetRequiredService<WorkflowMappingRuntime>());
+        services.AddScoped<Workflow.Application.Mapping.IMappingInvocations>(sp => sp.GetRequiredService<WorkflowMappingRuntime>());
+        services.AddScoped<NWFM.Shared.Integration.Forms.IFormSubmissionGuard, WorkflowFormSubmissionGuard>();
+        services.TryAddScoped<NWFM.Shared.Integration.Forms.TrustedFormSubmissionActor>();
+        services.AddScoped<Workflow.Application.Routing.IWorkflowRouting, WorkflowRoutingService>();
+        services.AddScoped<Workflow.Application.Abstractions.IWorkflowDraftLock, WorkflowDraftLock>();
         services.AddScoped<Workflow.Application.Workspace.IWorkspaceSla, WorkspaceSla>();
         services.AddScoped<Workflow.Application.Workspace.IWorkspaceActivityForms, Workflow.Application.Workspace.WorkspaceActivityForms>();
         services.AddScoped<Workflow.Application.Workspace.IWorkflowWorkspacePublisher, WorkflowWorkspacePublisher>();
@@ -74,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowBindingResolver, WorkflowBindingResolver>();
         services.AddScoped<IWorkflowAssignmentResolver, WorkflowAssignmentResolver>();
         services.AddScoped<IWorkflowCandidateFactory, WorkflowCandidateFactory>();
+        services.AddScoped<IWorkflowRoleAssignments, WorkflowRoleAssignments>();
         services.AddScoped<IWorkflowInboxWriter, WorkflowInboxWriter>();
         services.AddScoped<WorkflowRuntimeEngine>();
         services.AddScoped<IWorkflowRuntimeEngine, SerializedWorkflowRuntimeEngine>();

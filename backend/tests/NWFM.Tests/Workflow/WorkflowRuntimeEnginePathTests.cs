@@ -1,17 +1,17 @@
 namespace NWFM.Tests.Modules.Workflow;
 
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Moq;
-using NWFM.Shared.Abstractions;
-using NWFM.Shared.Integration.Workflow;
-using NWFM.Shared.Results;
 using global::Workflow.Application.Abstractions;
 using global::Workflow.Domain.Entities;
 using global::Workflow.Domain.Enums;
 using global::Workflow.Infrastructure.Persistence;
 using global::Workflow.Infrastructure.Persistence.Repositories;
 using global::Workflow.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
+using Moq;
+using NWFM.Shared.Abstractions;
+using NWFM.Shared.Integration.Workflow;
+using NWFM.Shared.Results;
 
 /// <summary>
 /// Tests the WorkflowRuntimeEngine execution paths using an InMemory EF store.
@@ -29,14 +29,14 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
     private readonly WorkflowDbContext _db;
 
     // Shared mocks reused across all three cases
-    private readonly Mock<IWorkflowActionRegistry>        _actionRegistry   = new();
-    private readonly Mock<IWorkflowNotificationPublisher> _notifPublisher    = new();
-    private readonly Mock<IWorkflowOutcomeDispatcher>     _outcomeDispatcher = new();
-    private readonly Mock<IBusinessCalendarService>       _calendarService   = new();
-    private readonly Mock<IWorkflowIncidentService>       _incidentService   = new();
-    private readonly Mock<IWorkflowRequestProjector>      _requestProjector  = new();
-    private readonly Mock<IWorkflowAssignmentResolver>    _assignmentResolver = new();
-    private readonly Mock<IWorkflowCandidateFactory>      _candidateFactory  = new();
+    private readonly Mock<IWorkflowActionRegistry> _actionRegistry = new();
+    private readonly Mock<IWorkflowNotificationPublisher> _notifPublisher = new();
+    private readonly Mock<IWorkflowOutcomeDispatcher> _outcomeDispatcher = new();
+    private readonly Mock<IBusinessCalendarService> _calendarService = new();
+    private readonly Mock<IWorkflowIncidentService> _incidentService = new();
+    private readonly Mock<IWorkflowRequestProjector> _requestProjector = new();
+    private readonly Mock<IWorkflowAssignmentResolver> _assignmentResolver = new();
+    private readonly Mock<IWorkflowCandidateFactory> _candidateFactory = new();
 
     public WorkflowRuntimeEnginePathTests()
     {
@@ -115,14 +115,14 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
         version.Publish(Guid.NewGuid(), now);
         db.WorkflowVersions.Add(version);
 
-        var start   = ActivityDefinition.Create(version.Id, "start",  ActivityType.Start,       "Start",        now);
-        var svc     = ActivityDefinition.Create(version.Id, "svc",    ActivityType.ServiceTask,  "Service Task", now, actionKey: actionKey);
-        var end     = ActivityDefinition.Create(version.Id, "end",    ActivityType.End,          "End",          now);
+        var start = ActivityDefinition.Create(version.Id, "start", ActivityType.Start, "Start", now);
+        var svc = ActivityDefinition.Create(version.Id, "svc", ActivityType.ServiceTask, "Service Task", now, actionKey: actionKey);
+        var end = ActivityDefinition.Create(version.Id, "end", ActivityType.End, "End", now);
         db.ActivityDefinitions.AddRange(start, svc, end);
 
         db.WorkflowTransitions.AddRange(
-            WorkflowTransition.Create(version.Id, start.Id, svc.Id,  "t1", 1, now),
-            WorkflowTransition.Create(version.Id, svc.Id,   end.Id,  "t2", 1, now));
+            WorkflowTransition.Create(version.Id, start.Id, svc.Id, "t1", 1, now),
+            WorkflowTransition.Create(version.Id, svc.Id, end.Id, "t2", 1, now));
 
         var binding = WorkflowBinding.Create(
             def.Id, orgId, "TestModule", "TestEntity", "Created", now,
@@ -278,14 +278,14 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
         version.Publish(Guid.NewGuid(), now);
         db.WorkflowVersions.Add(version);
 
-        var start  = ActivityDefinition.Create(version.Id, "start",  ActivityType.Start,    "Start",  now);
+        var start = ActivityDefinition.Create(version.Id, "start", ActivityType.Start, "Start", now);
         var review = ActivityDefinition.Create(version.Id, "review", ActivityType.UserTask, "Review", now);
-        var end    = ActivityDefinition.Create(version.Id, "end",    ActivityType.End,      "End",    now);
+        var end = ActivityDefinition.Create(version.Id, "end", ActivityType.End, "End", now);
         db.ActivityDefinitions.AddRange(start, review, end);
 
         db.WorkflowTransitions.AddRange(
-            WorkflowTransition.Create(version.Id, start.Id,  review.Id, "t1", 1, now),
-            WorkflowTransition.Create(version.Id, review.Id, end.Id,    "t2", 1, now));
+            WorkflowTransition.Create(version.Id, start.Id, review.Id, "t1", 1, now),
+            WorkflowTransition.Create(version.Id, review.Id, end.Id, "t2", 1, now));
 
         var binding = WorkflowBinding.Create(
             def.Id, orgId, "TestModule", "TestEntity", "Created", now,
@@ -308,15 +308,15 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
 
         // Timer with zero duration so DueAt == StartTime (immediately eligible to fire)
         const string timerConfig = "{\"timerType\":\"Duration\",\"duration\":\"00:00:00\"}";
-        var start = ActivityDefinition.Create(version.Id, "start", ActivityType.Start,   "Start", now);
-        var timer = ActivityDefinition.Create(version.Id, "tmr",   ActivityType.Timer,   "Timer", now,
+        var start = ActivityDefinition.Create(version.Id, "start", ActivityType.Start, "Start", now);
+        var timer = ActivityDefinition.Create(version.Id, "tmr", ActivityType.Timer, "Timer", now,
             configurationJson: timerConfig);
-        var end   = ActivityDefinition.Create(version.Id, "end",   ActivityType.End,     "End",   now);
+        var end = ActivityDefinition.Create(version.Id, "end", ActivityType.End, "End", now);
         db.ActivityDefinitions.AddRange(start, timer, end);
 
         db.WorkflowTransitions.AddRange(
             WorkflowTransition.Create(version.Id, start.Id, timer.Id, "t1", 1, now),
-            WorkflowTransition.Create(version.Id, timer.Id, end.Id,   "t2", 1, now));
+            WorkflowTransition.Create(version.Id, timer.Id, end.Id, "t2", 1, now));
 
         var binding = WorkflowBinding.Create(
             def.Id, orgId, "TestModule", "TestEntity", "Created", now,
@@ -436,22 +436,22 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
         version.Publish(Guid.NewGuid(), now);
         db.WorkflowVersions.Add(version);
 
-        var start   = ActivityDefinition.Create(version.Id, "start",  ActivityType.Start,           "Start",        now);
-        var fork    = ActivityDefinition.Create(version.Id, "fork",   ActivityType.ParallelGateway,  "Fork",         now,
+        var start = ActivityDefinition.Create(version.Id, "start", ActivityType.Start, "Start", now);
+        var fork = ActivityDefinition.Create(version.Id, "fork", ActivityType.ParallelGateway, "Fork", now,
             configurationJson: "{\"joinNodeKey\":\"join\"}");
-        var svc1    = ActivityDefinition.Create(version.Id, "svc1",   ActivityType.ServiceTask,      "Service 1",    now, actionKey: actionKey);
-        var svc2    = ActivityDefinition.Create(version.Id, "svc2",   ActivityType.ServiceTask,      "Service 2",    now, actionKey: actionKey);
-        var join    = ActivityDefinition.Create(version.Id, "join",   ActivityType.JoinGateway,      "Join",         now);
-        var end     = ActivityDefinition.Create(version.Id, "end",    ActivityType.End,              "End",          now);
+        var svc1 = ActivityDefinition.Create(version.Id, "svc1", ActivityType.ServiceTask, "Service 1", now, actionKey: actionKey);
+        var svc2 = ActivityDefinition.Create(version.Id, "svc2", ActivityType.ServiceTask, "Service 2", now, actionKey: actionKey);
+        var join = ActivityDefinition.Create(version.Id, "join", ActivityType.JoinGateway, "Join", now);
+        var end = ActivityDefinition.Create(version.Id, "end", ActivityType.End, "End", now);
         db.ActivityDefinitions.AddRange(start, fork, svc1, svc2, join, end);
 
         db.WorkflowTransitions.AddRange(
-            WorkflowTransition.Create(version.Id, start.Id, fork.Id,  "t-start-fork",  1, now),
-            WorkflowTransition.Create(version.Id, fork.Id,  svc1.Id,  "t-fork-svc1",   1, now),
-            WorkflowTransition.Create(version.Id, fork.Id,  svc2.Id,  "t-fork-svc2",   2, now),
-            WorkflowTransition.Create(version.Id, svc1.Id,  join.Id,  "t-svc1-join",   1, now),
-            WorkflowTransition.Create(version.Id, svc2.Id,  join.Id,  "t-svc2-join",   1, now),
-            WorkflowTransition.Create(version.Id, join.Id,  end.Id,   "t-join-end",    1, now));
+            WorkflowTransition.Create(version.Id, start.Id, fork.Id, "t-start-fork", 1, now),
+            WorkflowTransition.Create(version.Id, fork.Id, svc1.Id, "t-fork-svc1", 1, now),
+            WorkflowTransition.Create(version.Id, fork.Id, svc2.Id, "t-fork-svc2", 2, now),
+            WorkflowTransition.Create(version.Id, svc1.Id, join.Id, "t-svc1-join", 1, now),
+            WorkflowTransition.Create(version.Id, svc2.Id, join.Id, "t-svc2-join", 1, now),
+            WorkflowTransition.Create(version.Id, join.Id, end.Id, "t-join-end", 1, now));
 
         var binding = WorkflowBinding.Create(
             def.Id, orgId, "TestModule", "TestEntity", "Created", now,
@@ -466,28 +466,29 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
     // Engine factory: real repos + real services + mocked external services
     // ═══════════════════════════════════════════════════════════════════════
 
-    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db, global::Workflow.Application.Integrations.IWorkflowIntegrationRuntime? integrations = null)
+    private WorkflowRuntimeEngine BuildEngine(WorkflowDbContext db, global::Workflow.Application.Integrations.IWorkflowIntegrationRuntime? integrations = null,
+        IWorkflowRoleAssignments? roleAssignments = null, global::Workflow.Application.Mapping.IStepMappingRuntime? stepMappings = null)
     {
         // Real DB-backed repositories
-        var bindingRepo     = new WorkflowBindingRepository(db);
-        var versionRepo     = new WorkflowVersionRepository(db);
-        var definitionRepo  = new WorkflowDefinitionRepository(db);
-        var instanceRepo    = new WorkflowInstanceRepository(db);
-        var activityRepo    = new ActivityInstanceRepository(db);
-        var workItemRepo    = new WorkItemRepository(db);
-        var candidateRepo   = new WorkItemCandidateRepository(db);
-        var variableRepo    = new WorkflowVariableRepository(db);
-        var eventRepo       = new WorkflowEventRepository(db);
-        var transitionRepo  = new TransitionInstanceRepository(db);
-        var timerRepo       = new WorkflowTimerRepository(db);
-        var tokenRepo       = new WorkflowExecutionTokenRepository(db);
-        var slaRepo         = new SlaPolicyRepository(db);
+        var bindingRepo = new WorkflowBindingRepository(db);
+        var versionRepo = new WorkflowVersionRepository(db);
+        var definitionRepo = new WorkflowDefinitionRepository(db);
+        var instanceRepo = new WorkflowInstanceRepository(db);
+        var activityRepo = new ActivityInstanceRepository(db);
+        var workItemRepo = new WorkItemRepository(db);
+        var candidateRepo = new WorkItemCandidateRepository(db);
+        var variableRepo = new WorkflowVariableRepository(db);
+        var eventRepo = new WorkflowEventRepository(db);
+        var transitionRepo = new TransitionInstanceRepository(db);
+        var timerRepo = new WorkflowTimerRepository(db);
+        var tokenRepo = new WorkflowExecutionTokenRepository(db);
+        var slaRepo = new SlaPolicyRepository(db);
 
         // Real stateless services
-        var eventAppender    = new WorkflowEventAppender(eventRepo);
-        var transitionEval   = new WorkflowTransitionEvaluator();
-        var versionResolver  = new WorkflowVersionResolver(versionRepo);
-        var timerService     = new WorkflowTimerService(timerRepo);
+        var eventAppender = new WorkflowEventAppender(eventRepo);
+        var transitionEval = new WorkflowTransitionEvaluator();
+        var versionResolver = new WorkflowVersionResolver(versionRepo);
+        var timerService = new WorkflowTimerService(timerRepo);
 
         return new WorkflowRuntimeEngine(
             db,
@@ -515,7 +516,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests : IDisposable
             _notifPublisher.Object,
             tokenRepo,
             _outcomeDispatcher.Object,
-            _requestProjector.Object, integrations, integrations is null ? null : new WorkflowActivityEvents(db, integrations));
+            _requestProjector.Object, integrations, integrations is null ? null : new WorkflowActivityEvents(db, integrations, stepMappings as WorkflowMappingRuntime), roleAssignments: roleAssignments, stepMappings: stepMappings);
     }
 
     private sealed class StubTenant(Guid orgId) : ICurrentTenant

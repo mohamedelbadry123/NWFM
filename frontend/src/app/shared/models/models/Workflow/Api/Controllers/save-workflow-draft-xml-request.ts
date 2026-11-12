@@ -3,5 +3,6 @@
 
 export interface SaveWorkflowDraftXmlRequest {
   designerJson?: string | null;
+  expectedRevision?: string | null;
   xmlContent?: string | null;
 }

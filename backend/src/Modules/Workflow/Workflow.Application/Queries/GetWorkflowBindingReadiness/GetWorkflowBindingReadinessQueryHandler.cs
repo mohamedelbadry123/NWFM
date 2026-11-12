@@ -1,10 +1,12 @@
 namespace Workflow.Application.Queries.GetWorkflowBindingReadiness;
 
 using MediatR;
+using NWFM.Shared.Integration.Workflow;
 using NWFM.Shared.Results;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Constants;
 using Workflow.Application.DTOs;
+using Workflow.Application.Helpers;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 
@@ -15,17 +17,19 @@ public sealed class GetWorkflowBindingReadinessQueryHandler
     private readonly IWorkflowBindingRepository _bindings;
     private readonly IWorkflowVersionRepository _versions;
     private readonly IWorkflowAssignmentGroupRepository _groups;
+    private readonly IWorkflowRoleDirectory? _roles;
 
     public GetWorkflowBindingReadinessQueryHandler(
         IWorkflowFeatureGate gate,
         IWorkflowBindingRepository bindings,
         IWorkflowVersionRepository versions,
-        IWorkflowAssignmentGroupRepository groups)
+        IWorkflowAssignmentGroupRepository groups, IWorkflowRoleDirectory? roles = null)
     {
         _gate = gate;
         _bindings = bindings;
         _versions = versions;
         _groups = groups;
+        _roles = roles;
     }
 
     public async Task<Result<WorkflowBindingReadinessDto>> Handle(
@@ -64,6 +68,14 @@ public sealed class GetWorkflowBindingReadinessQueryHandler
 
         foreach (var task in version.Activities.Where(a => a.ActivityType == ActivityType.UserTask))
         {
+            var roleReady = await WorkflowAccountRoleSelection.IsReadyAsync(task, _roles, cancellationToken);
+            if (roleReady is not null)
+            {
+                var roleLabel = task.Name ?? task.NodeKey;
+                required.Add(roleLabel);
+                if (roleReady.Value) resolved.Add(roleLabel); else missing.Add(roleLabel);
+                continue;
+            }
             var rule = task.AssignmentRules.FirstOrDefault(r => r.IsActive);
             var label = rule?.AssignmentKey ?? task.Name ?? task.NodeKey;
             required.Add(label);
@@ -96,6 +108,6 @@ public sealed class GetWorkflowBindingReadinessQueryHandler
             UnmappedAssignmentKeys: missing,
             BlockingReason: ready
                 ? null
-                : $"User tasks without an organization group: {string.Join(", ", missing)}"));
+                : $"User tasks without an organization group or valid assigned roles: {string.Join(", ", missing)}"));
     }
 }

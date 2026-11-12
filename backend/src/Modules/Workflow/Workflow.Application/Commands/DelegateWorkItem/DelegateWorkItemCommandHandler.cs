@@ -12,6 +12,7 @@ using Workflow.Domain.Repositories;
 public sealed class DelegateWorkItemCommandHandler
     : IRequestHandler<DelegateWorkItemCommand, Result<WorkItemDto>>
 {
+    private readonly IWorkflowRoleAssignments? _roles;
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkItemRepository _workItemRepo;
     private readonly IWorkflowAssignmentGroupRepository _groupRepo;
@@ -25,14 +26,15 @@ public sealed class DelegateWorkItemCommandHandler
         IWorkflowAssignmentGroupRepository groupRepo,
         IWorkflowParticipantRepository participantRepo,
         IWorkflowEventAppender events,
-        IWorkflowRequestProjector projector)
+        IWorkflowRequestProjector projector, IWorkflowRoleAssignments? roles = null)
     {
-        _gate            = gate;
-        _workItemRepo    = workItemRepo;
-        _groupRepo       = groupRepo;
+        _roles = roles;
+        _gate = gate;
+        _workItemRepo = workItemRepo;
+        _groupRepo = groupRepo;
         _participantRepo = participantRepo;
-        _events          = events;
-        _projector       = projector;
+        _events = events;
+        _projector = projector;
     }
 
     public async Task<Result<WorkItemDto>> Handle(
@@ -56,11 +58,14 @@ public sealed class DelegateWorkItemCommandHandler
         if (!delegateIsParticipant)
             return Result.Failure<WorkItemDto>(WorkflowErrors.Participant.NotFound);
 
-        var isMember = await _groupRepo.IsUserMemberOfGroupAsync(
-            item.AssignmentGroupId, request.DelegateToUserId, request.OrganizationId, cancellationToken);
+        var isMember = item.AssignmentGroupId == Guid.Empty
+            ? _roles is not null && await _roles.CanAccessAsync(item, request.DelegateToUserId, cancellationToken)
+            : await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.DelegateToUserId, request.OrganizationId, cancellationToken);
         if (!isMember)
-            return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotGroupMember);
+            return Result.Failure<WorkItemDto>(item.AssignmentGroupId == Guid.Empty ? WorkflowErrors.WorkItem.NotAssignedRole : WorkflowErrors.WorkItem.NotGroupMember);
 
+        if (item.AssignmentGroupId == Guid.Empty && (_roles is null || !await _roles.CanAccessAsync(item, request.ActorUserId, cancellationToken)))
+            return Result.Failure<WorkItemDto>(WorkflowErrors.WorkItem.NotAssignedRole);
         var now = DateTime.UtcNow;
         item.Delegate(request.DelegateToUserId, now);
         await _workItemRepo.SaveChangesAsync(cancellationToken);

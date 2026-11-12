@@ -1,6 +1,6 @@
 # Tenant security implementation and operating requirements
 
-Source: [OWASP Multi-Tenant Application Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multi_Tenant_Security_Cheat_Sheet.html), retrieved 2026-10-20.
+Source: [OWASP Multi-Tenant Application Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multi_Tenant_Security_Cheat_Sheet.html), retrieved 2026-11-12.
 The unmodified article and its CC-BY-SA-4.0 license are in `vendor/`. The adapted
 requirement mapping in `tenant-controls.json` is also attributed to the OWASP Cheat
 Sheet Series Team and provided under CC-BY-SA-4.0.
@@ -164,7 +164,9 @@ repository. These are explicit obligations, not passing automated checks:
 - Connect structured security events to a protected collector. Alert on repeated
   tenant mismatch/authorization denials, failed binding/role checks and abnormal
   queue or resource exhaustion; test notification delivery with synthetic events.
-  The API emits JSON event `4201/TenantAccessDenied` for each denied response.
+  The API emits JSON event `4201/TenantAccessDenied` for tenant-selector denials
+  and `/api` responses with status 401, 403 or 429. Non-API responses and tenant
+  inactivity/offboarding refusals with status 503 are outside this event's scope.
   Event `4202/TenantIsolationAlert` triggers at 20 denials within 60 seconds,
   at most once per minute per deployment. Both include the server tenant ID. Configure the
   collector to notify on event 4202 and failed startup boundary validation.
@@ -177,7 +179,91 @@ repository. These are explicit obligations, not passing automated checks:
 - Verify encryption, key isolation, key rotation and recoverability against the
   selected managed services.
 
-## Validation results
+## Upstream reconciliation, 2026-11-12
+
+The current pin is SHA-256
+`b546aa45feefa54f42d025e9823cd15d2cc67f1eb8d4c7b555775650321c050a`.
+Its **146 source units** comprise **75 repository**, **47 repository-and-deployment**,
+**2 deployment**, and **22 not-applicable** mappings. **49 units still require
+deployment evidence.** This replaces the 141-unit inventory below, not its historical
+test results. Of the old units, 120 have identical content hashes and retain their
+classifications, reasons, obligations and evidence groups. The 21 removed/changed
+blocks and 26 added/changed blocks were reviewed by content, not ordinal IDs.
+Removed rate-limit, S3, lifecycle and logging examples do not remove their security
+intent: the new explicit requirements are mapped to the actual C#/SQL/local-storage
+boundary. The gate/parser and its exact inventory/digest checks are unchanged.
+
+The following distinctions are required when using this catalog:
+
+- **Evidence groups:** file lists identify related implementation and tests to
+  inspect; they do not prove every requirement in the group independently. Each
+  control's reason, classification and deployment obligation define its actual
+  coverage, including controls marked not applicable.
+
+- **Rate limits (MT-075–078):** the configurable one-minute windows and concurrency
+  rejection are real application controls; HTTP and queue rejection supply 429
+  and Retry-After. They are not a capacity assessment or a shared HTTP counter.
+  Multiple replicas sharing a tenant quota require an atomic aggregate gateway
+  budget and burst/window tests, or a single-process restriction. Atomic SQL queue
+  capacity does not substitute for an HTTP rate limiter. Approve limits from
+  measured capacity, abuse risk and contracts; preserve global host limits.
+- **Files (MT-087–094):** a bound local root, exact database file handle and current
+  operation permissions establish access, not the filename or supplied metadata.
+  Upload resolves the form/schema version and records the uploader. Pending files
+  are private to their owner/admin; submitted reads use review/task permission.
+  Delete requires owner/admin and pending state; imported archive bytes are never
+  deleted by dropping a reference. These form-schema pins are distinct from storage
+  object versions. No signed URL, arbitrary object-version selector or bulk tenant
+  deletion API exists. Any later versioned/signed access needs exact version and
+  operation authorization. Operators must prove isolated OS ACLs and exact deletion
+  boundaries, including sibling-prefix tests; versions, replicas and backups remain
+  part of retention even though local storage does not expose them.
+- **Provisioning (MT-095/101):** database ownership binding and its ledger insertion
+  are transactional. The `Provisioned` event marks binding, not the completion of
+  subsequent migrations/seeds or all external resource allocation. Production
+  provisioning must remain quarantined until every stage succeeds. On failure,
+  record the partial attempt in a protected external sink and remove only resources
+  proved to belong to that attempt; do not delete preexisting tenant data. Test a
+  failure at every stage. There is no full infrastructure provisioning orchestrator
+  in this application. Rolled-back operator failures also need external audit capture.
+- **Credentials/offboarding (MT-097–100):** generate optional inbound API keys using
+  a CSPRNG with at least 128 bits of entropy (use 32 random bytes), deliver once via
+  an authenticated secret channel, and retain only `ApiKeySha256` in verifier
+  configuration. A digest/length check cannot prove entropy; passwords keep Identity
+  hashing. No tenant key-issuance endpoint exists. Offboarding atomically disables
+  admission and revokes sessions/stamps/accounts; external webhook/service/signing
+  credentials must separately be disabled/rotated before reactivation. Drain effects
+  authorized before offboarding. The recorded retention schedule does not execute
+  deletion. Inventory all encrypted copies and legal holds before key destruction;
+  destroying a key early destroys the recoverability of those copies too.
+- **Restore (MT-103–107, unchanged by content):** current operator checks verify an
+  isolated recovery resource, actual tenant-owned rows and storage marker. They do
+  not promote data or reinstate old memberships. Reapply current access/retention
+  rules in a separately authorized data-only promotion. Shared snapshot recovery
+  remains unsupported; do not give tenant operators shared backups. Repeat the
+  two-tenant contamination/unauthorized-operator drill against deployed identities.
+- **Audit (MT-108–117):** final denial events now include nullable `ActorId` from an
+  authenticated, unambiguous tenant-bound principal and the server trace; anonymous
+  or early denials have no invented actor. Headers and credentials are not logged as
+  identity. Lifecycle records use SQL `ORIGINAL_LOGIN()`. Tenant Administrator is
+  not a platform auditor. A central collector must separately authorize reads and
+  ingestion, enforce per-tenant views, and protect any platform-wide capability.
+  Startup rejects request-role mutation of `Tenancy.LifecycleAudit`; operator grants
+  are INSERT-only for that ledger. **Ordinary Workflow audit rows under schema CRUD
+  are not an immutable/WORM ledger.** Independently protect and durably collect every
+  required audit class, and demonstrate update/delete denial or WORM enforcement.
+  The repository has no cryptographic audit chain/checkpoint verifier: deploy and
+  test tamper detection separately from append-only prevention. Alert events are
+  not evidence of notification delivery. Minimize operator reason/backup metadata
+  and business audit payloads, exclude secrets, and verify per-class retention and
+  collector access against the OWASP Logging guidance.
+
+These are actionable deployment prerequisites, not certifications supplied by a
+passing source-inventory gate. No PR5 platform services, shared-database model or
+new public endpoints are implied. Preserve the existing isolated deployment until
+the applicable operational evidence exists.
+
+## Historical validation results
 
 Validated locally on 2026-10-20:
 

@@ -1,8 +1,6 @@
 namespace NWFM.Tests.Modules.FormEngine;
 
 using FluentAssertions;
-using Microsoft.Extensions.Options;
-using Moq;
 using global::FormEngine.Application.Common.Interfaces;
 using global::FormEngine.Application.Common.Schema;
 using global::FormEngine.Application.Constants;
@@ -13,6 +11,8 @@ using global::FormEngine.Domain.Constants;
 using global::FormEngine.Domain.Entities;
 using global::FormEngine.Domain.Options;
 using global::FormEngine.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
+using Moq;
 using NWFM.Shared.Abstractions;
 using NWFM.Shared.Caching;
 using NWFM.Shared.Exceptions;
@@ -58,6 +58,38 @@ public sealed class SubmitFormCommandHandlerTests : IDisposable
     }
 
     public void Dispose() => _context.Dispose();
+
+    [Theory]
+    [InlineData("WorkItem", "owned", true)]
+    [InlineData("WorkItem", "other", false)]
+    [InlineData("Standalone", "owned", false)]
+    public async Task WorkflowCompletionGatewayReadsOnlyTheImmutableClientReceiptInItsContext(string contextType, string contextId, bool allowed)
+    {
+        var form = await AddPublishedFormAsync(); var client = Guid.NewGuid(); var receipt = Guid.NewGuid();
+        _store.Setup(s => s.FindByClientIdAsync(It.IsAny<FormTable>(), client, default)).ReturnsAsync(receipt);
+        _store.Setup(s => s.GetByIdAsync(It.IsAny<FormTable>(), receipt, default)).ReturnsAsync(new Dictionary<string, object?>
+        { ["Id"] = receipt, ["VersionNo"] = 1, ["ContextType"] = contextType, ["ContextId"] = contextId, ["SubmittedDate"] = new DateTimeOffset(Now), ["meter_reading"] = 42 });
+        var gateway = new global::FormEngine.Infrastructure.Integration.FormGateway(_context, _store.Object, Mock.Of<IFormSubmissionService>(), _storage.Object);
+        var found = await gateway.GetByClientIdAsync(form.Id, client, "WorkItem", "owned", default);
+        if (allowed) { found!.SubmissionId.Should().Be(receipt); found.Answers["meter_reading"].Should().Be(42); }
+        else found.Should().BeNull();
+        _store.Verify(s => s.GetLatestByContextAsync(It.IsAny<FormTable>(), It.IsAny<string>(), It.IsAny<string>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task WorkflowOwnedContextGuardRunsBeforeGenericSubmissionAndReplay()
+    {
+        var guard = new Mock<NWFM.Shared.Integration.Forms.IFormSubmissionGuard>();
+        guard.Setup(g => g.ValidateAsync(It.IsAny<Guid>(), It.IsAny<int?>(), "WorkItem", "spoofed", It.IsAny<Guid?>(),
+            It.IsAny<IReadOnlyDictionary<string, object?>>(), "user-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NWFM.Shared.Results.Result.Failure(new NWFM.Shared.Results.Error("Workflow.Form.Context", "Readonly value tampered.")));
+        var service = new FormSubmissionService(_context, _store.Object, _publisher, _storage.Object, _user.Object,
+            new FakeTimeProvider(Now), Options.Create(new FileStorageOptions()), Options.Create(new FormEngineOptions()), [guard.Object]);
+        var result = await new SubmitFormCommandHandler(service).Handle(new SubmitFormCommand
+        { FormDefinitionId = Guid.NewGuid(), VersionNo = 2, ContextType = "WorkItem", ContextId = "spoofed", ClientSubmissionId = Guid.NewGuid(), Answers = new() { ["readonly"] = "changed" } }, default);
+        result.IsFailure.Should().BeTrue(); result.Error.Code.Should().Be("Workflow.Form.Context");
+        guard.VerifyAll(); _store.VerifyNoOtherCalls();
+    }
 
     private async Task<FormDefinition> AddPublishedFormAsync(string? schemaJson = null, string code = "FRM-001")
     {

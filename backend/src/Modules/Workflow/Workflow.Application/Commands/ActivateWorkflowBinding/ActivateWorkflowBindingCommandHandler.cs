@@ -1,9 +1,11 @@
 namespace Workflow.Application.Commands.ActivateWorkflowBinding;
 
 using MediatR;
+using NWFM.Shared.Integration.Workflow;
 using NWFM.Shared.Results;
 using Workflow.Application.Abstractions;
 using Workflow.Application.Constants;
+using Workflow.Application.Helpers;
 using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 
@@ -15,19 +17,21 @@ public sealed class ActivateWorkflowBindingCommandHandler
     private readonly IWorkflowVersionRepository _versionRepo;
     private readonly IWorkflowAssignmentGroupRepository _groupRepo;
     private readonly IWorkflowDefinitionRepository _definitionRepo;
+    private readonly IWorkflowRoleDirectory? _roles;
 
     public ActivateWorkflowBindingCommandHandler(
         IWorkflowFeatureGate gate,
         IWorkflowBindingRepository repo,
         IWorkflowVersionRepository versionRepo,
         IWorkflowAssignmentGroupRepository groupRepo,
-        IWorkflowDefinitionRepository definitionRepo)
+        IWorkflowDefinitionRepository definitionRepo, IWorkflowRoleDirectory? roles = null)
     {
         _gate = gate;
         _repo = repo;
         _versionRepo = versionRepo;
         _groupRepo = groupRepo;
         _definitionRepo = definitionRepo;
+        _roles = roles;
     }
 
     public async Task<Result<bool>> Handle(
@@ -58,6 +62,9 @@ public sealed class ActivateWorkflowBindingCommandHandler
             var userTasks = version.Activities.Where(a => a.ActivityType == ActivityType.UserTask);
             foreach (var task in userTasks)
             {
+                var roleReady = await WorkflowAccountRoleSelection.IsReadyAsync(task, _roles, cancellationToken);
+                if (roleReady == true) continue;
+                if (roleReady == false) return Result.Failure<bool>(WorkflowErrors.Binding.IncompleteMappings);
                 var rule = task.AssignmentRules.FirstOrDefault(r => r.IsActive);
                 var resolved = false;
 

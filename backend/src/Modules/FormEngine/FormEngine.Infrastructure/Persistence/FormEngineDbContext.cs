@@ -20,6 +20,7 @@ public sealed class FormEngineDbContext(DbContextOptions<FormEngineDbContext> op
     public DbSet<FormVersion> FormVersions => Set<FormVersion>();
     public DbSet<FormField> FormFields => Set<FormField>();
     public DbSet<SubmissionFile> SubmissionFiles => Set<SubmissionFile>();
+    public DbSet<WorkflowReceiptKey> WorkflowReceiptKeys => Set<WorkflowReceiptKey>();
 
     public async Task<IDbContextTransaction?> BeginTransactionIfNoneAsync(CancellationToken ct = default) =>
         Database.CurrentTransaction is null
@@ -32,5 +33,6 @@ public sealed class FormEngineDbContext(DbContextOptions<FormEngineDbContext> op
 
         builder.HasDefaultSchema(FormEngineSchema.Name);
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        builder.Entity<WorkflowReceiptKey>().ToTable("WorkflowReceiptKeys", FormEngineSchema.Name).HasKey(k => k.ClientSubmissionId);
     }
 }

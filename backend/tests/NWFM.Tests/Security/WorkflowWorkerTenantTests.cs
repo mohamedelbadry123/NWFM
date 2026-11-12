@@ -14,6 +14,21 @@ namespace NWFM.Tests.Security;
 public sealed class WorkflowWorkerTenantTests
 {
     [Fact]
+    public async Task InactiveTenantDesignerRecoveryDoesNotResolveRuntimeOrReadQueues()
+    {
+        var availability = new Mock<ITenantAvailability>();
+        availability.Setup(a => a.IsActiveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        await using var services = new ServiceCollection()
+            .Configure<TenantIsolationOptions>(o => o.TenantId = Guid.NewGuid())
+            .AddSingleton(availability.Object).BuildServiceProvider();
+        // No runtime or database is registered: either recovery dispatch would fail.
+        var worker = new WorkflowIntegrationHostedService(services.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<WorkflowIntegrationHostedService>.Instance);
+        await worker.ProcessDesignerRecoveryAsync(default);
+        availability.Verify(a => a.IsActiveAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
     public void EveryHostedWorkerRequiresExplicitTenantBoundaryClassification()
     {
         var assemblies = new[]

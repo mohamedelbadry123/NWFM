@@ -1,10 +1,10 @@
 namespace Workflow.Api.Controllers;
 
-using NWFM.Shared.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using NWFM.Shared.Constants;
 using NWFM.Shared.Results;
 using Workflow.Application.Commands.CloneWorkflowVersion;
 using Workflow.Application.Commands.CreateWorkflowDraft;
@@ -186,8 +186,11 @@ public sealed class WorkflowVersionsController : WorkflowControllerBase
         CancellationToken cancellationToken)
     {
         var command = new SaveWorkflowDraftXmlCommand(
-            versionId, request.XmlContent, request.DesignerJson);
+            versionId, request.XmlContent, request.DesignerJson, request.ExpectedRevision);
         var result = await _sender.Send(command, cancellationToken);
+
+        if (result.IsFailure && result.Error.Code == "Workflow.Draft.Conflict")
+            return Conflict(new { result.Error.Code, result.Error.Message });
 
         if (result.IsFailure && result.Error.Code == "Workflow.Version.NotFound")
             return NotFound(new { result.Error.Code, result.Error.Message });
@@ -204,6 +207,7 @@ public sealed class WorkflowVersionsController : WorkflowControllerBase
     /// <summary>Validates a Draft version and stores the validation result.</summary>
     [HttpPost("{versionId:guid}/validate")]
     [ProducesResponseType(typeof(WorkflowValidationResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Validate(
@@ -213,6 +217,9 @@ public sealed class WorkflowVersionsController : WorkflowControllerBase
     {
         var result = await _sender.Send(
             new ValidateWorkflowVersionCommand(versionId), cancellationToken);
+
+        if (result.IsFailure && result.Error.Code == "Workflow.Draft.Conflict")
+            return Conflict(new { result.Error.Code, result.Error.Message });
 
         if (result.IsFailure && result.Error.Code == "Workflow.Version.NotFound")
             return NotFound(new { result.Error.Code, result.Error.Message });
@@ -306,5 +313,5 @@ public sealed class WorkflowVersionsController : WorkflowControllerBase
 }
 
 public sealed record CreateWorkflowDraftRequest(string? ChangeSummary);
-public sealed record SaveWorkflowDraftXmlRequest(string XmlContent, string? DesignerJson);
+public sealed record SaveWorkflowDraftXmlRequest(string XmlContent, string? DesignerJson, string? ExpectedRevision = null);
 public sealed record CloneWorkflowVersionRequest(string? ChangeSummary);

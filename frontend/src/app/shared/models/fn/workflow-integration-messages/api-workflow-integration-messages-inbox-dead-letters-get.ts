@@ -7,14 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowIntegrationInboxMessageDto as NwfmSharedResultsPaginatedResultOfWorkflowIntegrationInboxMessageDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-integration-inbox-message-dto';
+import { WorkflowIntegrationInboxMessageDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationInboxMessageDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-integration-inbox-message-dto';
 
 export interface ApiWorkflowIntegrationMessagesInboxDeadLettersGet$Params {
   page?: number;
   pageSize?: number;
 }
 
-export function apiWorkflowIntegrationMessagesInboxDeadLettersGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIntegrationMessagesInboxDeadLettersGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIntegrationInboxMessageDto>> {
+export function apiWorkflowIntegrationMessagesInboxDeadLettersGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIntegrationMessagesInboxDeadLettersGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationInboxMessageDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowIntegrationMessagesInboxDeadLettersGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -26,7 +26,7 @@ export function apiWorkflowIntegrationMessagesInboxDeadLettersGet(http: HttpClie
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIntegrationInboxMessageDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationInboxMessageDto>;
     })
   );
 }

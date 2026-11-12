@@ -20,6 +20,8 @@ public sealed class WorkflowJobConfiguration : IEntityTypeConfiguration<Workflow
     {
         b.ToTable("integration_jobs", "Workflow"); b.HasKey(x => x.Id);
         b.Property(x => x.Kind).HasMaxLength(20); b.Property(x => x.Status).HasMaxLength(20);
+        b.Property(x => x.ExecutionKind).HasMaxLength(20).HasDefaultValue("Legacy");
+        b.HasIndex(x => x.InvocationId).IsUnique().HasFilter("[InvocationId] IS NOT NULL");
         b.Property(x => x.OperationKey).HasMaxLength(450); b.Property(x => x.Error).HasMaxLength(2000);
         b.Property(x => x.RowVersion).IsRowVersion();
         b.HasIndex(x => new { x.OrganizationId, x.OperationKey }).IsUnique();

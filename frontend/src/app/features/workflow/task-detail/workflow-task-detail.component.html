@@ -266,6 +266,9 @@
           [selectedForm]="selected"
           [workItemId]="item()!.id!"
           [answers]="formValues"
+          [mappingSnapshot]="item()!.mappingSnapshot"
+          [draftKey]="item()!.formDraftKey"
+          [serverAnswers]="item()!.formValues"
           [readonly]="true"
         />
       }
@@ -346,6 +349,9 @@
               [selectedForm]="selected"
               [workItemId]="item()!.id!"
               [answers]="formValues"
+              [mappingSnapshot]="item()!.mappingSnapshot"
+              [draftKey]="item()!.formDraftKey"
+              [serverAnswers]="item()!.formValues"
               (answersChange)="formValues = $event"
             />
           }
@@ -525,7 +531,34 @@
         </div>
       }
 
-      @if (tab() === 'action' && item()!.status !== 'Claimed' && item()!.status !== 'Pending') {
+      @if (tab() === 'action' && isPreparing()) {
+        <section
+          class="wf-card space-y-2 p-5 text-sm"
+          role="status"
+          aria-live="polite"
+          data-testid="preparing-notice"
+        >
+          <h2 class="text-base font-semibold text-ink-900 dark:text-white">
+            {{ t('Preparing this Step', 'جارٍ تجهيز هذه الخطوة') }}
+          </h2>
+          <p>{{ preparingMessage() }}</p>
+          <p class="text-ink-500 dark:text-dark-300">
+            {{
+              t(
+                'You cannot claim or complete this task until the values are ready. This page updates on its own.',
+                'لا يمكنك استلام المهمة أو إكمالها حتى تصبح القيم جاهزة. تتحدث هذه الصفحة تلقائياً.'
+              )
+            }}
+          </p>
+        </section>
+      }
+
+      @if (
+        tab() === 'action' &&
+        item()!.status !== 'Claimed' &&
+        item()!.status !== 'Pending' &&
+        !isPreparing()
+      ) {
         <p class="wf-card p-5 text-sm text-ink-500 dark:text-dark-300">
           {{ 'workflow.runtime.task_detail.complete_heading' | translate }}
         </p>

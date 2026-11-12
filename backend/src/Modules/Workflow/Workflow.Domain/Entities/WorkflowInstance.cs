@@ -35,6 +35,8 @@ public sealed class WorkflowInstance : Entity, ITenantAware
     public DateTime? CompletedAt { get; private set; }
     public DateTime? CancelledAt { get; private set; }
     public DateTime? SuspendedAt { get; private set; }
+    /// <summary>Start of the current status interval. Null on historical rows without authoritative evidence.</summary>
+    public DateTime? StatusEnteredAt { get; private set; }
 
     public string? FailureReason { get; private set; }
 
@@ -91,20 +93,21 @@ public sealed class WorkflowInstance : Entity, ITenantAware
     {
         return new WorkflowInstance
         {
-            Id                       = Guid.NewGuid(),
-            OrganizationId           = organizationId,
-            WorkflowBindingId        = workflowBindingId,
-            PinnedWorkflowVersionId  = pinnedWorkflowVersionId,
-            IdempotencyKey           = idempotencyKey,
-            BusinessEntityId         = businessEntityId,
-            CorrelationId            = correlationId,
-            Status                   = WorkflowInstanceStatus.Running,
-            StartedAt                = startedAt,
-            StartedByUserId          = startedByUserId,
-            CurrentActivityNodeKey   = currentActivityNodeKey,
-            ParentInstanceId         = parentInstanceId,
-            ParentActivityNodeKey    = parentActivityNodeKey,
-            CreatedAt                = startedAt,
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
+            WorkflowBindingId = workflowBindingId,
+            PinnedWorkflowVersionId = pinnedWorkflowVersionId,
+            IdempotencyKey = idempotencyKey,
+            BusinessEntityId = businessEntityId,
+            CorrelationId = correlationId,
+            Status = WorkflowInstanceStatus.Running,
+            StartedAt = startedAt,
+            StatusEnteredAt = startedAt,
+            StartedByUserId = startedByUserId,
+            CurrentActivityNodeKey = currentActivityNodeKey,
+            ParentInstanceId = parentInstanceId,
+            ParentActivityNodeKey = parentActivityNodeKey,
+            CreatedAt = startedAt,
         };
     }
 
@@ -116,28 +119,35 @@ public sealed class WorkflowInstance : Entity, ITenantAware
 
     public void Complete(DateTime completedAt)
     {
-        Status      = WorkflowInstanceStatus.Completed;
+        if (Status == WorkflowInstanceStatus.Completed) return;
+        StatusEnteredAt = completedAt;
+        Status = WorkflowInstanceStatus.Completed;
         CompletedAt = completedAt;
         SetUpdated(completedAt);
     }
 
     public void Cancel(DateTime cancelledAt)
     {
-        Status      = WorkflowInstanceStatus.Cancelled;
+        if (Status == WorkflowInstanceStatus.Cancelled) return;
+        StatusEnteredAt = cancelledAt;
+        Status = WorkflowInstanceStatus.Cancelled;
         CancelledAt = cancelledAt;
         SetUpdated(cancelledAt);
     }
 
     public void Suspend(DateTime suspendedAt)
     {
-        Status      = WorkflowInstanceStatus.Suspended;
+        if (Status == WorkflowInstanceStatus.Suspended) return;
+        StatusEnteredAt = suspendedAt;
+        Status = WorkflowInstanceStatus.Suspended;
         SuspendedAt = suspendedAt;
         SetUpdated(suspendedAt);
     }
 
     public void Resume(DateTime updatedAt)
     {
-        Status      = WorkflowInstanceStatus.Running;
+        if (Status != WorkflowInstanceStatus.Running) StatusEnteredAt = updatedAt;
+        Status = WorkflowInstanceStatus.Running;
         SuspendedAt = null;
         FailureReason = null;
         SetUpdated(updatedAt);
@@ -145,7 +155,8 @@ public sealed class WorkflowInstance : Entity, ITenantAware
 
     public void Fail(string reason, DateTime failedAt)
     {
-        Status        = WorkflowInstanceStatus.Failed;
+        if (Status != WorkflowInstanceStatus.Failed) StatusEnteredAt = failedAt;
+        Status = WorkflowInstanceStatus.Failed;
         FailureReason = reason;
         SetUpdated(failedAt);
     }

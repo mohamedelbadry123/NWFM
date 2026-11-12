@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Auth.Domain.Constants;
 using Microsoft.Extensions.Options;
 using NWFM.Api.Services;
 using NWFM.Shared.Abstractions;
@@ -93,7 +94,7 @@ public sealed class TenantRequestBudgetMiddleware(RequestDelegate next)
             http.Response.Headers.CacheControl = "no-store";
             if (http.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden
                 or StatusCodes.Status429TooManyRequests || http.Items.ContainsKey("TenantSecurity.SelectorDenied"))
-                signals.Denied(http.Response.StatusCode);
+                signals.Denied(http.Response.StatusCode, VerifiedActor(http, application.Value.TenantId), http.TraceIdentifier);
             return Task.CompletedTask;
         });
         using var concurrency = limits.AcquireConcurrency();
@@ -119,6 +120,17 @@ public sealed class TenantRequestBudgetMiddleware(RequestDelegate next)
             ? Math.Max(1, (int)Math.Ceiling(delay.TotalSeconds)) : 1;
         http.Response.Headers.RetryAfter = retry.ToString(CultureInfo.InvariantCulture);
         return http.Response.WriteAsJsonAsync(new { code = "Tenant.RateLimit", message = "Request limit exceeded." });
+    }
+
+    private static Guid? VerifiedActor(HttpContext http, Guid tenantId)
+    {
+        // OnStarting runs after authentication (or the outer exception handler). Early anonymous
+        // rejections have no actor. Never infer one from request headers, body or a tenant selector.
+        if (http.User.Identity?.IsAuthenticated != true) return null;
+        var tenants = http.User.FindAll(AppClaimTypes.TenantId).Take(2).ToArray();
+        var actors = http.User.FindAll(ClaimTypes.NameIdentifier).Take(2).ToArray();
+        return tenants.Length == 1 && Guid.TryParse(tenants[0].Value, out var verifiedTenant) && verifiedTenant == tenantId
+            && actors.Length == 1 && Guid.TryParse(actors[0].Value, out var actor) && actor != Guid.Empty ? actor : null;
     }
 }
 

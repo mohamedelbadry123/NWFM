@@ -6,6 +6,10 @@ using NWFM.Shared.MultiTenancy;
 public sealed class WorkflowIntegrationJob : Entity, ITenantAware
 {
     public Guid OrganizationId { get; private set; }
+    public Guid? InvocationId { get; private set; }
+    public string ExecutionKind { get; private set; } = "Legacy";
+    public void AttachInvocation(Guid id, string kind) => (InvocationId, ExecutionKind) = (id, kind);
+    public void Reapply() { Status = "Delivered"; ResultJson = DeliveryResultJson; Error = null; }
     public Guid WorkflowInstanceId { get; private set; }
     public Guid ActivityInstanceId { get; private set; }
     public Guid ConnectionId { get; private set; }
@@ -34,11 +38,19 @@ public sealed class WorkflowIntegrationJob : Entity, ITenantAware
     private WorkflowIntegrationJob() { }
     public static WorkflowIntegrationJob Create(Guid org, Guid instance, Guid activity, Guid connection,
         string kind, string configuration, string input, string operationKey) => new()
-    {
-        Id = Guid.NewGuid(), OrganizationId = org, WorkflowInstanceId = instance, ActivityInstanceId = activity,
-        ConnectionId = connection, Kind = kind, ConfigurationJson = configuration, InputJson = input,
-        OperationKey = operationKey, CreatedAt = DateTime.UtcNow, NextAttemptAt = DateTime.UtcNow
-    };
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = org,
+            WorkflowInstanceId = instance,
+            ActivityInstanceId = activity,
+            ConnectionId = connection,
+            Kind = kind,
+            ConfigurationJson = configuration,
+            InputJson = input,
+            OperationKey = operationKey,
+            CreatedAt = DateTime.UtcNow,
+            NextAttemptAt = DateTime.UtcNow
+        };
     public void Claim(Guid owner, DateTime until) { Status = "Running"; Attempts++; LeaseOwner = owner; LeaseUntil = until; }
     public void RecordDelivery(string result, int? statusCode)
     { Status = "Delivered"; ResultJson = result; DeliveryResultJson = result; StatusCode = statusCode; LeaseOwner = null; LeaseUntil = null; SetUpdated(DateTime.UtcNow); }

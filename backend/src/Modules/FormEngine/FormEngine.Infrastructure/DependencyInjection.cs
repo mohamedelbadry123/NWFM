@@ -8,7 +8,6 @@ using FormEngine.Infrastructure.Persistence;
 using FormEngine.Infrastructure.Submissions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -50,6 +49,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IFormSubmissionStore, FormSubmissionStore>();
         builder.Services.AddScoped<IFormPublisher, FormPublisher>();
         builder.Services.AddScoped<IFormSubmissionService, FormSubmissionService>();
+        builder.Services.TryAddScoped<TrustedFormSubmissionActor>();
 
         // How other modules — Tasks, a workflow task screen — read and fill forms without referencing this one.
         builder.Services.AddScoped<IFormGateway, FormGateway>();
