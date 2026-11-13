@@ -11,6 +11,7 @@ import {
   startOwnedTree,
 } from './support/mapping-runtime.js';
 import { designerAccounts } from './support/designer-accounts.js';
+import { signIn } from './support/login.js';
 const accounts = designerAccounts('draft-preservation');
 
 interface Item {
@@ -23,12 +24,12 @@ interface Item {
   formHistory: { answers: Record<string, unknown> }[];
 }
 
-beforeEach(async ({ app, screen }) => {
+beforeEach(async ({ app, browser, screen }) => {
   const user = accounts.next();
   await app.open('/login');
   await screen.getByLabel('Username').fill(user.username);
   await screen.getByLabel('Password').fill(user.password);
-  await screen.getByRole('button', 'Sign in').click();
+  await signIn(browser, () => screen.getByRole('button', 'Sign in').click());
   await expect(screen.getByRole('link', 'Workflows', { exact: true })).toBeVisible();
 });
 
@@ -159,7 +160,7 @@ test('one simulated 401 uses real same-user silent refresh, then edits survive r
   const user = accounts.current();
   await screen.getByLabel('Username').fill(user.username);
   await screen.getByLabel('Password').fill(user.password);
-  await screen.getByRole('button', 'Sign in').click();
+  await signIn(browser, () => screen.getByRole('button', 'Sign in').click());
   await expect(screen.getByRole('link', 'Workflows', { exact: true })).toBeVisible();
   await app.open('/org/workflow/tasks/' + fixture.task.id);
   await screen.getByRole('tab', 'Action', { exact: true }).click();
