@@ -1,9 +1,7 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Auth.Application.Auth.Models;
 using Auth.Application.Common.Interfaces;
-using NWFM.Shared.Constants;
 using Auth.Domain.Constants;
 using Auth.Domain.Entities;
 using Auth.Domain.Options;
@@ -11,7 +9,8 @@ using Auth.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using NWFM.Shared.Caching;
+using NWFM.Shared.Abstractions;
+using NWFM.Shared.Options;
 using NWFM.Shared.Results;
 
 namespace Auth.Infrastructure.Identity;
@@ -21,9 +20,10 @@ public sealed class AuthService(
     AuthDbContext context,
     IPermissionResolver permissionResolver,
     IActiveDirectoryAuthenticator activeDirectory,
-    ICacheService cache,
+    ICurrentTenant tenant,
     IOptions<JwtSettings> jwtOptions,
     IOptions<SsoSettings> ssoOptions,
+    IOptionsMonitor<TenantIsolationOptions> isolationOptions,
     TimeProvider timeProvider) : IAuthService
 {
     private static readonly Error InvalidCredentials = new("Auth.InvalidCredentials", "Invalid username or password.");
@@ -37,6 +37,7 @@ public sealed class AuthService(
     private static readonly Error DirectoryUnavailable = new("Auth.DirectoryUnavailable", "Sign-in is temporarily unavailable.");
     private static readonly Error InvalidSsoCode = new("Auth.InvalidSsoCode", "Sign-in code is invalid or expired.");
     private static readonly Error InvalidTeamCredentials = new("Auth.InvalidTeamCredentials", "Invalid team code or password.");
+    private static readonly Error TenantInactive = new("Auth.TenantInactive", "Tenant access is unavailable.");
 
     public async Task<Result<AuthTokenDto>> LoginAsync(string userName, string password, CancellationToken ct)
     {
@@ -103,26 +104,44 @@ public sealed class AuthService(
 
     public async Task<Result<AuthTokenDto>> RefreshAsync(string refreshToken, CancellationToken ct)
     {
+        if (!isolationOptions.CurrentValue.IsActive)
+            return Result<AuthTokenDto>.Failure(TenantInactive);
         JwtSettings settings = jwtOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.SigningKey))
             return Result<AuthTokenDto>.Failure(JwtNotConfigured);
 
-        string tokenHash = HashToken(refreshToken);
+        // A refresh credential is bound to the current security stamp. Password
+        // resets and account disablement cannot be undone by replaying an old token.
+        var separator = refreshToken.IndexOf('.');
+        if (separator != 32 || refreshToken.Length > 256 ||
+            !Guid.TryParseExact(refreshToken[..separator], "N", out var userId))
+            return Result<AuthTokenDto>.Failure(InvalidRefreshToken);
+        ApplicationUser? user = await userManager.FindByIdAsync(userId.ToString("D"));
+        if (user is null || await userManager.IsLockedOutAsync(user))
+            return Result<AuthTokenDto>.Failure(InvalidRefreshToken);
+
+        string tokenHash = HashRefreshToken(user, refreshToken);
         DateTime utcNow = timeProvider.GetUtcNow().UtcDateTime;
-        UserRefreshToken? stored = await context.UserRefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == tokenHash, ct);
+        UserRefreshToken? stored = await context.UserRefreshTokens.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == user.Id.ToString() && x.TokenHash == tokenHash, ct);
 
         if (stored is null || !stored.IsActive(utcNow))
             return Result<AuthTokenDto>.Failure(InvalidRefreshToken);
 
-        ApplicationUser? user = await userManager.FindByIdAsync(stored.UserId);
-        if (user is null || await userManager.IsLockedOutAsync(user))
+        if (user.TeamId is Guid teamId &&
+            (!await TeamIsActiveAsync(teamId, ct) || !await userManager.IsInRoleAsync(user, Roles.FieldTeam)))
             return Result<AuthTokenDto>.Failure(InvalidRefreshToken);
 
         Result<AuthTokenDto>? scopeGate = await EnsureRequiredScopeAsync(user, ct);
         if (scopeGate is not null) return scopeGate;
 
-        stored.Revoke(utcNow);
-        await context.SaveChangesAsync(ct);
+        // A conditional UPDATE consumes the credential exactly once even when
+        // requests race on different API instances.
+        var consumed = await context.UserRefreshTokens
+            .Where(x => x.Id == stored.Id && x.RevokedAtUtc == null && x.ExpiresAtUtc > utcNow)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAtUtc, utcNow), ct);
+        if (consumed != 1)
+            return Result<AuthTokenDto>.Failure(InvalidRefreshToken);
         return await IssueTokensAsync(user, ct);
     }
 
@@ -134,7 +153,9 @@ public sealed class AuthService(
 
         if (!string.IsNullOrWhiteSpace(refreshToken))
         {
-            string tokenHash = HashToken(refreshToken);
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null) return Result<bool>.Success(true);
+            string tokenHash = HashRefreshToken(user, refreshToken);
             sessions = sessions.Where(x => x.TokenHash == tokenHash);
         }
 
@@ -179,12 +200,16 @@ public sealed class AuthService(
     {
         DateTime utcNow = timeProvider.GetUtcNow().UtcDateTime;
         string codeHash = HashToken(code);
-        SsoAuthorizationCode? stored = await context.SsoAuthorizationCodes.FirstOrDefaultAsync(x => x.CodeHash == codeHash, ct);
+        SsoAuthorizationCode? stored = await context.SsoAuthorizationCodes.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CodeHash == codeHash, ct);
         if (stored is null || !stored.IsActive(utcNow))
             return Result<AuthTokenDto>.Failure(InvalidSsoCode);
 
-        stored.Consume(utcNow);
-        await context.SaveChangesAsync(ct);
+        var consumed = await context.SsoAuthorizationCodes
+            .Where(x => x.Id == stored.Id && x.ConsumedAtUtc == null && x.ExpiresAtUtc > utcNow)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ConsumedAtUtc, utcNow), ct);
+        if (consumed != 1)
+            return Result<AuthTokenDto>.Failure(InvalidSsoCode);
 
         ApplicationUser? user = await userManager.FindByIdAsync(stored.UserId);
         if (user is null || await userManager.IsLockedOutAsync(user))
@@ -198,6 +223,8 @@ public sealed class AuthService(
 
     private async Task<Result<AuthTokenDto>> IssueTokensAsync(ApplicationUser user, CancellationToken ct)
     {
+        if (!isolationOptions.CurrentValue.IsActive)
+            return Result<AuthTokenDto>.Failure(TenantInactive);
         JwtSettings settings = jwtOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.SigningKey))
             return Result<AuthTokenDto>.Failure(JwtNotConfigured);
@@ -205,13 +232,15 @@ public sealed class AuthService(
         DateTime utcNow = timeProvider.GetUtcNow().UtcDateTime;
         IList<string> roles = await userManager.GetRolesAsync(user);
         IReadOnlyList<string> permissions = await permissionResolver.GetPermissionCodesForUserAsync(user.Id.ToString(), ct);
-        string accessToken = JwtTokenGenerator.GenerateAccessToken(user, roles.ToList(), permissions, settings, utcNow);
-        string refreshTokenPlainText = GenerateRefreshToken();
+        string refreshTokenPlainText = $"{user.Id:N}.{GenerateRefreshToken()}";
         DateTime refreshExpiresAt = utcNow.AddDays(settings.RefreshTokenExpiryDays);
 
-        context.UserRefreshTokens.Add(
-            UserRefreshToken.Create(user.Id.ToString(), HashToken(refreshTokenPlainText), refreshExpiresAt, utcNow));
+        var session = UserRefreshToken.Create(user.Id.ToString(), HashRefreshToken(user, refreshTokenPlainText),
+            refreshExpiresAt, utcNow);
+        context.UserRefreshTokens.Add(session);
         await context.SaveChangesAsync(ct);
+        string accessToken = JwtTokenGenerator.GenerateAccessToken(user, roles.ToList(), permissions, settings,
+            utcNow, tenant.OrganizationId, session.Id);
 
         return Result<AuthTokenDto>.Success(new AuthTokenDto
         {
@@ -286,6 +315,17 @@ public sealed class AuthService(
     private static string GenerateRefreshToken() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
-    private static string HashToken(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private string HashToken(string token)
+    {
+        if (tenant.OrganizationId == Guid.Empty)
+            throw new InvalidOperationException("A server-configured tenant is required for authentication.");
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{tenant.OrganizationId:D}:{token}")));
+    }
+
+    private string HashRefreshToken(ApplicationUser user, string token)
+    {
+        if (string.IsNullOrWhiteSpace(user.SecurityStamp))
+            throw new InvalidOperationException("A security stamp is required for authentication.");
+        return HashToken($"{user.SecurityStamp}:{token}");
+    }
 }

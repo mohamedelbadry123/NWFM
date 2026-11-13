@@ -169,6 +169,8 @@ public sealed class UserAccountService(
         if (!enabledLockout.Succeeded) return Failed(enabledLockout);
 
         var result = await userManager.SetLockoutEndDateAsync(user, isEnabled ? null : PermanentLockout);
+        if (result.Succeeded && !isEnabled)
+            result = await userManager.UpdateSecurityStampAsync(user);
         return result.Succeeded ? Result<string>.Success(user.Id.ToString()) : Failed(result);
     }
 

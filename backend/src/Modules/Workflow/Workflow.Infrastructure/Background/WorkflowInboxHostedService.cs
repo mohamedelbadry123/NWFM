@@ -1,14 +1,13 @@
-﻿namespace Workflow.Infrastructure.Background;
+namespace Workflow.Infrastructure.Background;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Workflow.Application.Abstractions;
+using Workflow.Domain.Enums;
 using Workflow.Domain.Repositories;
 using Workflow.Infrastructure.Persistence;
 using Workflow.Infrastructure.Services;
-using Workflow.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Crash-recovery processor for leftover Pending inbox trigger messages.
@@ -27,7 +26,7 @@ internal sealed class WorkflowInboxHostedService : BackgroundService
         ILogger<WorkflowInboxHostedService> logger)
     {
         _scopeFactory = scopeFactory;
-        _logger       = logger;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -63,6 +62,7 @@ internal sealed class WorkflowInboxHostedService : BackgroundService
     internal async Task ProcessPendingBatchAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        if (!await WorkflowTenantAdmission.IsActiveAsync(scope.ServiceProvider, cancellationToken)) return;
         var inbox = scope.ServiceProvider.GetRequiredService<IWorkflowIntegrationInboxRepository>();
         var engine = scope.ServiceProvider.GetRequiredService<IWorkflowRuntimeEngine>();
         var instanceRepo = scope.ServiceProvider.GetRequiredService<IWorkflowInstanceRepository>();
@@ -70,6 +70,9 @@ internal sealed class WorkflowInboxHostedService : BackgroundService
         var pending = await inbox.GetPendingAsync(BatchSize, cancellationToken);
         foreach (var message in pending)
         {
+            // Admission failure is not a processing failure: preserve pending work
+            // when offboarding happens between the batch read and message delivery.
+            await WorkflowTenantAdmission.RequireMessageScopeAsync(scope.ServiceProvider, message.OrganizationId, cancellationToken);
             try
             {
                 var now = DateTime.UtcNow;

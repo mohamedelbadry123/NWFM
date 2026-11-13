@@ -1,25 +1,32 @@
-using Auth.Infrastructure.Organization;
-using NWFM.Shared.Integration.Organization;
 using System.Text;
 using Auth.Application.Common.Interfaces;
+using Auth.Domain.Constants;
 using Auth.Domain.Options;
 using Auth.Infrastructure.Authorization;
+using Auth.Infrastructure.Caching;
 using Auth.Infrastructure.Identity;
 using Auth.Infrastructure.Identity.ActiveDirectory;
 using Auth.Infrastructure.Identity.Sso;
+using Auth.Infrastructure.Operations;
+using Auth.Infrastructure.Organization;
 using Auth.Infrastructure.Persistence;
 using Auth.Infrastructure.Services;
 using Auth.Infrastructure.Services.Messaging;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Auth.Infrastructure.Caching;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using NWFM.Shared.Abstractions;
+using NWFM.Shared.Integration.Organization;
 using NWFM.Shared.Options;
 
 namespace Auth.Infrastructure;
@@ -42,10 +49,19 @@ public static class DependencyInjection
             .AddDefaultTokenProviders();
 
         builder.Services.AddCachingServices(builder.Configuration);
+        var tenantId = builder.Configuration.GetValue<Guid>("Application:TenantId");
+        builder.Services.AddDataProtection();
+        builder.Services.AddOptions<CookieAuthenticationOptions>(SsoDefaults.TempCookieScheme)
+            .Configure<IDataProtectionProvider>((options, provider) =>
+                options.DataProtectionProvider = provider.CreateProtector(
+                    "NWFM.Auth.TenantCookies.v1", builder.Environment.EnvironmentName, tenantId.ToString("D")));
 
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<IPermissionResolver, PermissionResolver>();
         builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddScoped<TenantSessionValidator>();
+        builder.Services.AddScoped<ITenantAvailability>(sp =>
+            new SqlTenantAvailability(connectionString, sp.GetRequiredService<ICurrentTenant>()));
         builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 
         // Territory for the modules that narrow work to it (Tasks), without referencing Auth.
@@ -59,7 +75,18 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         JwtSettings jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
-        builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+        var jwtValidator = new JwtSettingsValidator(builder.Environment);
+        var jwtValidation = jwtValidator.Validate(Options.DefaultName, jwtSettings);
+        if (jwtValidation.Failed)
+            throw new OptionsValidationException(Options.DefaultName, typeof(JwtSettings), jwtValidation.Failures);
+        builder.Services.AddSingleton<IValidateOptions<JwtSettings>>(jwtValidator);
+        builder.Services.AddOptions<JwtSettings>()
+            .BindConfiguration(JwtSettings.SectionName)
+            .ValidateOnStart();
+        builder.Services.AddOptions<TenantIsolationOptions>()
+            .BindConfiguration(TenantIsolationOptions.SectionName)
+            .Validate(options => options.TenantId != Guid.Empty, "Tenant ID is required.")
+            .ValidateOnStart();
         builder.Services.Configure<SsoSettings>(builder.Configuration.GetSection(SsoSettings.SectionName));
         builder.Services.Configure<ActiveDirectorySettings>(builder.Configuration.GetSection(ActiveDirectorySettings.SectionName));
         builder.Services.Configure<TeamOtpOptions>(builder.Configuration.GetSection(TeamOtpOptions.SectionName));
@@ -89,9 +116,33 @@ public static class DependencyInjection
                         ValidateAudience = true,
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
+                        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                        ClockSkew = TimeSpan.FromSeconds(30),
                         ValidIssuer = jwtSettings.Issuer,
                         ValidAudience = jwtSettings.Audience,
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey))
+                    };
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnTokenValidated = async context =>
+                        {
+                            var validator = context.HttpContext.RequestServices
+                                .GetRequiredService<TenantSessionValidator>();
+                            var principal = await validator.ValidateAsync(context.Principal!,
+                                context.HttpContext.RequestAborted);
+                            if (principal is null)
+                            {
+                                var logger = context.HttpContext.RequestServices
+                                    .GetRequiredService<ILogger<TenantSessionValidator>>();
+                                logger.LogWarning(new EventId(4101, "TenantSessionDenied"),
+                                    "Tenant session rejected for deployment {TenantId}.",
+                                    context.HttpContext.RequestServices
+                                        .GetRequiredService<NWFM.Shared.Abstractions.ICurrentTenant>().OrganizationId);
+                                context.Fail("The tenant session is no longer authorized.");
+                                return;
+                            }
+                            context.Principal = principal;
+                        }
                     };
                 })
                 .AddSaml2Sso(builder.Configuration, builder.Environment);

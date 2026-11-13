@@ -87,7 +87,8 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
         else
         {
             if (!long.TryParse(timestamp, out var seconds) || Math.Abs((decimal)DateTimeOffset.UtcNow.ToUnixTimeSeconds() - seconds) > 300) return Invalid("Workflow.Event.Unauthorized", "Webhook timestamp is missing or expired.");
-            var hash = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(creds.GetValueOrDefault("secret") ?? ""), Encoding.UTF8.GetBytes(timestamp + "." + rawBody)));
+            var hash = SignWebhook(tenant.OrganizationId, connectionId, timestamp!, rawBody,
+                creds.GetValueOrDefault("secret") ?? "");
             if (!Equal(hash, signature?.ToLowerInvariant())) return Invalid("Workflow.Event.Unauthorized", "Webhook authentication failed.");
         }
         EventEnvelope envelope;
@@ -106,6 +107,16 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
             db.EventReceipts.Add(row); await db.SaveChangesAsync(ct); return Result.Success(row.Id);
         }, ct);
     }
+
+    internal static string SignWebhook(Guid organizationId, Guid connectionId, string timestamp, string rawBody, string secret)
+    {
+        // Versioned canonical request binds a signature to its exact tenant, receiver,
+        // method, route and body. Reusing a secret cannot authorize another connection.
+        var digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(rawBody)));
+        var canonical = $"NWFM-WEBHOOK-V2\n{organizationId:D}\n{connectionId:D}\nPOST\n/api/workflow/integrations/webhooks/{connectionId:D}\n{timestamp}\n{digest}";
+        return Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(canonical)));
+    }
+
     public async Task<IReadOnlyList<OperationDto>> ListOperationsAsync(Guid? instanceId, CancellationToken ct)
         => await db.IntegrationJobs.AsNoTracking().Where(j => instanceId == null || j.WorkflowInstanceId == instanceId)
             .OrderByDescending(j => j.CreatedAt).Take(200).Select(j => new OperationDto(j.Id, j.WorkflowInstanceId, j.ActivityInstanceId,

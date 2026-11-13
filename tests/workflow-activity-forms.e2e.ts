@@ -1,5 +1,5 @@
-import { beforeEach, test } from '@e2e-dev/web';
-import { credentials, expect } from 'e2e';
+import { test, type Browser } from '@e2e-dev/web';
+import { credentials, expect, type TestFixtures } from 'e2e';
 import { randomUUID } from 'node:crypto';
 import {
   activeTasks,
@@ -8,21 +8,27 @@ import {
   type Task,
 } from './support/activity-forms.js';
 
-beforeEach(async ({ app, screen, browser }) => {
-  const user = credentials.user('admin');
+// Independent administrator identities keep each case's workload and assignments isolated
+// while exercising the application's ordinary per-principal rate limits.
+async function login(
+  { app, screen, browser }: Pick<TestFixtures, 'app' | 'screen'> & { browser: Browser },
+  account: string,
+) {
+  const user = credentials.user(account);
   await app.open('/login');
   await screen.getByLabel('Username').fill(user.username);
   await screen.getByLabel('Password').fill(user.password);
   await screen.getByRole('button', 'Sign in').click();
   await expect(screen.getByRole('link', 'New Instance', { exact: false })).toBeVisible();
   await expect(browser).toHaveURL(/\/admin\/workflow\/definitions$/);
-});
+}
 
 test('activity forms route forward, backward and to fresh child executions with persistent history', async ({
   app,
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-routing');
   const fixture = await createActivityForms(browser);
   await fixture.publish();
   const id = await fixture.start();
@@ -114,6 +120,7 @@ test('designer shows independent child previews and blocks invalid form routes b
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-designer');
   const fixture = await createActivityForms(browser);
   await app.open(
     `/admin/workflow/definitions/${fixture.main.definitionId}/versions/${fixture.main.versionId}/designer`,
@@ -178,6 +185,7 @@ test('form builder edits, saves, and publishes a new immutable form version', as
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-publish');
   const fixture = await createActivityForms(browser);
   const formId = fixture.forms[0].id;
   const previous = await fixture.api<{ value: { schemaJson: string; currentVersionNo: number } }>(
@@ -239,6 +247,7 @@ test('form builder preview validates required answers, shows the payload, and re
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-preview');
   const fixture = await createActivityForms(browser);
   await app.open(`/forms/${fixture.forms[0].id}/designer`);
   await screen.getByRole('button', 'Preview').click();
@@ -269,6 +278,7 @@ test('task detail rejects an empty form and displays saved answers as submission
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-history');
   const fixture = await createActivityForms(browser);
   await fixture.publish();
   const id = await fixture.start();
@@ -313,6 +323,7 @@ test('task detail claims and submits the pinned form sequence then survives a re
   browser,
   screen,
 }) => {
+  await login({ app, browser, screen }, 'forms-claim');
   const fixture = await createActivityForms(browser);
   await fixture.publish();
   const id = await fixture.start();

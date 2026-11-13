@@ -6,7 +6,8 @@ namespace NWFM.Api.Services;
 
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
-    private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User;
+    private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User is { Identity.IsAuthenticated: true } user
+        ? user : null;
 
     public string? Id => User?.FindFirstValue(ClaimTypes.NameIdentifier);
     public string? UserName => User?.Identity?.Name;

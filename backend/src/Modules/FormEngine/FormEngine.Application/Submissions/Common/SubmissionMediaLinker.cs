@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FormEngine.Application.Common.Interfaces;
 using FormEngine.Application.Common.Schema;
+using FormEngine.Application.Uploads.Common;
 using FormEngine.Domain.Constants;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Storage;
@@ -49,7 +50,8 @@ internal static class SubmissionMediaLinker
             // Passing no new path leaves it exactly where it is; LinkTo ignores an empty one.
             var newPath = file.IsMigrated
                 ? string.Empty
-                : await fileStorage.MoveAsync(file.RelativePath, destinationFolder, file.FileName, cancellationToken);
+                : await fileStorage.MoveAsync(file.RelativePath, destinationFolder,
+                    file.Id.ToString("N") + FormFileRules.SafeExtension(file.FileName), cancellationToken);
 
             file.LinkTo(submissionId, newPath, contextType, contextId, utcNow);
         }

@@ -9,6 +9,9 @@ public sealed class DatabaseStartupOptions
 {
     public const string SectionName = "DatabaseStartup";
 
+    /// <summary>Initialize using an administrative identity, then exit without serving requests.</summary>
+    public bool InitializeOnly { get; init; }
+
     /// <summary>Run EF Core MigrateAsync on API start.</summary>
     public bool ApplyMigrations { get; init; }
 

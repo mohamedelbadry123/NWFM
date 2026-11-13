@@ -2,7 +2,6 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using NWFM.Shared.Constants;
 using Auth.Domain.Constants;
 using Auth.Domain.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -16,14 +15,22 @@ internal static class JwtTokenGenerator
         IReadOnlyList<string> roles,
         IReadOnlyList<string> permissions,
         JwtSettings settings,
-        DateTime utcNow)
+        DateTime utcNow,
+        Guid tenantId,
+        long sessionId)
     {
+        if (tenantId == Guid.Empty || sessionId <= 0 || string.IsNullOrWhiteSpace(user.SecurityStamp))
+            throw new InvalidOperationException("Tokens require a tenant, persisted session and security stamp.");
+
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? user.Email ?? user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(AppClaimTypes.TenantId, tenantId.ToString("D")),
+            new(AppClaimTypes.SessionId, sessionId.ToString(CultureInfo.InvariantCulture)),
+            new(AppClaimTypes.SecurityStamp, user.SecurityStamp)
         };
 
         if (!string.IsNullOrWhiteSpace(user.Email))
