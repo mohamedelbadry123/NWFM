@@ -1,4 +1,9 @@
-import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  provideAppInitializer,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -13,19 +18,23 @@ import { AppContextService } from './core/context/app-context.service';
 import { AppConfigService } from './core/config/app-config.service';
 import { contextInterceptor } from './core/context/context.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { repairSessionIdentityInitializer } from './core/auth/session-repair';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' })),
+    provideRouter(
+      routes,
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
+    ),
     provideHttpClient(withInterceptors([authInterceptor, contextInterceptor, errorInterceptor])),
     provideAnimationsAsync(),
     providePrimeNG({
       theme: {
         preset: WaterPreset,
-        options: { darkModeSelector: '.dark' }
-      }
+        options: { darkModeSelector: '.dark' },
+      },
     }),
     provideApiConfiguration(''),
     provideTranslateService({ fallbackLang: 'en' }),
@@ -34,5 +43,7 @@ export const appConfig: ApplicationConfig = {
     // Runtime config (the Maps key) has to be in hand before the first map is drawn.
     provideAppInitializer(() => inject(AppConfigService).load()),
     provideAppInitializer(() => inject(AppContextService).load()),
-  ]
+    // A stored session with a blank user id must be verified before drafts can be owned (and so before editing).
+    provideAppInitializer(repairSessionIdentityInitializer),
+  ],
 };

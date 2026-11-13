@@ -4,10 +4,12 @@ using NWFM.Shared.Abstractions;
 
 namespace NWFM.Api.Services;
 
-public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
+public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, StartupActorContext? startup = null) : ICurrentUser
 {
-    private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User is { Identity.IsAuthenticated: true } user
-        ? user : null;
+    // An HTTP request must authenticate; it can never inherit the server-only startup actor.
+    private ClaimsPrincipal? User => httpContextAccessor.HttpContext is { } http
+        ? http.User is { Identity.IsAuthenticated: true } user ? user : null
+        : startup?.Principal;
 
     public string? Id => User?.FindFirstValue(ClaimTypes.NameIdentifier);
     public string? UserName => User?.Identity?.Name;

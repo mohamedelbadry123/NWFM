@@ -1,9 +1,9 @@
 namespace Workflow.Application.Helpers;
 
+using NWFM.Shared.Integration.Workflow;
 using Workflow.Application.DTOs;
 using Workflow.Application.Models;
 using Workflow.Domain.Enums;
-using NWFM.Shared.Integration.Workflow;
 
 /// <summary>
 /// Shared graph rules for Validate and Publish so the designer badge and Publish agree.
@@ -83,21 +83,41 @@ public static class WorkflowGraphValidator
             string.Equals(a.ActivityTypeName, ActivityType.UserTask.ToString(), StringComparison.OrdinalIgnoreCase) || a.ActivityTypeName == "MainActivity");
         foreach (var ut in userTasks)
         {
+            if (ut.ActivityTypeName == "MainActivity" &&
+                Workflow.Application.Workspace.WorkspaceDesign.IsHierarchical(doc.WorkspaceJson)) continue;
             var hasGroup = ut.AssignmentRules.Any(r =>
                 !string.IsNullOrWhiteSpace(r.ReferenceId) || !string.IsNullOrWhiteSpace(r.AssignmentKey));
-            if (!hasGroup && string.IsNullOrWhiteSpace(ut.AssignmentGroupId) && string.IsNullOrWhiteSpace(ut.AssignmentKey))
+            var hasRoles = false;
+            try
+            {
+                using var config = System.Text.Json.JsonDocument.Parse(ut.ConfigurationJson ?? "{}");
+                hasRoles = config.RootElement.TryGetProperty("assignmentRoleIds", out var ids) && ids.ValueKind == System.Text.Json.JsonValueKind.Array && ids.GetArrayLength() > 0;
+            }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException) { /* Configuration validation reports invalid JSON. */ }
+            if (!hasRoles && !hasGroup && string.IsNullOrWhiteSpace(ut.AssignmentGroupId) && string.IsNullOrWhiteSpace(ut.AssignmentKey))
             {
                 errors.Add(new WorkflowValidationIssueDto("USER_TASK_NO_ASSIGNMENT",
-                    $"UserTask '{ut.NodeKey}' must assign an organization group.", ut.NodeKey));
+                    $"UserTask '{ut.NodeKey}' must select account roles or an organization group.", ut.NodeKey));
             }
         }
 
-        ValidateGateways(doc, errors, warnings, ActivityType.ExclusiveGateway);
-        ValidateGateways(doc, errors, warnings, ActivityType.InclusiveGateway);
+        if (Routing.RoutingDefinition.Enabled(doc.WorkspaceJson))
+        {
+            try { errors.AddRange(Routing.RoutingGraphRules.Validate(Routing.RoutingDefinition.Graph(doc)).Select(e => new WorkflowValidationIssueDto(e.Code, e.Message, e.NodeKey))); }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException) { errors.Add(new("ROUTING_CONFIG", "Routing settings contain an invalid value.")); }
+            if (doc.Transitions.Any(t => !string.IsNullOrWhiteSpace(t.ConditionExpression)))
+                errors.Add(new("ROUTING_LEGACY_EXPRESSION", "Move arrow expressions into visible Condition components before publishing."));
+        }
+        else
+        {
+            ValidateGateways(doc, errors, warnings, ActivityType.ExclusiveGateway);
+            ValidateGateways(doc, errors, warnings, ActivityType.InclusiveGateway);
+        }
 
         var joins = doc.Activities.Where(a => a.ActivityTypeName == nameof(ActivityType.JoinGateway)).Select(a => a.NodeKey).ToHashSet();
         foreach (var fork in doc.Activities.Where(a => a.ActivityTypeName is nameof(ActivityType.ParallelGateway) or nameof(ActivityType.InclusiveGateway)))
         {
+            if (Routing.RoutingDefinition.Enabled(doc.WorkspaceJson)) continue;
             try
             {
                 using var config = System.Text.Json.JsonDocument.Parse(fork.ConfigurationJson ?? "{}");

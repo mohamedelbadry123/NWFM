@@ -26,7 +26,10 @@ public static class WorkflowFormRouting
         }
         if (destination.Kind != "Activity") throw new FormatException("Select a supported routing destination.");
         var target = version.Activities.FirstOrDefault(a => a.NodeKey == destination.Target);
-        if (target is null || target.ActivityType is not (ActivityType.UserTask or ActivityType.MainActivity or ActivityType.End))
+        var routedEvent = WorkspaceDesign.IsHierarchical(version.WorkspaceJson)
+            && target?.ActivityType is ActivityType.ServiceTask or ActivityType.WaitEvent or ActivityType.NotificationTask
+            && WorkspaceDesign.Binding(target.ConfigurationJson) is null;
+        if (target is null || (!routedEvent && target.ActivityType is not (ActivityType.UserTask or ActivityType.MainActivity or ActivityType.End)))
             throw new FormatException("Select a business activity or End in this workflow.");
         // A conditional jump cannot escape a branch or enter a different branch.
         var source = version.Activities.First(a => a.NodeKey == sourceNodeKey);

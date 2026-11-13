@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfSlaPolicyDto as NwfmSharedResultsPaginatedResultOfSlaPolicyDto } from '../../models/NWFM/Shared/Results/paginated-result-of-sla-policy-dto';
+import { SlaPolicyDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsSlaPolicyDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/sla-policy-dto';
 
 export interface ApiWorkflowSlaPoliciesGet$Params {
   page?: number;
@@ -15,7 +15,7 @@ export interface ApiWorkflowSlaPoliciesGet$Params {
   search?: string;
 }
 
-export function apiWorkflowSlaPoliciesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowSlaPoliciesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfSlaPolicyDto>> {
+export function apiWorkflowSlaPoliciesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowSlaPoliciesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsSlaPolicyDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowSlaPoliciesGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -28,7 +28,7 @@ export function apiWorkflowSlaPoliciesGet(http: HttpClient, rootUrl: string, par
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfSlaPolicyDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsSlaPolicyDto>;
     })
   );
 }

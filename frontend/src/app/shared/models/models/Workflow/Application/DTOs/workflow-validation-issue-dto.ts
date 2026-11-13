@@ -3,6 +3,12 @@
 
 export interface WorkflowValidationIssueDto {
   code?: string | null;
+  connectionKey?: string | null;
+  correctionAction?: string | null;
+  field?: string | null;
+  id?: string | null;
   message?: string | null;
+  messageKey?: string | null;
   nodeKey?: string | null;
+  severity?: string | null;
 }

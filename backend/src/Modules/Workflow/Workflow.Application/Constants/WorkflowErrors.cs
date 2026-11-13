@@ -197,6 +197,8 @@ public static class WorkflowErrors
 
         public static readonly Error NotGroupMember =
             new("Workflow.WorkItem.NotGroupMember", "You are not a member of the group this work item is assigned to.");
+        public static readonly Error NotAssignedRole =
+            new("Workflow.WorkItem.NotAssignedRole", "You must hold one of this task's assigned account roles.");
 
         public static readonly Error AlreadyCompleted =
             new("Workflow.WorkItem.AlreadyCompleted", "This work item has already been completed.");

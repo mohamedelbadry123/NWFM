@@ -9,6 +9,7 @@ using Workflow.Domain.Repositories;
 public sealed class ListAvailableWorkItemsQueryHandler
     : IRequestHandler<ListAvailableWorkItemsQuery, Result<IReadOnlyList<WorkItemDto>>>
 {
+    private readonly IWorkflowRoleAssignments? _roles;
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkItemRepository _workItems;
     private readonly IWorkflowAssignmentGroupRepository _groups;
@@ -20,8 +21,9 @@ public sealed class ListAvailableWorkItemsQueryHandler
         IWorkItemRepository workItems,
         IWorkflowAssignmentGroupRepository groups,
         IWorkflowParticipantRepository participants,
-        IWorkItemDtoAssembler assembler)
+        IWorkItemDtoAssembler assembler, IWorkflowRoleAssignments? roles = null)
     {
+        _roles = roles;
         _gate = gate;
         _workItems = workItems;
         _groups = groups;
@@ -35,13 +37,15 @@ public sealed class ListAvailableWorkItemsQueryHandler
         var gateResult = _gate.EnsureEnabled();
         if (gateResult.IsFailure) return Result.Failure<IReadOnlyList<WorkItemDto>>(gateResult.Error);
 
+        var roleItems = _roles is null ? Array.Empty<Workflow.Domain.Entities.WorkItem>()
+            : await _roles.AvailableAsync(request.OrganizationId, request.UserId, false, cancellationToken);
         var groupIds = await _groups.GetGroupIdsForUserAsync(
             request.UserId, request.OrganizationId, cancellationToken);
         if (groupIds.Count > 0)
         {
             var mine = await _workItems.GetPendingForGroupIdsAsync(
                 request.OrganizationId, groupIds, cancellationToken);
-            return Result.Success(await _assembler.ToDtoListAsync(mine, cancellationToken));
+            return Result.Success(await _assembler.ToDtoListAsync(mine.Concat(roleItems).DistinctBy(w => w.Id).OrderBy(w => w.CreatedAt).ToList(), cancellationToken));
         }
 
         // Org owners are often not registered as participants. Show every pending
@@ -56,6 +60,6 @@ public sealed class ListAvailableWorkItemsQueryHandler
             return Result.Success(await _assembler.ToDtoListAsync(orgPending, cancellationToken));
         }
 
-        return Result.Success(await _assembler.ToDtoListAsync([], cancellationToken));
+        return Result.Success(await _assembler.ToDtoListAsync(roleItems, cancellationToken));
     }
 }

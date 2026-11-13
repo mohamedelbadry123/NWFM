@@ -1,8 +1,8 @@
 namespace Workflow.Api.Controllers;
 
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Constants;
 using Workflow.Application.Integrations;
 
@@ -23,8 +23,13 @@ public sealed class WorkflowIntegrationsController(IWorkflowIntegrations integra
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     { var result = await integrations.DeleteConnectionAsync(id, ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
     [HttpPost("http/test")]
+    [RequestSizeLimit(524288)]
     public async Task<IActionResult> Test(HttpTestRequest request, CancellationToken ct)
-    { var result = await integrations.TestHttpAsync(request.Configuration, request.Variables ?? [], ct); return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error); }
+    {
+        var result = request.PreparedRequest is null ? await integrations.TestHttpAsync(request.Configuration, request.Variables ?? [], ct)
+            : await integrations.TestPreparedHttpAsync(request.Configuration, request.PreparedRequest, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+    }
     [HttpGet("operations")]
     public Task<IReadOnlyList<OperationDto>> Operations([FromQuery] Guid? instanceId, CancellationToken ct) => integrations.ListOperationsAsync(instanceId, ct);
     [HttpPost("operations/{id:guid}/replay")]
@@ -50,5 +55,6 @@ public sealed class WorkflowIntegrationsController(IWorkflowIntegrations integra
     public async Task<IActionResult> ReplayEvent(Guid id, [FromBody] EventReplayRequest request, CancellationToken ct)
     { var result = await integrations.ReplayEventAsync(id, request.ActivityInstanceId, ct); return result.IsSuccess ? NoContent() : BadRequest(result.Error); }
 }
-public sealed record HttpTestRequest(HttpActivityConfiguration Configuration, Dictionary<string, JsonElement>? Variables);
+public sealed record HttpTestRequest(HttpActivityConfiguration Configuration, Dictionary<string, JsonElement>? Variables,
+    Workflow.Application.Mapping.PreparedMappingRequest? PreparedRequest = null);
 public sealed record EventReplayRequest(Guid? ActivityInstanceId);

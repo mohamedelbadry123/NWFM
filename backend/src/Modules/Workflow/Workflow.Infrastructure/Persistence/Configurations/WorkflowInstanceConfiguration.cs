@@ -25,6 +25,7 @@ public sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<Wor
         builder.Property(x => x.CompletedAt);
         builder.Property(x => x.CancelledAt);
         builder.Property(x => x.SuspendedAt);
+        builder.Property(x => x.StatusEnteredAt);
         builder.Property(x => x.FailureReason).HasMaxLength(2000);
         builder.Property(x => x.StartedByUserId);
         builder.Property(x => x.CurrentActivityNodeKey).HasMaxLength(200).IsRequired();

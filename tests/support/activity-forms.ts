@@ -284,5 +284,5 @@ export async function createActivityForms(browser: Browser) {
         { requestId: randomUUID(), reference: name, isDemo: false },
       )
     ).instanceId;
-  return { api, name, forms, type, child, main, mainPath, mainXml, publish, start };
+  return { api, name, forms, type, group, child, main, mainPath, mainXml, publish, start };
 }

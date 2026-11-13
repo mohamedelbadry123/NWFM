@@ -41,6 +41,7 @@ public sealed partial class WorkflowDbContext : BaseDbContext
     public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
     public DbSet<ActivityInstance> ActivityInstances => Set<ActivityInstance>();
     public DbSet<WorkItem> WorkItems => Set<WorkItem>();
+    public DbSet<WorkflowFormReceiptReservation> FormReceiptReservations => Set<WorkflowFormReceiptReservation>();
     public DbSet<WorkItemCandidate> WorkItemCandidates => Set<WorkItemCandidate>();
     public DbSet<WorkflowVariable> WorkflowVariables => Set<WorkflowVariable>();
     public DbSet<WorkflowEvent> WorkflowEvents => Set<WorkflowEvent>();
@@ -60,14 +61,87 @@ public sealed partial class WorkflowDbContext : BaseDbContext
     public DbSet<WorkflowRequest> WorkflowRequests => Set<WorkflowRequest>();
     public DbSet<WorkflowIntegrationConnection> IntegrationConnections => Set<WorkflowIntegrationConnection>();
     public DbSet<WorkflowIntegrationJob> IntegrationJobs => Set<WorkflowIntegrationJob>();
+    public DbSet<WorkflowMappingInvocation> MappingInvocations => Set<WorkflowMappingInvocation>();
     public DbSet<WorkflowEventSubscription> EventSubscriptions => Set<WorkflowEventSubscription>();
     public DbSet<WorkflowEventReceipt> EventReceipts => Set<WorkflowEventReceipt>();
+    public DbSet<WorkflowRoutingScope> RoutingScopes => Set<WorkflowRoutingScope>();
+    public DbSet<WorkflowRoutingResult> RoutingResults => Set<WorkflowRoutingResult>();
+    public DbSet<WorkflowRoutingActivation> RoutingActivations => Set<WorkflowRoutingActivation>();
+    public DbSet<WorkflowRoutingUpgradeSnapshot> RoutingUpgradeSnapshots => Set<WorkflowRoutingUpgradeSnapshot>();
+
+    private Dictionary<Guid, WorkItem> ReceiptReservations()
+    {
+        var reservations = new Dictionary<Guid, WorkItem>();
+        foreach (var entry in ChangeTracker.Entries<WorkItem>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+        {
+            var item = entry.Entity;
+            void Reserve(Guid key)
+            {
+                if (key == Guid.Empty) return;
+                if (reservations.TryGetValue(key, out var owner) && owner.Id != item.Id)
+                    throw new InvalidOperationException("A workflow receipt key already has another owner.");
+                reservations[key] = item;
+            }
+            Reserve(item.Id);
+            var visitId = item.Id;
+            if (item.FormProgressJson is not null)
+            {
+                var progress = System.Text.Json.JsonSerializer.Deserialize<Workflow.Application.Workspace.ActivityFormProgress>(item.FormProgressJson)!;
+                visitId = progress.VisitId;
+                Reserve(visitId);
+                foreach (var visit in progress.Visits) { Reserve(visit.VisitId); Reserve(visit.ReceiptKey ?? visit.VisitId); }
+            }
+            if (item.ClaimedByUserId is Guid actor) Reserve(item.FormReceiptKey(visitId, actor));
+            if (item.CompletedFormReceiptKey is Guid completed) Reserve(completed);
+        }
+        foreach (var tracked in FormReceiptReservations.Local)
+        {
+            if (reservations.TryGetValue(tracked.ReceiptKey, out var item) && item.Id != tracked.WorkItemId)
+                throw new InvalidOperationException("A workflow receipt key already has another owner.");
+            reservations.Remove(tracked.ReceiptKey);
+        }
+        return reservations;
+    }
+
+    private void AddReservations(Dictionary<Guid, WorkItem> requested, IEnumerable<WorkflowFormReceiptReservation> existing)
+    {
+        foreach (var row in existing)
+        {
+            if (requested[row.ReceiptKey].Id != row.WorkItemId)
+                throw new InvalidOperationException("A workflow receipt key already has another owner.");
+            requested.Remove(row.ReceiptKey);
+        }
+        FormReceiptReservations.AddRange(requested.Select(r => WorkflowFormReceiptReservation.Create(r.Key, r.Value)));
+    }
+
+    private void PrepareReceiptReservations()
+    {
+        var requested = ReceiptReservations();
+        if (requested.Count > 0)
+        {
+            var keys = requested.Keys.ToArray();
+            AddReservations(requested, FormReceiptReservations.IgnoreQueryFilters().Where(r => keys.Contains(r.ReceiptKey)).ToList());
+        }
+
+    }
+
+    private async Task PrepareReceiptReservationsAsync(CancellationToken cancellationToken)
+    {
+        var requested = ReceiptReservations();
+        if (requested.Count > 0)
+        {
+            var keys = requested.Keys.ToArray();
+            AddReservations(requested, await FormReceiptReservations.IgnoreQueryFilters().Where(r => keys.Contains(r.ReceiptKey)).ToListAsync(cancellationToken));
+        }
+
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.HasDefaultSchema("Workflow");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(WorkflowDbContext).Assembly);
+        modelBuilder.Entity<WorkflowFormReceiptReservation>().HasQueryFilter(r => r.OrganizationId == CurrentTenant.OrganizationId);
 
         modelBuilder.Entity<NWFM.Shared.MultiTenancy.Tenant>(tenant =>
         {

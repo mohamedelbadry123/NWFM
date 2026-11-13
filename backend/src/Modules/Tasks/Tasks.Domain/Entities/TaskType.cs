@@ -93,6 +93,35 @@ public sealed class TaskType : Entity
     }
 
     /// <summary>
+    /// Adds one form after the type's others and leaves everything else as it is — the order, the closing
+    /// form and the other forms' rows. A form the type already has is not touched, so repeating the call
+    /// is harmless. The parent row is touched on a real change, so two writers adding at the same moment
+    /// cannot both build on the same list. Returns whether a form was added.
+    /// </summary>
+    public bool AttachForm(Guid formDefinitionId, string? updatedBy, DateTime utcNow)
+    {
+        if (formDefinitionId == Guid.Empty)
+        {
+            throw new DomainException("Choose the form to attach.");
+        }
+
+        if (_forms.Any(f => f.FormDefinitionId == formDefinitionId))
+        {
+            return false;
+        }
+
+        if (_forms.Count >= MaxForms)
+        {
+            throw new DomainException($"A task type can have at most {MaxForms} forms.");
+        }
+
+        var sortOrder = _forms.Count == 0 ? 0 : _forms.Max(f => f.SortOrder) + 1;
+        _forms.Add(new TaskTypeForm(Id, formDefinitionId, sortOrder, _forms.Count == 0, utcNow));
+        Touch(updatedBy, utcNow);
+        return true;
+    }
+
+    /// <summary>
     /// Replaces the type's forms, in the order given. Forms kept keep their rows; the closing form is
     /// the one named, or the first when none is.
     /// </summary>

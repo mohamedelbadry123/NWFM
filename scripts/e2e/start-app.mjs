@@ -4,10 +4,14 @@ import net from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import { runTenantLifecycleDrill } from './tenant-lifecycle-drill.mjs';
 import { createTenantProxy } from './tenant-proxy.mjs';
+import { designerFixtureUsers } from './fixture-users.ts';
 
 if (process.env.NWFM_E2E_ISOLATED !== '1')
   throw new Error('This launcher requires the isolated e2e config.');
-const runId = randomUUID();
+const runId = process.env.NWFM_E2E_OWNER_RUN_ID ?? randomUUID();
+if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(runId))
+  throw new Error('Invalid e2e owner identity.');
+console.log('E2E_APP_OWNER run=' + runId);
 const containerName = 'nwfm-e2e-' + runId;
 let containerId;
 let stopping = false;
@@ -25,6 +29,7 @@ const fixtureUsers = [
   'forms-preview',
   'forms-history',
   'forms-claim',
+  ...designerFixtureUsers,
 ].map((name) => name + '@localhost');
 const dockerEnv = { ...process.env, MSSQL_SA_PASSWORD: password };
 function docker(args, optional = false) {
@@ -40,12 +45,8 @@ async function cleanup(code) {
   for (const child of children) {
     if (child.exitCode === null && child.signalCode === null) {
       try {
-        if (process.platform === 'win32') {
-          spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-            windowsHide: true,
-            stdio: 'ignore',
-          });
-        } else process.kill(-child.pid, 'SIGTERM');
+        if (process.platform === 'win32') child.kill();
+        else process.kill(-child.pid, 'SIGTERM');
       } catch {
         /* already exited */
       }
@@ -326,11 +327,13 @@ try {
       DatabaseStartup__SeedData: 'true',
       DatabaseStartup__ApplySqlObjects: 'true',
       WorkflowDemo__Enabled: 'true',
+      UnrcDemo__Enabled: 'true',
       WorkflowDemo__HttpAddress: 'http://127.0.0.1:5091',
       WorkflowDemo__SmtpPort: '2525',
       WorkflowDemo__CallbackKey: randomBytes(32).toString('hex'),
       WorkflowSettings__AllowPrivateConnections: 'true',
       WorkflowSettings__MaxPendingPerQueue: deployment.suffix === 'B' ? '8' : '10000',
+      WorkflowSettings__RoutingV4Enabled: 'true',
       Sso__Enabled: 'false',
       ActiveDirectory__Enabled: 'false',
       TeamOtp__Enabled: 'false',
@@ -367,6 +370,30 @@ try {
        SELECT users.Id, roles.Id FROM Auth.Users users CROSS JOIN Auth.Roles roles
        WHERE users.NormalizedUserName IN (${fixtureUsers.map((name) => `N'${name.toUpperCase()}'`).join(',')})
          AND roles.NormalizedName=N'ADMINISTRATOR';`,
+      database,
+    );
+    // These two suites exercise the seeded UNRC team's tasks as real current actors.
+    // Seed only their disposable principals into that team; administrator status alone
+    // intentionally does not bypass the runtime's group membership checks.
+    const unrcUsers = designerFixtureUsers
+      .filter((name) => /^designer-(?:routing-runtime|unrc)-/.test(name))
+      .map((name) => `N'${(name + '@localhost').toUpperCase()}'`)
+      .join(',');
+    sql(
+      `INSERT Workflow.workflow_participants
+       (Id,OrganizationId,UserId,DisplayName,Email,IsActive,IsDemo,CreatedAt,UpdatedAt)
+       SELECT NEWID(), source.OrganizationId, users.Id, users.UserName, users.Email, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME()
+       FROM Auth.Users users CROSS JOIN Workflow.workflow_participants source
+       JOIN Auth.Users admin ON admin.Id=source.UserId
+       WHERE admin.NormalizedUserName=N'ADMINISTRATOR@LOCALHOST'
+         AND users.NormalizedUserName IN (${unrcUsers});
+       INSERT Workflow.workflow_group_members
+       (Id,AssignmentGroupId,ParticipantId,CanClaim,IsPrimary,CreatedAt,UpdatedAt)
+       SELECT NEWID(), groups.Id, participants.Id, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME()
+       FROM Workflow.workflow_participants participants
+       JOIN Auth.Users users ON users.Id=participants.UserId
+       JOIN Workflow.workflow_assignment_groups groups ON groups.OrganizationId=participants.OrganizationId
+       WHERE groups.Code=N'UNRC-LOCAL' AND users.NormalizedUserName IN (${unrcUsers});`,
       database,
     );
     // Explicitly bounded schema grants preserve dynamic form publication while excluding
@@ -524,6 +551,16 @@ try {
     );
   }
   await runTenantLifecycleDrill({ containerId, runId, sqlPort, sql });
+  // Preparation-only uses the same restricted identities and refusal/isolation checks.
+  // It never starts a browser or a model, and disposes every owned resource before exit.
+  if (process.env.NWFM_E2E_PREPARE_ONLY === '1') {
+    await runToExit(process.execPath, ['scripts/e2e/generate-compat.mjs'], {
+      NWFM_E2E_API_URL: 'http://127.0.0.1:5081',
+      NWFM_E2E_RUN_ID: runId,
+    });
+    console.log('Combined API preparation succeeded: ' + runId);
+    await cleanup(0);
+  }
   proxies.push(await createTenantProxy());
   start(
     process.execPath,

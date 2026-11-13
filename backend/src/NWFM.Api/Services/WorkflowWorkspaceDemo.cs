@@ -26,6 +26,11 @@ public static class WorkflowWorkspaceDemo
         if (!configuration.GetValue<bool>("WorkflowDemo:Enabled")) return;
         if (!configuration.GetValue<bool>("WorkflowSettings:AllowPrivateConnections"))
             throw new InvalidOperationException("WorkflowDemo requires WorkflowSettings:AllowPrivateConnections for its loopback transports.");
+        await services.GetRequiredService<StartupActorContext>().RunWorkspaceDemoAsync(admin => SeedAsync(services, configuration, admin));
+    }
+
+    private static async Task SeedAsync(IServiceProvider services, IConfiguration configuration, Guid admin)
+    {
         var db = services.GetRequiredService<WorkflowDbContext>();
         var auth = services.GetRequiredService<AuthDbContext>();
         var tenant = services.GetRequiredService<ICurrentTenant>().OrganizationId;
@@ -34,8 +39,6 @@ public static class WorkflowWorkspaceDemo
         var engine = services.GetRequiredService<Workflow.Application.Abstractions.IWorkflowRuntimeEngine>();
         var sender = services.GetRequiredService<ISender>();
         var now = DateTime.UtcNow;
-        var admin = await auth.Users.Where(u => u.UserName == "administrator@localhost").Select(u => u.Id).FirstOrDefaultAsync();
-        if (admin == Guid.Empty) throw new InvalidOperationException("Create the local administrator before enabling WorkflowDemo.");
 
         var department = await auth.Departments.FirstOrDefaultAsync(d => d.NameEn == "Water Network" && d.IsActive);
         if (department is null)

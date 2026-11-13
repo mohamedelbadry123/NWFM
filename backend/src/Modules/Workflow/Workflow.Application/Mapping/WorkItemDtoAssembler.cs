@@ -22,13 +22,15 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
     private readonly IWorkflowVersionRepository _versions;
     private readonly IWorkflowVariableRepository? _variables;
     private readonly IFormGateway? _forms;
+    private readonly IStepMappingRuntime? _stepMappings;
+    private readonly IWorkflowRoleAssignments? _roles;
 
     public WorkItemDtoAssembler(
         IWorkflowRequestRepository requests,
         IWorkflowAssignmentGroupRepository groups,
         IWorkflowInstanceRepository instances,
         IActivityInstanceRepository activities,
-        IWorkflowVersionRepository versions, IWorkflowVariableRepository? variables = null, IFormGateway? forms = null)
+        IWorkflowVersionRepository versions, IWorkflowVariableRepository? variables = null, IFormGateway? forms = null, IWorkflowRoleAssignments? roles = null, IStepMappingRuntime? stepMappings = null)
     {
         _requests = requests;
         _groups = groups;
@@ -37,6 +39,8 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
         _versions = versions;
         _variables = variables;
         _forms = forms;
+        _roles = roles;
+        _stepMappings = stepMappings;
     }
 
     public async Task<WorkItemDto> ToDtoAsync(
@@ -68,10 +72,11 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
                     .ToDictionary(v => v.VariableName, v => JsonSerializer.Deserialize<JsonElement>(v.ValueJson ?? "null"));
                 values = IntegrationValueMapper.Map(JsonSerializer.Serialize(new { variables }), WorkflowTaskForm.Mappings(config.InputMappingJson));
             }
-            if (selectedForm is not null && item.FormDataJson is null && _forms is not null)
+            if (selectedForm is not null && item.FormDataJson is null && _forms is not null && item.ClaimedByUserId is Guid receiptActor)
             {
-                var fill = await _forms.GetLatestByContextAsync(selectedForm.FormId, "WorkItem", item.Id.ToString(), cancellationToken);
-                if (fill is not null) values = fill.Answers.ToDictionary(x => x.Key, x => x.Value);
+                var fill = await _forms.GetByClientIdAsync(selectedForm.FormId, item.FormReceiptKey(item.Id, receiptActor), "WorkItem", item.Id.ToString(), cancellationToken);
+                if (fill is not null && (string.IsNullOrWhiteSpace(fill.SubmittedBy) || Guid.TryParse(fill.SubmittedBy, out var owner) && owner == receiptActor))
+                    values = fill.Answers.ToDictionary(x => x.Key, x => x.Value);
             }
             ActivityFormProgress? progress = null;
             var history = new List<WorkflowFormVisitDto>();
@@ -91,12 +96,18 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
                         visit.SubmittedAt, visit.RuleId, visit.Destination, visit.Answers, schemas[key]));
                 }
             }
+            var snapshot = binding.TypedMapping is null ? null : await (_stepMappings ?? throw new InvalidOperationException("Step mapping runtime is required.")).ReadStepAsync(item, progress?.VisitId ?? item.Id, cancellationToken);
+            if (item.Status != WorkItemStatus.Completed && snapshot?.Status == "Completed")
+                foreach (var field in snapshot.Values) values.TryAdd(field.FieldKey, field.Value);
             return dto with
             {
                 AvailableOutcomes = outcomes,
+                MappingSnapshot = snapshot,
                 FormFields = selectedForm is null ? config.FormFields : [],
                 FormValues = values,
                 FormVisitId = progress?.VisitId,
+                FormDraftKey = item.FormDraftKey(progress?.VisitId ?? item.Id),
+                FormReceiptKey = item.ClaimedByUserId is Guid claimant ? item.FormReceiptKey(progress?.VisitId ?? item.Id, claimant) : null,
                 ActiveFormStepId = progress?.ActiveStepId,
                 FormSteps = binding.FormSteps.Count > 0 ? binding.FormSteps : null,
                 FormHistory = progress is null ? null : history,
@@ -132,6 +143,7 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
             ? new Dictionary<Guid, string>()
             : await _groups.GetNamesByIdsAsync(orgId, originalIds, cancellationToken);
 
+        var roleNames = _roles is null ? new Dictionary<Guid, string>() : await _roles.NamesAsync(items.Where(w => w.AssignmentGroupId == Guid.Empty).Select(w => w.Id).ToArray(), cancellationToken);
         var now = DateTime.UtcNow;
         return items.Select(item =>
         {
@@ -155,7 +167,7 @@ public sealed class WorkItemDtoAssembler : IWorkItemDtoAssembler
             var baseDto = ClaimWorkItemCommandHandler.MapToDto(item);
             return baseDto with
             {
-                AssignmentGroupName = groupName,
+                AssignmentGroupName = item.AssignmentGroupId == Guid.Empty ? roleNames.GetValueOrDefault(item.Id) : groupName,
                 RequestNumber = request?.RequestNumber,
                 ServiceNameEn = request?.ServiceNameEn,
                 ServiceNameAr = request?.ServiceNameAr,

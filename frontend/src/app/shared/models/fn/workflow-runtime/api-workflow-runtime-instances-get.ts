@@ -7,14 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowInstanceDto as NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-instance-dto';
+import { WorkflowInstanceDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-instance-dto';
 
 export interface ApiWorkflowRuntimeInstancesGet$Params {
   page?: number;
   pageSize?: number;
 }
 
-export function apiWorkflowRuntimeInstancesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowRuntimeInstancesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto>> {
+export function apiWorkflowRuntimeInstancesGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowRuntimeInstancesGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowRuntimeInstancesGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -26,7 +26,7 @@ export function apiWorkflowRuntimeInstancesGet(http: HttpClient, rootUrl: string
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowInstanceDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowInstanceDto>;
     })
   );
 }

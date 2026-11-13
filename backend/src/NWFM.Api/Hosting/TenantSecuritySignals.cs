@@ -13,7 +13,7 @@ public sealed class TenantSecuritySignals(
     private readonly object _gate = new();
     private DateTimeOffset? _lastAlert;
 
-    public void Denied(int statusCode)
+    public void Denied(int statusCode, Guid? actorId = null, string? traceId = null)
     {
         var now = clock.GetUtcNow();
         var alert = false;
@@ -30,8 +30,8 @@ public sealed class TenantSecuritySignals(
             }
         }
         logger.LogWarning(new EventId(4201, "TenantAccessDenied"),
-            "Tenant security denial: TenantId={TenantId}, StatusCode={StatusCode}.",
-            application.Value.TenantId, statusCode);
+            "Tenant security denial: TenantId={TenantId}, StatusCode={StatusCode}, ActorId={ActorId}, TraceId={TraceId}.",
+            application.Value.TenantId, statusCode, actorId, traceId);
         if (alert)
             logger.LogError(new EventId(4202, "TenantIsolationAlert"),
                 "Review repeated security denials: TenantId={TenantId}, Threshold=20, WindowSeconds=60.",

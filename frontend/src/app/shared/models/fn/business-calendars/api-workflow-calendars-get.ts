@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfBusinessCalendarDto as NwfmSharedResultsPaginatedResultOfBusinessCalendarDto } from '../../models/NWFM/Shared/Results/paginated-result-of-business-calendar-dto';
+import { BusinessCalendarDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsBusinessCalendarDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/business-calendar-dto';
 
 export interface ApiWorkflowCalendarsGet$Params {
   page?: number;
@@ -15,7 +15,7 @@ export interface ApiWorkflowCalendarsGet$Params {
   search?: string;
 }
 
-export function apiWorkflowCalendarsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowCalendarsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfBusinessCalendarDto>> {
+export function apiWorkflowCalendarsGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowCalendarsGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsBusinessCalendarDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowCalendarsGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -28,7 +28,7 @@ export function apiWorkflowCalendarsGet(http: HttpClient, rootUrl: string, param
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfBusinessCalendarDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsBusinessCalendarDto>;
     })
   );
 }

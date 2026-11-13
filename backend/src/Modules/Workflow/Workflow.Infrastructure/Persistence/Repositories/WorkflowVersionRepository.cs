@@ -18,6 +18,8 @@ internal sealed class WorkflowVersionRepository : IWorkflowVersionRepository
     public Task<WorkflowVersion?> GetByIdWithProjectionAsync(
         Guid id, CancellationToken cancellationToken = default)
         => _db.WorkflowVersions
+            // Avoid repeating the full version XML for every combination of graph collections.
+            .AsSplitQuery()
             .Include(v => v.Activities)
                 .ThenInclude(a => a.AssignmentRules)
             .Include(v => v.Activities)
@@ -31,6 +33,7 @@ internal sealed class WorkflowVersionRepository : IWorkflowVersionRepository
     public Task<WorkflowVersion?> GetLatestPublishedWithProjectionAsync(
         Guid definitionId, CancellationToken cancellationToken = default)
         => _db.WorkflowVersions
+            .AsSplitQuery()
             .Include(v => v.Activities)
                 .ThenInclude(a => a.AssignmentRules)
             .Include(v => v.Activities)

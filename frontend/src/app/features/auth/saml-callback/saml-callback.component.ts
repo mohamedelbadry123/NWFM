@@ -37,16 +37,21 @@ export class SamlCallbackComponent implements OnInit {
       next: (response) => {
         if (response.isSuccess) {
           this.store.setSession(response);
+          const epoch = this.store.sessionEpoch();
           sessionStorage.removeItem('nwfm.sso.returnUrl');
           this.auth.getProfile().subscribe({
             next: async (res) => {
-              if (res.isSuccess) this.store.updateProfile(res.value);
+              if (res.isSuccess) this.store.updateProfile(res.value, epoch);
               await this.appContext.load();
-              await this.router.navigateByUrl(returnUrl && returnUrl !== '/login' ? returnUrl : '/');
+              await this.router.navigateByUrl(
+                returnUrl && returnUrl !== '/login' ? returnUrl : '/',
+              );
             },
             error: async () => {
               await this.appContext.load();
-              await this.router.navigateByUrl(returnUrl && returnUrl !== '/login' ? returnUrl : '/');
+              await this.router.navigateByUrl(
+                returnUrl && returnUrl !== '/login' ? returnUrl : '/',
+              );
             },
           });
         } else {

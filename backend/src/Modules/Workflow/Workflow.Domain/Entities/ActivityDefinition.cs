@@ -24,6 +24,14 @@ public sealed class ActivityDefinition : Entity
     public IReadOnlyList<ActivityOutcomeDefinition> Outcomes => _outcomes.AsReadOnly();
     public IReadOnlyList<ActivityActionDefinition> Actions => _actions.AsReadOnly();
 
+    /// <summary>Populates relationships only on a detached validation projection.</summary>
+    public void PopulateValidationRelations(IEnumerable<ActivityAssignmentRule> rules, IEnumerable<ActivityOutcomeDefinition> outcomes, IEnumerable<ActivityActionDefinition> actions)
+    {
+        _assignmentRules.Clear(); _assignmentRules.AddRange(rules);
+        _outcomes.Clear(); _outcomes.AddRange(outcomes);
+        _actions.Clear(); _actions.AddRange(actions);
+    }
+
     private ActivityDefinition() { }
 
     public static ActivityDefinition Create(

@@ -27,6 +27,8 @@ public sealed class WorkflowQueueCapacityTests
         "receipts" => WorkflowEventReceipt.Create(tenant, Guid.NewGuid(), Guid.NewGuid().ToString(), "event", "correlation", "{}"),
         "waits" => WorkflowEventSubscription.Create(tenant, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "event", "correlation", "{}", DateTime.UtcNow.AddMinutes(1)),
         "timers" => WorkflowTimer.Create(tenant, Guid.NewGuid(), Guid.NewGuid(), WorkflowTimerType.DueDate, DateTime.UtcNow.AddMinutes(1), DateTime.UtcNow),
+        "mappings" => WorkflowMappingInvocation.Create(tenant, Guid.NewGuid(), Guid.NewGuid(), null, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "event", "Callable", "{}", Guid.NewGuid().ToString(), DateTime.UtcNow),
+        "routing" => new WorkflowRoutingActivation { Id = Guid.NewGuid(), OrganizationId = tenant, WorkflowInstanceId = Guid.NewGuid(), Status = "Waiting", CreatedAt = DateTime.UtcNow },
         _ => throw new ArgumentOutOfRangeException(nameof(queue)),
     };
 
@@ -35,6 +37,7 @@ public sealed class WorkflowQueueCapacityTests
         "inbox" => WorkflowInboxStatus.Processed,
         "outbox" => WorkflowOutboxStatus.Published,
         "timers" => WorkflowTimerStatus.Completed,
+        "routing" => "Released",
         _ => "Completed",
     };
 
@@ -45,6 +48,8 @@ public sealed class WorkflowQueueCapacityTests
     [InlineData("receipts")]
     [InlineData("waits")]
     [InlineData("timers")]
+    [InlineData("mappings")]
+    [InlineData("routing")]
     public async Task EveryPersistedQueueRejectsOverflowAndAllowsTerminalReplacement(string queue)
     {
         var tenant = Guid.NewGuid();
@@ -54,7 +59,8 @@ public sealed class WorkflowQueueCapacityTests
         await db.SaveChangesAsync();
 
         // Ordinary active-state changes do not consume an additional queue slot.
-        db.Entry(first).Property("UpdatedAt").CurrentValue = DateTime.UtcNow;
+        if (queue == "routing") db.Entry(first).Property("StatesJson").CurrentValue = "{\"progress\":true}";
+        else db.Entry(first).Property("UpdatedAt").CurrentValue = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
         var second = Message(queue, tenant);
@@ -64,6 +70,49 @@ public sealed class WorkflowQueueCapacityTests
         // Completing the first and admitting its replacement atomically has zero net growth.
         db.Entry(first).Property("Status").CurrentValue = TerminalStatus(queue);
         await db.SaveChangesAsync();
+        Assert.Equal(EntityState.Unchanged, db.Entry(second).State);
+    }
+
+    [Fact]
+    public async Task TerminalRoutingAttentionReleasesSaturatedQueue()
+    {
+        var tenant = Guid.NewGuid(); using var db = Context(tenant, Guid.NewGuid().ToString());
+        var first = (WorkflowRoutingActivation)Message("routing", tenant);
+        db.Add(first); await db.SaveChangesAsync();
+        db.Add(Message("routing", tenant));
+        await Assert.ThrowsAsync<WorkflowQueueCapacityException>(() => db.SaveChangesAsync());
+        first.Status = "Attention";
+        await db.SaveChangesAsync();
+        Assert.Equal(1, await db.RoutingActivations.CountAsync(x => x.Status == "Waiting"));
+        Assert.Equal(1, await db.RoutingActivations.CountAsync(x => x.Status == "Attention"));
+    }
+
+    [Theory]
+    [InlineData("Graph", true)]
+    [InlineData("Callable", false)]
+    [InlineData("OptionalGraph", false)]
+    public async Task OnlyTerminalGraphAttentionReleasesQuotaAndAllPredicateFieldsCount(string kind, bool terminal)
+    {
+        var tenant = Guid.NewGuid(); using var db = Context(tenant, Guid.NewGuid().ToString());
+        var first = WorkflowMappingInvocation.Create(tenant, Guid.NewGuid(), Guid.NewGuid(), null, Guid.NewGuid(),
+            Guid.NewGuid(), Guid.NewGuid(), "event", kind, "{}", "first", DateTime.UtcNow);
+        first.Attention("failure"); db.Add(first); await db.SaveChangesAsync();
+        var second = Message("mappings", tenant); db.Add(second);
+        await Assert.ThrowsAsync<WorkflowQueueCapacityException>(() => db.SaveChangesAsync());
+        // Status does not change; admission must compare the original GraphAdvanced value too.
+        first.MarkGraphAdvanced();
+        if (!terminal)
+        {
+            await Assert.ThrowsAsync<WorkflowQueueCapacityException>(() => db.SaveChangesAsync());
+            first.Complete("{}", DateTime.UtcNow);
+        }
+        await db.SaveChangesAsync();
+        if (terminal)
+        {
+            // A reverse predicate transition must not bypass saturation either.
+            db.Entry(first).Property(x => x.GraphAdvanced).CurrentValue = false;
+            await Assert.ThrowsAsync<WorkflowQueueCapacityException>(() => db.SaveChangesAsync());
+        }
         Assert.Equal(EntityState.Unchanged, db.Entry(second).State);
     }
 

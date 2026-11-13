@@ -70,7 +70,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}");
         forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([new FormFieldInfo("route", "text", "Route", "", null, [])]);
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 1, false)));
-        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(() =>
+        forms.Setup(f => f.GetByClientIdAsync(form, It.IsAny<Guid>(), "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(() =>
             new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?> { ["route"] = canonicalRoute }));
         var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
         var handler = new CompleteWorkItemCommandHandler(gate.Object, new WorkItemRepository(_db), engine,
@@ -171,7 +171,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         var item = await _db.WorkItems.SingleAsync(); item.Claim(actor, now); var deadline = item.DueAt;
         var forms = new Mock<IFormGateway>(); forms.Setup(f => f.GetVersionSchemaAsync(form, 1, default)).ReturnsAsync("{}"); forms.Setup(f => f.GetFieldsAsync(form, 1, default)).ReturnsAsync([]);
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 1, false)));
-        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?>()));
+        forms.Setup(f => f.GetByClientIdAsync(form, It.IsAny<Guid>(), "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?>()));
         var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
         var groups = new Mock<IWorkflowAssignmentGroupRepository>(); groups.Setup(g => g.IsUserMemberOfGroupAsync(item.AssignmentGroupId, actor, _orgId, default)).ReturnsAsync(true);
         var handler = new CompleteWorkItemCommandHandler(gate.Object, new WorkItemRepository(_db), engine, new WorkflowEventAppender(new WorkflowEventRepository(_db)),
@@ -213,7 +213,7 @@ public sealed partial class WorkflowRuntimeEnginePathTests
         forms.Setup(f => f.GetVersionSchemaAsync(form, It.IsAny<int>(), default)).ReturnsAsync("{}");
         forms.Setup(f => f.GetFieldsAsync(form, It.IsAny<int>(), default)).ReturnsAsync([]);
         forms.Setup(f => f.SubmitAsync(It.IsAny<FormSubmitRequest>(), default)).ReturnsAsync(Result.Success(new FormSubmitReceipt(Guid.NewGuid(), 1, false)));
-        forms.Setup(f => f.GetLatestByContextAsync(form, "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?> { ["answer"] = "canonical" }));
+        forms.Setup(f => f.GetByClientIdAsync(form, It.IsAny<Guid>(), "WorkItem", It.IsAny<string>(), default)).ReturnsAsync(new FormSubmissionRecord(Guid.NewGuid(), form, 1, actor.ToString(), "Actor", null, new Dictionary<string, object?> { ["answer"] = "canonical" }));
         var gate = new Mock<IWorkflowFeatureGate>(); gate.Setup(g => g.EnsureEnabled()).Returns(Result.Success());
         var engine = BuildEngine(_db);
         var handler = new CompleteWorkItemCommandHandler(gate.Object, new WorkItemRepository(_db), engine,

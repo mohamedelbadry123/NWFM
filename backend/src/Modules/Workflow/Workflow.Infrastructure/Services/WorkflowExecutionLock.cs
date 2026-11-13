@@ -2,11 +2,23 @@ namespace Workflow.Infrastructure.Services;
 
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Workflow.Infrastructure.Persistence;
 
 internal static class WorkflowExecutionLock
 {
+    internal static bool IsTransient(WorkflowDbContext db, Exception error)
+        => error is DbUpdateConcurrencyException or NWFM.Shared.Exceptions.WorkflowQueueCapacityException || error is SqlException { Number: 51000 }
+            || new RetryClassification(db).IsRetryable(error)
+            || error.InnerException is not null && IsTransient(db, error.InnerException);
+
+    // Reuse EF's SQL Server deadlock/connection/timeout classification, plus our own sp_getapplock error.
+    private sealed class RetryClassification(WorkflowDbContext context) : SqlServerRetryingExecutionStrategy(context)
+    {
+        public bool IsRetryable(Exception error) => ShouldRetryOn(error);
+    }
+
     public static async Task<T> RunAsync<T>(WorkflowDbContext db, string key, Func<Task<T>> action, CancellationToken ct)
     {
         if (!db.Database.IsSqlServer()) return await action();

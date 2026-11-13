@@ -48,15 +48,7 @@ public sealed class TasksDatabaseInitializer(
 
             if (_startupOptions.SeedData)
             {
-                try
-                {
-                    await TaskSeedData.SeedAsync(scopeFactory, logger, ct);
-                }
-                catch (Exception ex)
-                {
-                    // Example data: a failed seed is logged and the API still starts.
-                    logger.LogError(ex, "Seeding Tasks example data failed.");
-                }
+                await TaskSeedData.SeedAsync(scopeFactory, logger, ct);
             }
         }
         catch (Exception ex)

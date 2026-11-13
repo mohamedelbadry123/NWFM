@@ -17,6 +17,9 @@ public sealed record EventWaitDto(Guid Id, Guid WorkflowInstanceId, Guid Activit
 
 public sealed class HttpActivityConfiguration
 {
+    public string MappingMode { get; set; } = "Legacy";
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Workflow.Application.Mapping.DesignerMappingConfiguration? TypedMapping { get; set; }
     public string Protocol { get; set; } = "Rest";
     public string SoapVersion { get; set; } = "1.1";
     public string SoapAction { get; set; } = "";
@@ -82,6 +85,7 @@ public interface IWorkflowIntegrations
     Task<Result<ConnectionDto>> SaveConnectionAsync(Guid? id, ConnectionInput input, CancellationToken ct);
     Task<Result> DeleteConnectionAsync(Guid id, CancellationToken ct);
     Task<Result<IntegrationResult>> TestHttpAsync(HttpActivityConfiguration configuration, Dictionary<string, JsonElement> variables, CancellationToken ct);
+    Task<Result<IntegrationResult>> TestPreparedHttpAsync(HttpActivityConfiguration configuration, Workflow.Application.Mapping.PreparedMappingRequest request, CancellationToken ct);
     Task<Result<Guid>> ReceiveEventAsync(Guid connectionId, string rawBody, string? timestamp, string? signature, string? apiKey, CancellationToken ct);
     Task<IReadOnlyList<OperationDto>> ListOperationsAsync(Guid? instanceId, CancellationToken ct);
     Task<Result> ReplayOperationAsync(Guid operationId, CancellationToken ct);

@@ -24,10 +24,12 @@ using Workflow.Infrastructure.Persistence;
 
 namespace Workflow.Infrastructure.Services;
 
-internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant tenant, ISender sender,
+internal sealed partial class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant tenant, ISender sender,
     IWorkflowRuntimeEngine engine, IWorkflowGroupDirectory groups, IWorkItemDtoAssembler assembler,
     IWorkflowVersionRepository versions, WorkflowActivityEvents events, IOrgScopeProvider scopes, IOrgDirectory directory,
-    IWorkflowReferenceData? references = null, IWorkflowTaskTypeCatalog? taskTypes = null) : IWorkflowWorkspace
+    IWorkflowReferenceData? references = null, IWorkflowTaskTypeCatalog? taskTypes = null, IWorkflowRoleAssignments? roleAssignments = null,
+    Microsoft.Extensions.Options.IOptions<Workflow.Application.Settings.WorkflowSettings>? routingSettings = null,
+    NWFM.Shared.Integration.Forms.TrustedFormSubmissionActor? formSubmissionActor = null) : IWorkflowWorkspace
 {
     private OrgScopeSet? _scope;
 
@@ -37,10 +39,18 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
     private static Error Invalid(string message) => new("Workflow.Workspace.Invalid", message);
 
     public Task<Result<WorkspaceCreated>> CreateAsync(WorkspaceDefinitionInput input, Guid actor, CancellationToken ct) =>
+        CreateDefinitionAsync(input, actor, false, ct);
+
+    private Task<Result<WorkspaceCreated>> CreateDefinitionAsync(WorkspaceDefinitionInput input, Guid actor, bool ownedChild, CancellationToken ct) =>
         WorkflowExecutionLock.RunAsync(db, "workspace-create:" + tenant.OrganizationId, async () =>
         {
             if (actor == Guid.Empty || string.IsNullOrWhiteSpace(input.Name)) return Result.Failure<WorkspaceCreated>(Invalid("A name and signed-in workflow participant are required."));
             var settings = input.Settings;
+            if (settings.DesignerVersion == 3 && routingSettings?.Value.RoutingV4Enabled == true) settings = settings with { DesignerVersion = 4 };
+            if (settings.DesignerVersion == 4 && routingSettings?.Value.RoutingV4Enabled != true)
+                return Result.Failure<WorkspaceCreated>(Invalid("Routing version 4 authoring is not enabled."));
+            if (settings.IsHierarchical && settings.Kind == "Child" && !ownedChild)
+                return Result.Failure<WorkspaceCreated>(Invalid("Create child workflows from a Task Type inside the main workflow."));
             if (settings.Kind is not (WorkflowWorkspaceDefinition.MainKind or WorkflowWorkspaceDefinition.ChildKind)) return Result.Failure<WorkspaceCreated>(Invalid("Select Main or Child workflow."));
             // Legacy children inherit location only; scoped children retain their eligible territory.
             if (settings.Kind == WorkflowWorkspaceDefinition.ChildKind && !settings.HasScopeSettings) settings = new(WorkflowWorkspaceDefinition.ChildKind, DesignerVersion: settings.DesignerVersion);
@@ -63,7 +73,7 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             var xml = new XElement(ns + "Workflow", new XAttribute("workspaceJson", JsonSerializer.Serialize(settings, IntegrationJson.Options)),
                 new XElement(ns + "Activities", new XElement(ns + "Activity", new XAttribute("nodeKey", "start"), new XAttribute("type", "Start"), new XAttribute("name", "Start")),
                     new XElement(ns + "Activity", new XAttribute("nodeKey", "end"), new XAttribute("type", "End"), new XAttribute("name", "End"))), new XElement(ns + "Transitions"));
-            var saved = await sender.Send(new SaveWorkflowDraftXmlCommand(draft.Value.Id, xml.ToString()), ct);
+            var saved = await sender.Send(new SaveWorkflowDraftXmlCommand(draft.Value.Id, xml.ToString(), ExpectedRevision: draft.Value.Revision ?? ""), ct);
             return saved.IsSuccess ? Result.Success(new WorkspaceCreated(created.Value.Id, draft.Value.Id)) : Result.Failure<WorkspaceCreated>(saved.Error);
         }, ct);
 
@@ -206,16 +216,19 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
                 var tasks = new List<WorkspaceTask>();
                 foreach (var item in items)
                 {
-                    var member = await groups.IsMemberAsync(instance.OrganizationId, item.AssignmentGroupId, effective, ct);
+                    var member = item.AssignmentGroupId == Guid.Empty
+                        ? roleAssignments is not null && await roleAssignments.CanAccessAsync(item, effective, ct)
+                        : await groups.IsMemberAsync(instance.OrganizationId, item.AssignmentGroupId, effective, ct);
                     var covered = WorkflowScopeFilter.Allows(instance, scope, config.DepartmentCode, config.FieldActivityCode);
                     var canAct = running && member && covered && (item.Status == WorkItemStatus.Pending || item.Status == WorkItemStatus.Claimed && item.ClaimedByUserId == effective);
-                    var completionBlocked = await db.IntegrationJobs.AnyAsync(j => j.ActivityInstanceId == activity.Id && j.IsActivityEvent && j.Required && j.Status != "Completed", ct);
-                    tasks.Add(new(await assembler.ToDtoAsync(item, true, ct), canAct, canAct ? null : !running ? "Workflow or parent is paused or finished." : !member ? "Assigned to another group."
+                    var completionBlocked = await db.IntegrationJobs.AnyAsync(j => j.ActivityInstanceId == activity.Id && j.ExecutionKind != "Callable" && j.IsActivityEvent && j.Required && j.Status != "Completed", ct)
+                        || await db.MappingInvocations.AnyAsync(i => i.OriginActivityId == activity.Id && i.ExecutionKind == "RequiredEvent" && !i.Applied, ct);
+                    tasks.Add(new(await assembler.ToDtoAsync(item, true, ct), canAct, canAct ? null : !running ? "Workflow or parent is paused or finished." : !member ? "Assigned to other roles or a group."
                         : !covered ? "This activity's department or activity type is outside your organization coverage." : "Task is completed or claimed by another user.", completionBlocked));
                 }
                 activityDtos.Add(new(activity.Id, activity.ActivityNodeKey, activity.Name, activity.ActivityType.ToString(), activity.Status.ToString(), activity.Phase,
                     activity.StartedAt, activity.CompletedAt, activity.DueAt, config.DepartmentCode, config.FieldActivityCode, tasks,
-                    definition.AssignmentRules.FirstOrDefault(r => r.IsActive)?.ReferenceId is Guid assigned ? groupNames.GetValueOrDefault(assigned) : null,
+                    config.AssignmentRoleIds is { Count: > 0 } assignedRoles ? $"{assignedRoles.Count} account roles" : definition.AssignmentRules.FirstOrDefault(r => r.IsActive)?.ReferenceId is Guid assigned ? groupNames.GetValueOrDefault(assigned) : null,
                     WorkspaceDesign.Configuration(definition.ConfigurationJson)["publishedSla"]?.Deserialize<PublishedSla>(IntegrationJson.Options)));
             }
             tree.Add(new(instance.Id, instance.ParentInstanceId, instance.ParentActivityInstanceId, name, instance.Status.ToString(), activityDtos));
@@ -225,8 +238,17 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
         var actors = await db.Participants.AsNoTracking().ToDictionaryAsync(p => p.UserId, p => p.DisplayName, ct);
         var history = audit.OrderBy(e => e.OccurredAt).Select(e => new WorkspaceHistory(e.Id, e.WorkflowInstanceId, e.EventType.ToString(), e.ActivityNodeKey, e.ActorUserId,
             e.ActorUserId is Guid user ? actors.GetValueOrDefault(user) : null, e.OccurredAt, e.PayloadJson)).ToList();
-        var operations = await db.IntegrationJobs.AsNoTracking().Where(j => ids.Contains(j.WorkflowInstanceId)).OrderByDescending(j => j.CreatedAt).Take(200)
-            .Select(j => new WorkspaceOperation(j.Id, j.WorkflowInstanceId, j.ActivityInstanceId, j.EventName, j.Kind, j.EventTrigger, j.Required, j.Status, j.Attempts, j.Error, j.StatusCode, j.DeliveryResultJson, j.EventNodeKey)).ToListAsync(ct);
+        var jobs = await db.IntegrationJobs.AsNoTracking().Where(j => ids.Contains(j.WorkflowInstanceId)).OrderByDescending(j => j.CreatedAt).Take(200).ToListAsync(ct);
+        var executions = tree.SelectMany(run => run.Activities).ToDictionary(activity => activity.Id);
+        var operations = jobs.Select(j =>
+        {
+            executions.TryGetValue(j.ActivityInstanceId, out var execution);
+            // Sequence events are required by their position in the graph. Their names belong to
+            // the execution; EventName/EventNodeKey are only populated for lifecycle jobs.
+            return new WorkspaceOperation(j.Id, j.WorkflowInstanceId, j.ActivityInstanceId, j.EventName ?? execution?.Name,
+                j.Kind, j.EventTrigger, !j.IsActivityEvent || j.Required, j.Status, j.Attempts, j.Error, j.StatusCode,
+                j.DeliveryResultJson, j.EventNodeKey ?? execution?.NodeKey);
+        }).ToList();
         var demoActors = administrator && root.IsDemo ? await db.Participants.Where(p => p.IsActive && p.IsDemo).Select(p => new WorkspaceActor(p.UserId, p.DisplayName)).ToListAsync(ct) : [];
         return Result.Success(new WorkspaceDetail(root.Id, root.IsDemo, await LocationPartsAsync(root.Location, ct), tree, history, operations, demoActors));
     }
@@ -263,7 +285,10 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             var receipt = await db.WorkspaceActions.FirstOrDefaultAsync(r => r.RequestId == input.RequestId, ct);
             if (receipt is not null) return receipt.Fingerprint == fingerprint ? Result.Success() : Result.Failure(Invalid("This request identifier was already used for a different action."));
             if (!await WorkflowTreeGuard.CanRunAsync(db, instance.Id, ct)) return Result.Failure(Invalid("This workflow or its parent is not running."));
-            if (!await groups.IsMemberAsync(tenant.OrganizationId, item.AssignmentGroupId, effective, ct)) return Result.Failure(Invalid("The selected user does not belong to the assigned group."));
+            var eligible = item.AssignmentGroupId == Guid.Empty
+                ? roleAssignments is not null && await roleAssignments.CanAccessAsync(item, effective, ct)
+                : await groups.IsMemberAsync(tenant.OrganizationId, item.AssignmentGroupId, effective, ct);
+            if (!eligible) return Result.Failure(Invalid("The selected user is not eligible for this task's assigned roles or group."));
             if (item.Status is not (WorkItemStatus.Pending or WorkItemStatus.Claimed)) return Result.Failure(Invalid("This task is already finished."));
             var execution = await db.ActivityInstances.FindAsync([item.ActivityInstanceId], ct);
             var version = await versions.GetByIdWithProjectionAsync(instance.PinnedWorkflowVersionId, ct);
@@ -285,6 +310,9 @@ internal sealed class WorkflowWorkspace(WorkflowDbContext db, ICurrentTenant ten
             else
             {
                 if (!definition.Outcomes.Any(o => o.IsActive && o.OutcomeKey == input.Action)) return Result.Failure(Invalid("Select a configured task outcome."));
+                using var submissionActor = input.DemoActorId is null ? null
+                    : (formSubmissionActor ?? throw new InvalidOperationException("Trusted form submission attribution is required for demo actions."))
+                        .BeginAuthorizedDemo(item.Id, actor, effective, await db.Participants.Where(p => p.UserId == effective && p.IsActive && p.IsDemo).Select(p => p.DisplayName).SingleAsync(ct));
                 if (item.Status == WorkItemStatus.Pending)
                 { var claimed = await sender.Send(new ClaimWorkItemCommand(item.Id, effective, tenant.OrganizationId), ct); if (claimed.IsFailure) return Result.Failure(claimed.Error); }
                 var completed = await sender.Send(new CompleteWorkItemCommand(item.Id, effective, tenant.OrganizationId, input.Action, input.Comment, FormValues: input.FormValues, FormVisitId: input.FormVisitId), ct);

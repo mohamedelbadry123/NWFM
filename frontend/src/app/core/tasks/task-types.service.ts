@@ -14,8 +14,12 @@ import {
 export class TaskTypesService {
   private readonly http = inject(HttpClient);
 
-  list(pageNumber: number, pageSize: number, searchTerm?: string | null, isActive?: boolean | null):
-    Observable<ApiResult<PaginatedResult<TaskType>>> {
+  list(
+    pageNumber: number,
+    pageSize: number,
+    searchTerm?: string | null,
+    isActive?: boolean | null,
+  ): Observable<ApiResult<PaginatedResult<TaskType>>> {
     let params = new HttpParams().set('pageNumber', pageNumber).set('pageSize', pageSize);
 
     if (searchTerm) {
@@ -44,6 +48,14 @@ export class TaskTypesService {
 
   update(id: string, payload: TaskTypePayload): Observable<ApiResult<TaskType>> {
     return this.http.put<ApiResult<TaskType>>(`${TASK_TYPES_PATH}/${id}`, payload);
+  }
+
+  /**
+   * Files one published form under the type, after its others, without touching them. Repeating it is
+   * harmless. Needs both form and task-type management, so callers show it only to those who hold both.
+   */
+  attachForm(id: string, formId: string): Observable<ApiResult<TaskType>> {
+    return this.http.put<ApiResult<TaskType>>(`${TASK_TYPES_PATH}/${id}/forms/${formId}`, {});
   }
 
   setStatus(id: string, isActive: boolean): Observable<ApiResult<TaskType>> {

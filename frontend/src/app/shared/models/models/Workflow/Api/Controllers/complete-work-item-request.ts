@@ -4,6 +4,10 @@
 export interface CompleteWorkItemRequest {
   actionTaken?: string | null;
   comment?: string | null;
+  formValues?: ({
+[key: string]: any;
+}) | null;
+  formVisitId?: string | null;
   redirectAssignmentGroupId?: string | null;
   redirectDepartmentId?: string | null;
 }

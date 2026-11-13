@@ -10,5 +10,6 @@ export const WORK_ITEM_STATUS: WorkItemStatus[] = [
   'Pending',
   'Claimed',
   'Completed',
-  'Cancelled'
+  'Cancelled',
+  'Preparing'
 ];

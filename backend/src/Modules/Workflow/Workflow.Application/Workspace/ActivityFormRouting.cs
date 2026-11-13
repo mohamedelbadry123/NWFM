@@ -59,6 +59,7 @@ public sealed class ActivityFormProgress
 public sealed class ActivityFormVisit
 {
     public Guid VisitId { get; set; }
+    public Guid? ReceiptKey { get; set; }
     public string StepId { get; set; } = "";
     public Guid FormId { get; set; }
     public int VersionNo { get; set; }

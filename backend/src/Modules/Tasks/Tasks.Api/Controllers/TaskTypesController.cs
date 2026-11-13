@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using NWFM.Shared.Constants;
 using NWFM.Shared.Results;
 using Tasks.Api.Common;
+using Tasks.Application.TaskTypes.Commands.AttachTaskTypeForm;
 using Tasks.Application.TaskTypes.Commands.SaveTaskType;
 using Tasks.Application.TaskTypes.Models;
 using Tasks.Application.TaskTypes.Queries.GetTaskTypes;
@@ -52,6 +53,17 @@ public sealed class TaskTypesController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(Result<TaskTypeDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTaskTypeCommand command, CancellationToken ct) =>
         (await sender.Send(command with { TaskTypeId = id }, ct)).ToActionResult();
+
+    /// <summary>
+    /// Files one published form under the type, after its others, and changes nothing else. Idempotent.
+    /// Both policies are required (they combine as AND): changing a type's forms needs form and task-type management.
+    /// </summary>
+    [HttpPut("{id:guid}/forms/{formId:guid}")]
+    [Authorize(Policy = NwfmPolicies.ManageForms)]
+    [Authorize(Policy = NwfmPolicies.ManageTaskTypes)]
+    [ProducesResponseType(typeof(Result<TaskTypeDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> AttachForm(Guid id, Guid formId, CancellationToken ct) =>
+        (await sender.Send(new AttachTaskTypeFormCommand(id, formId), ct)).ToActionResult();
 
     [HttpPut("{id:guid}/status")]
     [Authorize(Policy = NwfmPolicies.ManageTaskTypes)]

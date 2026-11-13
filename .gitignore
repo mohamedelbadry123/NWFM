@@ -85,6 +85,8 @@ node_modules/
 .e2e/videos/
 
 # Disposable e2e service data
+/.work/e2e-artifacts/
+/.work/tmp/
 .e2e/logs/
 .e2e/media/
 .e2e/sessions/

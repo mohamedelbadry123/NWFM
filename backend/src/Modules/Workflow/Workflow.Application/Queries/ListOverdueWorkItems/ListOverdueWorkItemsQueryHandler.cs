@@ -12,6 +12,7 @@ public sealed record ListOverdueWorkItemsQuery(Guid UserId, Guid OrganizationId)
 public sealed class ListOverdueWorkItemsQueryHandler
     : IRequestHandler<ListOverdueWorkItemsQuery, Result<IReadOnlyList<WorkItemDto>>>
 {
+    private readonly IWorkflowRoleAssignments? _roles;
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkItemRepository _workItems;
     private readonly IWorkflowAssignmentGroupRepository _groups;
@@ -23,8 +24,9 @@ public sealed class ListOverdueWorkItemsQueryHandler
         IWorkItemRepository workItems,
         IWorkflowAssignmentGroupRepository groups,
         IWorkflowParticipantRepository participants,
-        IWorkItemDtoAssembler assembler)
+        IWorkItemDtoAssembler assembler, IWorkflowRoleAssignments? roles = null)
     {
+        _roles = roles;
         _gate = gate;
         _workItems = workItems;
         _groups = groups;
@@ -38,13 +40,15 @@ public sealed class ListOverdueWorkItemsQueryHandler
         var gateResult = _gate.EnsureEnabled();
         if (gateResult.IsFailure) return Result.Failure<IReadOnlyList<WorkItemDto>>(gateResult.Error);
 
+        var roleItems = _roles is null ? Array.Empty<Workflow.Domain.Entities.WorkItem>()
+            : await _roles.AvailableAsync(request.OrganizationId, request.UserId, true, cancellationToken);
         var groupIds = await _groups.GetGroupIdsForUserAsync(
             request.UserId, request.OrganizationId, cancellationToken);
         if (groupIds.Count > 0)
         {
             var mine = await _workItems.GetOverdueForUserAsync(
                 request.OrganizationId, request.UserId, groupIds, DateTime.UtcNow, cancellationToken);
-            return Result.Success(await _assembler.ToDtoListAsync(mine, cancellationToken));
+            return Result.Success(await _assembler.ToDtoListAsync(mine.Concat(roleItems).DistinctBy(w => w.Id).OrderBy(w => w.CreatedAt).ToList(), cancellationToken));
         }
 
         var isParticipant = await _participants.ExistsActiveForUserAsync(
@@ -56,6 +60,6 @@ public sealed class ListOverdueWorkItemsQueryHandler
             return Result.Success(await _assembler.ToDtoListAsync(orgOverdue, cancellationToken));
         }
 
-        return Result.Success(await _assembler.ToDtoListAsync([], cancellationToken));
+        return Result.Success(await _assembler.ToDtoListAsync(roleItems, cancellationToken));
     }
 }

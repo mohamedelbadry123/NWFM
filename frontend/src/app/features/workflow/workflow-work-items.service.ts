@@ -1,5 +1,6 @@
 import type { WorkflowSelectedForm } from './workspace/workflow-selected-form.component';
 import type { ActivityFormStep, ActivityFormVisit } from './workspace/workflow-form-routing.types';
+import type { StepMappingSnapshot } from './mapping/mapping.models';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -16,8 +17,13 @@ import type {
   WorkflowWorkItemExtras,
 } from '@core/models/workflow-ops.models';
 
-export type WorkflowWorkItemView = WorkItemDto &
+/** Preparing is a server status the generated enum predates: the Step's mapped values are still being prepared. */
+export type WorkflowWorkItemStatus = NonNullable<WorkItemDto['status']> | 'Preparing';
+export type WorkflowWorkItemView = Omit<WorkItemDto, 'status'> &
   WorkflowWorkItemExtras & {
+    status?: WorkflowWorkItemStatus;
+    /** Completed/Preparing values the Step mapped into its form; see StepMappingSnapshot. */
+    mappingSnapshot?: StepMappingSnapshot | null;
     instructionsEn?: string;
     instructionsAr?: string;
     formFields?: {

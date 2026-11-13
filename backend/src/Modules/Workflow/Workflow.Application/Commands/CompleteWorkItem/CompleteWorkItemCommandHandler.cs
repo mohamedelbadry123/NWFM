@@ -16,6 +16,7 @@ using Workflow.Domain.Repositories;
 public sealed class CompleteWorkItemCommandHandler
     : IRequestHandler<CompleteWorkItemCommand, Result<WorkItemDto>>
 {
+    private readonly IWorkflowRoleAssignments? _roles;
     private readonly IWorkflowFeatureGate _gate;
     private readonly IWorkItemRepository _workItemRepo;
     private readonly IWorkflowRuntimeEngine _engine;
@@ -29,6 +30,7 @@ public sealed class CompleteWorkItemCommandHandler
     private readonly IWorkflowCandidateFactory _candidateFactory;
     private readonly IWorkItemCandidateRepository _candidateRepo;
     private readonly IFormGateway? _forms;
+    private readonly Workflow.Application.Mapping.IStepMappingRuntime? _stepMappings;
 
     public CompleteWorkItemCommandHandler(
         IWorkflowFeatureGate gate,
@@ -42,8 +44,10 @@ public sealed class CompleteWorkItemCommandHandler
         IWorkflowAssignmentGroupRepository groupRepo,
         IWorkflowDepartmentRepository departmentRepo,
         IWorkflowCandidateFactory candidateFactory,
-        IWorkItemCandidateRepository candidateRepo, IFormGateway? forms = null)
+        IWorkItemCandidateRepository candidateRepo, IFormGateway? forms = null, IWorkflowRoleAssignments? roles = null, Workflow.Application.Mapping.IStepMappingRuntime? stepMappings = null)
     {
+        _roles = roles;
+        _stepMappings = stepMappings;
         _gate = gate;
         _workItemRepo = workItemRepo;
         _engine = engine;
@@ -71,6 +75,9 @@ public sealed class CompleteWorkItemCommandHandler
 
         if (item.Status == WorkItemStatus.Completed)
         {
+            if (request.FormVisitId is null && item.CompletedFormReceiptKey is not null && item.CompletedByUserId == request.UserId
+                && item.ActionTaken == request.ActionTaken)
+                return Result.Success(await _assembler.ToDtoAsync(item, true, cancellationToken));
             // Completed visits are immutable receipts, including when a response was lost.
             if (request.FormVisitId is Guid replayId && item.CompletedByUserId == request.UserId && item.FormProgressJson is not null
                 && System.Text.Json.JsonSerializer.Deserialize<ActivityFormProgress>(item.FormProgressJson)?.Visits.Any(v => v.VisitId == replayId && v.ActorId == request.UserId) == true)
@@ -86,10 +93,12 @@ public sealed class CompleteWorkItemCommandHandler
 
         var workspaceInstance = await _instances.GetByIdAsync(item.WorkflowInstanceId, cancellationToken);
         var workspaceVersion = workspaceInstance is null ? null : await _versions.GetByIdWithProjectionAsync(workspaceInstance.PinnedWorkflowVersionId, cancellationToken);
-        if (workspaceVersion?.WorkspaceJson is not null)
+        if (workspaceVersion?.WorkspaceJson is not null || item.AssignmentGroupId == Guid.Empty)
         {
-            if (!await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken))
-                return Result.Failure<WorkItemDto>(new Error("Workflow.Assignment.Membership", "The user no longer belongs to the assigned group."));
+            if (item.AssignmentGroupId == Guid.Empty
+                ? _roles is null || !await _roles.CanAccessAsync(item, request.UserId, cancellationToken)
+                : !await _groupRepo.IsUserMemberOfGroupAsync(item.AssignmentGroupId, request.UserId, request.OrganizationId, cancellationToken))
+                return Result.Failure<WorkItemDto>(new Error("Workflow.Assignment.Membership", "The user is no longer eligible for the assigned roles or group."));
             var execution = await _activities.GetByIdAsync(item.ActivityInstanceId, cancellationToken);
             if (execution?.ActivityType == ActivityType.MainActivity && execution.Phase != "AwaitingApproval")
                 return Result.Failure<WorkItemDto>(new Error("Workflow.Main.ChildPending", "Complete the child workflow before approving its parent."));
@@ -133,14 +142,18 @@ public sealed class CompleteWorkItemCommandHandler
                         VersionNo = binding.FormVersionNo.Value,
                         ContextType = "WorkItem",
                         ContextId = item.Id.ToString(),
-                        ClientSubmissionId = item.Id,
+                        ClientSubmissionId = item.FormReceiptKey(item.Id, request.UserId),
                         Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
                     }, cancellationToken);
                     if (submitted.IsFailure) return Result.Failure<WorkItemDto>(submitted.Error);
                     // A retry must use the answers actually recorded, including normalized media values.
-                    var recorded = await _forms.GetLatestByContextAsync(formId, "WorkItem", item.Id.ToString(), cancellationToken);
+                    var receiptKey = item.FormReceiptKey(item.Id, request.UserId);
+                    var recorded = await _forms.GetByClientIdAsync(formId, receiptKey, "WorkItem", item.Id.ToString(), cancellationToken);
                     if (recorded is null) return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Invalid", "The form submission could not be read. Retry the action."));
+                    if (!string.IsNullOrWhiteSpace(recorded.SubmittedBy) && (!Guid.TryParse(recorded.SubmittedBy, out var submitter) || submitter != request.UserId))
+                        return Result.Failure<WorkItemDto>(new Error("Workflow.Form.Context", "The completion receipt belongs to another actor."));
                     item.SetFormData(System.Text.Json.JsonSerializer.Serialize(recorded.Answers));
+                    item.RecordFormReceipt(receiptKey);
                 }
             }
             else
@@ -208,18 +221,22 @@ public sealed class CompleteWorkItemCommandHandler
             VersionNo = step.VersionNo,
             ContextType = "WorkItem",
             ContextId = context,
-            ClientSubmissionId = visitId,
+            ClientSubmissionId = item.FormReceiptKey(visitId, request.UserId),
             Answers = (request.FormValues ?? []).ToDictionary(x => x.Key, x => (object?)x.Value)
         }, ct);
         if (submitted.IsFailure) return Result.Failure<bool>(submitted.Error);
-        var recorded = await _forms.GetLatestByContextAsync(step.FormId, "WorkItem", context, ct);
+        var receiptKey = item.FormReceiptKey(visitId, request.UserId);
+        var recorded = await _forms.GetByClientIdAsync(step.FormId, receiptKey, "WorkItem", context, ct);
         if (recorded is null) return Result.Failure<bool>(new Error("Workflow.Form.Invalid", "The submission could not be read. Retry the action."));
+        if (!string.IsNullOrWhiteSpace(recorded.SubmittedBy) && (!Guid.TryParse(recorded.SubmittedBy, out var submitter) || submitter != request.UserId))
+            return Result.Failure<bool>(new Error("Workflow.Form.Context", "The completion receipt belongs to another actor."));
         var decision = WorkflowFormRouting.Decide(step, fields, recorded.Answers);
         var target = WorkflowFormRouting.ResolveDestination(binding.FormSteps, step, decision.Destination, version, definition.NodeKey);
         var now = DateTime.UtcNow;
         progress.Visits.Add(new ActivityFormVisit
         {
             VisitId = visitId,
+            ReceiptKey = receiptKey,
             StepId = step.Id,
             FormId = step.FormId,
             VersionNo = step.VersionNo,
@@ -237,6 +254,8 @@ public sealed class CompleteWorkItemCommandHandler
         await _events.AppendAsync(item.OrganizationId, item.WorkflowInstanceId, WorkflowEventType.FormSubmitted, now,
             activityNodeKey: definition.NodeKey, actorUserId: request.UserId,
             payloadJson: System.Text.Json.JsonSerializer.Serialize(new { workItemId = item.Id, comment = request.Comment, visitId, stepId = step.Id, formId = step.FormId, step.VersionNo, submissionId = recorded.SubmissionId, ruleId = decision.RuleId, fallback = decision.RuleId is null, destination = decision.Destination }), cancellationToken: ct);
+        if (target.FormStepId is not null && binding.TypedMapping is not null)
+            await (_stepMappings ?? throw new InvalidOperationException("Step mapping runtime is required.")).PrepareStepAsync(item, definition.ConfigurationJson!, ct);
         if (target.FormStepId is not null) await _workItemRepo.SaveChangesAsync(ct);
         return Result.Success(target.FormStepId is null);
     }

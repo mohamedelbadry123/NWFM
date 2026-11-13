@@ -4,9 +4,9 @@ using System.Globalization;
 using System.Text.Json;
 using NWFM.Shared.Integration.Workflow;
 using Workflow.Application.DTOs;
+using Workflow.Application.Integrations;
 using Workflow.Application.Models;
 using Workflow.Domain.Enums;
-using Workflow.Application.Integrations;
 
 /// <summary>Configuration checks shared by Validate and Publish; never execute an integration.</summary>
 public static class WorkflowActivityConfigurationValidator
@@ -60,11 +60,26 @@ public static class WorkflowActivityConfigurationValidator
                 }
                 string? Text(string key) => root.TryGetProperty(key, out var value)
                     && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+                if (root.TryGetProperty("mappingMode", out var mappingMode) && (mappingMode.ValueKind != JsonValueKind.String || mappingMode.GetString() is not ("Legacy" or "Typed")))
+                    Error("MAPPING_MODE_INVALID", "Select Legacy or Typed mapping mode.");
+                if (Text("mappingMode") == "Typed" && !root.TryGetProperty("typedMapping", out _))
+                    Error("MAPPING_CONFIG_INVALID", "Typed mapping configuration is required.");
+                if (root.TryGetProperty("typedMapping", out var typed) && (typed.ValueKind != JsonValueKind.Object
+                    || type is not (ActivityType.UserTask or ActivityType.MainActivity or ActivityType.ServiceTask)
+                    || type == ActivityType.ServiceTask && (activity.ActionKey != "http.request" || Text("mappingMode") != "Typed")))
+                    Error("MAPPING_CONFIG_INVALID", "Typed mappings require a supported Step or explicit Typed HTTP event.");
 
                 switch (type)
                 {
                     case ActivityType.UserTask:
                     case ActivityType.MainActivity:
+                        if (root.TryGetProperty("assignmentRoleIds", out var roleIds))
+                        {
+                            if (roleIds.ValueKind != JsonValueKind.Array || roleIds.GetArrayLength() > 50 || roleIds.EnumerateArray().Any(id => id.ValueKind != JsonValueKind.String || !Guid.TryParse(id.GetString(), out var value) || value == Guid.Empty))
+                                Error("ASSIGNMENT_ROLES_INVALID", "Select at most 50 existing account roles.");
+                            else if (roleIds.GetArrayLength() > 0 && (activity.AssignmentRules.Count > 0 || !string.IsNullOrWhiteSpace(activity.AssignmentGroupId) || !string.IsNullOrWhiteSpace(activity.AssignmentKey)))
+                                Error("ASSIGNMENT_ROLES_MIXED", "Select roles or retain the legacy group assignment, not both.");
+                        }
                         if (root.TryGetProperty("nodePriority", out var priority) && priority.ValueKind == JsonValueKind.Number && (!priority.TryGetDecimal(out var priorityValue) || priorityValue != 0))
                             Error("TASK_PRIORITY_UNSUPPORTED", "Task queue priority is not supported. Set it to zero; routing priority is configured on transitions.");
                         foreach (var flag in new[] { "requiresClaim", "allowSelfClaim" })

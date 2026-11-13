@@ -10,6 +10,7 @@ public interface IFormEngineDbContext
     DbSet<FormVersion> FormVersions { get; }
     DbSet<FormField> FormFields { get; }
     DbSet<SubmissionFile> SubmissionFiles { get; }
+    DbSet<WorkflowReceiptKey> WorkflowReceiptKeys { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 

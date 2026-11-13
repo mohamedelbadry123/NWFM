@@ -1,5 +1,6 @@
 import type { ActivityFormStep, ActivityFormVisit } from './workflow-form-routing.types';
 import type { WorkflowSelectedForm } from './workflow-selected-form.component';
+import type { StepMappingSnapshot } from '../mapping/mapping.models';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import type { WorkItemDto } from '@shared/models/models/Workflow/Application/DTOs/work-item-dto';
@@ -12,11 +13,15 @@ import { OrgLocation, OrgScopeLevel } from '@shared/components/org-scope/org-sco
 export interface WorkspaceSettings {
   schemaVersion?: number;
   organizationScopes?: WorkflowOrganizationScope[];
+  /** Optional authored grouping of {@link organizationScopes}; absent on older saves. */
+  scopeRows?: WorkflowScopeRow[];
   fieldActivityTypeId?: string;
   departmentCode?: string;
   fieldActivityCode?: string;
   taskTypeId?: string;
   designerVersion?: number;
+  parentDefinitionId?: string;
+  parentNodeKey?: string;
   kind: 'Main' | 'Child';
   clusterCode?: string;
   cbuCode?: string;
@@ -70,7 +75,7 @@ export function workspaceLocation(settings: WorkspaceSettings): OrgLocation {
   };
 }
 
-/** A main workflow must name at least its cluster and CBU — the level coverage is matched at. */
+/** Scoped workflows require a cluster; descendant organization levels are optional. Legacy locations retain their original rules. */
 export function hasRequiredLocation(settings: WorkspaceSettings): boolean {
   if (settings.schemaVersion === 2 || settings.organizationScopes)
     return (
@@ -96,6 +101,17 @@ export interface WorkflowOrganizationScope {
   clusterCode: string;
   cbuCode?: string;
 }
+/**
+ * One entry as it was authored (Cluster, then optionally CBU, Branch and Operation Area). Saved beside
+ * `organizationScopes` only so the same entries come back after a reload; the canonical scopes stay authoritative.
+ */
+export interface WorkflowScopeRow {
+  id: string;
+  clusterCode: string;
+  cbuCode?: string;
+  branchCode?: string;
+  operationAreaCode?: string;
+}
 export function scopeLocation(scope: WorkflowOrganizationScope): OrgLocation {
   return {
     clusterCode: scope.clusterCode,
@@ -117,10 +133,7 @@ export function scopeContains(scope: WorkflowOrganizationScope, location: OrgLoc
 export function hasRequiredClassification(settings: WorkspaceSettings): boolean {
   if (settings.schemaVersion !== 2) return true;
   return settings.kind === 'Main'
-    ? !!settings.fieldActivityTypeId &&
-        !!settings.departmentCode &&
-        !!settings.fieldActivityCode &&
-        !settings.taskTypeId
+    ? !!settings.fieldActivityTypeId && !!settings.fieldActivityCode && !settings.taskTypeId
     : !!settings.taskTypeId && !settings.fieldActivityTypeId;
 }
 
@@ -157,7 +170,9 @@ export interface WorkspaceInstance {
   location: OrgLocation;
 }
 export interface WorkspaceTask {
-  task: WorkItemDto & {
+  task: Omit<WorkItemDto, 'status'> & {
+    status?: NonNullable<WorkItemDto['status']> | 'Preparing';
+    mappingSnapshot?: StepMappingSnapshot | null;
     instructionsEn?: string;
     instructionsAr?: string;
     formFields?: {
@@ -252,6 +267,9 @@ export class WorkflowWorkspaceService {
   }
   catalog() {
     return this.http.get<WorkspaceWorkflow[]>(`${this.base}/catalog`);
+  }
+  openChild(parentVersionId: string, nodeKey: string) {
+    return this.http.post<WorkspaceWorkflow>(`${this.base}/children`, { parentVersionId, nodeKey });
   }
   children(selectedVersionId?: string) {
     return this.http.get<WorkspaceWorkflow[]>(`${this.base}/children`, {

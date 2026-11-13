@@ -44,7 +44,10 @@ export class LoginComponent implements OnInit {
   protected readonly submitting = signal(false);
   protected readonly redirecting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  private readonly ssoStatus = signal<SsoStatus>({ enabled: false, allowLocalLoginForAdministrators: true });
+  private readonly ssoStatus = signal<SsoStatus>({
+    enabled: false,
+    allowLocalLoginForAdministrators: true,
+  });
 
   private readonly returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
   private readonly localRequested = this.route.snapshot.queryParamMap.get('local') === '1';
@@ -109,7 +112,7 @@ export class LoginComponent implements OnInit {
         this.submitting.set(false);
         if (response.isSuccess) {
           this.store.setSession(response);
-          this.loadProfileAndNavigate();
+          this.loadProfileAndNavigate(this.store.sessionEpoch());
         } else {
           this.errorMessage.set(response.error?.message || 'auth.login.error_invalid');
         }
@@ -121,10 +124,11 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  private loadProfileAndNavigate(): void {
+  private loadProfileAndNavigate(epoch: number): void {
     this.auth.getProfile().subscribe({
       next: (res) => {
-        if (res.isSuccess) this.store.updateProfile(res.value);
+        // Ignored when the session changed (logout, another login) while the profile was loading.
+        if (res.isSuccess) this.store.updateProfile(res.value, epoch);
         void this.finishLogin();
       },
       error: () => void this.finishLogin(),
@@ -133,6 +137,8 @@ export class LoginComponent implements OnInit {
 
   private async finishLogin(): Promise<void> {
     await this.appContext.load();
-    await this.router.navigateByUrl(this.returnUrl && this.returnUrl !== '/login' ? this.returnUrl : '/');
+    await this.router.navigateByUrl(
+      this.returnUrl && this.returnUrl !== '/login' ? this.returnUrl : '/',
+    );
   }
 }

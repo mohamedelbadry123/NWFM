@@ -7,14 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResultOfWorkflowIntegrationOutboxMessageDto as NwfmSharedResultsPaginatedResultOfWorkflowIntegrationOutboxMessageDto } from '../../models/NWFM/Shared/Results/paginated-result-of-workflow-integration-outbox-message-dto';
+import { WorkflowIntegrationOutboxMessageDto as NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationOutboxMessageDto } from '../../models/NWFM/Shared/Results/PaginatedResultOfWorkflow/Application/DTOs/workflow-integration-outbox-message-dto';
 
 export interface ApiWorkflowIntegrationMessagesOutboxFailedGet$Params {
   page?: number;
   pageSize?: number;
 }
 
-export function apiWorkflowIntegrationMessagesOutboxFailedGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIntegrationMessagesOutboxFailedGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIntegrationOutboxMessageDto>> {
+export function apiWorkflowIntegrationMessagesOutboxFailedGet(http: HttpClient, rootUrl: string, params?: ApiWorkflowIntegrationMessagesOutboxFailedGet$Params, context?: HttpContext): Observable<StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationOutboxMessageDto>> {
   const rb = new RequestBuilder(rootUrl, apiWorkflowIntegrationMessagesOutboxFailedGet.PATH, 'get');
   if (params) {
     rb.query('page', params.page, {});
@@ -26,7 +26,7 @@ export function apiWorkflowIntegrationMessagesOutboxFailedGet(http: HttpClient, 
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowIntegrationOutboxMessageDto>;
+      return r as StrictHttpResponse<NwfmSharedResultsPaginatedResultOfWorkflowApplicationDtOsWorkflowIntegrationOutboxMessageDto>;
     })
   );
 }

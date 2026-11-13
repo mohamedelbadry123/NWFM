@@ -52,3 +52,51 @@ test('deployment obligations cannot silently be marked as covered', () => {
   delete deployment.deploymentRequirement;
   assert.throws(() => validateCoverage(source, missing, root), /deployment obligation/);
 });
+
+test('per-unit hashes, unique identities, exact locations and safe evidence remain mandatory', () => {
+  const hash = structuredClone(catalog);
+  hash.controls[0].sha256 = '0'.repeat(64);
+  assert.throws(() => validateCoverage(source, hash, root), /changed requirement/);
+  const duplicate = structuredClone(catalog);
+  duplicate.controls[1] = structuredClone(duplicate.controls[0]);
+  assert.throws(() => validateCoverage(source, duplicate, root), /requirement/);
+  const line = structuredClone(catalog);
+  line.controls[0].end++;
+  assert.throws(() => validateCoverage(source, line, root), /misrepresented/);
+  const group = structuredClone(catalog);
+  group.controls[0].group = 'invented-evidence';
+  assert.throws(() => validateCoverage(source, group, root), /evidence required/);
+  const unsafe = structuredClone(catalog);
+  unsafe.groups[unsafe.controls[0].group].implementation = ['../AGENTS.md'];
+  assert.throws(() => validateCoverage(source, unsafe, root), /unsafe evidence/);
+});
+
+test('expanded requirements retain explicit operational gaps instead of claiming certification', () => {
+  // Locate by content: inserting another source unit must not attach evidence to its old ordinal.
+  const find = (text) => {
+    const unit = sourceUnits(source).find((u) => u.text.includes(text));
+    assert.ok(unit, 'Missing expanded requirement: ' + text);
+    const control = catalog.controls.find((c) => c.sha256 === unit.sha256);
+    assert.ok(control);
+    return control;
+  };
+  for (const text of ['shared counters with atomic updates', 'tamper-evident mechanisms']) {
+    const control = find(text);
+    assert.equal(control.status, 'deployment');
+    assert.ok(control.deploymentRequirement.length > 30);
+  }
+  const appendOnly = find('Enforce append-only audit behavior');
+  assert.equal(appendOnly.status, 'repository-and-deployment');
+  assert.match(appendOnly.reason, /not a WORM ledger/);
+  assert.match(appendOnly.deploymentRequirement, /every required audit class/);
+  assert.equal(find('Authorize the exact tenant, object, and operation').status, 'repository');
+  assert.equal(find('Restrict signed URLs to the required object').status, 'not-applicable');
+  assert.equal(
+    find('Generate tenant API credentials with a cryptographically secure').status,
+    'repository-and-deployment',
+  );
+  assert.match(
+    find('Treat onboarding as an all-or-nothing operation').deploymentRequirement,
+    /owned by that attempt/,
+  );
+});

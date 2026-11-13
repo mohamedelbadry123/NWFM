@@ -19,20 +19,48 @@ import { FormRouteNode, WorkflowFormRouteComponent } from './workflow-form-route
     <h3 id="wf-form-actions-title" tabindex="-1" class="font-semibold">
       {{ t('Form actions and routing', 'إجراءات النموذج والتوجيه') }}
     </h3>
+    @if (hierarchical) {
+      <label class="block text-sm"
+        >{{ t('Reject / return to step', 'رفض / الرجوع إلى خطوة') }}
+        <select
+          class="wf-input w-full"
+          [disabled]="readonly"
+          [ngModel]="config['rejectTargetNodeKey'] || ''"
+          (ngModelChange)="config['rejectTargetNodeKey'] = $event; save()"
+        >
+          <option value="">{{ t('Select a return step', 'اختر خطوة الرجوع') }}</option>
+          @for (node of nodes; track node.nodeKey) {
+            @if (node.type === 'UserTask') {
+              <option [value]="node.nodeKey">{{ node.name }}</option>
+            }
+          }
+        </select>
+      </label>
+    }
     <p class="text-xs wf-muted">
       {{
-        t(
-          'Submit a form, then follow its first matching rule. Otherwise, follow its default route.',
-          'بعد إرسال النموذج اتبع أول قاعدة مطابقة، وإلا اتبع المسار الافتراضي.'
-        )
+        hierarchical
+          ? t(
+              'Route to a Step or Event when a rule matches; otherwise use the default route.',
+              'انتقل إلى خطوة أو حدث عند مطابقة القاعدة؛ وإلا اتبع المسار الافتراضي.'
+            )
+          : t(
+              'Submit a form, then follow its first matching rule. Otherwise, follow its default route.',
+              'بعد إرسال النموذج اتبع أول قاعدة مطابقة، وإلا اتبع المسار الافتراضي.'
+            )
       }}
     </p>
     <p class="text-xs wf-muted">
       {{
-        t(
-          'Configure both matching rules and Otherwise. Either can go to any form in this activity or an earlier or later activity in this workflow. Form list order does not restrict explicit destinations.',
-          'اضبط القواعد المطابقة ومسار وإلا. يمكن لكليهما الانتقال إلى أي نموذج في هذا النشاط أو إلى نشاط سابق أو لاحق في سير العمل. ترتيب قائمة النماذج لا يقيد الوجهات المحددة.'
-        )
+        hierarchical
+          ? t(
+              'Rules use fields from this step’s selected form. Explicit destinations remain inside this child workflow.',
+              'تستخدم القواعد حقول نموذج هذه الخطوة. تبقى الوجهات المحددة داخل سير العمل الفرعي.'
+            )
+          : t(
+              'Configure both matching rules and Otherwise. Either can go to any form in this activity or an earlier or later activity in this workflow. Form list order does not restrict explicit destinations.',
+              'اضبط القواعد المطابقة ومسار وإلا. يمكن لكليهما الانتقال إلى أي نموذج في هذا النشاط أو إلى نشاط سابق أو لاحق في سير العمل. ترتيب قائمة النماذج لا يقيد الوجهات المحددة.'
+            )
       }}
     </p>
     @if (!steps.length) {
@@ -102,6 +130,7 @@ import { FormRouteNode, WorkflowFormRouteComponent } from './workflow-form-route
               [destination]="rule.destination"
               [steps]="steps"
               [nodes]="nodes"
+              [hierarchical]="hierarchical"
               [currentNodeKey]="nodeKey"
               [currentStepId]="step.id"
               [readonly]="readonly"
@@ -159,6 +188,7 @@ import { FormRouteNode, WorkflowFormRouteComponent } from './workflow-form-route
             [destination]="step.otherwise"
             [steps]="steps"
             [nodes]="nodes"
+            [hierarchical]="hierarchical"
             [currentNodeKey]="nodeKey"
             [currentStepId]="step.id"
             [readonly]="readonly"
@@ -170,6 +200,7 @@ import { FormRouteNode, WorkflowFormRouteComponent } from './workflow-form-route
   </section>`,
 })
 export class WorkflowFormActionsComponent implements OnChanges {
+  @Input() hierarchical = false;
   @Input() configuration = '{}';
   @Input() readonly = false;
   @Input() nodeKey = '';
@@ -177,7 +208,7 @@ export class WorkflowFormActionsComponent implements OnChanges {
   @Output() configurationChange = new EventEmitter<string>();
   private locale = inject(LocaleService);
   private api = inject(WorkflowActivityFormsService);
-  private config: Record<string, unknown> = {};
+  protected config: Record<string, unknown> = {};
   private request = 0;
   private loadedKey = '';
   steps: ActivityFormStep[] = [];

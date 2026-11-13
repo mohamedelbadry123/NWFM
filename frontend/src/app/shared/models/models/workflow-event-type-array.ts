@@ -37,5 +37,11 @@ export const WORKFLOW_EVENT_TYPE: WorkflowEventType[] = [
   'OutcomePublished',
   'CandidateAssigned',
   'WorkItemReassigned',
-  'WorkItemDelegated'
+  'WorkItemDelegated',
+  'CommentAdded',
+  'DemoAction',
+  'IntegrationCompleted',
+  'IntegrationFailed',
+  'SlaBreached',
+  'FormSubmitted'
 ];

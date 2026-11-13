@@ -16,7 +16,7 @@ using Workflow.Domain.Enums;
 using Workflow.Infrastructure.Persistence;
 
 internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant tenant, IDataProtectionProvider protection,
-    WorkflowIntegrationTransport transport, IOptions<WorkflowSettings> settings) : IWorkflowIntegrations, IWorkflowIntegrationRuntime
+    WorkflowIntegrationTransport transport, IOptions<WorkflowSettings> settings, WorkflowMappingRuntime? mappings = null) : IWorkflowIntegrations, IWorkflowIntegrationRuntime
 {
     private IDataProtector Protector => protection.CreateProtector("NWFM.Workflow.Connections.v1", tenant.OrganizationId.ToString());
     internal Dictionary<string, string> Credentials(WorkflowIntegrationConnection c) => string.IsNullOrEmpty(c.ProtectedCredentials)
@@ -66,6 +66,8 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
     }
     public async Task<Result<IntegrationResult>> TestHttpAsync(HttpActivityConfiguration configuration, Dictionary<string, JsonElement> variables, CancellationToken ct)
     {
+        if (configuration.MappingMode != "Legacy" || configuration.TypedMapping is not null)
+            return Result.Failure<IntegrationResult>(new Error("Mapping.PreparedRequired", "Typed Send Test requires a prepared request."));
         var errors = IntegrationConfigurationRules.Validate("Http", JsonSerializer.Serialize(configuration, IntegrationJson.Options));
         if (errors.Count > 0) return Result.Failure<IntegrationResult>(new Error("Workflow.Integration.Invalid", errors[0]));
         var connection = await db.IntegrationConnections.FindAsync([configuration.ConnectionId], ct);
@@ -73,6 +75,23 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var response = await transport.SendHttpAsync(connection, Credentials(connection), configuration, variables, "test:" + Guid.NewGuid(), ct);
         return Result.Success(response with { ElapsedMilliseconds = clock.ElapsedMilliseconds });
+    }
+    public async Task<Result<IntegrationResult>> TestPreparedHttpAsync(HttpActivityConfiguration configuration, Workflow.Application.Mapping.PreparedMappingRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var errors = IntegrationConfigurationRules.Validate("Http", JsonSerializer.Serialize(configuration, IntegrationJson.Options));
+            if (errors.Count > 0) throw new FormatException(errors[0]);
+            if (configuration.MappingMode != "Typed" || configuration.TypedMapping?.Endpoint is null) throw new FormatException("A typed endpoint schema is required.");
+            Workflow.Application.Mapping.MappingRequestPreparation.ValidatePreparedForEndpoint(request, configuration.TypedMapping.Endpoint);
+            var connection = await db.IntegrationConnections.SingleOrDefaultAsync(c => c.Id == configuration.ConnectionId && c.OrganizationId == tenant.OrganizationId && c.Kind == "Http", ct);
+            if (connection is null) return Result.Failure<IntegrationResult>(new Error("Workflow.Connection.NotFound", "Select an authorized HTTP connection."));
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var response = await transport.SendHttpAsync(connection, Credentials(connection), configuration, [], "test:" + Guid.NewGuid(), ct, request);
+            return Result.Success(response with { ElapsedMilliseconds = clock.ElapsedMilliseconds });
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException or InvalidOperationException or ArgumentException)
+        { return Result.Failure<IntegrationResult>(new Error("Mapping.PreparedInvalid", ex.Message)); }
     }
     public async Task<Result<Guid>> ReceiveEventAsync(Guid connectionId, string rawBody, string? timestamp, string? signature, string? apiKey, CancellationToken ct)
     {
@@ -146,6 +165,18 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
         {
             var job = await db.IntegrationJobs.FindAsync([operationId], ct);
             if (job is null || job.Status != "Failed") return Result.Failure(new Error("Workflow.Job.NotReplayable", "Only failed operations can be replayed."));
+            if (job.InvocationId is Guid invocationId)
+            {
+                var invocation = await db.MappingInvocations.SingleAsync(i => i.Id == invocationId, ct);
+                if (invocation.ExecutionKind == "Graph" && invocation.GraphAdvanced)
+                    return Result.Failure(new Error("Workflow.Job.NotReplayable", "This graph activity has already advanced. Start a new workflow visit to issue another graph request."));
+                if (!await (mappings ?? throw new InvalidOperationException("Mapping runtime is required.")).RunnableAsync(invocation, ct))
+                    return Result.Failure(new Error("Workflow.Job.NotReplayable", "The invocation tree is not runnable."));
+                invocation.Retry();
+                var recorded = job.DeliveryResultJson is null ? null : JsonSerializer.Deserialize<IntegrationResult>(job.DeliveryResultJson, IntegrationJson.Options);
+                if (recorded?.Success == true) job.Reapply(); else job.Replay();
+                await db.SaveChangesAsync(ct); return Result.Success();
+            }
             var instance = await db.WorkflowInstances.FindAsync([job.WorkflowInstanceId], ct);
             var activity = await db.ActivityInstances.FindAsync([job.ActivityInstanceId], ct);
             if (job.IsActivityEvent)
@@ -169,6 +200,8 @@ internal sealed class WorkflowIntegrations(WorkflowDbContext db, ICurrentTenant 
         {
             var errors = IntegrationConfigurationRules.Validate(kind, configurationJson);
             if (errors.Count > 0) return Result.Failure(new Error("Workflow.Integration.Invalid", errors[0]));
+            if (kind == "Http" && IntegrationJson.Read<HttpActivityConfiguration>(configurationJson).MappingMode == "Typed")
+                return await (mappings ?? throw new InvalidOperationException("Mapping runtime is required.")).BeginGraphAsync(instanceId, activityId, configurationJson, operationKey, ct);
             var connectionId = kind == "Http" ? IntegrationJson.Read<HttpActivityConfiguration>(configurationJson).ConnectionId : IntegrationJson.Read<EmailActivityConfiguration>(configurationJson).ConnectionId;
             var connection = await db.IntegrationConnections.FindAsync([connectionId], ct);
             if (connection?.Kind != (kind == "Http" ? "Http" : "Smtp")) return Result.Failure(new Error("Workflow.Connection.NotFound", "The configured integration connection is unavailable."));

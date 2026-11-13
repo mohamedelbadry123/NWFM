@@ -1,3 +1,4 @@
+import { LocaleService } from '@core/i18n/locale.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -11,8 +12,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { workflowApiErrorKey, workflowApiErrorMessage, workflowApiErrorStatus } from '../workflow-api-error';
-import { WorkflowVersionsService, type WorkflowPublishPreviewView } from '../workflow-versions.service';
+import {
+  workflowApiErrorKey,
+  workflowApiErrorMessage,
+  workflowApiErrorStatus,
+} from '../workflow-api-error';
+import {
+  WorkflowVersionsService,
+  type WorkflowPublishPreviewView,
+} from '../workflow-versions.service';
 import { WorkflowDefinitionsService } from '../workflow-definitions.service';
 import type { WorkflowVersionDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-version-dto';
 import type { WorkflowDefinitionDto } from '@shared/models/models/Workflow/Application/DTOs/workflow-definition-dto';
@@ -37,51 +45,66 @@ import { WorkflowTableShellComponent } from '../ui/workflow-table-shell.componen
   templateUrl: './workflow-versions.component.html',
 })
 export class WorkflowVersionsComponent implements OnInit {
-  private readonly route         = inject(ActivatedRoute);
-  private readonly versionsService    = inject(WorkflowVersionsService);
+  protected readonly locale = inject(LocaleService);
+  protected t(en: string, ar: string) {
+    return this.locale.isRtl() ? ar : en;
+  }
+  private readonly route = inject(ActivatedRoute);
+  private readonly versionsService = inject(WorkflowVersionsService);
   private readonly definitionsService = inject(WorkflowDefinitionsService);
-  private readonly toast         = inject(ToastService);
-  private readonly translate     = inject(TranslateService);
-  private readonly fb            = inject(FormBuilder);
-  private readonly destroyRef    = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
+  private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly definitionId = signal('');
-  protected readonly definition   = signal<WorkflowDefinitionDto | null>(null);
+  protected readonly definition = signal<WorkflowDefinitionDto | null>(null);
 
-  protected readonly items      = signal<WorkflowVersionDto[]>([]);
+  protected readonly items = signal<WorkflowVersionDto[]>([]);
   protected readonly totalCount = signal(0);
-  protected readonly isLoading  = signal(true);
-  protected readonly loadError  = signal<string | null>(null);
-  protected readonly page       = signal(1);
-  protected readonly pageSize   = signal(20);
+  protected readonly isLoading = signal(true);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly page = signal(1);
+  protected readonly pageSize = signal(20);
 
   protected readonly showDraftModal = signal(false);
   protected readonly showCloneModal = signal(false);
-  protected readonly cloneTargetId  = signal<string | null>(null);
-  protected readonly saving         = signal(false);
-  protected readonly draftError     = signal<string | null>(null);
+  protected readonly cloneTargetId = signal<string | null>(null);
+  protected readonly saving = signal(false);
+  protected readonly draftError = signal<string | null>(null);
 
   protected readonly confirmPublishTarget = signal<WorkflowVersionDto | null>(null);
-  protected readonly publishPreview       = signal<WorkflowPublishPreviewView | null>(null);
-  protected readonly confirmRetireTarget  = signal<WorkflowVersionDto | null>(null);
-  protected readonly actioning            = signal(false);
+  protected readonly publishPreview = signal<WorkflowPublishPreviewView | null>(null);
+  protected readonly publishPreviewFailed = signal(false);
+  private publishPreviewRequest = 0;
+  protected readonly confirmRetireTarget = signal<WorkflowVersionDto | null>(null);
+  protected readonly actioning = signal(false);
 
   protected readonly draftForm = this.fb.group({ changeSummary: [''] });
   protected readonly cloneForm = this.fb.group({ changeSummary: [''] });
 
   protected readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.totalCount() / this.pageSize())));
+    Math.max(1, Math.ceil(this.totalCount() / this.pageSize())),
+  );
   protected readonly rangeStart = computed(() =>
-    this.totalCount() === 0 ? 0 : (this.page() - 1) * this.pageSize() + 1);
+    this.totalCount() === 0 ? 0 : (this.page() - 1) * this.pageSize() + 1,
+  );
   protected readonly rangeEnd = computed(() =>
-    Math.min(this.page() * this.pageSize(), this.totalCount()));
+    Math.min(this.page() * this.pageSize(), this.totalCount()),
+  );
 
-  protected readonly hasPublishedVersion = computed(() => this.items().some(v => v.status === 'Published'));
-  protected readonly hasDraftVersion     = computed(() => this.items().some(v => v.status === 'Draft'));
+  protected readonly hasPublishedVersion = computed(() =>
+    this.items().some((v) => v.status === 'Published'),
+  );
+  protected readonly hasDraftVersion = computed(() =>
+    this.items().some((v) => v.status === 'Draft'),
+  );
   protected readonly draftNeedsValidation = computed(() =>
-    this.items().some(v => v.status === 'Draft' && v.validationStatus !== 'Valid'));
-  protected readonly draftReadyToPublish  = computed(() =>
-    this.items().some(v => v.status === 'Draft' && v.validationStatus === 'Valid'));
+    this.items().some((v) => v.status === 'Draft' && v.validationStatus !== 'Valid'),
+  );
+  protected readonly draftReadyToPublish = computed(() =>
+    this.items().some((v) => v.status === 'Draft' && v.validationStatus === 'Valid'),
+  );
 
   protected readonly guidedNextStep = computed((): { key: string; style: string } | null => {
     if (this.items().length === 0)
@@ -103,10 +126,11 @@ export class WorkflowVersionsComponent implements OnInit {
   }
 
   private loadDefinition(id: string): void {
-    this.definitionsService.getById(id)
+    this.definitionsService
+      .getById(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: d => this.definition.set(d),
+        next: (d) => this.definition.set(d),
         error: () => {},
       });
   }
@@ -114,18 +138,19 @@ export class WorkflowVersionsComponent implements OnInit {
   protected load(): void {
     this.isLoading.set(true);
     this.loadError.set(null);
-    this.versionsService.getPaged(this.definitionId(), this.page(), this.pageSize())
-      .subscribe({
-        next: r => {
-          this.items.set(r.items ?? []);
-          this.totalCount.set(r.totalCount ?? 0);
-          this.isLoading.set(false);
-        },
-        error: (err: unknown) => {
-          this.loadError.set(workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_load'));
-          this.isLoading.set(false);
-        },
-      });
+    this.versionsService.getPaged(this.definitionId(), this.page(), this.pageSize()).subscribe({
+      next: (r) => {
+        this.items.set(r.items ?? []);
+        this.totalCount.set(r.totalCount ?? 0);
+        this.isLoading.set(false);
+      },
+      error: (err: unknown) => {
+        this.loadError.set(
+          workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_load'),
+        );
+        this.isLoading.set(false);
+      },
+    });
   }
 
   protected openDraftModal(): void {
@@ -134,7 +159,9 @@ export class WorkflowVersionsComponent implements OnInit {
     this.showDraftModal.set(true);
   }
 
-  protected closeDraftModal(): void { this.showDraftModal.set(false); }
+  protected closeDraftModal(): void {
+    this.showDraftModal.set(false);
+  }
 
   protected submitDraft(): void {
     if (this.saving()) return;
@@ -152,7 +179,11 @@ export class WorkflowVersionsComponent implements OnInit {
         this.saving.set(false);
         if (workflowApiErrorStatus(err) === 403) return;
         const key = workflowApiErrorKey(err, 'workflow.versions.error_create_draft');
-        const message = workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_create_draft');
+        const message = workflowApiErrorMessage(
+          err,
+          this.translate,
+          'workflow.versions.error_create_draft',
+        );
         this.draftError.set(message);
         this.toast.error(message);
         if (key === 'error.Workflow.Version.DraftAlreadyExists') this.load();
@@ -167,7 +198,9 @@ export class WorkflowVersionsComponent implements OnInit {
     this.showCloneModal.set(true);
   }
 
-  protected closeCloneModal(): void { this.showCloneModal.set(false); }
+  protected closeCloneModal(): void {
+    this.showCloneModal.set(false);
+  }
 
   protected submitClone(): void {
     const targetId = this.cloneTargetId();
@@ -184,7 +217,9 @@ export class WorkflowVersionsComponent implements OnInit {
       error: (err: unknown) => {
         this.saving.set(false);
         if (workflowApiErrorStatus(err) === 403) return;
-        this.toast.error(workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_clone'));
+        this.toast.error(
+          workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_clone'),
+        );
       },
     });
   }
@@ -192,7 +227,7 @@ export class WorkflowVersionsComponent implements OnInit {
   protected validate(v: WorkflowVersionDto): void {
     if (!v.id) return;
     this.versionsService.validate(this.definitionId(), v.id).subscribe({
-      next: result => {
+      next: (result) => {
         if (result.isValid) {
           this.toast.success('Validation passed — no issues found.');
         } else {
@@ -202,20 +237,32 @@ export class WorkflowVersionsComponent implements OnInit {
         this.load();
       },
       error: (err: unknown) =>
-        this.toast.error(workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_validate')),
+        this.toast.error(
+          workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_validate'),
+        ),
     });
   }
 
   protected confirmPublish(v: WorkflowVersionDto): void {
     this.confirmPublishTarget.set(v);
     this.publishPreview.set(null);
+    this.publishPreviewFailed.set(false);
+    const request = ++this.publishPreviewRequest;
     if (!v.id) return;
-    this.versionsService.getPublishPreview(this.definitionId(), v.id).subscribe({
-      next: preview => this.publishPreview.set(preview),
-      error: () => this.publishPreview.set(null),
-    });
+    this.versionsService
+      .getPublishPreview(this.definitionId(), v.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (preview) => {
+          if (request === this.publishPreviewRequest) this.publishPreview.set(preview);
+        },
+        error: () => {
+          if (request === this.publishPreviewRequest) this.publishPreviewFailed.set(true);
+        },
+      });
   }
   protected cancelPublish(): void {
+    this.publishPreviewRequest++;
     this.confirmPublishTarget.set(null);
     this.publishPreview.set(null);
   }
@@ -224,8 +271,11 @@ export class WorkflowVersionsComponent implements OnInit {
     const v = this.confirmPublishTarget();
     if (!v?.id || this.actioning()) return;
     const preview = this.publishPreview();
+    if (!preview) return;
     if (preview && !preview.canPublish) {
-      this.toast.error(preview.blockingReasons[0] ?? this.translate.instant('workflow.versions.error_publish'));
+      this.toast.error(
+        preview.blockingReasons[0] ?? this.translate.instant('workflow.versions.error_publish'),
+      );
       return;
     }
     this.actioning.set(true);
@@ -241,7 +291,9 @@ export class WorkflowVersionsComponent implements OnInit {
         this.actioning.set(false);
         this.confirmPublishTarget.set(null);
         this.publishPreview.set(null);
-        this.toast.error(workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_publish'));
+        this.toast.error(
+          workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_publish'),
+        );
       },
     });
   }
@@ -249,7 +301,9 @@ export class WorkflowVersionsComponent implements OnInit {
   protected confirmRetire(v: WorkflowVersionDto): void {
     this.confirmRetireTarget.set(v);
   }
-  protected cancelRetire(): void { this.confirmRetireTarget.set(null); }
+  protected cancelRetire(): void {
+    this.confirmRetireTarget.set(null);
+  }
 
   protected executeRetire(): void {
     const v = this.confirmRetireTarget();
@@ -265,40 +319,63 @@ export class WorkflowVersionsComponent implements OnInit {
       error: (err: unknown) => {
         this.actioning.set(false);
         this.confirmRetireTarget.set(null);
-        this.toast.error(workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_retire'));
+        this.toast.error(
+          workflowApiErrorMessage(err, this.translate, 'workflow.versions.error_retire'),
+        );
       },
     });
   }
 
-  protected prevPage(): void { if (this.page() <= 1) return; this.page.update(p => p - 1); this.load(); }
-  protected nextPage(): void { if (this.page() >= this.totalPages()) return; this.page.update(p => p + 1); this.load(); }
+  protected prevPage(): void {
+    if (this.page() <= 1) return;
+    this.page.update((p) => p - 1);
+    this.load();
+  }
+  protected nextPage(): void {
+    if (this.page() >= this.totalPages()) return;
+    this.page.update((p) => p + 1);
+    this.load();
+  }
 
   protected formatDate(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   }
 
   protected statusTone(status: string | null | undefined): PrvTone {
     switch (status) {
-      case 'Published': return 'success';
-      case 'Retired':   return 'neutral';
-      default:          return 'warning';
+      case 'Published':
+        return 'success';
+      case 'Retired':
+        return 'neutral';
+      default:
+        return 'warning';
     }
   }
 
   protected statusClass(status: string | null | undefined): string {
     switch (status) {
-      case 'Published': return 'bg-green-900/40 text-green-400 border-green-800/50';
-      case 'Retired':   return 'bg-dark-700 text-dark-400 border-dark-600';
-      default:          return 'bg-amber-900/40 text-amber-400 border-amber-800/50';
+      case 'Published':
+        return 'bg-green-900/40 text-green-400 border-green-800/50';
+      case 'Retired':
+        return 'bg-dark-700 text-dark-400 border-dark-600';
+      default:
+        return 'bg-amber-900/40 text-amber-400 border-amber-800/50';
     }
   }
 
   protected validationClass(status: string | null | undefined): string {
     switch (status) {
-      case 'Valid':   return 'text-green-400';
-      case 'Invalid': return 'text-red-400';
-      default:        return 'text-dark-400';
+      case 'Valid':
+        return 'text-green-400';
+      case 'Invalid':
+        return 'text-red-400';
+      default:
+        return 'text-dark-400';
     }
   }
 }

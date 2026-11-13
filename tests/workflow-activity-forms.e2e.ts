@@ -52,6 +52,11 @@ test('activity forms route forward, backward and to fresh child executions with 
     await expect
       .poll(async () => activeTasks(await detail())[0]?.formVisitId ?? before.formVisitId)
       .not.toBe(before.formVisitId);
+    // A child and its parent can both display Form 1. Wait for the actionable
+    // task identity as well, so the next input cannot land in the outgoing child.
+    const nextTask = activeTasks(await detail())[0];
+    expect(nextTask).toBeDefined();
+    await expect(browser.locator(`a[href="/org/workflow/tasks/${nextTask.id}"]`)).toBeVisible();
     await expect(current).toContainText(next);
   };
   await send('FORM3', 'Form 3');
@@ -92,6 +97,11 @@ test('activity forms route forward, backward and to fresh child executions with 
   await send('END', 'Form 1');
   await route.fill('END');
   await submit.click();
+  // Child completion resumes its root asynchronously; prove persistence, then refresh the workspace.
+  await expect
+    .poll(async () => (await detail()).tree.every((run) => run.status === 'Completed'))
+    .toBe(true);
+  await screen.getByRole('button', 'Refresh', { exact: true }).click();
   await expect(browser.locator('app-workflow-instance-workspace header > div > p')).toContainText(
     'Completed',
   );
@@ -151,33 +161,37 @@ test('designer shows independent child previews and blocks invalid form routes b
     fixture.forms[0].nameEn,
   ]);
   await sequence.getByRole('button', 'Preview', { exact: true }).first().click();
-  const formPreview = screen.getByRole('dialog');
+  const formPreview = screen.getByRole('dialog', /^Preview:/);
   await expect(formPreview).toContainText(
     'Preview only. You can try the fields, but nothing is submitted or saved, and your workflow is not changed.',
   );
   await expect(formPreview.getByRole('textbox', 'Routing choice', { exact: false })).toBeVisible();
-  await formPreview.getByRole('button', 'Close', { exact: true }).click();
+  await formPreview.getByRole('button', 'Close preview', { exact: true }).click();
   await screen.getByRole('tab', 'Actions', { exact: true }).click();
   await expect(screen.getByRole('heading', 'Form actions and routing')).toBeVisible();
   await expect(screen.getByRole('button', 'Add routing rule')).toBeVisible();
   await expect(screen.getByText('Otherwise go to')).toBeVisible();
   const xml = await fixture.api<string>(fixture.mainPath + '/xml');
   expect(xml).not.toContain('name="Child review"');
-  const invalid = fixture.mainXml.replaceAll(
+  // Keep API validation independent of the designer's in-flight autosave/validation requests.
+  const validationFixture = await createActivityForms(browser);
+  const invalid = validationFixture.mainXml.replaceAll(
     '&quot;target&quot;:&quot;form3&quot;',
     '&quot;target&quot;:&quot;missing-form&quot;',
   );
-  await fixture.api(fixture.mainPath + '/xml', 'PUT', { xmlContent: invalid });
-  const validation = await fixture.api<{ isValid: boolean; errors: { code: string }[] }>(
-    fixture.mainPath + '/validate',
+  await validationFixture.api(validationFixture.mainPath + '/xml', 'PUT', { xmlContent: invalid });
+  const validation = await validationFixture.api<{ isValid: boolean; errors: { code: string }[] }>(
+    validationFixture.mainPath + '/validate',
     'POST',
     {},
   );
   expect(validation.isValid).toBe(false);
   expect(validation.errors.some((error) => error.code === 'ROUTING_DESTINATION')).toBe(true);
-  await fixture.api(fixture.mainPath + '/publish', 'POST', {}, 400);
-  await fixture.api(fixture.mainPath + '/xml', 'PUT', { xmlContent: fixture.mainXml });
-  await fixture.publish();
+  await validationFixture.api(validationFixture.mainPath + '/publish', 'POST', {}, 400);
+  await validationFixture.api(validationFixture.mainPath + '/xml', 'PUT', {
+    xmlContent: validationFixture.mainXml,
+  });
+  await validationFixture.publish();
 });
 
 test('form builder edits, saves, and publishes a new immutable form version', async ({
@@ -196,8 +210,15 @@ test('form builder edits, saves, and publishes a new immutable form version', as
   await app.open(`/forms/${formId}/designer`);
   await screen.getByRole('button', 'Numeric', { exact: true }).click();
   const editor = screen.getByRole('dialog', 'Field Properties');
-  await browser.locator('p-dialog input[formcontrolname="label_en"]').fill('Additional measure');
-  await browser.locator('p-dialog input[formcontrolname="label_ar"]').fill('قياس إضافي');
+  const labelEn = browser.locator('p-dialog input[formcontrolname="label_en"]');
+  const labelAr = browser.locator('p-dialog input[formcontrolname="label_ar"]');
+  // PrimeNG focuses the first input after the dialog's enter transition. Wait for
+  // that real readiness signal so it cannot steal focus during the Arabic fill.
+  await expect(labelEn).toBeFocused();
+  await labelEn.fill('Additional measure');
+  await labelAr.fill('قياس إضافي');
+  await expect(labelEn).toHaveValue('Additional measure');
+  await expect(labelAr).toHaveValue('قياس إضافي');
   await editor.getByRole('combobox').first().fill('additional_measure');
   await screen.getByLabel('Required field?').check();
   await editor.getByRole('button', 'Save', { exact: true }).click();

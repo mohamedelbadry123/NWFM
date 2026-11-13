@@ -8,6 +8,7 @@ public sealed class WorkflowSettings
     public bool AllowPrivateConnections { get; set; }
     /// <summary>Maximum active entries in each persisted tenant queue, including retries.</summary>
     public int MaxPendingPerQueue { get; set; } = 10000;
+    public bool RoutingV4Enabled { get; set; }
 
     /// <summary>
     /// When true, seeds the designer example workflow on startup.

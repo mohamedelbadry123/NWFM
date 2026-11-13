@@ -58,6 +58,18 @@ describe('WorkflowActivityFormsComponent (Task Type forms)', () => {
     expect(c.items()).toEqual([]);
     expect(api['listForTaskType']).not.toHaveBeenCalled();
   });
+  it('replaces the single step form only after confirmation and never retains two forms', () => {
+    const c = create({ taskTypeId: 'T' });
+    c.singleForm = true;
+    c.select(c.items()[0]);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    c.select(c.items()[1]);
+    expect(c.steps.map((s) => s.formId)).toEqual(['A']);
+    vi.mocked(window.confirm).mockReturnValue(true);
+    c.select(c.items()[1]);
+    expect(c.steps.map((s) => s.formId)).toEqual(['B']);
+    expect(c.steps[0].rules).toEqual([]);
+  });
   it('lists all associated forms, including unavailable ones', () => {
     const c = create({ taskTypeId: 'T' });
     expect(api['listForTaskType']).toHaveBeenCalledTimes(1);

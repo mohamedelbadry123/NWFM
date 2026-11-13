@@ -5,10 +5,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   OnInit,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { interval } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -41,6 +44,9 @@ import { WorkflowHistoryTimelineComponent } from '../ui/workflow-history-timelin
 import { WorkflowLiveGraphDialogComponent } from '../ui/workflow-live-graph-dialog.component';
 import { WorkflowRelatedRecordComponent } from '../ui/workflow-related-record.component';
 import { activityDisplayName, stepActivities } from '../workflow-history.util';
+import { WorkflowMappingService } from '../mapping/workflow-mapping.service';
+import type { MappingInvocationDto } from '../mapping/mapping.models';
+import { StepMappingMemory, preparingReason } from '../mapping/workflow-step-mapping';
 
 type TaskDetailTab = 'action' | 'details' | 'steps';
 
@@ -69,6 +75,9 @@ export class WorkflowTaskDetailComponent implements OnInit {
   private readonly runtimeService = inject(WorkflowRuntimeService);
   private readonly groupsService = inject(WorkflowAssignmentGroupsService);
   private readonly departmentsService = inject(WorkflowDepartmentsService);
+  private readonly mappings = inject(WorkflowMappingService);
+  private readonly memory = inject(StepMappingMemory);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   protected readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -89,6 +98,8 @@ export class WorkflowTaskDetailComponent implements OnInit {
   protected readonly liveGraphOpen = signal(false);
   @ViewChild(WorkflowSelectedFormComponent) selectedForm?: WorkflowSelectedFormComponent;
   protected formValues: Record<string, unknown> = {};
+  /** The draft attempt `formValues` belongs to: the pinned form visit and the server's draft key. */
+  private answersScope = '';
   protected formLabel(field: { labelEn: string; labelAr: string; key: string }) {
     return (this.locale.isRtl() ? field.labelAr : field.labelEn) || field.labelEn || field.key;
   }
@@ -111,23 +122,40 @@ export class WorkflowTaskDetailComponent implements OnInit {
     const o = this.selectedOutcome();
     return isRedirectOutcome(o?.outcomeKey, o?.resultValue);
   });
+  /** A Preparing item is waiting for the server to prepare its Step's mapped values: nobody can act yet. */
+  protected readonly isPreparing = computed(() => this.item()?.status === 'Preparing');
+  /** The Step's own mapping receipt, when the viewer may read invocation receipts (otherwise null). */
+  protected readonly preparingInvocation = signal<MappingInvocationDto | null>(null);
   protected readonly canReassign = computed(() => {
     const status = this.item()?.status;
-    return status !== 'Completed' && status !== 'Cancelled';
+    return status !== 'Completed' && status !== 'Cancelled' && status !== 'Preparing';
   });
+  protected t(en: string, ar: string): string {
+    return this.locale.isRtl() ? ar : en;
+  }
+  protected preparingMessage(): string {
+    return preparingReason((en, ar) => this.t(en, ar), this.preparingInvocation());
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.workItemsService.getById(id).subscribe({
       next: (item) => {
-        this.item.set(item);
-        this.formValues = { ...(item.formValues ?? {}) };
+        this.adopt(item, true);
         this.isLoading.set(false);
         this.tab.set(item.status === 'Claimed' ? 'details' : 'action');
         this.loadWorkflowContext(item.workflowInstanceId);
+        if (item.status === 'Preparing') this.loadPreparingInvocation();
       },
       error: () => this.isLoading.set(false),
     });
+    // Readiness is delayed by design: poll only while the server is preparing, and never replace what the
+    // user has typed (answers are re-seeded only for a new visit).
+    interval(4000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.isPreparing() && !this.isSubmitting()) this.reloadItem();
+      });
     this.groupsService.getPaged(1, 100).subscribe({
       next: (page) => this.groups.set(page.items ?? []),
       error: () => this.groups.set([]),
@@ -138,6 +166,53 @@ export class WorkflowTaskDetailComponent implements OnInit {
     });
   }
 
+  /**
+   * Takes an authoritative server view of the work item. The host answers restart from the server's values when the
+   * draft attempt changed (another visit, or another/absent draft key such as a sparse reassign response) or when
+   * `reset` says ownership changed; the same attempt re-delivered (pending claimed, polling) keeps what is typed.
+   */
+  private adopt(view: WorkflowWorkItemView, reset = false): void {
+    const scope = JSON.stringify([view.formVisitId ?? null, view.formDraftKey ?? null]);
+    if (reset || scope !== this.answersScope) this.formValues = { ...(view.formValues ?? {}) };
+    this.answersScope = scope;
+    this.item.set(view);
+  }
+
+  private reloadItem(): void {
+    const current = this.item();
+    if (!current?.id) return;
+    this.workItemsService.getById(current.id).subscribe({
+      next: (fresh) => {
+        this.adopt(fresh);
+        if (fresh.status === 'Preparing') this.loadPreparingInvocation();
+        else {
+          this.preparingInvocation.set(null);
+          this.tab.set(fresh.status === 'Claimed' ? 'details' : 'action');
+        }
+      },
+      error: () => undefined,
+    });
+  }
+
+  private loadPreparingInvocation(): void {
+    const item = this.item();
+    if (!item?.workflowInstanceId) return;
+    // The work item's workflow may be a child; the server resolves (and authorizes) that instance's real root tree.
+    this.mappings.invocationsForRoot(item.workflowInstanceId).subscribe({
+      next: (rows) =>
+        this.preparingInvocation.set(
+          rows.find(
+            (r) =>
+              r.executionKind === 'Step' &&
+              r.originActivityId === item.activityInstanceId &&
+              !['Completed', 'Cancelled'].includes(r.status),
+          ) ?? null,
+        ),
+      // Receipts need the integration-management permission; a plain assignee simply sees the general reason.
+      error: () => this.preparingInvocation.set(null),
+    });
+  }
+
   protected claim(): void {
     const id = this.item()?.id;
     if (!id) return;
@@ -145,7 +220,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.submitError.set(null);
     this.workItemsService.claim(id).subscribe({
       next: (updated) => {
-        this.item.set(updated);
+        this.adopt(updated);
         this.isSubmitting.set(false);
       },
       error: (err: unknown) => {
@@ -247,9 +322,9 @@ export class WorkflowTaskDetailComponent implements OnInit {
       .subscribe({
         next: (updated) => {
           this.isSubmitting.set(false);
+          this.memory.forget(id);
           if (updated.status !== 'Completed' && updated.formVisitId) {
-            this.item.set(updated);
-            this.formValues = { ...(updated.formValues ?? {}) };
+            this.adopt(updated, true);
             this.completeForm.patchValue({ comment: '' });
             return;
           }
@@ -270,6 +345,7 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.workItemsService.release(id).subscribe({
       next: () => {
         this.isSubmitting.set(false);
+        this.memory.forget(id);
         this.router.navigate(['/org/workflow/tasks'], { queryParams: { view: 'available' } });
       },
       error: () => this.isSubmitting.set(false),
@@ -284,7 +360,8 @@ export class WorkflowTaskDetailComponent implements OnInit {
     this.submitError.set(null);
     this.workItemsService.reassign(id, groupId).subscribe({
       next: (updated) => {
-        this.item.set(updated);
+        // Reassignment ends this user's attempt even if the response carries no (or the same) draft key.
+        this.adopt(updated, true);
         this.isSubmitting.set(false);
         this.reassignGroupId.set('');
       },
@@ -374,6 +451,8 @@ export class WorkflowTaskDetailComponent implements OnInit {
     switch (status) {
       case 'Claimed':
         return 'info';
+      case 'Preparing':
+        return 'warning';
       case 'Completed':
         return 'success';
       case 'Cancelled':

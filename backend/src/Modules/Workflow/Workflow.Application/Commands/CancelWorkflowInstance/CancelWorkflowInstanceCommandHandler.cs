@@ -25,12 +25,12 @@ public sealed class CancelWorkflowInstanceCommandHandler
         IWorkflowExecutionTokenRepository tokenRepo,
         IWorkflowEventAppender events)
     {
-        _gate         = gate;
+        _gate = gate;
         _instanceRepo = instanceRepo;
         _workItemRepo = workItemRepo;
-        _timerRepo    = timerRepo;
-        _tokenRepo    = tokenRepo;
-        _events       = events;
+        _timerRepo = timerRepo;
+        _tokenRepo = tokenRepo;
+        _events = events;
     }
 
     public async Task<Result<bool>> Handle(
@@ -50,7 +50,7 @@ public sealed class CancelWorkflowInstanceCommandHandler
         instance.Cancel(now);
 
         var items = await _workItemRepo.GetByInstanceIdAsync(request.InstanceId, cancellationToken);
-        foreach (var item in items.Where(w => w.Status is WorkItemStatus.Pending or WorkItemStatus.Claimed))
+        foreach (var item in items.Where(w => w.Status is WorkItemStatus.Pending or WorkItemStatus.Claimed or WorkItemStatus.Preparing))
             item.Cancel(now);
 
         var timers = await _timerRepo.GetByInstanceIdAsync(request.InstanceId, cancellationToken);

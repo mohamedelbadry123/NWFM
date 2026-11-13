@@ -246,12 +246,7 @@ internal static class TaskSeedData
 
         if (stored.IsFailure)
         {
-            logger.LogWarning(
-                "Seeded task {TaskNumber} left unfilled: {Code} {Message}",
-                task.TaskNumber,
-                stored.Error.Code,
-                stored.Error.Message);
-            return;
+            throw new InvalidOperationException($"Seeded task {task.TaskNumber} fill failed: {stored.Error.Code} {stored.Error.Message}");
         }
 
         var computed = (await forms.ComputeAsync(taskForm.FormDefinitionId, stored.Value.VersionNo, answers, ct))

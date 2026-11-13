@@ -85,7 +85,7 @@ internal sealed class WorkflowRequestProjector : IWorkflowRequestProjector
             workItem?.ActivityInstanceId,
             activityNameEn,
             activityNameAr,
-            workItem?.AssignmentGroupId,
+            workItem is not null && workItem.AssignmentGroupId != Guid.Empty ? workItem.AssignmentGroupId : null,
             slaMinutes,
             workItem?.DueAt,
             workItem?.ClaimedByUserId,

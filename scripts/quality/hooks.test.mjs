@@ -17,11 +17,14 @@ import { spawnSync } from 'node:child_process';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 test('real hooks preserve partial staging, reject lint and test failures, and enforce commit messages', () => {
   const fixture = mkdtempSync(path.join(tmpdir(), 'nwfm-hooks-'));
+  const fixtureEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith('GIT_')),
+  );
   const execute = (command, args) =>
     spawnSync(command, args, {
       cwd: fixture,
       encoding: 'utf8',
-      env: { ...process.env, HUSKY: '1' },
+      env: { ...fixtureEnv, HUSKY: '1' },
     });
   const git = (...args) => execute('git', args);
   const ok = (result) => assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -38,12 +41,17 @@ test('real hooks preserve partial staging, reject lint and test failures, and en
     for (const file of [
       'lint-staged.config.mjs',
       'commitlint.config.cjs',
+      '.gitattributes',
       '.prettierrc.json',
       '.prettierignore',
       'eslint.config.mjs',
     ])
       copyFileSync(path.join(root, file), path.join(fixture, file));
-    symlinkSync(path.join(root, 'node_modules'), path.join(fixture, 'node_modules'), 'dir');
+    symlinkSync(
+      path.join(root, 'node_modules'),
+      path.join(fixture, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     writeFileSync(path.join(fixture, '.gitignore'), 'node_modules/\n');
     writeFileSync(
       path.join(fixture, 'package.json'),

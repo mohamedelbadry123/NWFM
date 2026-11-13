@@ -19,5 +19,6 @@ export const ACTIVITY_TYPE: ActivityType[] = [
   'ScriptTask',
   'WaitEvent',
   'InclusiveGateway',
-  'CallActivity'
+  'CallActivity',
+  'MainActivity'
 ];

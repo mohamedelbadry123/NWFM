@@ -26,24 +26,44 @@ import {
     </legend>
     @for (c of group.conditions; track $index; let index = $index) {
       <div class="space-y-2 border-b pb-3">
+        @if (hasSources()) {
+          <label class="block text-xs"
+            >{{ t('Source', 'المصدر')
+            }}<select
+              class="wf-input w-full"
+              [ngModel]="source(c.field)"
+              (ngModelChange)="c.field = $event + '.'; changed.emit()"
+            >
+              <option value="">{{ t('Select source', 'اختر المصدر') }}</option>
+              @for (item of sources(); track item.key) {
+                <option [value]="item.key">{{ item.label }}</option>
+              }
+            </select></label
+          >
+        }
         <label class="block text-xs"
           >{{ t('Field', 'الحقل')
           }}<select
             class="wf-input w-full"
+            [attr.data-routing-field]="c.field"
             [ngModel]="c.field"
             (ngModelChange)="changeField(c, $event)"
           >
             <option value="">{{ t('Select field', 'اختر الحقل') }}</option>
-            @if (c.field && !field(c)) {
+            @if (c.field && !c.field.endsWith('.') && !field(c)) {
               <option [value]="c.field">{{ c.field }} — {{ t('Unavailable', 'غير متاح') }}</option>
             }
-            @for (f of fields; track f.dataName) {
-              <option [value]="f.dataName">{{ label(f) }} ({{ f.dataName }})</option>
+            @for (f of sourceFields(c.field); track f.dataName) {
+              <option [value]="f.dataName">
+                {{
+                  hasSources() ? label(f).split(' → ').slice(1).join(' → ') || label(f) : label(f)
+                }}
+              </option>
             }
           </select></label
         >
         <label class="block text-xs"
-          >{{ t('Operator', 'المقارنة')
+          >{{ t('Comparison', 'المقارنة')
           }}<select
             class="wf-input w-full"
             [ngModel]="c.operator"
@@ -167,6 +187,30 @@ import {
   </fieldset>`,
 })
 export class WorkflowRoutingGroupComponent {
+  hasSources() {
+    return this.fields.some((f) => f.dataName.includes('.'));
+  }
+  source(key: string) {
+    return key.includes('.') ? key.slice(0, key.indexOf('.')) : '';
+  }
+  sources() {
+    return [
+      ...new Map(
+        this.fields
+          .filter((f) => f.dataName.includes('.'))
+          .map((f) => [
+            this.source(f.dataName),
+            { key: this.source(f.dataName), label: f.labelEn.split(' → ')[0] },
+          ]),
+      ).values(),
+    ];
+  }
+  sourceFields(key: string) {
+    return this.hasSources()
+      ? this.fields.filter((f) => this.source(f.dataName) === this.source(key))
+      : this.fields;
+  }
+
   @Input({ required: true }) group!: RoutingGroup;
   @Input() fields: FormRoutingField[] = [];
   @Input() readonly = false;

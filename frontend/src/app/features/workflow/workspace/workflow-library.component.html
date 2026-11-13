@@ -1,0 +1,307 @@
+<section class="library" [attr.aria-label]="t('Workflow library', 'مكتبة مسارات العمل')">
+  <form class="filters" (ngSubmit)="load()">
+    <div class="search-field">
+      <label for="library-search">{{ t('Find a workflow', 'البحث عن سير عمل') }}</label>
+      <div class="search-control">
+        <input
+          class="wf-input"
+          id="library-search"
+          name="workflowSearch"
+          [(ngModel)]="query.search"
+          maxlength="200"
+          [placeholder]="
+            t(
+              'Search name, reference, activity or scope…',
+              'ابحث بالاسم أو المرجع أو النشاط أو النطاق…'
+            )
+          "
+        />
+        <button class="wf-btn-secondary" type="submit">{{ t('Search', 'بحث') }}</button>
+      </div>
+    </div>
+    <label
+      ><span>{{ t('Status', 'الحالة') }}</span>
+      <select class="wf-input" name="status" [(ngModel)]="query.status" (ngModelChange)="load()">
+        <option value="Active">{{ t('Active workflows', 'مسارات نشطة') }}</option>
+        <option value="All">{{ t('All workflows', 'كل المسارات') }}</option>
+        <option value="Archived">{{ t('Archived workflows', 'مسارات مؤرشفة') }}</option>
+      </select>
+    </label>
+    <label
+      ><span>{{ t('Organization scope', 'النطاق المؤسسي') }}</span>
+      <select class="wf-input" name="scope" [(ngModel)]="query.scope" (ngModelChange)="load()">
+        <option value="">{{ t('All scopes', 'كل النطاقات') }}</option>
+        @for (scope of data()?.scopes || []; track scope.level + ':' + scope.code) {
+          <option [value]="scope.level + ':' + scope.code">
+            {{ scopeLevel(scope.level) }} · {{ scopeName(scope) }}
+          </option>
+        }
+      </select>
+    </label>
+    <label
+      ><span>{{ t('Sort by', 'الترتيب حسب') }}</span>
+      <select class="wf-input" name="sort" [(ngModel)]="query.sort" (ngModelChange)="load()">
+        <option value="Updated">{{ t('Recently updated', 'آخر تعديل') }}</option>
+        <option value="Created">{{ t('Recently created', 'الأحدث إنشاءً') }}</option>
+        <option value="Name">{{ t('Name', 'الاسم') }}</option>
+      </select>
+    </label>
+  </form>
+
+  <div class="list-intro">
+    <div>
+      <h2>{{ t('Workflow library', 'مكتبة مسارات العمل') }}</h2>
+      <p>
+        {{
+          t(
+            'Expand a workflow to explore its children. Open any level to continue designing.',
+            'وسّع سير العمل لاستعراض مساراته الفرعية. افتح أي مستوى لمتابعة التصميم.'
+          )
+        }}
+      </p>
+    </div>
+    @if (!loading() && data(); as page) {
+      <span class="result-count" role="status"
+        >{{ page.totalWorkflows }} {{ t('matching workflows', 'مسارات مطابقة') }}</span
+      >
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state" role="status" aria-live="polite">
+      <span>{{ t('Loading workflows…', 'جارٍ تحميل مسارات العمل…') }}</span>
+      @for (row of [1, 2, 3]; track row) {
+        <div class="skeleton" aria-hidden="true"></div>
+      }
+    </div>
+  } @else if (error()) {
+    <div class="empty-state" role="alert">
+      <h3>{{ t('Workflows could not be loaded', 'تعذر تحميل مسارات العمل') }}</h3>
+      <p>
+        {{
+          t(
+            'Try again to refresh the workflow library.',
+            'حاول مرة أخرى لتحديث مكتبة مسارات العمل.'
+          )
+        }}
+      </p>
+      <button class="wf-btn-secondary" (click)="load(false)">
+        {{ t('Try again', 'حاول مرة أخرى') }}
+      </button>
+    </div>
+  } @else if (data(); as page) {
+    @if (page.items.length) {
+      <ul class="workflow-list">
+        @for (workflow of page.items; track workflow.id) {
+          <ng-container *ngTemplateOutlet="workflowNode; context: { $implicit: workflow }" />
+        }
+      </ul>
+      <nav class="pagination" [attr.aria-label]="t('Workflow pages', 'صفحات مسارات العمل')">
+        <p>
+          {{ t('Groups', 'المجموعات') }} {{ first() }}–{{ last() }} {{ t('of', 'من') }}
+          {{ page.totalGroups }}
+        </p>
+        <label class="page-size"
+          >{{ t('Groups per page', 'مجموعات لكل صفحة') }}
+          <select
+            class="wf-input"
+            name="pageSize"
+            [(ngModel)]="query.pageSize"
+            (ngModelChange)="load()"
+          >
+            <option [ngValue]="5">5</option>
+            <option [ngValue]="10">10</option>
+            <option [ngValue]="25">25</option>
+            <option [ngValue]="50">50</option>
+          </select>
+        </label>
+        <div class="page-buttons">
+          <button class="wf-btn-secondary" [disabled]="page.page === 1" (click)="go(page.page - 1)">
+            {{ t('Previous', 'السابق') }}
+          </button>
+          <span aria-live="polite">{{ t('Page', 'صفحة') }} {{ page.page }} / {{ pages() }}</span>
+          <button
+            class="wf-btn-secondary"
+            [disabled]="page.page >= pages()"
+            (click)="go(page.page + 1)"
+          >
+            {{ t('Next', 'التالي') }}
+          </button>
+        </div>
+      </nav>
+    } @else {
+      <div class="empty-state">
+        <h3>{{ t('No workflows found', 'لا توجد مسارات عمل') }}</h3>
+        <p>
+          {{
+            t(
+              'Adjust your filters, or create a workflow using the button above.',
+              'عدّل عوامل التصفية أو أنشئ سير عمل باستخدام الزر أعلاه.'
+            )
+          }}
+        </p>
+        <button class="wf-btn-secondary" (click)="reset()">
+          {{ t('Reset filters', 'إعادة ضبط التصفية') }}
+        </button>
+      </div>
+    }
+  }
+</section>
+
+<ng-template #workflowNode let-workflow>
+  <li class="workflow-node" [class.child-node]="workflow.parentDefinitionId">
+    <article class="workflow-row">
+      <div class="workflow-identity">
+        <div class="node-heading">
+          @if (workflow.children.length) {
+            <button
+              class="expand-button"
+              (click)="toggle(workflow.id)"
+              [attr.aria-expanded]="expanded().has(workflow.id)"
+              [attr.aria-controls]="'children-' + workflow.id"
+              [attr.aria-label]="
+                t('Toggle children of ', 'عرض أو إخفاء المسارات الفرعية لـ ') + name(workflow)
+              "
+            >
+              <span aria-hidden="true">{{ expanded().has(workflow.id) ? '−' : '+' }}</span>
+            </button>
+          }
+          <span class="kind-label">{{
+            workflow.kind === 'Main'
+              ? t('Main workflow', 'سير عمل رئيسي')
+              : workflow.kind === 'Child'
+                ? t('Child workflow', 'سير عمل فرعي')
+                : t('Workflow', 'سير عمل')
+          }}</span>
+          <span class="status-badge" [class.archived]="!workflow.isActive">{{
+            workflow.isActive ? t('Active', 'نشط') : t('Archived', 'مؤرشف')
+          }}</span>
+          @if (workflow.needsAttention) {
+            <span class="attention">{{ t('Review setup', 'مراجعة الإعداد') }}</span>
+          }
+        </div>
+        <h3>
+          <a [routerLink]="designer(workflow)">{{ name(workflow) }}</a>
+        </h3>
+        @if (workflow.description) {
+          <p class="description">
+            {{ t(workflow.description, workflow.descriptionAr || workflow.description) }}
+          </p>
+        }
+        <p class="reference">{{ workflow.definitionKey }}</p>
+        <div class="workflow-facts">
+          <span
+            >{{ versionStatus(workflow.versionStatus) }}
+            @if (workflow.versionNumber) {
+              · v{{ workflow.versionNumber }}
+            }
+          </span>
+          <span
+            >{{ workflow.versionCount }}
+            {{
+              workflow.versionCount === 1 ? t('version', 'إصدار') : t('versions', 'إصدارات')
+            }}</span
+          >
+          <span
+            >{{ workflow.activityCount }}
+            {{ workflow.kind === 'Child' ? t('steps', 'خطوات') : t('activities', 'أنشطة') }}</span
+          >
+          @if (workflow.children.length) {
+            <span>{{ workflow.children.length }} {{ t('child workflows', 'مسارات فرعية') }}</span>
+          }
+        </div>
+      </div>
+      <div class="workflow-context">
+        <div class="detail-label">{{ t('Organization scope', 'النطاق المؤسسي') }}</div>
+        <div class="scope-list">
+          @for (scope of workflow.scopes; track scope.level + ':' + scope.code) {
+            <span
+              class="scope-chip"
+              [title]="
+                scope.clusterCode +
+                (scope.cbuCode ? ' / ' + scope.cbuCode : '') +
+                ' / ' +
+                scope.code
+              "
+              >{{ scopeLevel(scope.level) }} · {{ scopeName(scope) }}</span
+            >
+          } @empty {
+            <span class="muted">{{
+              workflow.inheritsScope
+                ? t('Inherited from parent', 'موروث من المسار الرئيسي')
+                : t('Not configured', 'غير محدد')
+            }}</span>
+          }
+        </div>
+        <div class="classification">
+          <span class="detail-label">{{
+            workflow.kind === 'Child'
+              ? t('Task type', 'نوع المهمة')
+              : t('Activity type', 'نوع النشاط')
+          }}</span>
+          <span>{{
+            workflow.classification
+              ? t(
+                  workflow.classification.nameEn,
+                  workflow.classification.nameAr || workflow.classification.nameEn
+                )
+              : t('Not configured', 'غير محدد')
+          }}</span>
+        </div>
+      </div>
+      <div class="workflow-history">
+        <dl>
+          <div>
+            <dt>{{ t('Updated', 'آخر تعديل') }}</dt>
+            <dd>
+              <time
+                [attr.datetime]="workflow.updatedAt"
+                [title]="workflow.updatedAt | date: 'medium'"
+                >{{ workflow.updatedAt | date: 'MMM d, y' }}</time
+              >
+            </dd>
+          </div>
+          <div>
+            <dt>{{ t('Created', 'تاريخ الإنشاء') }}</dt>
+            <dd>
+              <time
+                [attr.datetime]="workflow.createdAt"
+                [title]="workflow.createdAt | date: 'medium'"
+                >{{ workflow.createdAt | date: 'MMM d, y' }}</time
+              >
+            </dd>
+          </div>
+        </dl>
+        <a
+          class="open-link"
+          [routerLink]="designer(workflow)"
+          [attr.aria-label]="
+            (workflow.versionStatus === 'Draft'
+              ? t('Continue editing ', 'متابعة تعديل ')
+              : t('View workflow ', 'عرض سير عمل ')) + name(workflow)
+          "
+          >{{
+            workflow.versionStatus === 'Draft'
+              ? t('Continue editing', 'متابعة التعديل')
+              : t('View workflow', 'عرض سير العمل')
+          }}</a
+        >
+        <details class="row-actions">
+          <summary>{{ t('More', 'المزيد') }}</summary>
+          <a
+            class="versions-link"
+            [routerLink]="['/admin/workflow/definitions', workflow.id, 'versions']"
+            >{{ t('Details and versions', 'التفاصيل والإصدارات') }}</a
+          >
+        </details>
+      </div>
+    </article>
+    @if (workflow.children.length) {
+      <ul class="children" [id]="'children-' + workflow.id" [hidden]="!expanded().has(workflow.id)">
+        @for (child of workflow.children; track child.id) {
+          <ng-container *ngTemplateOutlet="workflowNode; context: { $implicit: child }" />
+        }
+      </ul>
+    }
+  </li>
+</ng-template>

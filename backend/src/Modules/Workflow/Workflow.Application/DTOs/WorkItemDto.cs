@@ -35,7 +35,10 @@ public sealed record WorkItemDto(
     WorkflowSelectedFormDto? SelectedForm = null,
     Guid? FormVisitId = null, string? ActiveFormStepId = null,
     IReadOnlyList<Workflow.Application.Workspace.ActivityFormStep>? FormSteps = null,
-    IReadOnlyList<WorkflowFormVisitDto>? FormHistory = null);
+    IReadOnlyList<WorkflowFormVisitDto>? FormHistory = null,
+    Workflow.Application.Mapping.StepMappingSnapshot? MappingSnapshot = null,
+    Guid? FormReceiptKey = null,
+    Guid? FormDraftKey = null);
 
 public sealed record WorkflowSelectedFormDto(Guid FormId, int VersionNo, string? SchemaJson, Guid? VisitId = null, string? StepId = null);
 

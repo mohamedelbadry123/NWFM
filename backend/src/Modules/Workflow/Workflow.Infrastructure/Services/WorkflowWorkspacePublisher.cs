@@ -15,11 +15,38 @@ using Workflow.Infrastructure.Persistence;
 namespace Workflow.Infrastructure.Services;
 
 internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, IWorkflowReferenceData references,
-    IWorkflowVersionRepository versions, IOrgDirectory directory, IWorkflowTaskTypeCatalog? taskTypes = null, IFormGateway? forms = null) : IWorkflowWorkspacePublisher
+    IWorkflowVersionRepository versions, IOrgDirectory directory, IWorkflowTaskTypeCatalog? taskTypes = null, IFormGateway? forms = null,
+    IWorkflowRoleDirectory? roleDirectory = null, Workflow.Application.Routing.IWorkflowRouting? routing = null, MappingPublicationValidator? mappingValidator = null) : IWorkflowWorkspacePublisher
 {
     public async Task<IReadOnlyList<WorkflowValidationIssueDto>> ValidateAsync(WorkflowVersion version, CancellationToken ct)
     {
         var errors = new List<WorkflowValidationIssueDto>();
+        if (version.Activities.Any(a => (a.ConfigurationJson ?? "").Contains("typedMapping", StringComparison.Ordinal)))
+            errors.AddRange(await (mappingValidator ?? throw new InvalidOperationException("Mapping publication validator is required.")).ValidateAsync(version, ct));
+        if (Workflow.Application.Routing.RoutingDefinition.Enabled(version.WorkspaceJson))
+        {
+            if (routing is null) errors.Add(new("ROUTING_UNAVAILABLE", "Routing validation is unavailable."));
+            else errors.AddRange((await routing.ValidateAsync(version, ct)).Select(e => new WorkflowValidationIssueDto(e.Code, e.Message, e.NodeKey, e.Field, ConnectionKey: e.ConnectionKey)));
+        }
+        IReadOnlyList<WorkflowLookupItem>? availableRoles = null;
+        foreach (var node in version.Activities.Where(a => a.ActivityType is ActivityType.UserTask or ActivityType.MainActivity))
+        {
+            try
+            {
+                var assignments = IntegrationJson.Read<BusinessActivityConfiguration>(node.ConfigurationJson).AssignmentRoleIds;
+                if (assignments is null) { errors.Add(new("ASSIGNMENT_ROLES_INVALID", "Select existing account roles.", node.NodeKey)); continue; }
+                if (assignments.Count == 0) continue;
+                availableRoles ??= roleDirectory is null ? [] : await roleDirectory.ListAsync(ct);
+                if (assignments.Count > 50 || assignments.Distinct().Count() != assignments.Count || assignments.Any(id => id == Guid.Empty || !availableRoles.Any(r => r.Id == id)))
+                    errors.Add(new("ASSIGNMENT_ROLES_INVALID", "One or more selected account roles are unavailable. Review Assignment before publishing.", node.NodeKey));
+                if (node.AssignmentRules.Any(r => r.IsActive)) errors.Add(new("ASSIGNMENT_ROLES_MIXED", "Role and legacy group assignments cannot be combined.", node.NodeKey));
+            }
+            catch (JsonException) { errors.Add(new("ASSIGNMENT_ROLES_INVALID", "Assignment role settings are invalid.", node.NodeKey)); }
+        }
+        WorkflowWorkspaceDefinition? hierarchy;
+        try { hierarchy = WorkflowWorkspaceDefinition.Read(version.WorkspaceJson); }
+        catch (JsonException) { return [new("WORKSPACE_INVALID", "Workflow settings are invalid.")]; }
+        if (hierarchy?.IsHierarchical == true) ValidateHierarchy(version, hierarchy, errors);
         if (version.IsDraft)
             foreach (var activity in version.Activities.Where(a => a.ActivityType is ActivityType.UserTask or ActivityType.MainActivity))
             {
@@ -30,6 +57,8 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
 
                 if (config.TaskTypeId is not Guid typeId || taskTypes is null || !await taskTypes.IsActiveAsync(typeId, ct))
                     Error("ACTIVITY_TASK_TYPE", "Select an active Task Type for this activity.");
+                else if (hierarchy?.IsHierarchical == true && activity.ActivityType == ActivityType.MainActivity)
+                    continue;
                 else if (config.FormSteps.Count > 0)
                     await ValidateFormStepsAsync(version, activity, config, typeId, errors, ct);
                 else if (config.FormDefinitionId is not Guid formId || config.FormVersionNo is not > 0)
@@ -93,7 +122,7 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
                     Error("ACTIVITY_SLA", "Set a positive SLA duration or choose an SLA policy.");
                 if (!simplified && config.SlaPolicyId is Guid policyId && !await db.SlaPolicies.AnyAsync(p => p.Id == policyId && p.IsActive, ct))
                     Error("ACTIVITY_SLA", "Select an active SLA policy available to this tenant.");
-                if (activity.Outcomes.Any(o => o.OutcomeKey.Equals("reject", StringComparison.OrdinalIgnoreCase)))
+                if (!Workflow.Application.Routing.RoutingDefinition.Enabled(version.WorkspaceJson) && !(workspace.IsHierarchical && activity.ActivityType == ActivityType.MainActivity) && activity.Outcomes.Any(o => o.OutcomeKey.Equals("reject", StringComparison.OrdinalIgnoreCase)))
                 {
                     if (string.IsNullOrWhiteSpace(config.RejectTargetNodeKey) || !version.Activities.Any(a => a.NodeKey == config.RejectTargetNodeKey && a.ActivityType is ActivityType.UserTask or ActivityType.MainActivity))
                         Error("ACTIVITY_REWORK", "Select a business activity as the rejection/rework destination.");
@@ -107,16 +136,19 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
                 if (exactMatchRequired && (config.TaskTypeId is not Guid taskTypeId || taskTypes is null
                     || !await taskTypes.IsActiveAsync(taskTypeId, ct)))
                     Error("MAIN_TASK_TYPE", "Select an active Task Type for this activity.");
-                if (!activity.Outcomes.Any(o => o.OutcomeKey.Equals("approve", StringComparison.OrdinalIgnoreCase)))
+                if (!workspace.IsHierarchical && !activity.Outcomes.Any(o => o.OutcomeKey.Equals("approve", StringComparison.OrdinalIgnoreCase)))
                     Error("MAIN_APPROVAL", "Main activities require an Approve outcome.");
                 var child = await ResolveChildAsync(config, ct);
-                if (child is null) Error("MAIN_CHILD", "Select a published child workflow.");
+                if (child is null) Error("MAIN_CHILD", workspace.IsHierarchical ? "Open this Task Type’s child workflow and publish it before publishing the main workflow." : "Select a published child workflow.");
                 else
                 {
                     if (exactMatchRequired && !WorkflowChildMatch.Matches(workspace, WorkflowChildMatch.ReadChild(child.WorkspaceJson), config.TaskTypeId))
                         Error("MAIN_CHILD_MATCH", "The child workflow must have the same Task Type as this activity and exactly the same organization scope as the main workflow.");
+                    if (workspace.IsHierarchical && WorkflowWorkspaceDefinition.Read(child.WorkspaceJson) is { } childSettings
+                        && (childSettings.ParentDefinitionId != version.WorkflowDefinitionId || childSettings.ParentNodeKey != activity.NodeKey))
+                        Error("MAIN_CHILD_OWNER", "Create this child workflow from its owning Task Type.");
                     if (WorkflowWorkspaceDefinition.KindOf(child.WorkspaceJson) != WorkflowWorkspaceDefinition.ChildKind) Error("MAIN_CHILD_KIND", "Main activities require a workflow published as Child.");
-                    if (!await CheckTreeAsync(child, new HashSet<Guid> { version.WorkflowDefinitionId }, 1, ct))
+                    if (!await CheckTreeAsync(child, new HashSet<Guid> { version.WorkflowDefinitionId }, 1, ct, new(version.WorkflowDefinitionId, version.Id)))
                         Error("CHILD_RECURSION", "Child workflow references must be acyclic and at most 16 levels deep.");
                 }
             }
@@ -134,6 +166,9 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
                 if (item.Trigger is not ("OnEnter" or "OnApprove" or "OnReject" or "OnComment" or "OnComplete" or "OnFailure" or "OnSlaBreach")) Error("EVENT_TRIGGER", "Select a supported event trigger.");
                 if (item.Kind is not ("Http" or "Soap" or "Sms" or "Email")) { Error("EVENT_KIND", "Select REST, SOAP, SMS or Email."); continue; }
                 if (item.Configuration.ValueKind != JsonValueKind.Object) { Error("EVENT_CONFIG", "Configure the event request."); continue; }
+                if (item.Configuration.TryGetProperty("typedMapping", out _) || item.Configuration.TryGetProperty("mappingMode", out var eventMode)
+                    && (eventMode.ValueKind != JsonValueKind.String || eventMode.GetString() != "Legacy"))
+                    Error("EVENT_TYPED_NODE_REQUIRED", "Typed mappings require a designer Event node with stable source pins. Inline legacy activity events retain their existing mapping mode.");
                 foreach (var message in IntegrationConfigurationRules.Validate(item.Kind == "Email" ? "Email" : "Http", item.DeliveryConfiguration())) Error("EVENT_CONFIG", message);
                 if (!item.Configuration.TryGetProperty("connectionId", out var id) || id.ValueKind != JsonValueKind.String || !Guid.TryParse(id.GetString(), out var connectionId)
                     || !await db.IntegrationConnections.AnyAsync(c => c.Id == connectionId && c.Kind == (item.Kind == "Email" ? "Smtp" : "Http"), ct))
@@ -196,6 +231,8 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
         {
             if (workspace.SchemaVersion != 2 || !workspace.HasRequiredLocation || !workspace.Location.IsEmpty)
                 return [new("WORKSPACE_SCOPE_REQUIRED", "Select at least one cluster and valid organization scopes (up to 500).")];
+            if (WorkflowScopeRows.Validate(workspace) is { } rowProblem)
+                return [new(WorkflowScopeRows.InvalidCode, rowProblem)];
             foreach (var scope in workspace.OrganizationScopes!)
                 if (!await directory.IsValidLocationAsync(scope.Location, ct))
                     return [new("WORKSPACE_SCOPE", "Select active organization units under their correct Cluster and CBU.")];
@@ -220,16 +257,18 @@ internal sealed partial class WorkflowWorkspacePublisher(WorkflowDbContext db, I
         return version?.WorkflowDefinitionId == definition.Id && version.Status == WorkflowVersionStatus.Published ? version : null;
     }
 
-    private async Task<bool> CheckTreeAsync(WorkflowVersion version, HashSet<Guid> ancestors, int depth, CancellationToken ct)
+    private async Task<bool> CheckTreeAsync(WorkflowVersion version, HashSet<Guid> ancestors, int depth, CancellationToken ct, Workflow.Application.Mapping.MappingTreePin root)
     {
         if (depth >= 16 || !ancestors.Add(version.WorkflowDefinitionId)) return false;
+        if (version.Activities.Any(a => (a.ConfigurationJson ?? "").Contains("typedMapping", StringComparison.Ordinal))
+            && (mappingValidator is null || (await mappingValidator.ValidateAsync(version, ct, root)).Count > 0)) return false;
         var pins = JsonSerializer.Deserialize<Dictionary<string, Guid>>(version.PinnedChildVersionsJson ?? "{}")!;
         foreach (var activity in version.Activities.Where(a => a.ActivityType is ActivityType.MainActivity or ActivityType.CallActivity))
         {
             var config = IntegrationJson.Read<BusinessActivityConfiguration>(activity.ConfigurationJson);
             if (pins.TryGetValue(activity.NodeKey, out var pinned)) config.VersionId = pinned;
             var child = await ResolveChildAsync(config, ct);
-            if (child is null || !await CheckTreeAsync(child, new HashSet<Guid>(ancestors), depth + 1, ct)) return false;
+            if (child is null || !await CheckTreeAsync(child, new HashSet<Guid>(ancestors), depth + 1, ct, root)) return false;
         }
         return true;
     }

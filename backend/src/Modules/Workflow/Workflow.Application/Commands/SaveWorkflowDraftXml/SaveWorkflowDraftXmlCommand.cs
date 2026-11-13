@@ -7,4 +7,4 @@ using Workflow.Application.DTOs;
 public sealed record SaveWorkflowDraftXmlCommand(
     Guid VersionId,
     string XmlContent,
-    string? DesignerJson = null) : IRequest<Result<WorkflowVersionDto>>;
+    string? DesignerJson = null, string? ExpectedRevision = null, bool AllowRoutingUpgrade = false) : IRequest<Result<WorkflowVersionDto>>;

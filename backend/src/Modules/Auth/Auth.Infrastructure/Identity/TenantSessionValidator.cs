@@ -43,25 +43,9 @@ public sealed class TenantSessionValidator(
                 x.RevokedAtUtc == null && x.ExpiresAtUtc > now.UtcDateTime, ct))
             return null;
 
-        var roles = await (
-            from membership in db.UserRoles.AsNoTracking()
-            join role in db.Roles.AsNoTracking() on membership.RoleId equals role.Id
-            where membership.UserId == userId
-            select new { role.Id, role.Name }).ToListAsync(ct);
-
-        if (user.TeamId is Guid teamId &&
-            (!roles.Any(x => x.Name == Roles.FieldTeam) ||
-             !await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.IsActive, ct)))
-            return null;
-
-        if (!roles.Any(x => x.Name == Roles.Administrator))
-        {
-            var ownerType = user.TeamId is null ? OrgScopeOwnerTypes.User : OrgScopeOwnerTypes.Team;
-            var ownerId = user.TeamId?.ToString("D") ?? userId.ToString("D");
-            if (!await db.OrgScopes.AsNoTracking().AnyAsync(x =>
-                    x.OwnerType == ownerType && x.OwnerId == ownerId && x.IsActive, ct))
-                return null;
-        }
+        var rights = await CurrentActorAccessRules.ReadAsync(db, user, now, ct);
+        if (rights is null) return null;
+        var roles = rights.Roles;
 
         var roleIds = roles.Select(x => x.Id.ToString()).ToArray();
         var permissions = await db.RolePermissions.AsNoTracking()

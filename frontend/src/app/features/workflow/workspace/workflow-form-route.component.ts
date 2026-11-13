@@ -23,17 +23,25 @@ export interface FormRouteNode {
       >
         <option value="Next">
           {{
-            t(
-              'Next form; after last form, follow forward route',
-              'النموذج التالي؛ وبعد الأخير اتبع المسار الأمامي'
-            )
+            hierarchical
+              ? t('Follow the configured forward route', 'اتبع المسار الأمامي المحدد')
+              : t(
+                  'Next form; after last form, follow forward route',
+                  'النموذج التالي؛ وبعد الأخير اتبع المسار الأمامي'
+                )
           }}
         </option>
-        <option value="Form">
-          {{ t('Specific form in this activity', 'نموذج محدد في هذا النشاط') }}
-        </option>
+        @if (!hierarchical) {
+          <option value="Form">
+            {{ t('Specific form in this activity', 'نموذج محدد في هذا النشاط') }}
+          </option>
+        }
         <option value="Activity">
-          {{ t('Activity or End in this workflow', 'نشاط أو نهاية في سير العمل') }}
+          {{
+            hierarchical
+              ? t('Step, Event, or End', 'خطوة أو حدث أو نهاية')
+              : t('Activity or End in this workflow', 'نشاط أو نهاية في سير العمل')
+          }}
         </option>
       </select></label
     >
@@ -71,14 +79,20 @@ export interface FormRouteNode {
     }
     @if (destination.kind === 'Activity') {
       <label class="block text-xs"
-        >{{ t('Destination activity', 'النشاط الوجهة')
+        >{{ hierarchical ? t('Destination', 'الوجهة') : t('Destination activity', 'النشاط الوجهة')
         }}<select
           class="wf-input w-full"
           [disabled]="readonly"
           [ngModel]="destination.target"
           (ngModelChange)="destination.target = $event; changed.emit()"
         >
-          <option [ngValue]="null">{{ t('Select activity', 'اختر النشاط') }}</option>
+          <option [ngValue]="null">
+            {{
+              hierarchical
+                ? t('Select destination', 'اختر الوجهة')
+                : t('Select activity', 'اختر النشاط')
+            }}
+          </option>
           @if (destination.target && !hasNode()) {
             <option [value]="destination.target">
               {{ t('Removed activity — select again', 'نشاط محذوف — أعد الاختيار') }}
@@ -110,6 +124,7 @@ export class WorkflowFormRouteComponent {
   @Input() currentNodeKey = '';
   @Input() currentStepId = '';
   @Input() readonly = false;
+  @Input() hierarchical = false;
   @Output() changed = new EventEmitter<void>();
   private locale = inject(LocaleService);
   t(en: string, ar: string) {

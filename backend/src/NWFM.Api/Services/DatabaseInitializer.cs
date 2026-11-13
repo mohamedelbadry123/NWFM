@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NWFM.Shared.MultiTenancy;
+using NWFM.Shared.Options;
 using Workflow.Application.Commands.CreateWorkflowDraft;
 using Workflow.Application.Commands.PublishWorkflowVersion;
 using Workflow.Application.Commands.SaveWorkflowDraftXml;
@@ -14,12 +15,19 @@ using Workflow.Infrastructure.Persistence;
 
 public static class DatabaseInitializer
 {
-    public static async Task InitializeAsync(IServiceProvider services)
+    // Schema preparation must precede every module's seed: FormGateway submission guards
+    // read Workflow tables even for fills owned by another module.
+    public static async Task MigrateAsync(IServiceProvider services)
     {
+        if (services.GetRequiredService<IOptions<DatabaseStartupOptions>>().Value.ApplyMigrations)
+            await services.GetRequiredService<WorkflowDbContext>().Database.MigrateAsync();
+    }
+
+    public static async Task SeedAsync(IServiceProvider services)
+    {
+        if (!services.GetRequiredService<IOptions<DatabaseStartupOptions>>().Value.SeedData) return;
         var db = services.GetRequiredService<WorkflowDbContext>();
         var options = services.GetRequiredService<IOptions<ApplicationOptions>>().Value;
-        if (services.GetRequiredService<IOptions<NWFM.Shared.Options.DatabaseStartupOptions>>().Value.ApplyMigrations)
-            await db.Database.MigrateAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
         var now = DateTime.UtcNow;
         if (!await db.Set<Tenant>().AnyAsync(t => t.Id == options.TenantId))

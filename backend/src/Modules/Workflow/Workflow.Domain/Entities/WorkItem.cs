@@ -15,7 +15,7 @@ public sealed class WorkItem : Entity, ITenantAware
     public Guid WorkflowInstanceId { get; private set; }
     public Guid ActivityInstanceId { get; private set; }
 
-    /// <summary>The assignment group this task was routed to.</summary>
+    /// <summary>The legacy assignment group. Empty for role assignments, whose recipients are recorded as Role candidates.</summary>
     public Guid AssignmentGroupId { get; private set; }
 
     public Guid? ClaimedByUserId { get; private set; }
@@ -33,8 +33,32 @@ public sealed class WorkItem : Entity, ITenantAware
     public string? CommentText { get; private set; }
     public string? FormDataJson { get; private set; }
     public string? FormProgressJson { get; private set; }
+    // Private attempt entropy is never exposed in DTOs. A claim rolled back with the workflow
+    // still derives the same receipt; a transfer/release starts a different immutable attempt.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Guid? FormReceiptAttempt { get; private set; }
+    public Guid? CompletedFormReceiptKey { get; private set; }
+    /// <summary>Opaque UI draft continuity only; never a submission receipt or authorization token.
+    /// Claim does not change it. Ownership attempt rotation and a new form visit do.</summary>
+    public Guid FormDraftKey(Guid visitId)
+    {
+        var attempt = FormReceiptAttempt?.ToString("N") ?? "legacy";
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+            $"nwfm:form-draft:v1:{OrganizationId:N}:{Id:N}:{visitId:N}:{attempt}"));
+        return new Guid(bytes.AsSpan(0, 16));
+    }
+    public Guid FormReceiptKey(Guid visitId, Guid actorId)
+    {
+        if (FormReceiptAttempt is not Guid attempt) return visitId; // Existing published/runtime receipts.
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"{attempt:N}:{visitId:N}:{actorId:N}"));
+        return new Guid(bytes.AsSpan(0, 16));
+    }
+    public void RecordFormReceipt(Guid key) => CompletedFormReceiptKey = key;
     public void SetFormProgress(string json) => FormProgressJson = json;
     public void SetFormData(string json) => FormDataJson = json;
+    public void WaitForMapping() { if (Status is WorkItemStatus.Pending or WorkItemStatus.Claimed) Status = WorkItemStatus.Preparing; }
+    public void MappingReady() { if (Status == WorkItemStatus.Preparing) Status = ClaimedByUserId is null ? WorkItemStatus.Pending : WorkItemStatus.Claimed; }
 
     /// <summary>Optimistic concurrency token — only one claimant wins a concurrent race.</summary>
     public byte[] RowVersion { get; private set; } = [];
@@ -59,6 +83,7 @@ public sealed class WorkItem : Entity, ITenantAware
             Status = WorkItemStatus.Pending,
             DueAt = dueAt,
             CreatedAt = createdAt,
+            FormReceiptAttempt = Guid.NewGuid(),
         };
     }
 
@@ -80,6 +105,7 @@ public sealed class WorkItem : Entity, ITenantAware
 
         ClaimedByUserId = null;
         ClaimedAt = null;
+        FormReceiptAttempt = Guid.NewGuid();
         Status = WorkItemStatus.Pending;
         SetUpdated(releasedAt);
     }
@@ -109,6 +135,7 @@ public sealed class WorkItem : Entity, ITenantAware
             throw new InvalidOperationException("Cannot reassign a completed or cancelled work item.");
 
         AssignmentGroupId = newAssignmentGroupId;
+        FormReceiptAttempt = Guid.NewGuid();
         ClaimedByUserId = null;
         ClaimedAt = null;
         if (Status == WorkItemStatus.Claimed)
@@ -128,6 +155,7 @@ public sealed class WorkItem : Entity, ITenantAware
         if (Status != WorkItemStatus.Claimed)
             throw new InvalidOperationException("Only Claimed work items can be delegated.");
 
+        if (ClaimedByUserId != toUserId) FormReceiptAttempt = Guid.NewGuid();
         ClaimedByUserId = toUserId;
         ClaimedAt = delegatedAt;
         SetUpdated(delegatedAt);

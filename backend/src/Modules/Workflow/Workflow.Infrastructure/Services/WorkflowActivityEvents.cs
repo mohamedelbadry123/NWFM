@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NWFM.Shared.Results;
 using Workflow.Application.Integrations;
@@ -9,7 +8,7 @@ using Workflow.Infrastructure.Persistence;
 
 namespace Workflow.Infrastructure.Services;
 
-internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowIntegrationRuntime integrations)
+internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowIntegrationRuntime integrations, WorkflowMappingRuntime? mappings = null)
 {
     public async Task<Result<bool>> QueueAsync(WorkflowInstance instance, ActivityDefinition definition, ActivityInstance execution,
         string trigger, string occurrence, CancellationToken ct, Dictionary<string, object?>? eventValues = null)
@@ -24,9 +23,15 @@ internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowInte
             var config = WorkspaceDesign.Configuration(node.ConfigurationJson);
             var kind = node.ActivityType == Workflow.Domain.Enums.ActivityType.NotificationTask ? "Email" : config["protocol"]?.GetValue<string>() switch { "Soap" => "Soap", "Sms" => "Sms", _ => "Http" };
             config["eventNodeKey"] = node.NodeKey;
-            configured.Add(new ActivityEventConfiguration { Id = node.NodeKey, Name = node.Name, Trigger = trigger, Kind = kind,
+            configured.Add(new ActivityEventConfiguration
+            {
+                Id = node.NodeKey,
+                Name = node.Name,
+                Trigger = trigger,
+                Kind = kind,
                 Required = trigger is not ("OnFailure" or "OnSlaReminder" or "OnSlaBreach") && (config["required"]?.GetValue<bool>() ?? kind is "Http" or "Soap"),
-                Configuration = JsonSerializer.SerializeToElement(config) });
+                Configuration = JsonSerializer.SerializeToElement(config)
+            });
         }
         if (configured.Count == 0) return Result.Success(true);
         var variables = (await db.WorkflowVariables.Where(v => v.WorkflowInstanceId == instance.Id).ToListAsync(ct))
@@ -37,6 +42,24 @@ internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowInte
         foreach (var item in configured)
         {
             var key = $"event:{execution.Id}:{trigger}:{occurrence}:{item.Id}";
+            var delivery = item.DeliveryConfiguration();
+            if (item.Kind == "Http" && IntegrationJson.Read<HttpActivityConfiguration>(delivery).MappingMode == "Typed")
+            {
+                if (!item.Configuration.TryGetProperty("eventNodeKey", out var typedNode) || typedNode.ValueKind != JsonValueKind.String)
+                    return Result.Failure<bool>(new Error("Mapping.EventIdentity", "Typed events require a stable designer event node."));
+                var existing = await db.MappingInvocations.SingleOrDefaultAsync(i => i.OperationKey == key, ct);
+                if (existing is null)
+                {
+                    var errors = IntegrationConfigurationRules.Validate("Http", delivery);
+                    if (errors.Count > 0) return Result.Failure<bool>(new Error("Mapping.EventInvalid", errors[0]));
+                    var started = await (mappings ?? throw new InvalidOperationException("Mapping runtime is required.")).BeginGraphAsync(instance.Id,
+                        execution.Id, delivery, key, ct, typedNode.GetString(), item.Required && execution.Status == Workflow.Domain.Enums.ActivityInstanceStatus.Active);
+                    if (started.IsFailure) return Result.Failure<bool>(started.Error);
+                    existing = await db.MappingInvocations.SingleAsync(i => i.OperationKey == key, ct);
+                }
+                if (existing.ExecutionKind == "RequiredEvent" && !existing.Applied) ready = false;
+                continue;
+            }
             var job = await db.IntegrationJobs.FirstOrDefaultAsync(j => j.OperationKey == key, ct);
             if (job is null)
             {
@@ -65,9 +88,12 @@ internal sealed class WorkflowActivityEvents(WorkflowDbContext db, IWorkflowInte
         if (location.IsEmpty) return new Dictionary<string, object?>();
         return new Dictionary<string, object?>
         {
-            ["ClusterCode"] = location.ClusterCode, ["CbuCode"] = location.CbuCode,
-            ["BranchCode"] = location.BranchCode, ["OperationAreaCode"] = location.OperationAreaCode,
-            ["RegionCode"] = location.CbuCode, ["CityCode"] = location.BranchCode,
+            ["ClusterCode"] = location.ClusterCode,
+            ["CbuCode"] = location.CbuCode,
+            ["BranchCode"] = location.BranchCode,
+            ["OperationAreaCode"] = location.OperationAreaCode,
+            ["RegionCode"] = location.CbuCode,
+            ["CityCode"] = location.BranchCode,
         };
     }
 }

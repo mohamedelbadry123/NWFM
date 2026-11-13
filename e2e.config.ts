@@ -3,6 +3,7 @@ import { web } from '@e2e-dev/web';
 import { chatgpt } from 'e2e/oauth/chatgpt';
 import { replayOnly } from './scripts/e2e/replay-only.js';
 import { replayReceipt } from './scripts/e2e/replay-receipt.js';
+import { designerFixtureUsers } from './scripts/e2e/fixture-users.js';
 
 const replay =
   process.env.NWFM_E2E_REPLAY === '1' ||
@@ -25,6 +26,15 @@ export default {
     },
   },
   credentials: {
+    ...Object.fromEntries(
+      designerFixtureUsers.map((name) => [
+        name,
+        {
+          username: name + '@localhost',
+          password: () => process.env.NWFM_TEST_PASSWORD ?? '',
+        },
+      ]),
+    ),
     ...Object.fromEntries(
       [
         'forms-routing',
@@ -70,6 +80,22 @@ export default {
         command: {
           executable: 'node',
           args: ['scripts/e2e/start-app.mjs'],
+          inheritEnv: [
+            'NWFM_E2E_OWNER_RUN_ID',
+            'NWFM_TEST_PASSWORD',
+            'DOTNET_*',
+            'NUGET_*',
+            'APPDATA',
+            'USERPROFILE',
+            'DOCKER_CONFIG',
+            'LOCALAPPDATA',
+            'ProgramFiles',
+            'ProgramFiles(x86)',
+            'ProgramW6432',
+            'ProgramData',
+            'SystemDrive',
+            'windir',
+          ],
           env: { NWFM_E2E_ISOLATED: '1', DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
           startupTimeout: 720_000,
           shutdownTimeout: 30_000,

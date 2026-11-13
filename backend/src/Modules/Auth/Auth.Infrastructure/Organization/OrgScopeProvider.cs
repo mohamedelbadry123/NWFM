@@ -45,6 +45,8 @@ internal sealed class OrgScopeProvider(
         return await ScopeOfAsync(OrgScopeOwnerTypes.User, OrgScopeOwnerTypes.UserOwnerId(userId), cancellationToken);
     }
 
+    internal Task<OrgScopeSet> GetUserScopeAsync(Guid userId, CancellationToken ct) => ScopeOfAsync(OrgScopeOwnerTypes.User, OrgScopeOwnerTypes.UserOwnerId(userId), ct);
+
     public Task<OrgScopeSet> GetTeamScopeAsync(Guid teamId, CancellationToken cancellationToken) =>
         ScopeOfAsync(OrgScopeOwnerTypes.Team, OrgScopeOwnerTypes.TeamOwnerId(teamId), cancellationToken);
 

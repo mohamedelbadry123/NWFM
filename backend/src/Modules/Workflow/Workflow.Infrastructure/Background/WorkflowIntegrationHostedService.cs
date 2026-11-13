@@ -13,6 +13,18 @@ internal sealed class WorkflowIntegrationHostedService(IServiceScopeFactory scop
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
         => Task.WhenAll(PollAsync(true, stoppingToken), PollAsync(false, stoppingToken));
 
+    internal async Task ProcessDesignerRecoveryAsync(CancellationToken ct)
+    {
+        using var routingScope = scopes.CreateScope();
+        if (await WorkflowTenantAdmission.IsActiveAsync(routingScope.ServiceProvider, ct))
+            await routingScope.ServiceProvider.GetRequiredService<WorkflowRuntimeEngine>().ProcessRoutingDeadlinesAsync(ct,
+                (tenant, token) => WorkflowTenantAdmission.RequireMessageScopeAsync(routingScope.ServiceProvider, tenant, token));
+        using var mappingScope = scopes.CreateScope();
+        if (await WorkflowTenantAdmission.IsActiveAsync(mappingScope.ServiceProvider, ct))
+            await mappingScope.ServiceProvider.GetRequiredService<WorkflowMappingRuntime>().RecoverAsync(ct,
+                (tenant, token) => WorkflowTenantAdmission.RequireMessageScopeAsync(mappingScope.ServiceProvider, tenant, token));
+    }
+
     private async Task PollAsync(bool delivery, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -53,6 +65,7 @@ internal sealed class WorkflowIntegrationHostedService(IServiceScopeFactory scop
                     using var workspaceScope = scopes.CreateScope();
                     if (await WorkflowTenantAdmission.IsActiveAsync(workspaceScope.ServiceProvider, stoppingToken))
                         await workspaceScope.ServiceProvider.GetRequiredService<WorkflowWorkspaceProcessor>().ProcessAsync(stoppingToken);
+                    await ProcessDesignerRecoveryAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
