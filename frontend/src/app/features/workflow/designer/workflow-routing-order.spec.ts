@@ -256,25 +256,62 @@ describe('Ordered routes editor', () => {
   });
 
   it('can be reordered by dragging a handle in a real browser, not only by buttons', async () => {
-    const { fixture, el, order, lastSaved } = setup();
+    const { fixture, editor, el, changed, order, lastSaved } = setup();
     const handles = () => Array.from(el.querySelectorAll<HTMLElement>('[data-route-handle]'));
     expect(handles()).toHaveLength(3);
     el.style.display = 'block';
     el.style.width = '640px';
-    // Real pointer events (press, move, release): drag route 1's handle down onto route 3's.
-    await userEvent.dragAndDrop(handles()[0], handles()[2]);
-    fixture.detectChanges();
-    await vi.waitFor(() => expect(order()).not.toEqual(KEYS));
-    // Route 1 moved down; no route was lost or duplicated, and the saved order is the one on screen.
-    expect(order()[0]).not.toBe('route_a');
-    expect([...order()].sort()).toEqual(KEYS);
-    const saved = lastSaved();
-    expect(saved.routing.routes.map((r: { transitionKey: string }) => r.transitionKey)).toEqual(
-      order(),
+    const before = editor.localEdges.map((e) => ({ ...e }));
+
+    // Each route is taller than a third of the test viewport and the page smooth-scrolls, so left alone Playwright
+    // would scroll to the target handle after pressing the source handle, and CDK's reaction to that scroll is
+    // timing-dependent. CDK also autoscrolls the window when the pointer is within 5% of the viewport's top or
+    // bottom edge. So put both handles in the middle of the viewport first (an instant scroll, no input), well clear
+    // of those bands, and drag route 1 onto route 2: nothing scrolls during the drag.
+    const [first, second] = [handles()[0], handles()[1]];
+    const [from, to] = [first.getBoundingClientRect(), second.getBoundingClientRect()];
+    window.scrollTo({
+      top: window.scrollY + (from.top + to.bottom) / 2 - window.innerHeight / 2,
+      behavior: 'instant',
+    });
+    const edgeBand = window.innerHeight * 0.05;
+    for (const handle of [first, second]) {
+      const { top, bottom } = handle.getBoundingClientRect();
+      expect(top).toBeGreaterThan(edgeBand);
+      expect(bottom).toBeLessThan(window.innerHeight - edgeBand);
+    }
+
+    // Real mouse events: press route 1's handle, move to route 2's in steps, release. CDK treats the first move
+    // past its threshold only as "drag started"; a single jump never sorts, so the pointer must travel.
+    await userEvent.dragAndDrop(first, second, { steps: 12 });
+
+    // CDK applies the drop after its release animation, so wait for the order itself, not for a delay.
+    const moved = ['route_b', 'route_a', 'route_c'];
+    await vi.waitFor(
+      () => {
+        fixture.detectChanges();
+        expect(order()).toEqual(moved);
+      },
+      { timeout: 5000 },
     );
-    expect((saved.change.edges as CanvasEdge[]).map((e) => e.transitionKey).sort()).toEqual(KEYS);
-    expect(saved.routing).toMatchObject({ contractVersion: 2, matchMode: 'First' });
-    expect(el.querySelector('[role="status"]')!.textContent).toContain('Route moved to position');
+    // Route 1 took route 2's place: one save, the saved order is the one on screen, and every connection keeps
+    // its id, target and key (only the priority follows the new place).
+    expect(changed).toHaveBeenCalledOnce();
+    const { change, routing } = lastSaved();
+    expect(routing.routes.map((r: { transitionKey: string }) => r.transitionKey)).toEqual(moved);
+    expect(routing).toMatchObject({ contractVersion: 2, matchMode: 'First' });
+    const after = change.edges as CanvasEdge[];
+    expect(after.map((e) => [e.id, e.toNodeId, e.transitionKey]).sort()).toEqual(
+      before.map((e) => [e.id, e.toNodeId, e.transitionKey]).sort(),
+    );
+    expect(Object.fromEntries(after.map((e) => [e.transitionKey, e.priority]))).toEqual({
+      route_b: 0,
+      route_a: 1,
+      route_c: 2,
+    });
+    expect(el.querySelector('[role="status"]')!.textContent).toContain(
+      'Route moved to position 2 of 3',
+    );
   });
 
   it('moving does nothing on a published, read-only version, which has no handle or upgrade button', () => {
